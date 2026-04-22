@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>倉治整骨院 管理システム v5</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap');
+:root{
+  --primary:#1a3a5c;--accent:#2e8b57;--accent2:#e8572a;--gold:#c9a84c;
+  --bg:#f4f1eb;--card:#fff;--text:#1a1a1a;--muted:#6b7280;
+  --border:#ddd8ce;--shadow:0 2px 12px rgba(26,58,92,0.1);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+header{background:var(--primary);color:white;padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+.logo{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1rem;font-weight:700;}
+.logo span{color:var(--gold);}
+.sbadge{font-size:0.7rem;padding:3px 10px;border-radius:20px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.s-ok{background:rgba(46,139,87,0.3);color:#6ee7b7;}
+.s-err{background:rgba(232,87,42,0.3);color:#fca5a5;}
+.s-ing{background:rgba(201,168,76,0.3);color:#fcd34d;}
+.nav{display:flex;background:var(--primary);border-bottom:3px solid var(--accent);overflow-x:auto;}
+.nav-t{padding:9px 14px;color:rgba(255,255,255,0.55);cursor:pointer;font-size:0.78rem;font-weight:500;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-3px;transition:all 0.2s;}
+.nav-t.on{color:white;border-bottom-color:var(--gold);}
+.page{display:none;padding:14px;max-width:960px;margin:0 auto;}
+.page.on{display:block;}
+.card{background:var(--card);border-radius:10px;box-shadow:var(--shadow);padding:14px;margin-bottom:14px;border:1px solid var(--border);}
+.ctitle{font-family:'Zen Kaku Gothic New',sans-serif;font-size:0.9rem;font-weight:700;color:var(--primary);margin-bottom:10px;padding-left:8px;border-left:3px solid var(--accent);display:flex;align-items:center;justify-content:space-between;}
+.inp,.sel{width:100%;padding:6px 9px;border:1.5px solid var(--border);border-radius:7px;font-size:0.82rem;font-family:inherit;background:white;color:var(--text);}
+.fg{display:flex;flex-direction:column;gap:3px;}
+.fg label{font-size:0.73rem;color:var(--muted);font-weight:500;}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px;}
+.btn{padding:7px 14px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:700;transition:all 0.2s;}
+.btn:disabled{opacity:0.6;cursor:not-allowed;}
+.bp{background:var(--primary);color:white;} .ba{background:var(--accent);color:white;}
+.bd{background:var(--accent2);color:white;} .bc{background:#e5e7eb;color:#374151;}
+.bg{background:var(--gold);color:white;} .bsm{padding:3px 9px;font-size:0.72rem;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin-bottom:14px;}
+.sbox{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;box-shadow:var(--shadow);cursor:pointer;position:relative;transition:box-shadow .15s;}
+.sbox:hover{box-shadow:0 4px 16px rgba(26,58,92,.18);}
+.sbox .n{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1.5rem;font-weight:700;color:var(--primary);}
+.sbox .l{font-size:0.68rem;color:var(--muted);}
+.sbox .kpi-hint{position:absolute;top:3px;right:5px;font-size:0.6rem;opacity:0;transition:opacity .15s;color:var(--accent);}
+.sbox:hover .kpi-hint{opacity:1;}
+.date-inp{padding:7px 10px;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;font-family:inherit;}
+.day-b{padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;}
+.d-hei{background:#dbeafe;color:#1e40af;} .d-moku{background:#fef3c7;color:#92400e;} .d-nichi{background:#fee2e2;color:#991b1b;}
+.tbl{width:100%;border-collapse:collapse;font-size:0.78rem;}
+.tbl th{background:var(--primary);color:white;padding:6px 7px;text-align:left;font-size:0.73rem;}
+.tbl td{padding:4px 6px;border-bottom:1px solid #f0ece4;vertical-align:middle;}
+.tbl tr:hover td{background:#f8f6f1;}
+.tbl tr.brk td{background:#f0ece4;text-align:center;color:var(--muted);font-size:0.7rem;font-style:italic;}
+.tbl tr.cont td{background:#f0fdf4;}
+.tc{font-family:monospace;font-weight:700;color:var(--primary);font-size:0.82rem;white-space:nowrap;}
+.kb{display:inline-block;padding:2px 7px;border-radius:4px;font-size:0.68rem;font-weight:700;white-space:nowrap;}
+.k-ho{background:#dbeafe;color:#1e40af;} .k-ji{background:#d1fae5;color:#065f46;}
+.k-ko{background:#fef3c7;color:#92400e;} .k-sh{background:#fce7f3;color:#9d174d;}
+.k-ct{background:#f3f4f6;color:#6b7280;font-style:italic;}
+.rt{display:inline-block;padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:700;}
+.r-ji{background:#fef3c7;color:#92400e;} .r-to{background:#ede9fe;color:#5b21b6;}
+.r-li{background:#d1fae5;color:#065f46;} .r-te{background:#fee2e2;color:#991b1b;}
+.scroll{overflow-x:auto;}
+.empty{text-align:center;padding:28px;color:var(--muted);font-size:0.82rem;}
+/* モーダル */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal-ov.on{display:flex;}
+.modal{background:white;border-radius:12px;padding:18px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.mtitle{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:700;font-size:0.95rem;color:var(--primary);margin-bottom:12px;}
+/* モーダルタブ */
+.mtabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid var(--border);padding-bottom:0;}
+.mtab{padding:7px 12px;border:none;cursor:pointer;font-size:0.78rem;font-weight:700;background:none;color:var(--muted);font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-2px;}
+.mtab.on{color:var(--primary);border-bottom-color:var(--primary);}
+.mpane{display:none;} .mpane.on{display:block;}
+/* 処置ボタン */
+.shochi-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.shochi-btn{padding:9px 12px;border-radius:10px;border:2px solid var(--border);background:white;cursor:pointer;font-size:0.78rem;font-weight:700;color:var(--muted);font-family:inherit;transition:all .15s;line-height:1.3;}
+.shochi-btn:active{transform:scale(.93);}
+.shochi-btn.on{background:#ede9fe;border-color:#7c3aed;color:#5b21b6;}
+.shochi-price{font-size:0.68rem;opacity:.7;display:block;}
+/* 支払ボタン */
+.pay-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px;}
+.pay-btn{padding:9px 6px;border-radius:10px;border:2px solid var(--border);background:white;cursor:pointer;font-size:0.75rem;font-weight:700;color:var(--muted);font-family:inherit;transition:all .15s;text-align:center;}
+.pay-btn:active{transform:scale(.93);}
+.pay-btn.on{border-color:var(--accent);background:#f0fdf4;color:var(--accent);}
+/* 物販入力 */
+.bussan-item{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f0ece4;}
+.bussan-item:last-child{border-bottom:none;}
+.bussan-qty{width:60px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:inherit;text-align:center;}
+/* バッジ */
+.sh-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:0.62rem;font-weight:700;background:#ede9fe;color:#5b21b6;margin:1px 2px;}
+.pay-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:0.62rem;font-weight:700;margin:1px 2px;}
+.pb-cash{background:#dcfce7;color:#166534;} .pb-card{background:#dbeafe;color:#1e40af;}
+.pb-pp{background:#fff3cd;color:#92400e;} .pb-d{background:#f3e8ff;color:#6b21a8;}
+.pb-au{background:#fef9c3;color:#713f12;} .pb-ot{background:#f3f4f6;color:#374151;}
+/* 売上タブ */
+.utabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+.utab{padding:6px 12px;border-radius:20px;border:2px solid var(--border);background:white;cursor:pointer;font-size:0.75rem;font-weight:600;color:var(--muted);}
+.utab.on{background:var(--primary);color:white;border-color:var(--primary);}
+.usum{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;}
+.ubox{background:var(--card);border-radius:10px;padding:10px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--border);}
+.ubox .n{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1.2rem;font-weight:700;color:var(--primary);}
+.ubox.big .n{color:var(--accent);font-size:1.4rem;}
+.ubox .l{font-size:0.65rem;color:var(--muted);margin-top:2px;}
+.utbl{width:100%;border-collapse:collapse;font-size:0.75rem;}
+.utbl th{background:var(--primary);color:white;padding:6px;font-size:0.7rem;text-align:left;}
+.utbl td{padding:5px 6px;border-bottom:1px solid #f0ece4;}
+.utbl tr.tr td{font-weight:700;background:#f0fdf4;color:var(--accent);}
+/* 在庫 */
+.stock-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0ece4;}
+.stock-name{flex:1;font-size:0.82rem;font-weight:600;}
+.stock-price{font-size:0.72rem;color:var(--muted);white-space:nowrap;}
+.stock-qty-wrap{display:flex;align-items:center;gap:4px;}
+.stock-qty{width:60px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;text-align:center;}
+.stock-alert{width:50px;padding:4px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:0.78rem;font-family:inherit;text-align:center;}
+.stock-stat{font-size:0.68rem;padding:2px 7px;border-radius:10px;font-weight:700;white-space:nowrap;}
+.ss-ok{background:#dcfce7;color:#166534;} .ss-low{background:#fef3c7;color:#92400e;} .ss-none{background:#fee2e2;color:#991b1b;}
+.stock-del{background:none;border:none;color:#dc2626;cursor:pointer;font-size:0.75rem;padding:2px 6px;}
+/* LTV */
+.ltv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px;}
+.ltv-box{background:var(--card);border-radius:8px;padding:10px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--border);}
+.ltv-box .n{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1.2rem;font-weight:700;color:var(--primary);}
+.ltv-box .l{font-size:0.65rem;color:var(--muted);}
+/* 抽選 */
+.drum{width:160px;height:160px;margin:0 auto 16px;border-radius:50%;background:conic-gradient(var(--primary) 0% 25%,var(--accent) 25% 50%,var(--gold) 50% 75%,var(--accent2) 75%);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(26,58,92,0.3);cursor:pointer;}
+.drum.spin{animation:sp 0.15s linear infinite;}
+@keyframes sp{to{transform:rotate(360deg)}}
+.drum-in{width:100px;height:100px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Zen Kaku Gothic New',sans-serif;font-size:0.85rem;font-weight:700;color:var(--primary);text-align:center;padding:8px;}
+.winner{background:linear-gradient(135deg,var(--primary),#2a5a8c);color:white;border-radius:12px;padding:18px;margin:12px 0;display:none;}
+.winner.on{display:block;}
+.wname{font-family:'Zen Kaku Gothic New',sans-serif;font-size:1.6rem;font-weight:700;margin:6px 0;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;padding:10px;background:#f8f6f1;border-radius:8px;min-height:44px;}
+.chip{background:var(--primary);color:white;padding:3px 9px;border-radius:20px;font-size:0.75rem;cursor:pointer;}
+/* マスター編集 */
+.master-item{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #f0ece4;}
+.master-name-inp{flex:2;padding:4px 7px;border:1.5px solid var(--border);border-radius:6px;font-size:0.8rem;font-family:inherit;}
+.master-price-inp{width:90px;padding:4px 7px;border:1.5px solid var(--border);border-radius:6px;font-size:0.8rem;font-family:inherit;text-align:right;}
+.master-unit-inp{width:50px;padding:4px 7px;border:1.5px solid var(--border);border-radius:6px;font-size:0.78rem;font-family:inherit;}
+@media(max-width:480px){.tbl{font-size:0.68rem;}.tbl th,.tbl td{padding:3px;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">倉治<span>整骨院</span> 管理システム v5</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:0.68rem;color:rgba(255,255,255,0.55)" id="hdate"></span>
+    <span class="sbadge s-ing" id="sbadge" onclick="syncAll()">🔄 接続中...</span>
+  </div>
+</header>
+<div class="nav">
+  <div class="nav-t on" onclick="goPage('yoyaku')">📋 予約</div>
+  <div class="nav-t" onclick="goPage('patients')">👥 患者</div>
+  <div class="nav-t" onclick="goPage('uriage')">💰 売上</div>
+  <div class="nav-t" onclick="goPage('bussan')">🛍 物販</div>
+  <div class="nav-t" onclick="goPage('stock')">📦 在庫</div>
+  <div class="nav-t" onclick="goPage('ltv')">📊 LTV</div>
+  <div class="nav-t" onclick="goPage('master')">⚙️ マスター</div>
+  <div class="nav-t" onclick="goPage('lottery')">🎉 抽選</div>
+</div>
+
+<!-- 予約管理 -->
+<div class="page on" id="page-yoyaku">
+  <div class="card" style="margin-top:14px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div><label style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:3px">日付</label>
+        <input type="date" class="date-inp" id="selDate" onchange="renderSched()"></div>
+        <div id="daybadge" class="day-b" style="margin-top:16px"></div>
+      </div>
+      <button class="btn bp bsm" onclick="syncAll()" style="margin-top:16px">🔄 最新データ取得</button>
+    </div>
+  </div>
+  <div class="stats" id="statsArea">
+    <div class="sbox"><div class="n" id="s0">0</div><div class="l">予約数</div><div class="kpi-hint">✏️</div></div>
+    <div class="sbox"><div class="n" id="s1">0</div><div class="l">保険</div><div class="kpi-hint">✏️</div></div>
+    <div class="sbox"><div class="n" id="s2">0</div><div class="l">自費</div><div class="kpi-hint">✏️</div></div>
+    <div class="sbox"><div class="n" id="s3">0</div><div class="l">交通事故</div><div class="kpi-hint">✏️</div></div>
+    <div class="sbox"><div class="n" id="s4">0</div><div class="l">新規</div><div class="kpi-hint">✏️</div></div>
+    <div class="sbox"><div class="n" id="s5">0%</div><div class="l">稼働率</div><div class="kpi-hint">✏️</div></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">予約表（20分枠）</div>
+    <div class="scroll"><table class="tbl" id="schedTbl"><thead><tr>
+      <th style="min-width:46px">時間</th><th style="min-width:52px">区分</th>
+      <th style="min-width:80px">患者名</th><th style="min-width:36px">券No</th>
+      <th style="min-width:60px">ルート</th><th style="min-width:28px">来院</th>
+      <th style="min-width:32px">経過</th><th style="min-width:60px">症状</th>
+      <th style="min-width:80px">処置</th><th style="min-width:70px">支払</th>
+      <th style="min-width:50px"></th>
+    </tr></thead><tbody id="sbody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- 患者名簿 -->
+<div class="page" id="page-patients">
+  <div class="card" style="margin-top:14px">
+    <div class="ctitle">新規患者登録</div>
+    <div class="fgrid">
+      <div class="fg"><label>診察券No</label><input class="inp" id="c-id" type="number" placeholder="501"></div>
+      <div class="fg"><label>患者名</label><input class="inp" id="c-nm" placeholder="山田 太郎"></div>
+      <div class="fg"><label>ふりがな</label><input class="inp" id="c-kana" placeholder="やまだ たろう"></div>
+      <div class="fg"><label>生年月日</label><input class="inp" id="c-dob" type="date"></div>
+      <div class="fg"><label>電話番号</label><input class="inp" id="c-tel" placeholder="090-xxxx-xxxx"></div>
+      <div class="fg"><label>LINE名</label><input class="inp" id="c-line" placeholder="LINE表示名"></div>
+      <div class="fg"><label>前回通院日</label><input class="inp" id="c-last" type="date"></div>
+      <div class="fg"><label>通院回数</label><input class="inp" id="c-cnt" type="number" value="0"></div>
+      <div class="fg"><label>症状</label><input class="inp" id="c-sym" placeholder="腰痛など"></div>
+      <div class="fg"><label>備考</label><input class="inp" id="c-note" placeholder="自由記入"></div>
+    </div>
+    <button class="btn bp" onclick="addPatient()">＋ 登録</button>
+  </div>
+  <div class="card">
+    <div class="ctitle">患者一覧 <span style="font-size:0.72rem;color:var(--muted);font-weight:400" id="pcnt"></span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <input class="inp" id="psearch" placeholder="🔍 名前・券No・かな検索" oninput="renderPatients()" style="flex:1;min-width:160px;max-width:240px">
+      <select class="sel" id="psort" onchange="renderPatients()" style="width:140px">
+        <option value="id_asc">診察券No 昇順</option>
+        <option value="id_desc">診察券No 降順</option>
+        <option value="kana_asc">名前（かな）</option>
+        <option value="last_asc">通院日 早い順</option>
+        <option value="last_desc">通院日 遅い順</option>
+      </select>
+    </div>
+    <div class="scroll"><table class="tbl"><thead><tr>
+      <th>券No</th><th>患者名</th><th>かな</th><th>電話</th><th>前回通院</th><th>通院回数</th><th>症状</th><th>経過日数</th><th></th>
+    </tr></thead><tbody id="pbody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- 売上管理 -->
+<div class="page" id="page-uriage">
+  <div style="margin-top:14px">
+    <div class="utabs" id="uTabsArea">
+      <div class="utab on" onclick="switchU('day')">📅 日別</div>
+      <div class="utab" onclick="switchU('week')">📆 週別</div>
+      <div class="utab" onclick="switchU('month')">🗓 月別</div>
+      <div class="utab" onclick="switchU('year')">📊 年別</div>
+      <div class="utab" onclick="switchU('pay')">💳 支払別</div>
+    </div>
+    <!-- 日別 -->
+    <div id="u-day">
+      <div class="card">
+        <div class="ctitle">売上入力</div>
+        <div class="fgrid">
+          <div class="fg"><label>日付</label><input class="inp" id="u-date" type="date"></div>
+          <div class="fg"><label>保険売上（円）</label><input class="inp" id="u-ho" type="number" placeholder="0"></div>
+          <div class="fg"><label>自費売上（円）</label><input class="inp" id="u-ji" type="number" placeholder="0"></div>
+          <div class="fg"><label>交通事故（円）</label><input class="inp" id="u-ko" type="number" placeholder="0"></div>
+          <div class="fg"><label>物販（円）</label><input class="inp" id="u-bu" type="number" placeholder="0"></div>
+          <div class="fg"><label>その他（円）</label><input class="inp" id="u-ot" type="number" placeholder="0"></div>
+          <div class="fg" id="u-pay-row" style="grid-column:1/-1">
+            <label>支払方法（複数可）</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px" id="u-pay-btns">
+              <button class="pay-btn" data-v="現金" onclick="toggleUPay(this)">💴 現金</button>
+              <button class="pay-btn" data-v="クレジット" onclick="toggleUPay(this)">💳 クレカ</button>
+              <button class="pay-btn" data-v="PayPay" onclick="toggleUPay(this)">📱 PayPay</button>
+              <button class="pay-btn" data-v="d払い" onclick="toggleUPay(this)">🔵 d払い</button>
+              <button class="pay-btn" data-v="au Pay" onclick="toggleUPay(this)">🟡 au Pay</button>
+              <button class="pay-btn" data-v="その他" onclick="toggleUPay(this)">🔘 その他</button>
+            </div>
+          </div>
+          <div class="fg" style="grid-column:1/-1"><label>メモ</label><input class="inp" id="u-memo" placeholder="自由記入"></div>
+        </div>
+        <button class="btn bp" onclick="saveU()">💾 保存</button>
+      </div>
+      <div class="card">
+        <div class="ctitle">日別売上一覧</div>
+        <div class="scroll"><table class="utbl"><thead><tr>
+          <th>日付</th><th>保険</th><th>自費</th><th>交通事故</th><th>物販</th><th>その他</th><th>合計</th><th>支払方法</th><th>メモ</th><th></th>
+        </tr></thead><tbody id="u-dbody"></tbody></table></div>
+      </div>
+    </div>
+    <!-- 週別 -->
+    <div id="u-week" style="display:none">
+      <div class="card"><div class="ctitle">週別集計</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <input class="inp" id="uw-yr" type="number" value="2026" style="width:80px"> 年
+          <select class="sel" id="uw-mo" style="width:72px">
+            <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4" selected>4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+          </select>
+          <button class="btn bp bsm" onclick="renderWeekU()">表示</button>
+        </div>
+        <div class="scroll"><table class="utbl"><thead><tr><th>週</th><th>保険</th><th>自費</th><th>交通事故</th><th>物販</th><th>その他</th><th>合計</th></tr></thead><tbody id="u-wbody"></tbody></table></div>
+      </div>
+    </div>
+    <!-- 月別 -->
+    <div id="u-month" style="display:none">
+      <div class="card"><div class="ctitle">月別集計</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
+          <input class="inp" id="um-yr" type="number" value="2026" style="width:80px"> 年
+          <button class="btn bp bsm" onclick="renderMonthU()">表示</button>
+        </div>
+        <div class="usum" id="u-msum"></div>
+        <div class="scroll"><table class="utbl"><thead><tr><th>月</th><th>保険</th><th>自費</th><th>交通事故</th><th>物販</th><th>その他</th><th>合計</th></tr></thead><tbody id="u-mbody"></tbody></table></div>
+      </div>
+    </div>
+    <!-- 年別 -->
+    <div id="u-year" style="display:none">
+      <div class="card"><div class="ctitle">年別集計</div>
+        <div class="scroll"><table class="utbl"><thead><tr><th>年</th><th>保険</th><th>自費</th><th>交通事故</th><th>物販</th><th>その他</th><th>合計</th></tr></thead><tbody id="u-ybody"></tbody></table></div>
+      </div>
+    </div>
+    <!-- 支払別 -->
+    <div id="u-pay" style="display:none">
+      <div class="card"><div class="ctitle">支払方法別集計</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <select class="sel" id="pay-period" style="width:100px">
+            <option value="day">日別</option><option value="week">週別</option>
+            <option value="month" selected>月別</option><option value="year">年別</option>
+          </select>
+          <input class="inp" id="pay-yr" type="number" value="2026" style="width:80px"> 年
+          <select class="sel" id="pay-mo" style="width:72px">
+            <option value="0">全月</option><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4" selected>4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+          </select>
+          <button class="btn bp bsm" onclick="renderPayU()">表示</button>
+        </div>
+        <div class="usum" id="pay-sum"></div>
+        <div class="scroll"><table class="utbl"><thead><tr><th>期間</th><th>現金</th><th>クレカ</th><th>PayPay</th><th>d払い</th><th>au Pay</th><th>その他</th><th>合計</th></tr></thead><tbody id="pay-body"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 物販記録 -->
+<div class="page" id="page-bussan">
+  <div style="margin-top:14px">
+    <div class="utabs">
+      <div class="utab on" onclick="switchBussan('add')">➕ 直接追加</div>
+      <div class="utab" onclick="switchBussan('day')">📅 日別</div>
+      <div class="utab" onclick="switchBussan('week')">📆 週別</div>
+      <div class="utab" onclick="switchBussan('month')">🗓 月別</div>
+      <div class="utab" onclick="switchBussan('year')">📊 年別</div>
+    </div>
+    <!-- 直接追加 -->
+    <div id="bs-add">
+      <div class="card">
+        <div class="ctitle">物販記録を直接追加</div>
+        <div class="fgrid" style="margin-bottom:10px">
+          <div class="fg"><label>日付</label><input class="inp" id="bs-date" type="date"></div>
+          <div class="fg"><label>患者検索</label>
+            <input class="inp" id="bs-psearch" placeholder="名前・券No・かな検索" oninput="renderBsPatients()">
+          </div>
+          <div class="fg"><label>ソート</label>
+            <select class="sel" id="bs-psort" onchange="renderBsPatients()">
+              <option value="id_asc">券No 昇順</option><option value="id_desc">券No 降順</option>
+              <option value="kana_asc">かな順</option><option value="last_desc">通院日 新しい順</option>
+            </select>
+          </div>
+        </div>
+        <div id="bs-patient-list" style="max-height:140px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px;"></div>
+        <div id="bs-selected-patient" style="display:none;background:#f0fdf4;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:var(--accent);font-weight:700;"></div>
+
+        <div style="font-size:0.8rem;font-weight:700;color:var(--primary);margin-bottom:8px;">📦 販売商品</div>
+        <div id="bs-product-list"></div>
+
+        <div style="margin-top:10px;padding-top:10px;border-top:1.5px solid var(--border)">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--primary);margin-bottom:8px;">💳 支払方法</div>
+          <div class="pay-grid" id="bs-pay-btns">
+            <button class="pay-btn" data-v="現金" onclick="toggleBsPay(this)">💴 現金</button>
+            <button class="pay-btn" data-v="クレジット" onclick="toggleBsPay(this)">💳 クレカ</button>
+            <button class="pay-btn" data-v="PayPay" onclick="toggleBsPay(this)">📱 PayPay</button>
+            <button class="pay-btn" data-v="d払い" onclick="toggleBsPay(this)">🔵 d払い</button>
+            <button class="pay-btn" data-v="au Pay" onclick="toggleBsPay(this)">🟡 au Pay</button>
+            <button class="pay-btn" data-v="その他" onclick="toggleBsPay(this)">🔘 その他</button>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:10px;background:#f8f6f1;border-radius:8px;display:flex;align-items:center;justify-content:space-between">
+          <div><span style="font-size:0.8rem;color:var(--muted)">合計金額：</span><strong id="bs-total" style="font-size:1.1rem;color:var(--primary)">0円</strong></div>
+          <button class="btn ba" onclick="saveBsRecord()">💾 記録を保存</button>
+        </div>
+      </div>
+    </div>
+    <!-- 日別/週別/月別/年別は動的に表示 -->
+    <div id="bs-stats"></div>
+  </div>
+</div>
+
+<!-- 在庫管理 -->
+<div class="page" id="page-stock">
+  <div style="margin-top:14px">
+    <div class="card">
+      <div class="ctitle">在庫管理
+        <button class="btn bp bsm" onclick="openStockAdd()">＋ 商品追加</button>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;">物販・処置で使用すると在庫が自動で減算されます</div>
+      <div id="stock-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LTV分析 -->
+<div class="page" id="page-ltv">
+  <div style="margin-top:14px">
+    <div class="card">
+      <div class="ctitle">年代別患者分布</div>
+      <div class="ltv-grid" id="ltv-age"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">来院回数分析</div>
+      <div class="ltv-grid" id="ltv-visit"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">経過日数アラート（30日以上未来院）</div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>券No</th><th>患者名</th><th>前回通院</th><th>経過日数</th><th>電話</th></tr></thead><tbody id="ltv-alert"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- マスター設定 -->
+<div class="page" id="page-master">
+  <div style="margin-top:14px">
+    <!-- 物販マスター -->
+    <div class="card">
+      <div class="ctitle">🛍 物販商品マスター
+        <button class="btn bp bsm" onclick="addBussanMaster()">＋ 追加</button>
+      </div>
+      <div id="bussan-master-list"></div>
+    </div>
+    <!-- 処置マスター -->
+    <div class="card">
+      <div class="ctitle">🩺 処置マスター
+        <button class="btn bp bsm" onclick="addShochiMaster()">＋ 追加</button>
+      </div>
+      <div id="shochi-master-list"></div>
+    </div>
+    <!-- 在庫マスターは在庫ページと共通 -->
+  </div>
+</div>
+
+<!-- 抽選 -->
+<div class="page" id="page-lottery">
+  <div class="card" style="margin-top:14px">
+    <div class="ctitle">参加者登録</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <input class="inp" id="linp" placeholder="参加者名を入力" style="flex:1;min-width:130px" onkeydown="if(event.key==='Enter')addChip()">
+      <button class="btn bp bsm" onclick="addChip()">追加</button>
+      <button class="btn ba bsm" onclick="addToday()">今日の予約者全員</button>
+      <button class="btn bc bsm" onclick="clearChips()">クリア</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="card" style="text-align:center;padding:20px">
+    <div class="ctitle">抽選実行</div>
+    <div class="drum" id="drum" onclick="doLottery()">
+      <div class="drum-in" id="dtext">クリックして<br>スタート</div>
+    </div>
+    <button class="btn bg" onclick="doLottery()" style="padding:10px 24px;margin-bottom:12px">🎯 抽選スタート！</button>
+    <div class="winner" id="winner">
+      <div style="font-size:0.8rem;opacity:0.8">🎉 おめでとうございます！</div>
+      <div class="wname" id="wname">---</div>
+      <div style="font-size:0.8rem;opacity:0.8">様が当選されました！</div>
+    </div>
+  </div>
+</div>
+
+<!-- 予約編集モーダル -->
+<div class="modal-ov" id="bmodal">
+  <div class="modal">
+    <div class="mtitle" id="mtitle">予約入力</div>
+    <div class="mtabs">
+      <button class="mtab on" onclick="switchMTab('basic')">📋 基本</button>
+      <button class="mtab" onclick="switchMTab('shochi')">🩺 処置</button>
+      <button class="mtab" onclick="switchMTab('bussan')">🛍 物販</button>
+      <button class="mtab" onclick="switchMTab('pay')">💳 支払</button>
+    </div>
+    <!-- 基本情報 -->
+    <div class="mpane on" id="mp-basic">
+      <div class="fgrid">
+        <div class="fg"><label>診察券No</label><input class="inp" id="m-id" type="number" placeholder="入力で自動入力" oninput="autoFill()"></div>
+        <div class="fg"><label>患者名</label><input class="inp" id="m-nm" placeholder="患者名"></div>
+        <div class="fg"><label>区分</label>
+          <select class="sel" id="m-kb">
+            <option value="自費">自費（2枠40分）</option>
+            <option value="新規">新規（3枠60分）</option>
+            <option value="交通事故">交通事故（1枠20分）</option>
+            <option value="保険">保険（1枠20分）</option>
+          </select>
+        </div>
+        <div class="fg"><label>予約ルート</label>
+          <select class="sel" id="m-rt">
+            <option value="LINE">LINE</option><option value="次回予約">次回予約</option>
+            <option value="電話">電話</option><option value="飛び込み">飛び込み</option>
+          </select>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label>症状</label><input class="inp" id="m-sym" placeholder="腰痛・骨盤矯正など"></div>
+        <div class="fg" style="grid-column:1/-1"><label>自費メニュー</label><input class="inp" id="m-menu" placeholder="骨盤矯正・姿勢改善など"></div>
+        <div class="fg" style="grid-column:1/-1"><label>オプション</label><input class="inp" id="m-opt" placeholder="延長・電気・WBなど"></div>
+      </div>
+    </div>
+    <!-- 処置 -->
+    <div class="mpane" id="mp-shochi">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">施術した処置を選択（複数可・枚数入力可）</div>
+      <div id="m-shochi-btns" class="shochi-grid"></div>
+      <div class="fg"><label>処置メモ</label><input class="inp" id="m-shochi-memo" placeholder="その他処置があれば記入"></div>
+      <div style="margin-top:8px;padding:8px;background:#f8f6f1;border-radius:8px;font-size:0.8rem">
+        処置合計：<strong id="m-shochi-total" style="color:var(--primary)">0円</strong>
+      </div>
+    </div>
+    <!-- 物販 -->
+    <div class="mpane" id="mp-bussan">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">販売した商品と数量を入力</div>
+      <div id="m-bussan-items"></div>
+      <div style="margin-top:8px;padding:8px;background:#f8f6f1;border-radius:8px;font-size:0.8rem">
+        物販合計：<strong id="m-bussan-total" style="color:var(--primary)">0円</strong>
+      </div>
+    </div>
+    <!-- 支払 -->
+    <div class="mpane" id="mp-pay">
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">支払方法を選択（複数可）</div>
+      <div class="pay-grid" id="m-pay-btns">
+        <button class="pay-btn" data-v="現金" onclick="toggleMPay(this)">💴 現金</button>
+        <button class="pay-btn" data-v="クレジット" onclick="toggleMPay(this)">💳 クレカ</button>
+        <button class="pay-btn" data-v="PayPay" onclick="toggleMPay(this)">📱 PayPay</button>
+        <button class="pay-btn" data-v="d払い" onclick="toggleMPay(this)">🔵 d払い</button>
+        <button class="pay-btn" data-v="au Pay" onclick="toggleMPay(this)">🟡 au Pay</button>
+        <button class="pay-btn" data-v="その他" onclick="toggleMPay(this)">🔘 その他</button>
+      </div>
+      <div class="fg" style="margin-top:8px"><label>支払金額（円）</label><input class="inp" id="m-pay-amount" type="number" placeholder="0"></div>
+      <div style="margin-top:8px;padding:8px;background:#f8f6f1;border-radius:8px;font-size:0.78rem;color:var(--muted)">
+        処置+物販合計：<strong id="m-total-sum" style="color:var(--primary)">0円</strong>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+      <button class="btn bc" onclick="closeModal()">キャンセル</button>
+      <button class="btn bp" onclick="saveBk()" id="sbtn">予約を登録</button>
+    </div>
+  </div>
+</div>
+
+<!-- 在庫追加モーダル -->
+<div class="modal-ov" id="stockAddModal">
+  <div class="modal" style="max-width:360px">
+    <div class="mtitle">商品追加</div>
+    <div class="fgrid">
+      <div class="fg"><label>商品名</label><input class="inp" id="sa-name" placeholder="商品名"></div>
+      <div class="fg"><label>単価（円）</label><input class="inp" id="sa-price" type="number" placeholder="0"></div>
+      <div class="fg"><label>単位</label><input class="inp" id="sa-unit" placeholder="枚/本/袋/個"></div>
+      <div class="fg"><label>在庫数</label><input class="inp" id="sa-qty" type="number" value="0"></div>
+      <div class="fg"><label>アラート設定</label><input class="inp" id="sa-alert" type="number" value="5"></div>
+      <div class="fg"><label>種別</label>
+        <select class="sel" id="sa-type">
+          <option value="bussan">物販</option>
+          <option value="shochi">処置</option>
+          <option value="both">物販＋処置</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:12px">
+      <button class="btn bc" onclick="closeStockAdd()">キャンセル</button>
+      <button class="btn bp" onclick="saveStockAdd()">追加</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbwCQuy0wWz3aWjR82aPeF8cxDXSVahxl9vsaNjCfdMpxLH8XO7omTuyeRK5vj-tWqCBRg/exec';
+
+// ===== デフォルトマスターデータ =====
+const DEFAULT_BUSSAN_MASTER=[
+  {id:'bs001',name:'クラウドテープS',price:300,unit:'枚',stockId:'st001'},
+  {id:'bs002',name:'クラウドテープL',price:300,unit:'枚',stockId:'st002'},
+  {id:'bs003',name:'シリカ水(シエラ)',price:540,unit:'本',stockId:'st003'},
+  {id:'bs004',name:'スムージー',price:5400,unit:'袋',stockId:'st004'},
+  {id:'bs005',name:'枕',price:39600,unit:'個',stockId:'st005'},
+  {id:'bs006',name:'エスリーク500ml',price:8640,unit:'本',stockId:'st006'},
+  {id:'bs007',name:'湿布',price:400,unit:'袋',stockId:'st007'},
+  {id:'bs008',name:'バスパウダー',price:9900,unit:'袋',stockId:'st008'},
+  {id:'bs009',name:'UFVジェル',price:9680,unit:'個',stockId:'st009'},
+  {id:'bs010',name:'おしりまくら',price:18700,unit:'個',stockId:'st010'},
+  {id:'bs011',name:'ストレインS',price:4235,unit:'個',stockId:'st011'},
+  {id:'bs012',name:'ストレインM',price:4235,unit:'個',stockId:'st012'},
+  {id:'bs013',name:'ストレインL',price:4235,unit:'個',stockId:'st013'},
+  {id:'bs014',name:'ストレインLL',price:4235,unit:'個',stockId:'st014'},
+  {id:'bs015',name:'復元ウォーマーショートレッグ',price:6490,unit:'個',stockId:'st015'},
+  {id:'bs016',name:'パドルブラシ',price:7810,unit:'個',stockId:'st016'},
+  {id:'bs017',name:'リライトソックスM',price:10780,unit:'個',stockId:'st017'},
+  {id:'bs018',name:'リライトソックスL',price:10780,unit:'個',stockId:'st018'},
+  {id:'bs019',name:'ドクター水素ボトル',price:220000,unit:'本',stockId:'st019'},
+  {id:'bs020',name:'ツイスター本体',price:330000,unit:'個',stockId:'st020'},
+];
+const DEFAULT_SHOCHI_MASTER=[
+  {id:'sh001',name:'クラウドテープS',price:300,unit:'枚',stockId:'st001'},
+  {id:'sh002',name:'クラウドテープL',price:300,unit:'枚',stockId:'st002'},
+  {id:'sh003',name:'シリカアンカール',price:770,unit:'回',stockId:''},
+  {id:'sh004',name:'ツイスター',price:770,unit:'回',stockId:''},
+  {id:'sh005',name:'水素5分',price:770,unit:'回',stockId:''},
+  {id:'sh006',name:'水素5分+ツイスター+シリカアンカール',price:1650,unit:'回',stockId:''},
+  {id:'sh007',name:'超音波10分',price:1100,unit:'回',stockId:''},
+];
+const DEFAULT_STOCK=[
+  {id:'st001',name:'クラウドテープS',price:300,unit:'枚',qty:104,alert:50},
+  {id:'st002',name:'クラウドテープL',price:300,unit:'枚',qty:135,alert:50},
+  {id:'st003',name:'シリカ水(シエラ)',price:540,unit:'本',qty:21,alert:10},
+  {id:'st004',name:'スムージー',price:5400,unit:'袋',qty:5,alert:3},
+  {id:'st005',name:'枕',price:39600,unit:'個',qty:0,alert:1},
+  {id:'st006',name:'エスリーク500ml',price:8640,unit:'本',qty:1,alert:3},
+  {id:'st007',name:'湿布',price:400,unit:'袋',qty:35,alert:3},
+  {id:'st008',name:'バスパウダー',price:9900,unit:'袋',qty:5,alert:3},
+  {id:'st009',name:'UFVジェル',price:9680,unit:'個',qty:2,alert:3},
+  {id:'st010',name:'おしりまくら',price:18700,unit:'個',qty:1,alert:3},
+  {id:'st011',name:'ストレインS',price:4235,unit:'個',qty:2,alert:3},
+  {id:'st012',name:'ストレインM',price:4235,unit:'個',qty:0,alert:3},
+  {id:'st013',name:'ストレインL',price:4235,unit:'個',qty:5,alert:3},
+  {id:'st014',name:'ストレインLL',price:4235,unit:'個',qty:0,alert:3},
+  {id:'st015',name:'復元ウォーマーショートレッグ',price:6490,unit:'個',qty:2,alert:3},
+  {id:'st016',name:'パドルブラシ',price:7810,unit:'個',qty:2,alert:3},
+  {id:'st017',name:'リライトソックスM',price:10780,unit:'個',qty:2,alert:3},
+  {id:'st018',name:'リライトソックスL',price:10780,unit:'個',qty:2,alert:3},
+  {id:'st019',name:'ドクター水素ボトル',price:220000,unit:'本',qty:0,alert:1},
+  {id:'st020',name:'ツイスター本体',price:330000,unit:'個',qty:0,alert:1},
+];
+
+// ===== データ変数 =====
+let patients=[], bookings={}, uriage={}, bussanLog=[], lp=[];
+let bussanMaster=[], shochiMaster=[], stockData=[];
+let editDate=null, editSlot=null;
+let mShochiSel={}, mBussanQty={}, mPaySel=[], bsPaySel=[], uPaySel=[];
+let bsSelectedPatient=null;
+
+// ===== LOCAL STORAGE =====
+function save(){
+  try{
+    localStorage.setItem('kj_p',JSON.stringify(patients));
+    localStorage.setItem('kj_b',JSON.stringify(bookings));
+    localStorage.setItem('kj_u',JSON.stringify(uriage));
+    localStorage.setItem('kj_bl',JSON.stringify(bussanLog));
+    localStorage.setItem('kj_bm',JSON.stringify(bussanMaster));
+    localStorage.setItem('kj_sm',JSON.stringify(shochiMaster));
+    localStorage.setItem('kj_st',JSON.stringify(stockData));
+  }catch(e){}
+}
+function load(){
+  try{
+    patients=JSON.parse(localStorage.getItem('kj_p')||'[]');
+    bookings=JSON.parse(localStorage.getItem('kj_b')||'{}');
+    uriage=JSON.parse(localStorage.getItem('kj_u')||'{}');
+    bussanLog=JSON.parse(localStorage.getItem('kj_bl')||'[]');
+    const bm=JSON.parse(localStorage.getItem('kj_bm')||'null');
+    bussanMaster=bm||DEFAULT_BUSSAN_MASTER;
+    const sm=JSON.parse(localStorage.getItem('kj_sm')||'null');
+    shochiMaster=sm||DEFAULT_SHOCHI_MASTER;
+    const st=JSON.parse(localStorage.getItem('kj_st')||'null');
+    stockData=st||DEFAULT_STOCK;
+  }catch(e){patients=[];bookings={};uriage={};bussanLog=[];bussanMaster=DEFAULT_BUSSAN_MASTER;shochiMaster=DEFAULT_SHOCHI_MASTER;stockData=DEFAULT_STOCK;}
+}
+
+// ===== HELPERS =====
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>new Date().toISOString().split('T')[0];
+function fmtDate(v){if(!v&&v!==0)return'';if(typeof v==='string')return v.replace(/\//g,'-').substring(0,10);if(v instanceof Date)return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());if(typeof v==='number'&&v>0){const d=new Date(Math.round((v-25569)*86400*1000));return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}return'';}
+function fmtTime(v){if(v===null||v===undefined||v==='')return'';if(typeof v==='string'){const m=v.trim().match(/^(\d{1,2}):(\d{2})/);return m?pad(parseInt(m[1]))+':'+m[2]:v.trim();}if(v instanceof Date)return pad(v.getHours())+':'+pad(v.getMinutes());if(typeof v==='number'){const t=Math.round(v*24*60);return pad(Math.floor(t/60))+':'+pad(t%60);}return'';}
+const elapsed=last=>last?Math.round((new Date()-new Date(last+'T00:00:00'))/86400000):'';
+const yen=n=>Number(n||0).toLocaleString()+'円';
+function genId(){return 'id'+Date.now()+Math.random().toString(36).slice(2,6);}
+
+// ===== SYNC STATUS =====
+function setStat(cls,txt){const el=document.getElementById('sbadge');el.className='sbadge '+cls;el.textContent=txt;}
+
+// ===== SYNC =====
+async function syncAll(){
+  setStat('s-ing','🔄 同期中...');
+  try{
+    const res=await fetch(GAS+'?action=getAll',{redirect:'follow'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=JSON.parse(await res.text());
+    if(!data.ok)throw new Error('GAS error');
+    const prows=data.customers||[];
+    if(prows.length>1){
+      const parsed=prows.slice(1).filter(r=>r[0]!==''&&r[0]!=null).map(r=>({
+        id:String(r[0]).trim(),name:String(r[1]||'').trim(),kana:String(r[2]||'').trim(),
+        tel:String(r[3]||'').trim(),line:String(r[4]||'').trim(),
+        last:fmtDate(r[5]),count:parseInt(r[6])||0,dob:fmtDate(r[7]),
+        symptom:String(r[8]||'').trim(),note:String(r[9]||'').trim()
+      }));
+      if(parsed.length>0)patients=parsed;
+    }
+    const brows=data.bookings||[];
+    if(brows.length>1){
+      const newB={};
+      brows.slice(1).forEach(r=>{
+        if(!r[0]&&r[0]!==0)return;
+        const date=fmtDate(r[0]),slot=fmtTime(r[1]);
+        if(!date||!slot)return;
+        if(!newB[date])newB[date]={};
+        if(String(r[2]).trim()==='(継続)'){newB[date][slot]={cont:true,name:String(r[3]||''),cardId:String(r[4]||'')};}
+        else{
+          newB[date][slot]={
+            kubun:String(r[2]||'保険').trim(),name:String(r[3]||'').trim(),
+            cardId:String(r[4]||'').trim(),route:String(r[5]||'LINE').trim(),
+            visitCount:String(r[6]||'').trim(),elapsed:String(r[7]||'').trim(),
+            symptom:String(r[8]||'').trim(),option:String(r[9]||'').trim(),
+            menu:String(r[10]||'').trim(),
+            shochi:r[11]?JSON.parse(r[11]):[], shochiMemo:String(r[12]||'').trim(),
+            bussan:r[13]?JSON.parse(r[13]):[],
+            pay:r[14]?String(r[14]).split(',').filter(s=>s):[],
+            payAmount:String(r[15]||'').trim()
+          };
+        }
+      });
+      if(Object.keys(newB).length>0){Object.keys(bookings).forEach(d=>{if(!newB[d])newB[d]=bookings[d];});bookings=newB;}
+    }
+    save();setStat('s-ok','✅ 同期済み');renderSched();renderPatients();
+  }catch(e){setStat('s-err','⚠ タップで再試行');renderSched();renderPatients();}
+}
+
+async function pushB(){
+  const hdr=['日付','時間','区分','患者名','診察券No','予約ルート','来院回数','経過日数','症状','オプション','自費メニュー','処置(JSON)','処置メモ','物販(JSON)','支払方法','支払金額'];
+  const rows=[hdr];
+  Object.keys(bookings).sort().forEach(date=>{
+    Object.keys(bookings[date]).sort().forEach(slot=>{
+      const b=bookings[date][slot];
+      if(b.cont)rows.push([date,slot,'(継続)',b.name||'',b.cardId||'','','','','','','','','','','','']);
+      else rows.push([date,slot,b.kubun||'',b.name||'',b.cardId||'',b.route||'',b.visitCount||'',b.elapsed||'',b.symptom||'',b.option||'',b.menu||'',JSON.stringify(b.shochi||[]),b.shochiMemo||'',JSON.stringify(b.bussan||[]),(b.pay||[]).join(','),b.payAmount||'']);
+    });
+  });
+  try{
+    setStat('s-ing','🔄 保存中...');
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(rows)}),redirect:'follow'});
+    const d=JSON.parse(await res.text());
+    setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');return d.ok;
+  }catch(e){setStat('s-err','⚠ 保存エラー');return false;}
+}
+async function pushP(){
+  const hdr=['診察券No','患者名','ふりがな','電話番号','LINE名','前回通院日','通院回数','生年月日','症状','備考'];
+  const rows=[hdr,...patients.map(p=>[p.id,p.name,p.kana||'',p.tel,p.line,p.last,p.count,p.dob||'',p.symptom||'',p.note||''])];
+  try{const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveCustomers',rows:JSON.stringify(rows)}),redirect:'follow'});const d=JSON.parse(await res.text());setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');}catch(e){setStat('s-err','⚠ 保存エラー');}
+}
+
+// ===== SCHEDULE =====
+function dayType(d){const w=new Date(d+'T00:00:00').getDay();return w===0?'nichi':(w===4||w===6)?'moku':'hei';}
+function getSlots(dt){if(dt==='nichi')return[];const mo=[];let h=8,m=30;while(!(h===12&&m===30)){mo.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}if(dt==='moku')return mo;const af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}return[...mo,'BREAK',...af];}
+
+function renderSched(){
+  const date=document.getElementById('selDate').value;if(!date)return;
+  const dt=dayType(date);
+  const badge=document.getElementById('daybadge');
+  badge.textContent={hei:'平日',moku:'木・土（午前のみ）',nichi:'日・祝（休診）'}[dt];
+  badge.className='day-b '+{hei:'d-hei',moku:'d-moku',nichi:'d-nichi'}[dt];
+  const sl=getSlots(dt),tbody=document.getElementById('sbody');
+  tbody.innerHTML='';
+  if(dt==='nichi'){tbody.innerHTML='<tr><td colspan="11" class="empty">本日は休診日です</td></tr>';updateStats(date,[]);return;}
+  const bkDate=bookings[date]||{};
+  sl.forEach(s=>{
+    if(s==='BREAK'){const tr=document.createElement('tr');tr.className='brk';tr.innerHTML='<td colspan="11">── 昼休み ──</td>';tbody.appendChild(tr);return;}
+    const bk=bkDate[s]||null,tr=document.createElement('tr');
+    if(bk&&bk.cont){
+      tr.className='cont';
+      tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb k-ct">↑継続中</span></td><td><span style="color:var(--muted);font-size:0.75rem">↑${bk.name||''}</span></td><td colspan="8"></td>`;
+    }else if(bk){
+      const kc=bk.kubun==='保険'?'k-ho':bk.kubun==='自費'?'k-ji':bk.kubun==='新規'?'k-sh':'k-ko';
+      const rc=bk.route==='次回予約'?'r-ji':bk.route==='飛び込み'?'r-to':bk.route==='LINE'?'r-li':'r-te';
+      // 処置表示
+      const sh=bk.shochi||[];
+      const shHtml=sh.map(s=>`<span class="sh-badge">${s.name}${s.qty>1?'×'+s.qty:''}</span>`).join('');
+      // 物販表示
+      const bs=bk.bussan||[];
+      const bsHtml=bs.filter(b=>b.qty>0).map(b=>`<span class="sh-badge" style="background:#fef3c7;color:#92400e">${b.name}×${b.qty}</span>`).join('');
+      // 支払表示
+      const pays=bk.pay||[];
+      const payHtml=pays.map(p=>{const pc=p==='現金'?'pb-cash':p==='クレジット'?'pb-card':p==='PayPay'?'pb-pp':p==='d払い'?'pb-d':p==='au Pay'?'pb-au':'pb-ot';return`<span class="pay-badge ${pc}">${p}</span>`;}).join('');
+      tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb ${kc}">${bk.kubun}</span></td><td><strong style="font-size:0.8rem">${bk.name}</strong>${bk.menu?'<br><span style="font-size:0.65rem;color:var(--accent)">'+bk.menu+'</span>':''}</td><td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td><td><span class="rt ${rc}">${bk.route||''}</span></td><td style="font-size:0.72rem">${bk.visitCount||''}</td><td style="font-size:0.72rem;color:var(--accent2);font-weight:600">${bk.elapsed?bk.elapsed+'日':''}</td><td style="font-size:0.7rem;color:var(--muted)">${bk.symptom||''}</td><td>${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td><td>${payHtml||'-'}${bk.payAmount?'<br><span style="font-size:0.68rem;color:var(--muted)">'+yen(bk.payAmount)+'</span>':''}</td><td><button class="btn bc bsm" onclick="editBk('${date}','${s}')">編集</button><br><button class="btn bd bsm" onclick="delBk('${date}','${s}')" style="margin-top:2px">削除</button></td>`;
+    }else{
+      tr.innerHTML=`<td class="tc">${s}</td><td></td><td><span style="color:#ccc;font-size:0.7rem">空き</span></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><button class="btn ba bsm" onclick="openModal('${date}','${s}')">＋予約</button></td>`;
+    }
+    tbody.appendChild(tr);
+  });
+  updateStats(date,sl.filter(s=>s!=='BREAK'));
+}
+
+function updateStats(date,sl){
+  const e=Object.values(bookings[date]||{}).filter(b=>!b.cont);
+  const ho=e.filter(b=>b.kubun==='保険').length,ji=e.filter(b=>b.kubun==='自費').length;
+  const ko=e.filter(b=>b.kubun==='交通事故').length,sh=e.filter(b=>b.kubun==='新規').length;
+  const used=e.reduce((a,b)=>a+(b.kubun==='自費'?2:b.kubun==='新規'?3:1),0);
+  document.getElementById('s0').textContent=e.length;document.getElementById('s1').textContent=ho;
+  document.getElementById('s2').textContent=ji;document.getElementById('s3').textContent=ko;
+  document.getElementById('s4').textContent=sh;
+  document.getElementById('s5').textContent=(sl.length?Math.round(used/sl.length*100):0)+'%';
+}
+
+// ===== モーダルタブ =====
+function switchMTab(tab){
+  const tabs=['basic','shochi','bussan','pay'];
+  document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',tabs[i]===tab));
+  document.querySelectorAll('.mpane').forEach((p,i)=>p.classList.toggle('on',tabs[i]===tab));
+  if(tab==='pay')updateMTotal();
+}
+
+// ===== 処置 =====
+function renderMShochiBtns(){
+  const area=document.getElementById('m-shochi-btns');area.innerHTML='';
+  shochiMaster.forEach(sh=>{
+    const needQty=sh.unit==='枚'||sh.unit==='本';
+    const qty=mShochiSel[sh.id]||0;
+    const div=document.createElement('div');
+    div.className='shochi-btn'+(qty>0?' on':'');
+    div.innerHTML=`${sh.name}<span class="shochi-price">${yen(sh.price)}/${sh.unit}</span>`;
+    if(needQty){
+      const qinp=document.createElement('input');
+      qinp.type='number';qinp.min='0';qinp.value=qty||0;
+      qinp.style.cssText='width:52px;padding:2px 4px;border:1.5px solid var(--border);border-radius:5px;font-size:0.8rem;text-align:center;margin-top:4px;';
+      qinp.oninput=function(){mShochiSel[sh.id]=parseInt(this.value)||0;div.classList.toggle('on',mShochiSel[sh.id]>0);calcMShochiTotal();};
+      div.appendChild(qinp);
+    }else{
+      div.onclick=function(){
+        mShochiSel[sh.id]=(mShochiSel[sh.id]||0)>0?0:1;
+        div.classList.toggle('on',mShochiSel[sh.id]>0);calcMShochiTotal();
+      };
+    }
+    area.appendChild(div);
+  });
+}
+
+function calcMShochiTotal(){
+  let total=0;
+  shochiMaster.forEach(sh=>{const q=mShochiSel[sh.id]||0;total+=sh.price*q;});
+  document.getElementById('m-shochi-total').textContent=yen(total);
+  updateMTotal();
+}
+
+// ===== 物販（モーダル内） =====
+function renderMBussanItems(){
+  const area=document.getElementById('m-bussan-items');area.innerHTML='';
+  bussanMaster.forEach(bs=>{
+    const qty=mBussanQty[bs.id]||0;
+    const div=document.createElement('div');
+    div.className='bussan-item';
+    div.innerHTML=`<span style="flex:1;font-size:0.8rem;font-weight:600">${bs.name}</span><span style="font-size:0.7rem;color:var(--muted);margin-right:6px">${yen(bs.price)}/${bs.unit}</span>`;
+    const inp=document.createElement('input');
+    inp.type='number';inp.min='0';inp.value=qty||0;inp.className='bussan-qty';
+    inp.oninput=function(){mBussanQty[bs.id]=parseInt(this.value)||0;calcMBussanTotal();};
+    div.appendChild(inp);
+    area.appendChild(div);
+  });
+}
+
+function calcMBussanTotal(){
+  let total=0;
+  bussanMaster.forEach(bs=>{const q=mBussanQty[bs.id]||0;total+=bs.price*q;});
+  document.getElementById('m-bussan-total').textContent=yen(total);
+  updateMTotal();
+}
+
+function updateMTotal(){
+  let sh=0,bs=0;
+  shochiMaster.forEach(s=>{sh+=s.price*(mShochiSel[s.id]||0);});
+  bussanMaster.forEach(b=>{bs+=b.price*(mBussanQty[b.id]||0);});
+  const el=document.getElementById('m-total-sum');
+  if(el)el.textContent=yen(sh+bs);
+}
+
+// ===== 支払（モーダル内） =====
+function toggleMPay(btn){
+  btn.classList.toggle('on');
+  const v=btn.getAttribute('data-v');
+  if(btn.classList.contains('on')){if(!mPaySel.includes(v))mPaySel.push(v);}
+  else{mPaySel=mPaySel.filter(x=>x!==v);}
+}
+function resetMPay(){mPaySel=[];document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));document.getElementById('m-pay-amount').value='';}
+function loadMPay(pays,amount){resetMPay();(pays||[]).forEach(p=>{const btn=document.querySelector(`#m-pay-btns .pay-btn[data-v="${p}"]`);if(btn){btn.classList.add('on');mPaySel.push(p);}});document.getElementById('m-pay-amount').value=amount||'';}
+
+// ===== モーダル開閉 =====
+function openModal(date,slot){
+  editDate=date;editSlot=slot;
+  document.getElementById('mtitle').textContent='予約入力 '+slot;
+  ['m-id','m-nm','m-sym','m-opt','m-menu'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('m-kb').value='自費';document.getElementById('m-rt').value='LINE';
+  mShochiSel={};mBussanQty={};
+  renderMShochiBtns();renderMBussanItems();
+  resetMPay();switchMTab('basic');
+  document.getElementById('bmodal').classList.add('on');
+}
+
+function editBk(date,slot){
+  const bk=bookings[date]?.[slot];if(!bk)return;
+  editDate=date;editSlot=slot;
+  document.getElementById('mtitle').textContent='予約編集 '+slot;
+  document.getElementById('m-id').value=bk.cardId||'';
+  document.getElementById('m-nm').value=bk.name||'';
+  document.getElementById('m-kb').value=bk.kubun||'自費';
+  document.getElementById('m-rt').value=bk.route||'LINE';
+  document.getElementById('m-sym').value=bk.symptom||'';
+  document.getElementById('m-opt').value=bk.option||'';
+  document.getElementById('m-menu').value=bk.menu||'';
+  // 処置ロード
+  mShochiSel={};
+  (bk.shochi||[]).forEach(s=>{mShochiSel[s.id]=(s.qty||1);});
+  renderMShochiBtns();
+  if(bk.shochiMemo)document.getElementById('m-shochi-memo').value=bk.shochiMemo;
+  // 物販ロード
+  mBussanQty={};
+  (bk.bussan||[]).forEach(b=>{mBussanQty[b.id]=(b.qty||0);});
+  renderMBussanItems();
+  // 支払ロード
+  loadMPay(bk.pay||[],bk.payAmount||'');
+  switchMTab('basic');
+  document.getElementById('bmodal').classList.add('on');
+}
+
+function closeModal(){document.getElementById('bmodal').classList.remove('on');}
+
+function autoFill(){
+  const id=document.getElementById('m-id').value;
+  const p=patients.find(p=>p.id===String(id));
+  if(p)document.getElementById('m-nm').value=p.name;
+}
+
+async function saveBk(){
+  const date=editDate,slot=editSlot;
+  const kubun=document.getElementById('m-kb').value;
+  const name=document.getElementById('m-nm').value.trim();
+  const cardId=document.getElementById('m-id').value.trim();
+  const route=document.getElementById('m-rt').value;
+  const symptom=document.getElementById('m-sym').value.trim();
+  const option=document.getElementById('m-opt').value.trim();
+  const menu=document.getElementById('m-menu').value.trim();
+  const shochiMemo=document.getElementById('m-shochi-memo').value.trim();
+  const payAmount=document.getElementById('m-pay-amount').value.trim();
+  if(!name){alert('患者名を入力してください');return;}
+
+  // 処置配列作成
+  const shochiArr=shochiMaster.filter(s=>mShochiSel[s.id]>0).map(s=>({id:s.id,name:s.name,price:s.price,qty:mShochiSel[s.id]||1}));
+  // 物販配列作成
+  const bussanArr=bussanMaster.filter(b=>mBussanQty[b.id]>0).map(b=>({id:b.id,name:b.name,price:b.price,qty:mBussanQty[b.id]}));
+
+  if(!bookings[date])bookings[date]={};
+  const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
+  const p=patients.find(p=>p.id===cardId);
+  const el=p&&p.last?elapsed(p.last):'';
+  const vc=p?(parseInt(p.count)||0)+1:'';
+  bookings[date][slot]={kubun,name,cardId,route,symptom,option,menu,shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,elapsed:el,visitCount:vc};
+
+  const extra=kubun==='自費'?1:kubun==='新規'?2:0;
+  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){if(i<=extra){if(!bookings[date][sl[ni]])bookings[date][sl[ni]]={cont:true,name,cardId};}else{if(bookings[date][sl[ni]]?.cont)delete bookings[date][sl[ni]];}}}
+
+  if(p){p.last=date;p.count=vc;}
+
+  // 在庫自動減算（処置・物販）
+  shochiArr.forEach(s=>{if(s.id){const st=stockData.find(x=>shochiMaster.find(m=>m.id===s.id)?.stockId===x.id);if(st)st.qty=Math.max(0,st.qty-s.qty);}});
+  bussanArr.forEach(b=>{const master=bussanMaster.find(m=>m.id===b.id);if(master?.stockId){const st=stockData.find(x=>x.id===master.stockId);if(st)st.qty=Math.max(0,st.qty-b.qty);}});
+
+  const btn=document.getElementById('sbtn');btn.textContent='保存中...';btn.disabled=true;
+  save();renderSched();renderPatients();closeModal();
+  await pushB();if(p)await pushP();
+  btn.textContent='予約を登録';btn.disabled=false;
+}
+
+async function delBk(date,slot){
+  if(!confirm('この予約を削除しますか？'))return;
+  const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
+  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'&&bookings[date]?.[sl[ni]]?.cont)delete bookings[date][sl[ni]];else break;}
+  delete bookings[date][slot];save();renderSched();await pushB();
+}
+
+// ===== 患者 =====
+async function addPatient(){
+  const id=document.getElementById('c-id').value.trim();
+  const name=document.getElementById('c-nm').value.trim();
+  if(!id||!name){alert('診察券Noと患者名は必須です');return;}
+  if(patients.find(p=>p.id===id)){alert('この診察券Noは既に登録されています');return;}
+  patients.push({id,name,kana:document.getElementById('c-kana').value.trim(),tel:document.getElementById('c-tel').value.trim(),line:document.getElementById('c-line').value.trim(),dob:document.getElementById('c-dob').value,last:document.getElementById('c-last').value,count:parseInt(document.getElementById('c-cnt').value)||0,symptom:document.getElementById('c-sym').value.trim(),note:document.getElementById('c-note').value.trim()});
+  save();renderPatients();await pushP();
+  ['c-id','c-nm','c-kana','c-tel','c-line','c-sym','c-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('c-cnt').value='0';document.getElementById('c-last').value='';document.getElementById('c-dob').value='';
+}
+async function delPatient(id){if(!confirm('この患者を削除しますか？'))return;patients=patients.filter(p=>p.id!==id);save();renderPatients();await pushP();}
+
+function sortPatients(list,sort){
+  const l=[...list];
+  if(sort==='id_asc')l.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
+  else if(sort==='id_desc')l.sort((a,b)=>parseInt(b.id)-parseInt(a.id));
+  else if(sort==='kana_asc')l.sort((a,b)=>(a.kana||a.name).localeCompare(b.kana||b.name,'ja'));
+  else if(sort==='last_asc')l.sort((a,b)=>(a.last||'').localeCompare(b.last||''));
+  else if(sort==='last_desc')l.sort((a,b)=>(b.last||'').localeCompare(a.last||''));
+  return l;
+}
+
+function renderPatients(){
+  const q=(document.getElementById('psearch')?.value||'').toLowerCase();
+  const sort=document.getElementById('psort')?.value||'id_asc';
+  let list=patients.filter(p=>p.name.toLowerCase().includes(q)||p.id.includes(q)||(p.kana||'').toLowerCase().includes(q));
+  list=sortPatients(list,sort);
+  document.getElementById('pcnt').textContent='（'+list.length+'名）';
+  const tbody=document.getElementById('pbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="9" class="empty">患者が見つかりません</td></tr>';return;}
+  tbody.innerHTML=list.map(p=>`<tr><td><strong>${p.id}</strong></td><td>${p.name}</td><td style="font-size:0.72rem">${p.kana||'-'}</td><td style="font-size:0.72rem">${p.tel||'-'}</td><td style="font-size:0.72rem">${p.last||'-'}</td><td>${p.count}回</td><td style="font-size:0.72rem">${p.symptom||'-'}</td><td><strong style="color:var(--accent2)">${p.last?elapsed(p.last)+'日':'-'}</strong></td><td><button class="btn bd bsm" onclick="delPatient('${p.id}')">削除</button></td></tr>`).join('');
+}
+
+// ===== 物販ページ 患者リスト =====
+function renderBsPatients(){
+  const q=(document.getElementById('bs-psearch')?.value||'').toLowerCase();
+  const sort=document.getElementById('bs-psort')?.value||'id_asc';
+  let list=patients.filter(p=>p.name.toLowerCase().includes(q)||p.id.includes(q)||(p.kana||'').toLowerCase().includes(q));
+  list=sortPatients(list,sort);
+  const area=document.getElementById('bs-patient-list');
+  if(!list.length){area.innerHTML='<div style="padding:8px;font-size:0.78rem;color:var(--muted)">患者が見つかりません</div>';return;}
+  area.innerHTML=list.slice(0,20).map(p=>`<div onclick="selectBsPatient('${p.id}')" style="padding:7px 12px;cursor:pointer;font-size:0.8rem;border-bottom:1px solid #f0ece4;display:flex;gap:8px;align-items:center;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">`+
+    `<strong style="color:var(--primary);min-width:36px">#${p.id}</strong>`+
+    `<span>${p.name}</span>`+
+    `<span style="color:var(--muted);font-size:0.72rem">${p.kana||''}</span>`+
+    `<span style="color:var(--muted);font-size:0.72rem;margin-left:auto">${p.last||''}</span>`+
+  `</div>`).join('');
+}
+
+function selectBsPatient(id){
+  bsSelectedPatient=patients.find(p=>p.id===id)||null;
+  const area=document.getElementById('bs-selected-patient');
+  if(bsSelectedPatient){
+    area.style.display='block';
+    area.textContent='✅ 選択中：#'+bsSelectedPatient.id+' '+bsSelectedPatient.name;
+    document.getElementById('bs-patient-list').style.display='none';
+  }
+}
+
+// ===== 物販記録 直接追加 =====
+function renderBsProductList(){
+  const area=document.getElementById('bs-product-list');area.innerHTML='';
+  bussanMaster.forEach(b=>{
+    const div=document.createElement('div');div.className='bussan-item';
+    div.innerHTML=`<span style="flex:1;font-size:0.8rem;font-weight:600">${b.name}</span><span style="font-size:0.7rem;color:var(--muted);margin-right:6px">${yen(b.price)}/${b.unit}</span>`;
+    const inp=document.createElement('input');inp.type='number';inp.min='0';inp.value='0';inp.className='bussan-qty';
+    inp.oninput=calcBsTotal;inp.setAttribute('data-id',b.id);inp.setAttribute('data-price',b.price);
+    div.appendChild(inp);area.appendChild(div);
+  });
+}
+
+function calcBsTotal(){
+  let total=0;
+  document.querySelectorAll('#bs-product-list .bussan-qty').forEach(inp=>{total+=parseInt(inp.value||0)*parseInt(inp.getAttribute('data-price')||0);});
+  document.getElementById('bs-total').textContent=yen(total);
+}
+
+function toggleBsPay(btn){
+  btn.classList.toggle('on');
+  const v=btn.getAttribute('data-v');
+  if(btn.classList.contains('on')){if(!bsPaySel.includes(v))bsPaySel.push(v);}
+  else{bsPaySel=bsPaySel.filter(x=>x!==v);}
+}
+
+function saveBsRecord(){
+  const date=document.getElementById('bs-date').value;
+  if(!date){alert('日付を入力してください');return;}
+  const items=[];
+  document.querySelectorAll('#bs-product-list .bussan-qty').forEach(inp=>{
+    const qty=parseInt(inp.value||0);
+    if(qty>0){
+      const master=bussanMaster.find(b=>b.id===inp.getAttribute('data-id'));
+      if(master){
+        items.push({id:master.id,name:master.name,price:master.price,unit:master.unit,qty});
+        // 在庫減算
+        if(master.stockId){const st=stockData.find(x=>x.id===master.stockId);if(st)st.qty=Math.max(0,st.qty-qty);}
+      }
+    }
+  });
+  if(!items.length){alert('商品を選択してください');return;}
+  const total=items.reduce((a,b)=>a+b.price*b.qty,0);
+  const record={id:genId(),date,patientId:bsSelectedPatient?.id||'',patientName:bsSelectedPatient?.name||'',items,pay:bsPaySel.slice(),total};
+  bussanLog.push(record);
+  // 予約表との連動（同日同患者の予約があれば物販を追加）
+  if(bsSelectedPatient){
+    const bkDate=bookings[date]||{};
+    Object.keys(bkDate).forEach(slot=>{
+      const bk=bkDate[slot];
+      if(bk&&!bk.cont&&bk.cardId===bsSelectedPatient.id){
+        // 物販をマージ（ダブり防止）
+        if(!bk.bussan)bk.bussan=[];
+        items.forEach(item=>{
+          const exist=bk.bussan.find(x=>x.id===item.id);
+          if(exist)exist.qty=item.qty;// 上書き
+          else bk.bussan.push({...item});
+        });
+        if(bsPaySel.length){bk.pay=bsPaySel.slice();}
+      }
+    });
+  }
+  save();
+  alert('物販記録を保存しました！');
+  // リセット
+  document.querySelectorAll('#bs-product-list .bussan-qty').forEach(inp=>inp.value='0');
+  document.getElementById('bs-total').textContent='0円';
+  bsPaySel=[];
+  document.querySelectorAll('#bs-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+  bsSelectedPatient=null;
+  document.getElementById('bs-selected-patient').style.display='none';
+  document.getElementById('bs-patient-list').style.display='block';
+  renderBsPatients();
+}
+
+// ===== 物販集計 =====
+function switchBussan(tab){
+  document.querySelectorAll('#page-bussan .utab').forEach((t,i)=>t.classList.toggle('on',['add','day','week','month','year'][i]===tab));
+  document.getElementById('bs-add').style.display=tab==='add'?'':'none';
+  if(tab!=='add')renderBsStats(tab);
+  else{document.getElementById('bs-stats').innerHTML='';}
+}
+
+function renderBsStats(period){
+  const area=document.getElementById('bs-stats');
+  // 商品別集計
+  const itemTotals={};
+  bussanLog.forEach(rec=>{
+    let include=true; // period filtering could be added
+    if(!include)return;
+    rec.items.forEach(item=>{
+      if(!itemTotals[item.name])itemTotals[item.name]={qty:0,total:0};
+      itemTotals[item.name].qty+=item.qty;
+      itemTotals[item.name].total+=item.price*item.qty;
+    });
+  });
+  // 予約表の物販も集計
+  Object.values(bookings).forEach(dayBk=>{
+    Object.values(dayBk).forEach(bk=>{
+      if(!bk||bk.cont)return;
+      (bk.bussan||[]).forEach(item=>{
+        if(!itemTotals[item.name])itemTotals[item.name]={qty:0,total:0};
+        itemTotals[item.name].qty+=item.qty;
+        itemTotals[item.name].total+=item.price*item.qty;
+      });
+    });
+  });
+  const sorted=Object.entries(itemTotals).sort((a,b)=>b[1].total-a[1].total);
+  area.innerHTML=`<div class="card"><div class="ctitle">物販売れ筋ランキング</div><div class="scroll"><table class="utbl"><thead><tr><th>順位</th><th>商品名</th><th>販売数</th><th>売上金額</th></tr></thead><tbody>${sorted.map((([name,d],i)=>`<tr><td>${i+1}</td><td>${name}</td><td>${d.qty}</td><td>${yen(d.total)}</td>`)).join('')}</tbody></table></div></div>`;
+}
+
+// ===== 売上 =====
+let uTab='day';
+function toggleUPay(btn){
+  btn.classList.toggle('on');
+  const v=btn.getAttribute('data-v');
+  if(btn.classList.contains('on')){if(!uPaySel.includes(v))uPaySel.push(v);}
+  else{uPaySel=uPaySel.filter(x=>x!==v);}
+}
+function switchU(t){
+  uTab=t;
+  const tabs=['day','week','month','year','pay'];
+  document.querySelectorAll('#uTabsArea .utab').forEach((el,i)=>el.classList.toggle('on',tabs[i]===t));
+  ['u-day','u-week','u-month','u-year','u-pay'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  const target=document.getElementById('u-'+t);if(target)target.style.display='';
+  if(t==='day')renderDayU();if(t==='week')renderWeekU();if(t==='month')renderMonthU();if(t==='year')renderYearU();if(t==='pay')renderPayU();
+}
+function saveU(){
+  const date=document.getElementById('u-date').value;if(!date){alert('日付を入力してください');return;}
+  uriage[date]={hoken:parseInt(document.getElementById('u-ho').value)||0,jhi:parseInt(document.getElementById('u-ji').value)||0,jiko:parseInt(document.getElementById('u-ko').value)||0,bussan:parseInt(document.getElementById('u-bu').value)||0,other:parseInt(document.getElementById('u-ot').value)||0,pay:uPaySel.slice(),memo:document.getElementById('u-memo').value.trim()};
+  save();renderDayU();
+  ['u-ho','u-ji','u-ko','u-bu','u-ot'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('u-memo').value='';
+  uPaySel=[];document.querySelectorAll('#u-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+}
+function delU(date){if(!confirm(date+'の売上を削除しますか？'))return;delete uriage[date];save();renderDayU();}
+
+function renderDayU(){
+  const tbody=document.getElementById('u-dbody');
+  const entries=Object.entries(uriage).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!entries.length){tbody.innerHTML='<tr><td colspan="10" class="empty">データがありません</td></tr>';return;}
+  let th=0,tj=0,tk=0,tb=0,to=0;
+  tbody.innerHTML=entries.map(([d,u])=>{const tot=(u.hoken||0)+(u.jhi||0)+(u.jiko||0)+(u.bussan||0)+(u.other||0);th+=u.hoken||0;tj+=u.jhi||0;tk+=u.jiko||0;tb+=u.bussan||0;to+=u.other||0;
+    const payHtml=(u.pay||[]).map(p=>{const pc=p==='現金'?'pb-cash':p==='クレジット'?'pb-card':p==='PayPay'?'pb-pp':p==='d払い'?'pb-d':p==='au Pay'?'pb-au':'pb-ot';return`<span class="pay-badge ${pc}">${p}</span>`;}).join('');
+    return`<tr><td>${d}</td><td>${u.hoken?yen(u.hoken):'-'}</td><td>${u.jhi?yen(u.jhi):'-'}</td><td>${u.jiko?yen(u.jiko):'-'}</td><td>${u.bussan?yen(u.bussan):'-'}</td><td>${u.other?yen(u.other):'-'}</td><td><strong>${yen(tot)}</strong></td><td>${payHtml||'-'}</td><td style="font-size:0.7rem">${u.memo||''}</td><td><button class="btn bd bsm" onclick="delU('${d}')">削除</button></td></tr>`;}).join('');
+  tbody.innerHTML+=`<tr class="tr"><td>合計</td><td>${yen(th)}</td><td>${yen(tj)}</td><td>${yen(tk)}</td><td>${yen(tb)}</td><td>${yen(to)}</td><td>${yen(th+tj+tk+tb+to)}</td><td></td><td></td><td></td></tr>`;
+}
+
+function renderWeekU(){
+  const yr=parseInt(document.getElementById('uw-yr').value),mo=parseInt(document.getElementById('uw-mo').value);
+  const weeks={};
+  Object.entries(uriage).forEach(([d,u])=>{const dt=new Date(d+'T00:00:00');if(dt.getFullYear()!==yr||dt.getMonth()+1!==mo)return;const w=Math.ceil(dt.getDate()/7);if(!weeks[w])weeks[w]={hoken:0,jhi:0,jiko:0,bussan:0,other:0};['hoken','jhi','jiko','bussan','other'].forEach(k=>weeks[w][k]+=u[k]||0);});
+  const tbody=document.getElementById('u-wbody');
+  if(!Object.keys(weeks).length){tbody.innerHTML='<tr><td colspan="7" class="empty">データがありません</td></tr>';return;}
+  tbody.innerHTML=Object.entries(weeks).sort((a,b)=>a[0]-b[0]).map(([w,u])=>{const tot=Object.values(u).reduce((a,b)=>a+b,0);return`<tr><td>${mo}月 第${w}週</td><td>${u.hoken?yen(u.hoken):'-'}</td><td>${u.jhi?yen(u.jhi):'-'}</td><td>${u.jiko?yen(u.jiko):'-'}</td><td>${u.bussan?yen(u.bussan):'-'}</td><td>${u.other?yen(u.other):'-'}</td><td><strong>${yen(tot)}</strong></td></tr>`;}).join('');
+}
+
+function renderMonthU(){
+  const yr=parseInt(document.getElementById('um-yr').value);
+  const months={};
+  Object.entries(uriage).forEach(([d,u])=>{const dt=new Date(d+'T00:00:00');if(dt.getFullYear()!==yr)return;const m=dt.getMonth()+1;if(!months[m])months[m]={hoken:0,jhi:0,jiko:0,bussan:0,other:0};['hoken','jhi','jiko','bussan','other'].forEach(k=>months[m][k]+=u[k]||0);});
+  const tbody=document.getElementById('u-mbody');
+  if(!Object.keys(months).length){tbody.innerHTML='<tr><td colspan="7" class="empty">データがありません</td></tr>';document.getElementById('u-msum').innerHTML='';return;}
+  let th=0,tj=0,tk=0,tb=0,to=0;
+  tbody.innerHTML=Object.entries(months).sort((a,b)=>a[0]-b[0]).map(([m,u])=>{const tot=Object.values(u).reduce((a,b)=>a+b,0);th+=u.hoken||0;tj+=u.jhi||0;tk+=u.jiko||0;tb+=u.bussan||0;to+=u.other||0;return`<tr><td>${m}月</td><td>${u.hoken?yen(u.hoken):'-'}</td><td>${u.jhi?yen(u.jhi):'-'}</td><td>${u.jiko?yen(u.jiko):'-'}</td><td>${u.bussan?yen(u.bussan):'-'}</td><td>${u.other?yen(u.other):'-'}</td><td><strong>${yen(tot)}</strong></td></tr>`;}).join('');
+  const grand=th+tj+tk+tb+to;
+  tbody.innerHTML+=`<tr class="tr"><td>年間合計</td><td>${yen(th)}</td><td>${yen(tj)}</td><td>${yen(tk)}</td><td>${yen(tb)}</td><td>${yen(to)}</td><td>${yen(grand)}</td></tr>`;
+  document.getElementById('u-msum').innerHTML=`<div class="ubox big"><div class="n">${yen(grand)}</div><div class="l">${yr}年 年間売上</div></div><div class="ubox"><div class="n">${yen(th)}</div><div class="l">保険合計</div></div><div class="ubox"><div class="n">${yen(tj)}</div><div class="l">自費合計</div></div><div class="ubox"><div class="n">${yen(tk)}</div><div class="l">交通事故合計</div></div><div class="ubox"><div class="n">${yen(tb)}</div><div class="l">物販合計</div></div>`;
+}
+
+function renderYearU(){
+  const years={};
+  Object.entries(uriage).forEach(([d,u])=>{const yr=d.substring(0,4);if(!years[yr])years[yr]={hoken:0,jhi:0,jiko:0,bussan:0,other:0};['hoken','jhi','jiko','bussan','other'].forEach(k=>years[yr][k]+=u[k]||0);});
+  const tbody=document.getElementById('u-ybody');
+  if(!Object.keys(years).length){tbody.innerHTML='<tr><td colspan="7" class="empty">データがありません</td></tr>';return;}
+  tbody.innerHTML=Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])).map(([yr,u])=>{const tot=Object.values(u).reduce((a,b)=>a+b,0);return`<tr><td>${yr}年</td><td>${u.hoken?yen(u.hoken):'-'}</td><td>${u.jhi?yen(u.jhi):'-'}</td><td>${u.jiko?yen(u.jiko):'-'}</td><td>${u.bussan?yen(u.bussan):'-'}</td><td>${u.other?yen(u.other):'-'}</td><td><strong>${yen(tot)}</strong></td></tr>`;}).join('');
+}
+
+function renderPayU(){
+  const period=document.getElementById('pay-period').value;
+  const yr=parseInt(document.getElementById('pay-yr').value);
+  const mo=parseInt(document.getElementById('pay-mo').value);
+  const payTypes=['現金','クレジット','PayPay','d払い','au Pay','その他'];
+  const groups={};
+  Object.entries(uriage).forEach(([d,u])=>{
+    const dt=new Date(d+'T00:00:00');
+    if(dt.getFullYear()!==yr)return;
+    if(mo>0&&dt.getMonth()+1!==mo)return;
+    let key='';
+    if(period==='day')key=d;
+    else if(period==='week'){const w=Math.ceil(dt.getDate()/7);key=`${dt.getMonth()+1}月第${w}週`;}
+    else if(period==='month')key=`${dt.getMonth()+1}月`;
+    else key=`${dt.getFullYear()}年`;
+    if(!groups[key]){groups[key]={};payTypes.forEach(p=>groups[key][p]=0);}
+    const pays=u.pay||[];
+    const tot=(u.hoken||0)+(u.jhi||0)+(u.jiko||0)+(u.bussan||0)+(u.other||0);
+    if(pays.length){const perPay=Math.round(tot/pays.length);pays.forEach(p=>{if(groups[key][p]!==undefined)groups[key][p]+=perPay;else groups[key]['その他']+=perPay;});}
+    else{groups[key]['現金']+=tot;}
+  });
+  const keys=Object.keys(groups).sort();
+  const tbody=document.getElementById('pay-body');
+  if(!keys.length){tbody.innerHTML='<tr><td colspan="8" class="empty">データがありません</td></tr>';document.getElementById('pay-sum').innerHTML='';return;}
+  let totals={};payTypes.forEach(p=>totals[p]=0);
+  tbody.innerHTML=keys.map(k=>{const g=groups[k];const tot=payTypes.reduce((a,p)=>a+(g[p]||0),0);payTypes.forEach(p=>totals[p]+=(g[p]||0));return`<tr><td>${k}</td>${payTypes.map(p=>`<td>${g[p]?yen(g[p]):'-'}</td>`).join('')}<td><strong>${yen(tot)}</strong></td></tr>`;}).join('');
+  const grandTotal=payTypes.reduce((a,p)=>a+totals[p],0);
+  tbody.innerHTML+=`<tr class="tr"><td>合計</td>${payTypes.map(p=>`<td>${yen(totals[p])}</td>`).join('')}<td>${yen(grandTotal)}</td></tr>`;
+  document.getElementById('pay-sum').innerHTML=payTypes.map(p=>`<div class="ubox"><div class="n" style="font-size:0.95rem">${yen(totals[p])}</div><div class="l">${p}</div></div>`).join('');
+}
+
+// ===== 在庫管理 =====
+function renderStock(){
+  const area=document.getElementById('stock-list');
+  if(!stockData.length){area.innerHTML='<div class="empty">在庫データがありません</div>';return;}
+  area.innerHTML=stockData.map((s,i)=>{
+    const stat=s.qty<=0?'ss-none':s.qty<=s.alert?'ss-low':'ss-ok';
+    const statTxt=s.qty<=0?'在庫なし':s.qty<=s.alert?'残少':'正常';
+    return`<div class="stock-item">
+      <span class="stock-name">${s.name}</span>
+      <span class="stock-price">${yen(s.price)}/${s.unit}</span>
+      <div class="stock-qty-wrap">
+        <button class="btn bc bsm" onclick="changeStock(${i},-1)">－</button>
+        <input type="number" class="stock-qty" value="${s.qty}" onchange="setStock(${i},this.value)">
+        <button class="btn ba bsm" onclick="changeStock(${i},1)">＋</button>
+      </div>
+      <div class="fg" style="flex-direction:row;align-items:center;gap:4px">
+        <span style="font-size:0.68rem;color:var(--muted)">アラート:</span>
+        <input type="number" class="stock-alert" value="${s.alert}" onchange="setStockAlert(${i},this.value)">
+      </div>
+      <span class="stock-stat ${stat}">${statTxt}</span>
+      <button class="stock-del" onclick="delStock(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+function changeStock(i,delta){stockData[i].qty=Math.max(0,stockData[i].qty+delta);save();renderStock();}
+function setStock(i,v){stockData[i].qty=Math.max(0,parseInt(v)||0);save();renderStock();}
+function setStockAlert(i,v){stockData[i].alert=Math.max(0,parseInt(v)||0);save();renderStock();}
+function delStock(i){if(!confirm('削除しますか？'))return;stockData.splice(i,1);save();renderStock();}
+function openStockAdd(){document.getElementById('stockAddModal').classList.add('on');}
+function closeStockAdd(){document.getElementById('stockAddModal').classList.remove('on');}
+function saveStockAdd(){
+  const name=document.getElementById('sa-name').value.trim();
+  if(!name){alert('商品名を入力してください');return;}
+  const newId='st'+Date.now();
+  stockData.push({id:newId,name,price:parseInt(document.getElementById('sa-price').value)||0,unit:document.getElementById('sa-unit').value||'個',qty:parseInt(document.getElementById('sa-qty').value)||0,alert:parseInt(document.getElementById('sa-alert').value)||5});
+  save();renderStock();closeStockAdd();
+  ['sa-name','sa-price','sa-unit','sa-qty','sa-alert'].forEach(id=>document.getElementById(id).value='');
+}
+
+// ===== LTV =====
+function renderLTV(){
+  const ageGroups={'10代':0,'20代':0,'30代':0,'40代':0,'50代':0,'60代':0,'70代':0,'80代':0,'不明':0};
+  const visitGroups={'初回':0,'2〜5回':0,'6〜10回':0,'11〜20回':0,'21回以上':0};
+  const today=new Date();
+  patients.forEach(p=>{
+    if(p.dob){const age=Math.floor((today-new Date(p.dob))/(365.25*24*3600*1000));const dec=Math.floor(age/10)*10;const key=dec+'代';if(ageGroups[key]!==undefined)ageGroups[key]++;else ageGroups['不明']++;}
+    else ageGroups['不明']++;
+    const c=p.count||0;
+    if(c<=1)visitGroups['初回']++;
+    else if(c<=5)visitGroups['2〜5回']++;
+    else if(c<=10)visitGroups['6〜10回']++;
+    else if(c<=20)visitGroups['11〜20回']++;
+    else visitGroups['21回以上']++;
+  });
+  document.getElementById('ltv-age').innerHTML=Object.entries(ageGroups).map(([l,n])=>`<div class="ltv-box"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+  document.getElementById('ltv-visit').innerHTML=Object.entries(visitGroups).map(([l,n])=>`<div class="ltv-box"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+  const alerts=patients.filter(p=>p.last&&elapsed(p.last)>=30).sort((a,b)=>elapsed(b.last)-elapsed(a.last));
+  const tbody=document.getElementById('ltv-alert');
+  tbody.innerHTML=alerts.length?alerts.map(p=>`<tr><td><strong>${p.id}</strong></td><td>${p.name}</td><td>${p.last}</td><td><strong style="color:var(--accent2)">${elapsed(p.last)}日</strong></td><td style="font-size:0.72rem">${p.tel||'-'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">30日以上未来院の患者はいません</td></tr>';
+}
+
+// ===== マスター編集 =====
+function renderMasterList(){
+  // 物販マスター
+  const bArea=document.getElementById('bussan-master-list');
+  bArea.innerHTML=bussanMaster.map((b,i)=>`<div class="master-item">
+    <input class="master-name-inp" value="${b.name}" onchange="bussanMaster[${i}].name=this.value;save()">
+    <input class="master-price-inp" type="number" value="${b.price}" onchange="bussanMaster[${i}].price=parseInt(this.value)||0;save()">
+    <input class="master-unit-inp" value="${b.unit||''}" onchange="bussanMaster[${i}].unit=this.value;save()">
+    <button class="btn bd bsm" onclick="delBussanMaster(${i})">削除</button>
+  </div>`).join('');
+  // 処置マスター
+  const sArea=document.getElementById('shochi-master-list');
+  sArea.innerHTML=shochiMaster.map((s,i)=>`<div class="master-item">
+    <input class="master-name-inp" value="${s.name}" onchange="shochiMaster[${i}].name=this.value;save()">
+    <input class="master-price-inp" type="number" value="${s.price}" onchange="shochiMaster[${i}].price=parseInt(this.value)||0;save()">
+    <input class="master-unit-inp" value="${s.unit||''}" onchange="shochiMaster[${i}].unit=this.value;save()">
+    <button class="btn bd bsm" onclick="delShochiMaster(${i})">削除</button>
+  </div>`).join('');
+}
+
+function addBussanMaster(){
+  bussanMaster.push({id:'bs'+Date.now(),name:'新商品',price:0,unit:'個',stockId:''});
+  save();renderMasterList();
+}
+function addShochiMaster(){
+  shochiMaster.push({id:'sh'+Date.now(),name:'新処置',price:0,unit:'回',stockId:''});
+  save();renderMasterList();
+}
+function delBussanMaster(i){if(!confirm('削除しますか？'))return;bussanMaster.splice(i,1);save();renderMasterList();}
+function delShochiMaster(i){if(!confirm('削除しますか？'))return;shochiMaster.splice(i,1);save();renderMasterList();}
+
+// ===== 抽選 =====
+function addChip(){const inp=document.getElementById('linp');const name=inp.value.trim();if(!name||lp.includes(name))return;lp.push(name);inp.value='';renderChips();}
+function addToday(){const date=document.getElementById('selDate').value;if(!date){alert('予約表タブで日付を選択してください');return;}Object.values(bookings[date]||{}).filter(b=>!b.cont&&b.name).forEach(b=>{if(!lp.includes(b.name))lp.push(b.name);});renderChips();}
+function removeChip(n){lp=lp.filter(p=>p!==n);renderChips();}
+function clearChips(){lp=[];renderChips();document.getElementById('winner').classList.remove('on');document.getElementById('dtext').innerHTML='クリックして<br>スタート';}
+function renderChips(){const area=document.getElementById('chips');if(!lp.length){area.innerHTML='<span style="color:var(--muted);font-size:0.75rem">参加者を追加してください</span>';return;}area.innerHTML=lp.map(p=>`<div class="chip" onclick="removeChip('${p}')">${p} ×</div>`).join('');}
+let ltimer=null;
+function doLottery(){if(!lp.length){alert('参加者を追加してください');return;}const drum=document.getElementById('drum'),dtext=document.getElementById('dtext');document.getElementById('winner').classList.remove('on');drum.classList.add('spin');let c=0,total=25+Math.floor(Math.random()*15);if(ltimer)clearInterval(ltimer);ltimer=setInterval(()=>{dtext.innerHTML=`<span style="font-size:0.82rem">${lp[Math.floor(Math.random()*lp.length)]}</span>`;if(++c>=total){clearInterval(ltimer);drum.classList.remove('spin');const w=lp[Math.floor(Math.random()*lp.length)];dtext.innerHTML=`🎉<br><span style="font-size:0.78rem;color:var(--gold)">${w}</span>`;document.getElementById('wname').textContent=w+' 様';document.getElementById('winner').classList.add('on');}},80);}
+
+// ===== NAV =====
+function goPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav-t').forEach(t=>t.classList.remove('on'));
+  document.getElementById('page-'+id).classList.add('on');
+  const pages=['yoyaku','patients','uriage','bussan','stock','ltv','master','lottery'];
+  document.querySelectorAll('.nav-t').forEach((t,i)=>{if(pages[i]===id)t.classList.add('on');});
+  if(id==='patients')renderPatients();
+  if(id==='uriage'){renderDayU();document.getElementById('u-date').value=today();}
+  if(id==='bussan'){renderBsPatients();renderBsProductList();}
+  if(id==='stock')renderStock();
+  if(id==='ltv')renderLTV();
+  if(id==='master')renderMasterList();
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('selDate').value=today();
+  document.getElementById('bs-date').value=today();
+  document.getElementById('hdate').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  load();renderSched();renderPatients();
+  syncAll();
+});
+document.getElementById('bmodal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('stockAddModal').addEventListener('click',function(e){if(e.target===this)closeStockAdd();});
+</script>
+</body>
+</html>
