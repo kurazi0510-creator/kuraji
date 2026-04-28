@@ -1254,57 +1254,39 @@ function setStat(cls,txt){const el=document.getElementById('sbadge');el.classNam
 // ===== SYNC =====
 async function syncAll(){
   setStat('s-ing','🔄 同期中...');
-  // GAS失敗でも必ずUIは動作する
   const _syncFromGAS=async()=>{
     const controller=new AbortController();
-    const tid=setTimeout(()=>controller.abort(),12000); // 12秒タイムアウト
+    const tid=setTimeout(()=>controller.abort(),12000);
     try{
       const res=await fetch(GAS+'?action=getAll&t='+Date.now(),{redirect:'follow',cache:'no-store',signal:controller.signal});
       clearTimeout(tid);
       if(!res.ok)throw new Error('HTTP '+res.status);
       const data=JSON.parse(await res.text());
-      if(!data.ok)throw new Error('GAS error: '+JSON.stringify(data));
+      if(!data.ok)throw new Error('GAS error');
 
+      // 患者データ（GAS優先）
       const prows=data.customers||[];
       if(prows.length>1){
         const headers=(prows[0]||[]).map(h=>String(h||'').trim());
         const parsed=prows.slice(1).filter(r=>r[0]!==''&&r[0]!=null).map(r=>{
-          // ヘッダー名で各フィールドを取得（カラム順に依存しない）
-          const idx=k=>{
-            const i=headers.indexOf(k);
-            return i>-1?i:-1;
-          };
-          const g=(k,fb)=>{
-            const i=idx(k);
-            return i>-1?String(r[i]||'').trim():String(r[fb]||'').trim();
-          };
-          const gDate=(k,fb)=>{
-            const i=idx(k);
-            return i>-1?fmtDate(r[i]):fmtDate(r[fb]);
-          };
-          const gInt=(k,fb)=>{
-            const i=idx(k);
-            return i>-1?parseInt(r[i])||0:parseInt(r[fb])||0;
-          };
+          const idx=k=>{const i=headers.indexOf(k);return i>-1?i:-1;};
+          const g=(k,fb)=>{const i=idx(k);return i>-1?String(r[i]||'').trim():String(r[fb]||'').trim();};
+          const gDate=(k,fb)=>{const i=idx(k);return i>-1?fmtDate(r[i]):fmtDate(r[fb]);};
+          const gInt=(k,fb)=>{const i=idx(k);return i>-1?parseInt(r[i])||0:parseInt(r[fb])||0;};
           return{
-            id:   String(r[0]||'').trim(),
-            name: String(r[1]||'').trim(),
-            kana: g('ふりがな',99),
-            sex:  g('性別',2),
-            tel:  normTel(g('電話番号',3)||g('電話',3)),
-            line: g('LINE',4),
-            city: g('住所',5),
-            job:  g('職業',6),
-            src:  g('流入元',7)||g('流入',7),
-            symptom: g('症状',8),
-            last: gDate('前回通院日',9),
-            count: gInt('通院回数',10),
-            dob:  gDate('生年月日',11),
-            note: g('備考',12),
+            id:String(r[0]||'').trim(),name:String(r[1]||'').trim(),
+            kana:g('ふりがな',99),sex:g('性別',2),
+            tel:normTel(g('電話番号',3)||g('電話',3)),
+            line:g('LINE',4),city:g('住所',5),job:g('職業',6),
+            src:g('流入元',7)||g('流入',7),symptom:g('症状',8),
+            last:gDate('前回通院日',9),count:gInt('通院回数',10),
+            dob:gDate('生年月日',11),note:g('備考',12),
           };
         });
         if(parsed.length>0)patients=parsed;
       }
+
+      // 予約データ：★localStorageを優先・GASにしかない日付のみ追加
       const brows=data.bookings||[];
       if(brows.length>1){
         const newB={};
@@ -1316,9 +1298,23 @@ async function syncAll(){
           const kubunStr=String(r[2]||'').trim();
           if(kubunStr==='(継続)'){newB[date][slot]={cont:true,name:String(r[3]||''),cardId:String(r[4]||'')};}
           else if(kubunStr==='(キャンセル)'){newB[date][slot]={cancelled:true,name:String(r[3]||''),cardId:String(r[4]||''),cancelReason:String(r[18]||''),reBookedBy:String(r[17]||'')};}
-          else{newB[date][slot]={kubun:kubunStr,kubunList:String(r[16]||kubunStr).split(',').filter(s=>s),name:String(r[3]||'').trim(),cardId:String(r[4]||'').trim(),route:String(r[5]||'LINE').trim(),visitCount:String(r[6]||'').trim(),elapsed:String(r[7]||'').trim(),symptom:String(r[8]||'').trim(),option:String(r[9]||'').trim(),menu:String(r[10]||'').trim(),bui:r[19]?String(r[19]).split(',').filter(s=>s):[],shochi:r[11]?tryParse(r[11]):[],shochiMemo:String(r[12]||'').trim(),bussan:r[13]?tryParse(r[13]):[],pay:r[14]?String(r[14]).split(',').filter(s=>s):[],payAmount:String(r[15]||'').trim()};}
+          else{newB[date][slot]={
+            kubun:kubunStr,kubunList:String(r[16]||kubunStr).split(',').filter(s=>s),
+            name:String(r[3]||'').trim(),cardId:String(r[4]||'').trim(),
+            route:String(r[5]||'LINE').trim(),visitCount:String(r[6]||'').trim(),
+            elapsed:String(r[7]||'').trim(),symptom:String(r[8]||'').trim(),
+            option:String(r[9]||'').trim(),menu:String(r[10]||'').trim(),
+            bui:r[19]?String(r[19]).split(',').filter(s=>s):[],
+            shochi:r[11]?tryParse(r[11]):[],shochiMemo:String(r[12]||'').trim(),
+            bussan:r[13]?tryParse(r[13]):[],
+            pay:r[14]?String(r[14]).split(',').filter(s=>s):[],
+            payAmount:String(r[15]||'').trim()
+          };}
         });
-        if(Object.keys(newB).length>0){Object.keys(bookings).forEach(d=>{if(!newB[d])newB[d]=bookings[d];});bookings=newB;}
+        // localStorageにある日付はGASで絶対に上書きしない
+        Object.keys(newB).forEach(d=>{
+          if(!bookings[d])bookings[d]=newB[d];
+        });
       }
       save();
       setStat('s-ok','✅ 同期済み');
@@ -1330,10 +1326,9 @@ async function syncAll(){
   try{
     await _syncFromGAS();
   }catch(e){
-    console.warn('GAS sync failed (offline mode):', e.message);
-    setStat('s-err','⚠ オフライン（ローカル動作中）');
+    console.warn('GAS sync failed:', e.message);
+    setStat('s-err','⚠ オフライン');
   }finally{
-    // GAS成否にかかわらず必ず描画
     renderSched();
     renderPatients();
   }
@@ -2942,14 +2937,10 @@ document.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('selDate').value=today();
   document.getElementById('bs-date').value=today();
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
-  // まずlocalStorageから読み込んで即表示（オフライン対応）
+  // まずlocalStorageから即表示（データは消えない）
   load();renderSched();renderPatients();
-  // 次にGASから最新データを取得（必ずGASをマスターとして上書き）
+  // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
-  // GAS取得後に再描画
-  renderSched();renderPatients();
-  // 5分ごとに自動同期
-  setInterval(()=>{syncAll();},5*60*1000);
 });
 document.getElementById('bmodal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 document.getElementById('stockAddModal').addEventListener('click',function(e){if(e.target===this)closeStockAdd();});
