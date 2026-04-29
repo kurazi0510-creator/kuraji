@@ -74,13 +74,21 @@ function clearLog(){document.getElementById('log').innerHTML='';}
 
 function fmtDate(v){
   if(!v)return'';
-  if(typeof v==='string'){if(v.includes('T'))return v.split('T')[0];return v.replace(/\//g,'-').substring(0,10);}
+  if(typeof v==='string'){
+    if(v.startsWith('1899-')||v.startsWith('1900-')||v.startsWith('1905-'))return'';
+    if(v.includes('T')){const dp=v.split('T')[0];return dp>='1970-01-01'?dp:'';}
+    return v.replace(/\//g,'-').substring(0,10);
+  }
   if(typeof v==='number'&&v>0){const d=new Date(Math.round((v-25569)*86400*1000));const p=n=>String(n).padStart(2,'0');return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());}
   return'';
 }
 function fmtTime(v){
   if(!v&&v!==0)return'';
-  if(typeof v==='string'){const m=v.trim().match(/^(\d{1,2}):(\d{2})/);const p=n=>String(n).padStart(2,'0');return m?p(parseInt(m[1]))+':'+m[2]:v.trim();}
+  if(typeof v==='string'){
+    const isoM=v.match(/^1899-12-30T(\d{2}):(\d{2})/);
+    if(isoM){let h=parseInt(isoM[1])-9;const m=parseInt(isoM[2]);if(h<0)h+=24;const p=n=>String(n).padStart(2,'0');return p(h)+':'+p(m);}
+    const m=v.trim().match(/^(\d{1,2}):(\d{2})/);const p=n=>String(n).padStart(2,'0');return m?p(parseInt(m[1]))+':'+m[2]:v.trim();
+  }
   if(typeof v==='number'){const t=Math.round(v*24*60);const p=n=>String(n).padStart(2,'0');return p(Math.floor(t/60))+':'+p(t%60);}
   return'';
 }

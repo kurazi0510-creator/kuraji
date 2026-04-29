@@ -1210,8 +1210,55 @@ function load(){
 
 const pad=n=>String(n).padStart(2,'0');
 const today=()=>new Date().toISOString().split('T')[0];
-function fmtDate(v){if(!v&&v!==0)return'';if(typeof v==='string'){if(v.includes('T'))return v.split('T')[0];return v.replace(/\//g,'-').substring(0,10);}if(v instanceof Date)return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());if(typeof v==='number'&&v>0){const d=new Date(Math.round((v-25569)*86400*1000));return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}return'';}
-function fmtTime(v){if(v===null||v===undefined||v==='')return'';if(typeof v==='string'){const m=v.trim().match(/^(\d{1,2}):(\d{2})/);return m?pad(parseInt(m[1]))+':'+m[2]:v.trim();}if(v instanceof Date)return pad(v.getHours())+':'+pad(v.getMinutes());if(typeof v==='number'){const t=Math.round(v*24*60);return pad(Math.floor(t/60))+':'+pad(t%60);}return'';}
+function fmtDate(v){
+  if(!v&&v!==0)return'';
+  if(typeof v==='string'){
+    // 1899-12-30T... は壊れた日付（GASのタイムゾーンバグ）→ 空文字を返す
+    if(v.startsWith('1899-')||v.startsWith('1900-')||v.startsWith('1905-'))return'';
+    if(v.includes('T')){
+      // 正常なISO日付は日付部分だけ取る
+      const datePart=v.split('T')[0];
+      if(datePart>='1970-01-01')return datePart;
+      return'';
+    }
+    return v.replace(/\//g,'-').substring(0,10);
+  }
+  if(v instanceof Date){
+    const yr=v.getFullYear();
+    if(yr<1970)return'';
+    return yr+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());
+  }
+  if(typeof v==='number'&&v>0){
+    const d=new Date(Math.round((v-25569)*86400*1000));
+    return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());
+  }
+  return'';
+}
+function fmtTime(v){
+  if(v===null||v===undefined||v==='')return'';
+  if(typeof v==='string'){
+    // 1899-12-30T17:00:00.000Z 形式（GASのタイムゾーンバグ）→ UTC時刻-9時間でJSTに変換
+    const isoM=v.match(/^1899-12-30T(\d{2}):(\d{2})/);
+    if(isoM){
+      let h=parseInt(isoM[1])-9; // UTC→JST変換
+      const m=parseInt(isoM[2]);
+      if(h<0)h+=24;
+      return pad(h)+':'+pad(m);
+    }
+    // 通常のHH:MM形式
+    const m=v.trim().match(/^(\d{1,2}):(\d{2})/);
+    return m?pad(parseInt(m[1]))+':'+m[2]:v.trim();
+  }
+  if(v instanceof Date){
+    // Date型の場合もUTC時刻を使う（GASはUTCで返す）
+    return pad(v.getUTCHours())+':'+pad(v.getUTCMinutes());
+  }
+  if(typeof v==='number'){
+    const t=Math.round(v*24*60);
+    return pad(Math.floor(t/60))+':'+pad(t%60);
+  }
+  return'';
+}
 function calcAge(dob){if(!dob)return'';const d=new Date(dob);if(isNaN(d.getTime()))return'';return Math.floor((new Date()-d)/(365.25*24*3600*1000));}
 // 和暦→西暦変換
 function warekiToSeireki(val){
