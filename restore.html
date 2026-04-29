@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>予約データ診断・復元</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;min-height:100vh;}
+h1{color:#f97316;font-size:1.1rem;margin-bottom:4px;}
+.sub{color:#64748b;font-size:0.8rem;margin-bottom:16px;}
+.card{background:#1e293b;border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid #334155;}
+.card h2{font-size:0.88rem;color:#94a3b8;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #334155;}
+.btn{padding:10px 16px;border:none;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;margin:4px 4px 4px 0;}
+.btn-orange{background:#f97316;color:#fff;}
+.btn-green{background:#16a34a;color:#fff;}
+.btn-blue{background:#2563eb;color:#fff;}
+.btn-red{background:#dc2626;color:#fff;}
+.btn-gray{background:#475569;color:#fff;}
+.btn:disabled{background:#1e293b;color:#475569;border:1px solid #334155;cursor:not-allowed;}
+.log{background:#020617;border-radius:8px;padding:12px;font-size:0.75rem;line-height:1.9;max-height:300px;overflow-y:auto;font-family:monospace;border:1px solid #1e3a5f;}
+.ok{color:#22c55e;} .ng{color:#ef4444;} .info{color:#7dd3fc;} .warn{color:#fbbf24;} .data{color:#a78bfa;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px;}
+.stat{background:#0f172a;border-radius:8px;padding:10px;text-align:center;}
+.stat .n{font-size:1.4rem;font-weight:800;color:#f97316;}
+.stat .l{font-size:0.65rem;color:#64748b;margin-top:2px;}
+.bk-table{width:100%;border-collapse:collapse;font-size:0.75rem;margin-top:8px;}
+.bk-table th{background:#1e3a5f;color:#7dd3fc;padding:5px 6px;text-align:left;}
+.bk-table td{padding:4px 6px;border-bottom:1px solid #1e293b;}
+.bk-table tr:hover td{background:#1e293b;}
+</style>
+</head>
+<body>
+<h1>🔍 予約データ診断・復元ツール</h1>
+<p class="sub">GASとlocalStorageの予約データを確認して復元します</p>
+
+<div class="card">
+  <h2>📊 現在の状態</h2>
+  <div class="stat-grid" id="stat-grid">
+    <div class="stat"><div class="n" id="ls-days">-</div><div class="l">localStorage予約日数</div></div>
+    <div class="stat"><div class="n" id="ls-bk">-</div><div class="l">localStorage予約件数</div></div>
+    <div class="stat"><div class="n" id="gas-days">-</div><div class="l">GAS予約日数</div></div>
+    <div class="stat"><div class="n" id="gas-bk">-</div><div class="l">GAS予約件数</div></div>
+  </div>
+  <button class="btn btn-blue" onclick="diagnose()">🔍 診断開始</button>
+  <button class="btn btn-gray" onclick="showLocalData()">💾 localStorage内容を表示</button>
+</div>
+
+<div class="card" id="gas-card" style="display:none">
+  <h2>☁️ GASの予約データ</h2>
+  <div id="gas-content"></div>
+</div>
+
+<div class="card" id="action-card" style="display:none">
+  <h2>🔧 復元・修正アクション</h2>
+  <div id="action-content"></div>
+</div>
+
+<div class="card">
+  <h2>📋 ログ</h2>
+  <div class="log" id="log">診断ボタンを押してください...</div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+let gasBookings={}, localBookings={}, gasPatients=[], localPatients=[];
+
+function log(msg,cls='info'){
+  const el=document.getElementById('log');
+  const d=document.createElement('div');d.className=cls;d.innerHTML=msg;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+function clearLog(){document.getElementById('log').innerHTML='';}
+
+function fmtDate(v){
+  if(!v)return'';
+  if(typeof v==='string'){if(v.includes('T'))return v.split('T')[0];return v.replace(/\//g,'-').substring(0,10);}
+  if(typeof v==='number'&&v>0){const d=new Date(Math.round((v-25569)*86400*1000));const p=n=>String(n).padStart(2,'0');return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());}
+  return'';
+}
+function fmtTime(v){
+  if(!v&&v!==0)return'';
+  if(typeof v==='string'){const m=v.trim().match(/^(\d{1,2}):(\d{2})/);const p=n=>String(n).padStart(2,'0');return m?p(parseInt(m[1]))+':'+m[2]:v.trim();}
+  if(typeof v==='number'){const t=Math.round(v*24*60);const p=n=>String(n).padStart(2,'0');return p(Math.floor(t/60))+':'+p(t%60);}
+  return'';
+}
+function tryParse(v){try{return JSON.parse(v);}catch(e){return[];}}
+
+// localStorage読み込み
+function loadLocal(){
+  try{
+    const raw=localStorage.getItem('kj_b')||'{}';
+    localBookings=JSON.parse(raw);
+    const rawBak=localStorage.getItem('kj_b_bak')||'{}';
+    const bak=JSON.parse(rawBak);
+    // バックアップとメインをマージ
+    Object.keys(bak).forEach(d=>{if(!localBookings[d])localBookings[d]=bak[d];});
+    localPatients=JSON.parse(localStorage.getItem('kj_p')||'[]');
+  }catch(e){localBookings={};localPatients=[];}
+}
+
+// GASから取得
+async function fetchGAS(){
+  const res=await fetch(GAS+'?action=getAll&t='+Date.now(),{redirect:'follow',cache:'no-store'});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const data=await res.json();
+  if(!data.ok)throw new Error('GAS error');
+
+  // 患者データ
+  const prows=data.customers||[];
+  if(prows.length>1){
+    const headers=(prows[0]||[]).map(h=>String(h||'').trim());
+    gasPatients=prows.slice(1).filter(r=>r[0]&&r[1]).map(r=>{
+      const idx=k=>{const i=headers.indexOf(k);return i>-1?i:-1;};
+      const g=(k,fb)=>{const i=idx(k);return i>-1?String(r[i]||'').trim():String(r[fb]||'').trim();};
+      return{id:String(r[0]||'').trim(),name:String(r[1]||'').trim(),sex:g('性別',2),tel:g('電話番号',3)||g('電話',3),symptom:g('症状',8),last:fmtDate(r[idx('前回通院日')>-1?idx('前回通院日'):9]),dob:fmtDate(r[idx('生年月日')>-1?idx('生年月日'):11])};
+    });
+  }
+
+  // 予約データ
+  const brows=data.bookings||[];
+  gasBookings={};
+  if(brows.length>1){
+    const headers=(brows[0]||[]).map(h=>String(h||'').trim());
+    log('GASヘッダー: '+JSON.stringify(headers),'data');
+    brows.slice(1).forEach(r=>{
+      if(!r[0]&&r[0]!==0)return;
+      const date=fmtDate(r[0]),slot=fmtTime(r[1]);
+      if(!date||!slot)return;
+      if(!gasBookings[date])gasBookings[date]={};
+      const kubunStr=String(r[2]||'').trim();
+      log(`GAS行: ${date} ${slot} [${kubunStr}] ${r[3]||''}`, 'data');
+      if(kubunStr==='(継続)'){gasBookings[date][slot]={cont:true,name:String(r[3]||''),cardId:String(r[4]||'')};}
+      else if(kubunStr==='(キャンセル)'){gasBookings[date][slot]={cancelled:true,name:String(r[3]||''),cancelReason:String(r[18]||'')};}
+      else if(kubunStr){
+        gasBookings[date][slot]={
+          kubun:kubunStr,
+          kubunList:String(r[16]||kubunStr).split(',').filter(s=>s),
+          name:String(r[3]||'').trim(),
+          cardId:String(r[4]||'').trim(),
+          route:String(r[5]||'LINE').trim(),
+          visitCount:String(r[6]||'').trim(),
+          elapsed:String(r[7]||'').trim(),
+          symptom:String(r[8]||'').trim(),
+          option:String(r[9]||'').trim(),
+          menu:String(r[10]||'').trim(),
+          bui:r[19]?String(r[19]).split(',').filter(s=>s):[],
+          shochi:r[11]?tryParse(r[11]):[],
+          shochiMemo:String(r[12]||'').trim(),
+          bussan:r[13]?tryParse(r[13]):[],
+          pay:r[14]?String(r[14]).split(',').filter(s=>s):[],
+          payAmount:String(r[15]||'').trim()
+        };
+      }
+    });
+  }
+  return data;
+}
+
+async function diagnose(){
+  clearLog();
+  loadLocal();
+  log('📡 診断開始...','info');
+
+  // localStorage状況
+  const lsDays=Object.keys(localBookings).length;
+  const lsBk=Object.values(localBookings).reduce((a,d)=>a+Object.keys(d).length,0);
+  document.getElementById('ls-days').textContent=lsDays;
+  document.getElementById('ls-bk').textContent=lsBk;
+  log(`💾 localStorage: ${lsDays}日分 ${lsBk}件`,'info');
+
+  // GAS取得
+  log('☁️ GASからデータ取得中...','info');
+  try{
+    await fetchGAS();
+    const gDays=Object.keys(gasBookings).length;
+    const gBk=Object.values(gasBookings).reduce((a,d)=>a+Object.keys(d).length,0);
+    document.getElementById('gas-days').textContent=gDays;
+    document.getElementById('gas-bk').textContent=gBk;
+    log(`☁️ GAS: ${gDays}日分 ${gBk}件`,'ok');
+
+    // GASのデータを表示
+    showGASData();
+
+    // 比較
+    if(gBk>0){
+      log(`✅ GASに${gBk}件の予約データがあります！復元可能です`,'ok');
+      showRestoreAction(gDays,gBk);
+    }else{
+      log('⚠️ GASに予約データがありません','warn');
+    }
+
+    if(gBk>lsBk){
+      log(`⚠️ GASの方がデータが多い（GAS:${gBk} > localStorage:${lsBk}）→ GASから復元推奨`,'warn');
+    }
+  }catch(e){
+    log('❌ GAS取得エラー: '+e.message,'ng');
+    document.getElementById('gas-days').textContent='取得失敗';
+    document.getElementById('gas-bk').textContent='取得失敗';
+  }
+}
+
+function showGASData(){
+  const card=document.getElementById('gas-card');
+  const content=document.getElementById('gas-content');
+  card.style.display='';
+  const dates=Object.keys(gasBookings).sort();
+  if(!dates.length){content.innerHTML='<p style="color:#64748b;font-size:0.8rem">GASに予約データがありません</p>';return;}
+  let html='<table class="bk-table"><thead><tr><th>日付</th><th>時間</th><th>患者名</th><th>区分</th><th>ルート</th></tr></thead><tbody>';
+  dates.forEach(date=>{
+    Object.entries(gasBookings[date]).sort().forEach(([slot,bk])=>{
+      if(bk.cont)return;
+      const kubun=(bk.kubunList||[bk.kubun||'']).join('+');
+      const style=bk.cancelled?'color:#ef4444;text-decoration:line-through':'';
+      html+=`<tr><td>${date}</td><td>${slot}</td><td style="${style}">${bk.name||'−'}</td><td>${kubun||'−'}</td><td>${bk.route||'−'}</td></tr>`;
+    });
+  });
+  html+='</tbody></table>';
+  content.innerHTML=html;
+}
+
+function showLocalData(){
+  loadLocal();
+  clearLog();
+  const dates=Object.keys(localBookings).sort();
+  if(!dates.length){log('localStorageに予約データがありません','warn');return;}
+  log(`💾 localStorage内の予約データ（${dates.length}日分）:`,'info');
+  dates.forEach(date=>{
+    const slots=Object.entries(localBookings[date]).sort();
+    slots.forEach(([slot,bk])=>{
+      if(bk.cont)return;
+      const kubun=(bk.kubunList||[bk.kubun||'']).join('+');
+      log(`${date} ${slot} [${kubun}] ${bk.name||'−'} ${bk.route||''}`,'data');
+    });
+  });
+}
+
+function showRestoreAction(gDays,gBk){
+  const card=document.getElementById('action-card');
+  const content=document.getElementById('action-content');
+  card.style.display='';
+  content.innerHTML=`
+    <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:10px">
+      GASに<strong style="color:#22c55e">${gBk}件</strong>の予約データが見つかりました。<br>
+      このデータをlocalStorageに復元して管理システムで表示できるようにします。
+    </p>
+    <button class="btn btn-green" onclick="restoreFromGAS()">✅ GASから予約データを復元する</button>
+  `;
+}
+
+async function restoreFromGAS(){
+  log('🔧 GASから復元中...','info');
+  if(!Object.keys(gasBookings).length){
+    log('GASデータがありません。先に診断を実行してください','warn');return;
+  }
+
+  // localStorageとGASをマージ（両方の日付を保持）
+  const merged={...localBookings};
+  let added=0,kept=0;
+  Object.keys(gasBookings).forEach(date=>{
+    if(!merged[date]){
+      merged[date]=gasBookings[date];
+      added++;
+      log(`追加: ${date}（GASのみ）`,'ok');
+    }else{
+      // 両方にある場合はslot単位でマージ
+      Object.keys(gasBookings[date]).forEach(slot=>{
+        if(!merged[date][slot]){
+          merged[date][slot]=gasBookings[date][slot];
+          kept++;
+        }
+      });
+    }
+  });
+
+  // localStorageに保存
+  localStorage.setItem('kj_b',JSON.stringify(merged));
+  localStorage.setItem('kj_b_bak',JSON.stringify(merged));
+
+  // 患者データも復元
+  if(gasPatients.length>0){
+    localStorage.setItem('kj_p',JSON.stringify(gasPatients));
+    log(`患者データ復元: ${gasPatients.length}名`,'ok');
+  }
+
+  const total=Object.values(merged).reduce((a,d)=>a+Object.keys(d).length,0);
+  log(`✅ 復元完了！ 合計${total}件の予約データをlocalStorageに保存しました`,'ok');
+  log(`➡️ 下のボタンから管理システムに戻ってください`,'ok');
+
+  document.getElementById('action-card').innerHTML+=`
+    <div style="margin-top:10px">
+      <button class="btn btn-orange" onclick="window.location.href='kanri.html'">🏥 管理システムに戻る</button>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
