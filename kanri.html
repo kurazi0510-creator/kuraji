@@ -1171,12 +1171,28 @@ function save(){
     localStorage.setItem('kj_bm',JSON.stringify(bussanMaster));
     localStorage.setItem('kj_sm',JSON.stringify(shochiMaster));
     localStorage.setItem('kj_st',JSON.stringify(stockData));
-  }catch(e){}
+    // 予約データのバックアップ（GASで上書きされた時の復元用）
+    localStorage.setItem('kj_b_bak',JSON.stringify(bookings));
+    localStorage.setItem('kj_b_bak_ts',Date.now().toString());
+  }catch(e){console.error('save error:',e);}
 }
 function load(){
   try{
     patients=JSON.parse(localStorage.getItem('kj_p')||'[]');
-    bookings=JSON.parse(localStorage.getItem('kj_b')||'{}');
+    // kj_bとkj_b_bakを比較して多い方を使う（データ消失防止）
+    const bMain=JSON.parse(localStorage.getItem('kj_b')||'{}');
+    const bBak=JSON.parse(localStorage.getItem('kj_b_bak')||'{}');
+    const mainDays=Object.keys(bMain).length;
+    const bakDays=Object.keys(bBak).length;
+    // バックアップの方がデータが多い場合はバックアップを優先
+    if(bakDays>mainDays){
+      bookings=bBak;
+      localStorage.setItem('kj_b',JSON.stringify(bBak));
+      console.log('バックアップから予約データ復元:',bakDays,'日分');
+    }else{
+      // メインとバックアップをマージ（両方の日付を保持）
+      bookings={...bBak,...bMain};
+    }
     uriage=JSON.parse(localStorage.getItem('kj_u')||'{}');
     bussanLog=JSON.parse(localStorage.getItem('kj_bl')||'[]');
     const bm=JSON.parse(localStorage.getItem('kj_bm')||'null');
@@ -1185,7 +1201,11 @@ function load(){
     shochiMaster=sm||DEFAULT_SHOCHI_MASTER;
     const st=JSON.parse(localStorage.getItem('kj_st')||'null');
     stockData=st||DEFAULT_STOCK;
-  }catch(e){patients=[];bookings={};uriage={};bussanLog=[];bussanMaster=DEFAULT_BUSSAN_MASTER;shochiMaster=DEFAULT_SHOCHI_MASTER;stockData=DEFAULT_STOCK;}
+  }catch(e){
+    console.error('load error:',e);
+    patients=[];bookings={};uriage={};bussanLog=[];
+    bussanMaster=DEFAULT_BUSSAN_MASTER;shochiMaster=DEFAULT_SHOCHI_MASTER;stockData=DEFAULT_STOCK;
+  }
 }
 
 const pad=n=>String(n).padStart(2,'0');
@@ -1249,6 +1269,21 @@ function normTel(t){
   if(t.length===8&&/^[2-9]/.test(t))t='0'+t;
   return t;
 }
+// データ破損チェック（日付文字列・「○日前」が混入していないか）
+function isGarbageData(v){
+  if(!v)return false;
+  const s=String(v);
+  if(s.match(/\d+日前/))return true;
+  if(s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:/))return true;
+  if(s.match(/^1899-|^1900-|^1905-/))return true;
+  return false;
+}
+// 症状フィールドの壊れたデータを除去
+function cleanSymptom(v){
+  if(!v)return'−';
+  if(isGarbageData(v))return'−';
+  return v;
+}
 function setStat(cls,txt){const el=document.getElementById('sbadge');el.className='sbadge '+cls;el.textContent=txt;}
 
 // ===== SYNC =====
@@ -1276,10 +1311,10 @@ async function syncAll(){
           return{
             id:String(r[0]||'').trim(),name:String(r[1]||'').trim(),
             kana:g('ふりがな',99),sex:g('性別',2),
-            tel:normTel(g('電話番号',3)||g('電話',3)),
+            tel:normTel((g('電話番号',3)||g('電話',3)).replace(/[^0-9]/g,'')),
             line:g('LINE',4),city:g('住所',5),job:g('職業',6),
-            src:g('流入元',7)||g('流入',7),symptom:g('症状',8),
-            last:gDate('前回通院日',9),count:gInt('通院回数',10),
+            src:g('流入元',7)||g('流入',7),symptom:(()=>{const sv=g('症状',8);return isGarbageData(sv)?'':sv;})(),
+            last:(()=>{const lv=gDate('前回通院日',9);return isGarbageData(lv)?'':lv;})(),count:gInt('通院回数',10),
             dob:gDate('生年月日',11),note:g('備考',12),
           };
         });
@@ -1311,9 +1346,13 @@ async function syncAll(){
             payAmount:String(r[15]||'').trim()
           };}
         });
-        // localStorageにある日付はGASで絶対に上書きしない
+        // ★予約マージルール: localStorageを必ず優先
+        // GASにしかない日付のみ追加。localStorageにある日付は絶対に上書きしない
         Object.keys(newB).forEach(d=>{
-          if(!bookings[d])bookings[d]=newB[d];
+          if(!bookings[d]){
+            bookings[d]=newB[d]; // GASのみの日付を追加
+          }
+          // localStorageにある日付はスキップ（上書きしない）
         });
       }
       save();
@@ -2123,7 +2162,7 @@ function renderPatients(){
       <td style="font-size:0.7rem">${p.city||'−'}</td>
       <td style="font-size:0.7rem">${p.job||'−'}</td>
       <td>${srcBadge}</td>
-      <td style="font-size:0.7rem">${p.symptom||'−'}${p.last?'<br><span style="font-size:0.6rem;color:'+elColor+'">'+p.last+(elDays?'('+elDays+'日前)':'')+'</span>':''}</td>
+      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+'">'+p.last+(elDays?'('+elDays+'日前)':'')+'</span>':''}</td>
       <td><button class="btn be bsm" onclick="openPEdit('${p.id}')">編集</button></td>
     </tr>`;
   }).join('');
