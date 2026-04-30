@@ -72,13 +72,15 @@ function log(msg,cls='info'){
 }
 function clearLog(){document.getElementById('log').innerHTML='';}
 const pad=n=>String(n).padStart(2,'0');
+
+function fmtDate(v){
   if(!v)return'';
   if(typeof v==='string'){
     if(v.startsWith('1899-')||v.startsWith('1900-')||v.startsWith('1905-'))return'';
     if(v.includes('T')){const dp=v.split('T')[0];return dp>='1970-01-01'?dp:'';}
     return v.replace(/\//g,'-').substring(0,10);
   }
-  if(typeof v==='number'&&v>0){const d=new Date(Math.round((v-25569)*86400*1000));const p=n=>String(n).padStart(2,'0');return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());}
+  if(typeof v==='number'&&v>0){const d=new Date(Math.round((v-25569)*86400*1000));return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}
   return'';
 }
 function fmtTime(v){
