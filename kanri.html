@@ -1236,26 +1236,37 @@ function fmtDate(v){
 }
 function fmtTime(v){
   if(v===null||v===undefined||v==='')return'';
+  // 有効スロット一覧（-9h変換後にここに丸める）
+  const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+  const snapSlot=jst=>{
+    const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+    const jstMin=toMin(jst);
+    let best=SLOTS[0],bestDiff=9999;
+    SLOTS.forEach(s=>{const d=Math.abs(toMin(s)-jstMin);if(d<bestDiff){bestDiff=d;best=s;}});
+    return bestDiff<=30?best:jst; // 20分以内なら最近スロットに丸める
+  };
   if(typeof v==='string'){
-    // 1899-12-30T17:00:00.000Z 形式（GASのタイムゾーンバグ）→ UTC時刻-9時間でJSTに変換
+    // 1899-12-30T17:00:00.000Z形式（GASタイムゾーンバグ）→ UTC-9h→JST→スロットスナップ
     const isoM=v.match(/^1899-12-30T(\d{2}):(\d{2})/);
     if(isoM){
-      let h=parseInt(isoM[1])-9; // UTC→JST変換
+      let h=parseInt(isoM[1])-9;
       const m=parseInt(isoM[2]);
       if(h<0)h+=24;
-      return pad(h)+':'+pad(m);
+      const jst=pad(h)+':'+pad(m);
+      return snapSlot(jst);
     }
     // 通常のHH:MM形式
     const m=v.trim().match(/^(\d{1,2}):(\d{2})/);
-    return m?pad(parseInt(m[1]))+':'+m[2]:v.trim();
+    if(m){const jst=pad(parseInt(m[1]))+':'+m[2];return snapSlot(jst);}
+    return v.trim();
   }
   if(v instanceof Date){
-    // Date型の場合もUTC時刻を使う（GASはUTCで返す）
-    return pad(v.getUTCHours())+':'+pad(v.getUTCMinutes());
+    const h=v.getUTCHours()-9<0?v.getUTCHours()-9+24:v.getUTCHours()-9;
+    return snapSlot(pad(h)+':'+pad(v.getUTCMinutes()));
   }
   if(typeof v==='number'){
     const t=Math.round(v*24*60);
-    return pad(Math.floor(t/60))+':'+pad(t%60);
+    return snapSlot(pad(Math.floor(t/60))+':'+pad(t%60));
   }
   return'';
 }

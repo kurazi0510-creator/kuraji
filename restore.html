@@ -84,12 +84,15 @@ function fmtDate(v){
 }
 function fmtTime(v){
   if(!v&&v!==0)return'';
+  const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+  const p=n=>String(n).padStart(2,'0');
+  const snap=jst=>{const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};const jm=toMin(jst);let best=SLOTS[0],bd=9999;SLOTS.forEach(s=>{const d=Math.abs(toMin(s)-jm);if(d<bd){bd=d;best=s;}});return bd<=30?best:jst;};
   if(typeof v==='string'){
     const isoM=v.match(/^1899-12-30T(\d{2}):(\d{2})/);
-    if(isoM){let h=parseInt(isoM[1])-9;const m=parseInt(isoM[2]);if(h<0)h+=24;const p=n=>String(n).padStart(2,'0');return p(h)+':'+p(m);}
-    const m=v.trim().match(/^(\d{1,2}):(\d{2})/);const p=n=>String(n).padStart(2,'0');return m?p(parseInt(m[1]))+':'+m[2]:v.trim();
+    if(isoM){let h=parseInt(isoM[1])-9;const m=parseInt(isoM[2]);if(h<0)h+=24;return snap(p(h)+':'+p(m));}
+    const m=v.trim().match(/^(\d{1,2}):(\d{2})/);return m?snap(p(parseInt(m[1]))+':'+m[2]):v.trim();
   }
-  if(typeof v==='number'){const t=Math.round(v*24*60);const p=n=>String(n).padStart(2,'0');return p(Math.floor(t/60))+':'+p(t%60);}
+  if(typeof v==='number'){const t=Math.round(v*24*60);return snap(p(Math.floor(t/60))+':'+p(t%60));}
   return'';
 }
 function tryParse(v){try{return JSON.parse(v);}catch(e){return[];}}
