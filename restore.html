@@ -71,8 +71,7 @@ function log(msg,cls='info'){
   el.appendChild(d);el.scrollTop=el.scrollHeight;
 }
 function clearLog(){document.getElementById('log').innerHTML='';}
-
-function fmtDate(v){
+const pad=n=>String(n).padStart(2,'0');
   if(!v)return'';
   if(typeof v==='string'){
     if(v.startsWith('1899-')||v.startsWith('1900-')||v.startsWith('1905-'))return'';
