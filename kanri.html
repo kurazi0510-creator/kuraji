@@ -1246,12 +1246,12 @@ function fmtTime(v){
     return bestDiff<=30?best:jst; // 20分以内なら最近スロットに丸める
   };
   if(typeof v==='string'){
-    // 1899-12-30T17:00:00.000Z形式（GASタイムゾーンバグ）→ UTC-9h→JST→スロットスナップ
+    // 1899-12-30T06:00:00.000Z形式（GASタイムゾーンバグ）→ UTC+9h→JST→スロットスナップ
     const isoM=v.match(/^1899-12-30T(\d{2}):(\d{2})/);
     if(isoM){
-      let h=parseInt(isoM[1])-9;
+      let h=parseInt(isoM[1])+9; // UTC→JST は +9時間
       const m=parseInt(isoM[2]);
-      if(h<0)h+=24;
+      if(h>=24)h-=24;
       const jst=pad(h)+':'+pad(m);
       return snapSlot(jst);
     }
@@ -1261,7 +1261,8 @@ function fmtTime(v){
     return v.trim();
   }
   if(v instanceof Date){
-    const h=v.getUTCHours()-9<0?v.getUTCHours()-9+24:v.getUTCHours()-9;
+    let h=v.getUTCHours()+9; // UTC→JST は +9時間
+    if(h>=24)h-=24;
     return snapSlot(pad(h)+':'+pad(v.getUTCMinutes()));
   }
   if(typeof v==='number'){

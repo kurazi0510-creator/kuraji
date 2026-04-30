@@ -89,7 +89,7 @@ function fmtTime(v){
   const snap=jst=>{const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};const jm=toMin(jst);let best=SLOTS[0],bd=9999;SLOTS.forEach(s=>{const d=Math.abs(toMin(s)-jm);if(d<bd){bd=d;best=s;}});return bd<=30?best:jst;};
   if(typeof v==='string'){
     const isoM=v.match(/^1899-12-30T(\d{2}):(\d{2})/);
-    if(isoM){let h=parseInt(isoM[1])-9;const m=parseInt(isoM[2]);if(h<0)h+=24;return snap(p(h)+':'+p(m));}
+    if(isoM){let h=parseInt(isoM[1])+9;const m=parseInt(isoM[2]);if(h>=24)h-=24;return snap(p(h)+':'+p(m));}
     const m=v.trim().match(/^(\d{1,2}):(\d{2})/);return m?snap(p(parseInt(m[1]))+':'+m[2]):v.trim();
   }
   if(typeof v==='number'){const t=Math.round(v*24*60);return snap(p(Math.floor(t/60))+':'+p(t%60));}
