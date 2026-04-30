@@ -1247,13 +1247,17 @@ function fmtTime(v){
   };
   if(typeof v==='string'){
     // 1899-12-30T06:00:00.000Z形式（GASタイムゾーンバグ）→ UTC+9h→JST→スロットスナップ
-    const isoM=v.match(/^1899-12-30T(\d{2}):(\d{2})/);
+    // 1899-12-30 or 1899-12-31 形式のGAS時刻（Excelシリアル値バグ）
+    const isoM=v.match(/^1899-12-3([01])T(\d{2}):(\d{2})/);
     if(isoM){
-      let h=parseInt(isoM[1])+9; // UTC→JST は +9時間
-      const m=parseInt(isoM[2]);
-      if(h>=24)h-=24;
-      const jst=pad(h)+':'+pad(m);
-      return snapSlot(jst);
+      // 1899-12-31の場合は+24時間(1440分)してから計算
+      const extraDay=parseInt(isoM[1])===1?1440:0;
+      const gasMin=parseInt(isoM[2])*60+parseInt(isoM[3])+extraDay;
+      // 実測オフセット520分(8時間40分)を引く
+      let slotMin=gasMin-520;
+      if(slotMin<0)slotMin+=1440;
+      const rh=Math.floor(slotMin/60),rm=slotMin%60;
+      return snapSlot(pad(rh)+':'+pad(rm));
     }
     // 通常のHH:MM形式
     const m=v.trim().match(/^(\d{1,2}):(\d{2})/);
