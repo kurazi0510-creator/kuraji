@@ -1241,9 +1241,17 @@ function fmtTime(v){
     '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
     '19:00','19:20','19:40'];
   const snapSlot=min=>{
-    let best=SLOTS[0],bestDiff=9999;
-    SLOTS.forEach(s=>{const[sh,sm]=s.split(':').map(Number);const d=Math.abs(sh*60+sm-min);if(d<bestDiff){bestDiff=d;best=s;}});
-    return bestDiff<=20?best:pad(Math.floor(min/60))+':'+pad(min%60);
+    let best=null,bestDiff=9999;
+    SLOTS.forEach(s=>{
+      const[sh,sm]=s.split(':').map(Number);
+      const slotMin=sh*60+sm;
+      const d=Math.abs(slotMin-min);
+      if(d<bestDiff){bestDiff=d;best=s;}
+    });
+    // 30分以内なら最近接スロットを返す（20分→30分に緩和）
+    if(bestDiff<=30)return best;
+    // それ以外はHH:MM形式で返す
+    return pad(Math.floor(min/60)%24)+':'+pad(min%60);
   };
   if(typeof v==='string'){
     // GASのExcelシリアル値バグ: 1899-12-30 or 1899-12-31 形式
@@ -1373,14 +1381,29 @@ async function syncAll(){
           const g=(k,fb)=>{const i=idx(k);return i>-1?String(r[i]||'').trim():String(r[fb]||'').trim();};
           const gDate=(k,fb)=>{const i=idx(k);return i>-1?fmtDate(r[i]):fmtDate(r[fb]);};
           const gInt=(k,fb)=>{const i=idx(k);return i>-1?parseInt(r[i])||0:parseInt(r[fb])||0;};
+          // ヘッダー名で完全一致取得（フォールバックはpushPのカラム順と完全一致）
+          // pushP送信順: 診0,名1,性2,電3,LINE4,住5,職6,流7,症8,前9,通10,生11,備12
+          const id_val = String(r[0]||'').trim();
+          const name_val = String(r[1]||'').trim();
+          const sex_val = g('性別',2);
+          const tel_val = normTel((g('電話番号',3)||g('電話',3)).replace(/[^0-9]/g,''));
+          const line_val = g('LINE',4);
+          const city_val = g('住所',5);
+          const job_val = g('職業',6);
+          const src_val = g('流入元',7)||g('流入',7);
+          const sym_raw = g('症状',8);
+          const sym_val = isGarbageData(sym_raw)?'':sym_raw;
+          const last_raw = gDate('前回通院日',9);
+          const last_val = isGarbageData(last_raw)?'':last_raw;
+          const cnt_val = gInt('通院回数',10);
+          const dob_val = gDate('生年月日',11);
+          const note_val = g('備考',12);
           return{
-            id:String(r[0]||'').trim(),name:String(r[1]||'').trim(),
-            kana:g('ふりがな',99),sex:g('性別',2),
-            tel:normTel((g('電話番号',3)||g('電話',3)).replace(/[^0-9]/g,'')),
-            line:g('LINE',4),city:g('住所',5),job:g('職業',6),
-            src:g('流入元',7)||g('流入',7),symptom:(()=>{const sv=g('症状',8);return isGarbageData(sv)?'':sv;})(),
-            last:(()=>{const lv=gDate('前回通院日',9);return isGarbageData(lv)?'':lv;})(),count:gInt('通院回数',10),
-            dob:gDate('生年月日',11),note:g('備考',12),
+            id:id_val,name:name_val,kana:g('ふりがな',99),
+            sex:sex_val,tel:tel_val,line:line_val,
+            city:city_val,job:job_val,src:src_val,
+            symptom:sym_val,last:last_val,count:cnt_val,
+            dob:dob_val,note:note_val,
           };
         });
         if(parsed.length>0)patients=parsed;

@@ -89,10 +89,11 @@ function fmtTime(v){
     '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
     '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
     '19:00','19:20','19:40'];
-  const snapSlot=min=>{
-    let best=SLOTS[0],bestDiff=9999;
+const snapSlot=min=>{
+    let best=null,bestDiff=9999;
     SLOTS.forEach(s=>{const[sh,sm]=s.split(':').map(Number);const d=Math.abs(sh*60+sm-min);if(d<bestDiff){bestDiff=d;best=s;}});
-    return bestDiff<=20?best:pad(Math.floor(min/60))+':'+pad(min%60);
+    if(bestDiff<=30)return best;
+    return pad(Math.floor(min/60)%24)+':'+pad(min%60);
   };
   if(typeof v==='string'){
     // GASのExcelシリアル値バグ: 1899-12-30 or 1899-12-31 形式
