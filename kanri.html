@@ -1381,29 +1381,60 @@ async function syncAll(){
           const g=(k,fb)=>{const i=idx(k);return i>-1?String(r[i]||'').trim():String(r[fb]||'').trim();};
           const gDate=(k,fb)=>{const i=idx(k);return i>-1?fmtDate(r[i]):fmtDate(r[fb]);};
           const gInt=(k,fb)=>{const i=idx(k);return i>-1?parseInt(r[i])||0:parseInt(r[fb])||0;};
-          // ヘッダー名で完全一致取得（フォールバックはpushPのカラム順と完全一致）
-          // pushP送信順: 診0,名1,性2,電3,LINE4,住5,職6,流7,症8,前9,通10,生11,備12
-          const id_val = String(r[0]||'').trim();
-          const name_val = String(r[1]||'').trim();
-          const sex_val = g('性別',2);
-          const tel_val = normTel((g('電話番号',3)||g('電話',3)).replace(/[^0-9]/g,''));
-          const line_val = g('LINE',4);
-          const city_val = g('住所',5);
-          const job_val = g('職業',6);
-          const src_val = g('流入元',7)||g('流入',7);
-          const sym_raw = g('症状',8);
-          const sym_val = isGarbageData(sym_raw)?'':sym_raw;
-          const last_raw = gDate('前回通院日',9);
-          const last_val = isGarbageData(last_raw)?'':last_raw;
-          const cnt_val = gInt('通院回数',10);
-          const dob_val = gDate('生年月日',11);
-          const note_val = g('備考',12);
+          // ★GAS実データのカラム順に完全対応
+          // GASヘッダー: 診0,名1,性2,電3,LINE4,住5,職6,流7,症8,前9,通10,生11,備12
+          // 実測データ:  券0,名1,性2,電3,住4, 職5,流6,  ,  ,   ,生10,NaN11,備12
+          // → ヘッダー名優先で取得し、実測ズレをインデックスで吸収する
+          const _hIdx = k => headers.indexOf(k);
+          const _g = (k,fb) => {
+            const i=_hIdx(k);
+            const v = i>-1 ? r[i] : r[fb];
+            return String(v||'').trim();
+          };
+          const _gd = (k,fb) => {
+            const i=_hIdx(k); const v=i>-1?r[i]:r[fb]; return fmtDate(v);
+          };
+          // 電話番号
+          const p_tel = normTel((_g('電話番号',3)||_g('電話',3)).replace(/[^0-9]/g,''));
+          // LINE（ヘッダー「LINE」の位置 or 空）
+          const p_line = _g('LINE', 98)||'';
+          // 住所: ヘッダー「住所」が[5]だがデータは[4]に入っている → 両方試して長い方
+          const p_city_hdr = _g('住所', 98);
+          const p_city_raw = String(r[4]||'').trim();
+          const p_city = p_city_hdr.length > p_city_raw.length ? p_city_hdr : p_city_raw;
+          // 職業
+          const p_job_hdr = _g('職業', 98);
+          const p_job_raw = String(r[5]||'').trim();
+          const p_job = p_job_hdr||p_job_raw;
+          // 流入元
+          const p_src = _g('流入元',6)||_g('流入',6);
+          // 症状
+          const p_sym_raw = _g('症状',7);
+          const p_sym = isGarbageData(p_sym_raw)?'':p_sym_raw;
+          // 前回通院日
+          const p_last_raw = _gd('前回通院日',9);
+          const p_last = isGarbageData(p_last_raw)?'':p_last_raw;
+          // 通院回数（ヘッダー「通院回数」優先）
+          const p_cnt_i = _hIdx('通院回数');
+          const p_cnt = p_cnt_i>-1 ? (parseInt(r[p_cnt_i])||0) : 0;
+          // 生年月日: ヘッダー「生年月日」の位置 or [10]（実データでは[10]に年4桁が入っている）
+          const p_dob_i = _hIdx('生年月日');
+          const p_dob_raw = p_dob_i>-1 ? r[p_dob_i] : r[10];
+          const p_dob = (()=>{
+            if(!p_dob_raw) return '';
+            const s = String(p_dob_raw).trim();
+            if(!s||isGarbageData(s)||s.includes('NaN')||s==='-') return '';
+            if(/^\d{4}$/.test(s)) return s+'-01-01'; // 年だけの場合
+            return fmtDate(p_dob_raw)||'';
+          })();
+          // 備考
+          const p_note = _g('備考',12);
           return{
-            id:id_val,name:name_val,kana:g('ふりがな',99),
-            sex:sex_val,tel:tel_val,line:line_val,
-            city:city_val,job:job_val,src:src_val,
-            symptom:sym_val,last:last_val,count:cnt_val,
-            dob:dob_val,note:note_val,
+            id:String(r[0]||'').trim(), name:String(r[1]||'').trim(),
+            kana:_g('ふりがな',99), sex:_g('性別',2),
+            tel:p_tel, line:p_line, city:p_city, job:p_job,
+            src:p_src, symptom:p_sym, last:p_last, count:p_cnt,
+            dob:p_dob, note:p_note,
           };
         });
         if(parsed.length>0)patients=parsed;

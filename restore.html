@@ -154,9 +154,20 @@ async function fetchGAS(){
   if(prows.length>1){
     const headers=(prows[0]||[]).map(h=>String(h||'').trim());
     gasPatients=prows.slice(1).filter(r=>r[0]&&r[1]).map(r=>{
-      const idx=k=>{const i=headers.indexOf(k);return i>-1?i:-1;};
-      const g=(k,fb)=>{const i=idx(k);return i>-1?String(r[i]||'').trim():String(r[fb]||'').trim();};
-      return{id:String(r[0]||'').trim(),name:String(r[1]||'').trim(),sex:g('性別',2),tel:g('電話番号',3)||g('電話',3),symptom:g('症状',8),last:fmtDate(r[idx('前回通院日')>-1?idx('前回通院日'):9]),dob:fmtDate(r[idx('生年月日')>-1?idx('生年月日'):11])};
+      // GAS実データに合わせた正しいパース
+      const _hi = k=>headers.indexOf(k);
+      const _gv = (k,fb)=>{const i=_hi(k);return String((i>-1?r[i]:r[fb])||'').trim();};
+      const p_tel = (_gv('電話番号',3)||_gv('電話',3)).replace(/[^0-9]/g,'');
+      const normT = t=>{if(!t)return'';if(t.length===10&&/^[6789]/.test(t))t='0'+t;if(t.length===9&&/^[789]/.test(t))t='0'+t;return t;};
+      const p_city = (()=>{const hv=_gv('住所',98);const rv=String(r[4]||'').trim();return hv.length>rv.length?hv:rv;})();
+      const p_job = _gv('職業',98)||String(r[5]||'').trim();
+      const p_src = _gv('流入元',6)||_gv('流入',6);
+      const p_line = _gv('LINE',98)||'';
+      const p_sym = (()=>{const v=_gv('症状',7);return(v&&v.match(/\d+日前/))?'':v;})();
+      const p_last = (()=>{const i=_hi('前回通院日');const v=fmtDate(i>-1?r[i]:r[9]);return(v&&(v.startsWith('1899')||v.startsWith('1905')))?'':v;})();
+      const p_cnt_i=_hi('通院回数');const p_cnt=p_cnt_i>-1?parseInt(r[p_cnt_i])||0:0;
+      const p_dob = (()=>{const i=_hi('生年月日');const raw=i>-1?r[i]:r[10];if(!raw)return'';const s=String(raw).trim();if(!s||s.includes('NaN')||s==='-')return'';if(/^\d{4}$/.test(s))return s+'-01-01';return fmtDate(raw)||'';})();
+      return{id:String(r[0]||'').trim(),name:String(r[1]||'').trim(),sex:_gv('性別',2),tel:normT(p_tel),line:p_line,city:p_city,job:p_job,src:p_src,symptom:p_sym,last:p_last,count:p_cnt,dob:p_dob,note:_gv('備考',12)};
     });
   }
 
