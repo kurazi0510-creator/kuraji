@@ -297,24 +297,79 @@ async function restoreFromGAS(){
     log('GASデータがありません。先に診断を実行してください','warn');return;
   }
 
-  // localStorageとGASをマージ（両方の日付を保持）
+  const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
+    '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
+    '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
+    '19:00','19:20','19:40'];
+
+  // localStorageとGASをマージ
   const merged={...localBookings};
-  let added=0,kept=0;
   Object.keys(gasBookings).forEach(date=>{
-    if(!merged[date]){
-      merged[date]=gasBookings[date];
-      added++;
-      log(`追加: ${date}（GASのみ）`,'ok');
-    }else{
-      // 両方にある場合はslot単位でマージ
-      Object.keys(gasBookings[date]).forEach(slot=>{
-        if(!merged[date][slot]){
-          merged[date][slot]=gasBookings[date][slot];
-          kept++;
-        }
-      });
-    }
+    if(!merged[date])merged[date]={};
+    Object.keys(gasBookings[date]).forEach(slot=>{
+      if(!merged[date][slot]){
+        merged[date][slot]=gasBookings[date][slot];
+      }
+    });
   });
+
+  // ★継続枠の修正：各日付で継続枠の整合性をチェック
+  let fixCount=0;
+  Object.keys(merged).forEach(date=>{
+    const daySlots=SLOTS;
+    // まずメイン予約（cont:falseかつcancelled:false）を特定
+    daySlots.forEach((slot,idx)=>{
+      const bk=merged[date][slot];
+      if(!bk||bk.cont||bk.cancelled)return;
+      // このスロットはメイン予約 → 区分に応じた継続枠を確認
+      const kubunList=bk.kubunList||[bk.kubun||''];
+      let slots=1;
+      if(kubunList.includes('新規'))slots=3;
+      else if(kubunList.includes('自費')&&kubunList.includes('保険'))slots=3;
+      else if(kubunList.includes('自費'))slots=2;
+      // 次のスロットが継続枠になっているべき
+      for(let i=1;i<slots;i++){
+        const ni=idx+i;
+        if(ni>=SLOTS.length)break;
+        const nextSlot=SLOTS[ni];
+        if(nextSlot==='BREAK')break;
+        if(!merged[date][nextSlot]){
+          // 継続枠がない → 追加
+          merged[date][nextSlot]={cont:true,name:bk.name,cardId:bk.cardId};
+          fixCount++;
+        }else if(merged[date][nextSlot].cont){
+          // すでに継続枠 → 名前を正しく設定
+          merged[date][nextSlot]={cont:true,name:bk.name,cardId:bk.cardId};
+        }
+      }
+    });
+
+    // 前のスロットがメイン予約なのに継続扱いになっているスロットを修正
+    // 「1つ前が継続中 && 2つ前がメイン」の場合、1つ前を修正
+    daySlots.forEach((slot,idx)=>{
+      const bk=merged[date][slot];
+      if(!bk||!bk.cont)return;
+      // このスロットが継続枠になっている → 前のスロットを確認
+      let foundMain=false;
+      for(let back=1;back<=2;back++){
+        const pi=idx-back;
+        if(pi<0)break;
+        const prevBk=merged[date][SLOTS[pi]];
+        if(prevBk&&!prevBk.cont&&!prevBk.cancelled){
+          foundMain=true;
+          break;
+        }
+      }
+      if(!foundMain){
+        // 前にメイン予約がない継続枠 → 削除（孤立した継続枠）
+        delete merged[date][slot];
+        fixCount++;
+        log(`修正: ${date} ${slot} 孤立した継続枠を削除`,'warn');
+      }
+    });
+  });
+
+  if(fixCount>0)log(`✅ 継続枠 ${fixCount}件を修正しました`,'ok');
 
   // localStorageに保存
   localStorage.setItem('kj_b',JSON.stringify(merged));
