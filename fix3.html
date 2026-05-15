@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>予約データ直接編集ツール</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:16px;}
+.card{background:#1e293b;border-radius:14px;padding:16px;max-width:700px;margin:0 auto;}
+h1{color:#f97316;font-size:0.95rem;text-align:center;margin-bottom:4px;}
+.sub{color:#64748b;font-size:0.72rem;text-align:center;margin-bottom:14px;}
+.toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;}
+input[type=text]{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:0.8rem;flex:1;min-width:120px;}
+.btn{padding:7px 14px;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;white-space:nowrap;}
+.btn-search{background:#1e3a5f;color:#7dd3fc;}
+.btn-save{background:#f97316;color:white;}
+.btn-back{background:#1e293b;color:#94a3b8;border:1px solid #334155;}
+.btn-del{background:#450a0a;color:#ef4444;border:1px solid #7f1d1d;padding:3px 8px;font-size:0.7rem;border-radius:4px;cursor:pointer;}
+.log{font-family:monospace;font-size:0.72rem;line-height:1.8;background:#0f172a;border-radius:8px;padding:10px;margin-bottom:10px;max-height:120px;overflow-y:auto;}
+.ok{color:#22c55e;}.ng{color:#ef4444;}.info{color:#94a3b8;}.warn{color:#fbbf24;}
+table{width:100%;border-collapse:collapse;font-size:0.72rem;}
+th{background:#1e3a5f;color:#7dd3fc;padding:5px 6px;text-align:left;position:sticky;top:0;}
+td{padding:4px 6px;border-bottom:1px solid #1e293b;vertical-align:middle;}
+tr:hover td{background:#1e293b;}
+.del-row td{background:#2d0a0a!important;opacity:0.5;text-decoration:line-through;}
+.tag-cont{background:#1e3a5f;color:#7dd3fc;padding:1px 5px;border-radius:3px;font-size:0.65rem;}
+.tag-main{background:#14532d;color:#22c55e;padding:1px 5px;border-radius:3px;font-size:0.65rem;}
+.tag-cancel{background:#3b1f00;color:#fbbf24;padding:1px 5px;border-radius:3px;font-size:0.65rem;}
+.tbl-wrap{max-height:420px;overflow-y:auto;border-radius:8px;border:1px solid #334155;}
+.count-badge{background:#f97316;color:white;border-radius:12px;padding:1px 8px;font-size:0.7rem;margin-left:6px;}
+.summary{background:#0f172a;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:0.75rem;color:#94a3b8;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔧 予約データ直接編集ツール</h1>
+  <p class="sub">GASスプレッドシートの予約を直接確認・削除できます</p>
+
+  <div class="toolbar">
+    <input type="text" id="dateInput" placeholder="日付 例: 2026-04-01" value="2026-04-01">
+    <input type="text" id="nameInput" placeholder="患者名（任意）" value="今井">
+    <button class="btn btn-search" onclick="search()">🔍 検索</button>
+  </div>
+
+  <div class="log" id="log"><div class="info">日付と患者名を入力して検索してください</div></div>
+
+  <div id="summary" class="summary" style="display:none"></div>
+  <div class="tbl-wrap" id="tbl-wrap" style="display:none">
+    <table>
+      <thead><tr><th>時間</th><th>区分</th><th>患者名</th><th>カードNo</th><th>ルート</th><th>操作</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+    <button class="btn btn-save" id="save-btn" style="display:none;flex:1" onclick="save()">💾 チェックした行を削除してGASに保存</button>
+    <button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムへ</button>
+  </div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+
+let allRows=[], hdr=[], deleteSet=new Set();
+
+function log(msg,cls='info'){
+  const d=document.getElementById('log');
+  d.innerHTML=`<div class="${cls}">${msg}</div>`;
+}
+
+async function search(){
+  const date=document.getElementById('dateInput').value.trim();
+  const name=document.getElementById('nameInput').value.trim();
+  if(!date){log('日付を入力してください','warn');return;}
+  
+  log('📡 GASからデータ取得中...','info');
+  try{
+    const res=await fetch(GAS+'?action=getAll&_='+Date.now(),{redirect:'follow'});
+    const raw=await res.text();
+    let data;
+    try{data=JSON.parse(raw);}
+    catch(e){const m=raw.match(/\{[\s\S]*\}/);if(m)data=JSON.parse(m[0]);else throw new Error('パースエラー');}
+    
+    allRows=data.bookings||[];
+    hdr=allRows[0]||[];
+    deleteSet=new Set();
+    
+    const dataRows=allRows.slice(1);
+    // 日付でフィルタ（部分一致対応）
+    let filtered=dataRows.map((r,i)=>({r,origIdx:i+1}))
+      .filter(({r})=>{
+        const rd=String(r[0]||'').replace(/\//g,'-');
+        return rd.includes(date.replace(/\//g,'-'));
+      });
+    
+    if(name){
+      filtered=filtered.filter(({r})=>String(r[3]||'').includes(name));
+    }
+    
+    if(filtered.length===0){
+      log(`「${date}」${name?'/ '+name:''}の予約が見つかりません。日付形式を確認してください（例: 2026-04-01）`,'warn');
+      document.getElementById('tbl-wrap').style.display='none';
+      document.getElementById('save-btn').style.display='none';
+      document.getElementById('summary').style.display='none';
+      return;
+    }
+    
+    log(`✅ ${filtered.length}件ヒット（全${dataRows.length}行中）`,'ok');
+    
+    // サマリー表示
+    const names={};
+    filtered.forEach(({r})=>{
+      const n=String(r[3]||'');
+      const kubun=String(r[2]||'');
+      if(kubun!=='(継続)')names[n]=(names[n]||0)+1;
+    });
+    const sumHtml=Object.entries(names).map(([n,c])=>
+      `<span>${n}: <strong style="color:${c>1?'#f97316':'#22c55e'}">${c}枠${c>1?' ⚠️重複疑い':''}</strong></span>`
+    ).join('　／　');
+    document.getElementById('summary').innerHTML=sumHtml;
+    document.getElementById('summary').style.display='block';
+    
+    // テーブル表示
+    const tbody=document.getElementById('tbody');
+    tbody.innerHTML='';
+    filtered.forEach(({r,origIdx})=>{
+      const kubun=String(r[2]||'');
+      const name2=String(r[3]||'');
+      const cardId=String(r[4]||'');
+      const route=String(r[5]||'');
+      const time=String(r[1]||'');
+      
+      let tag='';
+      if(kubun==='(継続)')tag='<span class="tag-cont">継続</span>';
+      else if(kubun==='(キャンセル)')tag='<span class="tag-cancel">キャンセル</span>';
+      else tag='<span class="tag-main">メイン</span>';
+      
+      const tr=document.createElement('tr');
+      tr.id='row-'+origIdx;
+      tr.innerHTML=`
+        <td><strong>${time}</strong></td>
+        <td>${tag}<br><span style="color:#64748b;font-size:0.65rem">${kubun}</span></td>
+        <td>${name2}</td>
+        <td style="color:#64748b">${cardId}</td>
+        <td style="color:#64748b">${route}</td>
+        <td><button class="btn-del" onclick="toggleDel(${origIdx},this)">削除</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+    document.getElementById('tbl-wrap').style.display='block';
+    document.getElementById('save-btn').style.display='block';
+    
+  }catch(e){
+    log('❌ '+e.message,'ng');
+  }
+}
+
+function toggleDel(idx,btn){
+  const tr=document.getElementById('row-'+idx);
+  if(deleteSet.has(idx)){
+    deleteSet.delete(idx);
+    tr.classList.remove('del-row');
+    btn.textContent='削除';
+    btn.style.background='#450a0a';
+  }else{
+    deleteSet.add(idx);
+    tr.classList.add('del-row');
+    btn.textContent='取消';
+    btn.style.background='#166534';
+  }
+  const btn2=document.getElementById('save-btn');
+  btn2.textContent=deleteSet.size>0?`💾 ${deleteSet.size}行を削除してGASに保存`:'💾 チェックした行を削除してGASに保存';
+}
+
+async function save(){
+  if(deleteSet.size===0){log('削除する行を選択してください（削除ボタンをタップ）','warn');return;}
+  if(!confirm(`${deleteSet.size}行を削除してGASに保存します。よろしいですか？`))return;
+  
+  log('💾 保存中...','info');
+  const newRows=[hdr,...allRows.slice(1).filter((_,i)=>!deleteSet.has(i+1))];
+  
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(newRows)}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res.text());
+    if(d.ok){
+      // localStorageも更新
+      try{
+        const newB={};
+        newRows.slice(1).forEach(r=>{
+          const date=String(r[0]||'').trim();
+          const slot=String(r[1]||'').trim();
+          const kubun=String(r[2]||'').trim();
+          const name=String(r[3]||'').trim();
+          const cardId=String(r[4]||'').trim();
+          if(!date||!slot)return;
+          if(!newB[date])newB[date]={};
+          if(kubun==='(継続)'){newB[date][slot]={cont:true,name,cardId};}
+          else if(kubun==='(キャンセル)'){newB[date][slot]={cancelled:true,name,cardId,cancelReason:String(r[18]||''),reBookedBy:String(r[17]||'')};}
+          else{newB[date][slot]={kubun,name,cardId,route:String(r[5]||''),visitCount:String(r[6]||''),elapsed:String(r[7]||''),symptom:String(r[8]||''),option:String(r[9]||''),menu:String(r[10]||''),pay:r[14]?String(r[14]).split(',').filter(s=>s):[],payAmount:String(r[15]||''),kubunList:String(r[16]||kubun).split(',').filter(s=>s),bui:r[19]?String(r[19]).split(',').filter(s=>s):[]};}
+        });
+        localStorage.setItem('kj_bookings',JSON.stringify(newB));
+      }catch(e2){}
+      allRows=newRows;
+      deleteSet=new Set();
+      log(`✅ ${deleteSet.size}行を削除してGASに保存完了！再検索で確認できます`,'ok');
+      setTimeout(()=>search(),800);
+    }else{
+      throw new Error(d.error||'GAS保存エラー');
+    }
+  }catch(e){
+    log('❌ '+e.message,'ng');
+  }
+}
+
+window.addEventListener('load',()=>setTimeout(search,400));
+</script>
+</body>
+</html>
