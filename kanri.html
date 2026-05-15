@@ -1262,9 +1262,8 @@ function fmtTime(v){
     if(isoM){
       const extraDay=parseInt(isoM[1])===1?1440:0;
       const gasMin=parseInt(isoM[2])*60+parseInt(isoM[3])+extraDay;
-      let jstMin=gasMin-540; // -9時間(=540分)が正しい変換
-      if(jstMin<0)jstMin+=1440;
-      return snapSlot(jstMin);
+      // 予約表シートはGASがUTCとして時刻を保存するため変換不要（-540は不要）
+      return snapSlot(gasMin%1440);
     }
     // 通常のHH:MM形式（予約表シートはJST文字列で保存済み→変換不要、そのまま返す）
     const m=v.trim().match(/^(\d{1,2}):(\d{2})/);
@@ -1281,11 +1280,9 @@ function fmtTime(v){
     return v.trim();
   }
   if(v instanceof Date){
-    // DateオブジェクトもUTCで同じ計算
+    // 予約表シートはUTCとして時刻を保存するため変換不要
     const gasMin=v.getUTCHours()*60+v.getUTCMinutes();
-    let jstMin=gasMin-540;
-    if(jstMin<0)jstMin+=1440;
-    return snapSlot(jstMin);
+    return snapSlot(gasMin%1440);
   }
   if(typeof v==='number'){
     const t=Math.round(v*24*60);
