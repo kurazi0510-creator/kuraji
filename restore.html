@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>データ復元ツール</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;}
+.card{background:#1e293b;border-radius:14px;padding:20px;max-width:600px;margin:0 auto;}
+h1{color:#f97316;font-size:1rem;text-align:center;margin-bottom:16px;}
+.log{font-family:monospace;font-size:0.75rem;line-height:1.8;background:#0f172a;border-radius:8px;padding:12px;margin-bottom:12px;max-height:300px;overflow-y:auto;}
+.ok{color:#22c55e;}.ng{color:#ef4444;}.info{color:#94a3b8;}.warn{color:#fbbf24;}
+.prog-bar{background:#334155;border-radius:6px;height:10px;margin:8px 0;}
+.prog-fill{height:100%;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:6px;transition:width 0.3s;width:0%;}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin-top:8px;font-size:0.9rem;}
+.result{border-radius:10px;padding:14px;margin-top:12px;display:none;text-align:center;}
+.result-ok{background:#14532d;border:1px solid #22c55e;}
+.result-ng{background:#450a0a;border:1px solid #ef4444;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔄 localStorageデータをGASに復元</h1>
+  <div class="prog-bar"><div class="prog-fill" id="prog"></div></div>
+  <div class="log" id="log"><div class="info">開始中...</div></div>
+  <div class="result" id="result"></div>
+  <button class="btn" style="background:#1e3a5f;color:#7dd3fc;display:none" id="back-btn" onclick="location.href='kanri.html'">← 管理システムへ</button>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+
+const HDR=['日付','時間','区分','患者名','診察券No','予約ルート','来院回数','経過日数',
+           '症状','オプション','自費メニュー','処置(JSON)','処置メモ','物販(JSON)',
+           '支払方法','支払金額','区分リスト','再予約情報','キャンセル理由','施術部位'];
+
+function log(msg,cls='info'){
+  const d=document.getElementById('log');
+  d.innerHTML+=`<div class="${cls}">${msg}</div>`;
+  d.scrollTop=d.scrollHeight;
+}
+function prog(v){document.getElementById('prog').style.width=v+'%';}
+
+function toRows(bookings){
+  const rows=[HDR];
+  const dates=Object.keys(bookings).sort();
+  for(const date of dates){
+    const slots=Object.keys(bookings[date]).sort();
+    for(const time of slots){
+      const b=bookings[date][time];
+      let row;
+      if(b.cont){
+        row=[date,time,'(継続)',b.name||'',b.cardId||'','','','','','','','[]','','[]','','','','','',''];
+      } else if(b.cancelled){
+        row=[date,time,'(キャンセル)',b.name||'',b.cardId||'','','','','','','','[]','','[]','','','','',b.cancelReason||'',''];
+      } else {
+        const pay=b.pay||[];
+        const bui=b.bui||[];
+        const kubunList=b.kubunList||[b.kubun||''];
+        const shochi=b.shochi||[];
+        const bussan=b.bussan||[];
+        row=[
+          date,time,
+          b.kubun||'',b.name||'',b.cardId||'',
+          b.route||'',b.visitCount||'',b.elapsed||'',
+          b.symptom||'',b.option||'',b.menu||'',
+          JSON.stringify(shochi),b.shochiMemo||'',
+          JSON.stringify(bussan),
+          pay.join(','),b.payAmount||'',
+          kubunList.join(','),
+          b.reBookedBy||'','',
+          bui.join(',')
+        ];
+      }
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
+async function run(){
+  try{
+    // localStorageから取得
+    const raw=localStorage.getItem('kj_bookings');
+    if(!raw){log('❌ localStorageにデータがありません','ng');return;}
+    const bookings=JSON.parse(raw);
+    const dates=Object.keys(bookings);
+    let totalSlots=0;
+    dates.forEach(d=>totalSlots+=Object.keys(bookings[d]).length);
+    log(`✅ localStorageから取得: ${dates.length}日分 ${totalSlots}枠`,'ok');
+    prog(20);
+
+    // rows変換
+    const rows=toRows(bookings);
+    log(`📋 変換完了: ${rows.length-1}行`,'info');
+    prog(40);
+
+    // GASに送信
+    log('📡 GASに送信中...','info');
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(rows)}),
+      redirect:'follow'
+    });
+    prog(80);
+    const d=JSON.parse(await res.text());
+    if(d.ok){
+      prog(100);
+      log(`✅ GAS保存完了！ ${rows.length-1}行を「予約表」シートに書き込みました`,'ok');
+      const el=document.getElementById('result');
+      el.className='result result-ok';
+      el.innerHTML='<div style="font-size:1.2rem;font-weight:bold;margin-bottom:8px">✅ 復元完了！</div><div style="font-size:0.8rem;color:#94a3b8">管理システムに戻って「🔄 最新データ取得」を押してください</div>';
+      el.style.display='block';
+      document.getElementById('back-btn').style.display='block';
+    } else {
+      throw new Error(d.error||'GAS保存エラー');
+    }
+  }catch(e){
+    log('❌ '+e.message,'ng');
+    const el=document.getElementById('result');
+    el.className='result result-ng';
+    el.innerHTML='<div style="font-weight:bold">❌ エラー</div><div style="font-size:0.75rem;margin-top:4px">'+e.message+'</div>';
+    el.style.display='block';
+    document.getElementById('back-btn').style.display='block';
+  }
+}
+
+window.addEventListener('load',()=>setTimeout(run,500));
+</script>
+</body>
+</html>
