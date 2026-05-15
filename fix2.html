@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>予約重複クリーナー v2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:20px;}
+.card{background:#1e293b;border-radius:16px;padding:20px;max-width:600px;margin:0 auto;}
+h1{color:#f97316;font-size:1rem;text-align:center;margin-bottom:4px;}
+.sub{color:#64748b;font-size:0.75rem;text-align:center;margin-bottom:16px;}
+.step{background:#0f172a;border-radius:10px;padding:12px;margin-bottom:10px;}
+.step-title{color:#7dd3fc;font-size:0.8rem;font-weight:bold;margin-bottom:6px;}
+.log{font-family:monospace;font-size:0.72rem;line-height:1.9;max-height:320px;overflow-y:auto;}
+.ok{color:#22c55e;} .ng{color:#ef4444;} .info{color:#94a3b8;} .warn{color:#fbbf24;} .dup{color:#f97316;}
+.prog-bar{background:#1e293b;border-radius:6px;height:8px;margin:8px 0;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:6px;transition:width 0.4s;width:0%;}
+.result-box{border-radius:10px;padding:14px;margin-top:12px;display:none;text-align:center;}
+.result-ok{background:#14532d;border:1px solid #22c55e;}
+.result-ng{background:#450a0a;border:1px solid #ef4444;}
+.result-title{font-size:1.1rem;font-weight:bold;margin-bottom:6px;}
+.result-msg{font-size:0.78rem;color:#94a3b8;white-space:pre-wrap;}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:0.9rem;font-weight:bold;cursor:pointer;margin-top:10px;}
+.btn-back{background:#1e3a5f;color:#7dd3fc;}
+.summary-table{width:100%;border-collapse:collapse;font-size:0.72rem;margin-top:8px;}
+.summary-table th{background:#1e3a5f;color:#7dd3fc;padding:4px 6px;text-align:left;}
+.summary-table td{padding:4px 6px;border-bottom:1px solid #1e293b;}
+.dup-row{background:#431407;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔧 予約重複クリーナー v2</h1>
+  <p class="sub">GASスプレッドシートの重複データを直接除去します</p>
+
+  <div class="step">
+    <div class="step-title">📊 進捗</div>
+    <div class="prog-bar"><div class="prog-fill" id="prog"></div></div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div id="dup-section" style="display:none">
+    <div class="step">
+      <div class="step-title">⚠️ 重複検出結果</div>
+      <div id="dup-table-wrap"></div>
+    </div>
+    <button class="btn" id="fix-btn" style="background:#f97316;color:white;" onclick="runFix()">🗑️ 重複を全て削除してGASに保存</button>
+  </div>
+
+  <div class="result-box" id="result">
+    <div class="result-title" id="result-title"></div>
+    <div class="result-msg" id="result-msg"></div>
+  </div>
+  <button class="btn btn-back" id="back-btn" style="display:none" onclick="location.href='kanri.html'">🏥 管理システムに戻る</button>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+
+function log(msg,cls='info'){
+  const d=document.getElementById('log');
+  d.innerHTML+=`<div class="${cls}">${msg}</div>`;
+  d.scrollTop=d.scrollHeight;
+}
+function prog(v){document.getElementById('prog').style.width=v+'%';}
+
+let cleanedRows=null;
+
+async function run(){
+  try{
+    // STEP1: GASから取得
+    log('📡 GASからデータ取得中...','info');
+    prog(10);
+    const res=await fetch(GAS+'?action=getAll&_='+Date.now(),{redirect:'follow'});
+    const raw=await res.text();
+    prog(30);
+
+    let data;
+    try{data=JSON.parse(raw);}
+    catch(e){
+      // JSONP形式の場合
+      const m=raw.match(/\{[\s\S]*\}/);
+      if(m)data=JSON.parse(m[0]);
+      else throw new Error('GASレスポンスのパースに失敗: '+raw.slice(0,100));
+    }
+
+    const rows=data.bookings||[];
+    if(rows.length<2){log('予約データなし','warn');prog(100);return;}
+
+    const hdr=rows[0];
+    const dataRows=rows.slice(1);
+    log(`✅ ${dataRows.length}行取得完了`,'ok');
+    prog(50);
+
+    // STEP2: 重複検出
+    // 同じ日付+時間のslotが複数ある = 重複
+    log('🔍 重複を検出中...','info');
+    const seen={}; // key: "date|slot" → 最初の行のindex
+    const dupIndexes=new Set();
+    const dupList=[];
+
+    dataRows.forEach((r,i)=>{
+      const date=String(r[0]||'').trim();
+      const slot=String(r[1]||'').trim();
+      const kubun=String(r[2]||'').trim();
+      const name=String(r[3]||'').trim();
+      if(!date||!slot)return;
+      const key=date+'|'+slot;
+      if(seen[key]!==undefined){
+        // 重複！
+        // キープするのは: 継続枠でない方、またはより情報が多い方
+        const firstIdx=seen[key];
+        const firstR=dataRows[firstIdx];
+        const firstKubun=String(firstR[2]||'').trim();
+        // 継続枠(cont)はメイン予約の後にある正規の継続枠のみキープ
+        // 同じslotに2つある場合：非継続枠を優先、両方非継続なら最初の方をキープ
+        let removeIdx=i;
+        if(kubun!=='(継続)'&&firstKubun==='(継続)'){
+          // 今の行が非継続、最初が継続 → 最初を削除、今の行をキープ
+          removeIdx=firstIdx;
+          seen[key]=i;
+        }
+        dupIndexes.add(removeIdx);
+        dupList.push({
+          date,slot,
+          kept:removeIdx===i?firstR:r,
+          removed:removeIdx===i?r:firstR
+        });
+      }else{
+        seen[key]=i;
+      }
+    });
+
+    prog(70);
+
+    if(dupList.length===0){
+      log('✅ 重複なし！データはクリーンです','ok');
+      prog(100);
+      showResult(true,'✅ 重複なし','GASのデータに重複はありませんでした。\n管理システムに戻ってください。');
+      document.getElementById('back-btn').style.display='block';
+      return;
+    }
+
+    log(`⚠️ ${dupList.length}件の重複を検出`,'dup');
+
+    // 重複テーブル表示
+    let tableHtml='<table class="summary-table"><thead><tr><th>日付</th><th>時間</th><th>削除される行</th><th>残る行</th></tr></thead><tbody>';
+    dupList.forEach(d=>{
+      const removedKubun=String(d.removed[2]||'');
+      const removedName=String(d.removed[3]||'');
+      const keptKubun=String(d.kept[2]||'');
+      const keptName=String(d.kept[3]||'');
+      tableHtml+=`<tr class="dup-row">
+        <td>${d.date}</td>
+        <td>${d.slot}</td>
+        <td style="color:#ef4444">[${removedKubun}] ${removedName}</td>
+        <td style="color:#22c55e">[${keptKubun}] ${keptName}</td>
+      </tr>`;
+    });
+    tableHtml+='</tbody></table>';
+    document.getElementById('dup-table-wrap').innerHTML=tableHtml;
+    document.getElementById('dup-section').style.display='block';
+    prog(80);
+
+    // クリーン済み行を準備
+    cleanedRows=[hdr,...dataRows.filter((_,i)=>!dupIndexes.has(i))];
+    log(`📋 修正後: ${cleanedRows.length-1}行（${dupList.length}件削除）`,'info');
+
+  }catch(e){
+    log('❌ '+e.message,'ng');
+    showResult(false,'❌ エラー',e.message);
+    document.getElementById('back-btn').style.display='block';
+  }
+}
+
+async function runFix(){
+  if(!cleanedRows){log('データがありません','ng');return;}
+  document.getElementById('fix-btn').disabled=true;
+  document.getElementById('fix-btn').textContent='保存中...';
+  log('💾 GASに保存中...','info');
+  prog(85);
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(cleanedRows)}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res.text());
+    prog(100);
+    if(d.ok){
+      log('✅ GAS保存完了！','ok');
+      // localStorageも更新
+      try{
+        const hdr2=cleanedRows[0];
+        const newB={};
+        cleanedRows.slice(1).forEach(r=>{
+          const date=String(r[0]||'').trim();
+          const slot=String(r[1]||'').trim();
+          const kubun=String(r[2]||'').trim();
+          const name=String(r[3]||'').trim();
+          const cardId=String(r[4]||'').trim();
+          if(!date||!slot)return;
+          if(!newB[date])newB[date]={};
+          if(kubun==='(継続)'){
+            newB[date][slot]={cont:true,name,cardId};
+          }else if(kubun==='(キャンセル)'){
+            newB[date][slot]={cancelled:true,name,cardId,cancelReason:String(r[18]||''),reBookedBy:String(r[17]||'')};
+          }else{
+            newB[date][slot]={
+              kubun,name,cardId,
+              route:String(r[5]||'LINE'),visitCount:String(r[6]||''),
+              elapsed:String(r[7]||''),symptom:String(r[8]||''),
+              option:String(r[9]||''),menu:String(r[10]||''),
+              pay:r[14]?String(r[14]).split(',').filter(s=>s):[],
+              payAmount:String(r[15]||''),
+              kubunList:String(r[16]||kubun).split(',').filter(s=>s),
+              bui:r[19]?String(r[19]).split(',').filter(s=>s):[],
+            };
+          }
+        });
+        localStorage.setItem('kj_bookings',JSON.stringify(newB));
+        log('✅ localStorageも更新完了','ok');
+      }catch(e2){log('⚠ localStorage更新失敗（GASは成功）: '+e2.message,'warn');}
+      showResult(true,'✅ 修復完了！',`重複${cleanedRows.length-1-Object.values(cleanedRows).length+1}件を削除してGASに保存しました。\n「管理システムに戻る」を押してください。`);
+      document.getElementById('back-btn').style.display='block';
+    }else{
+      throw new Error('GAS保存エラー: '+(d.error||JSON.stringify(d)));
+    }
+  }catch(e){
+    log('❌ '+e.message,'ng');
+    showResult(false,'❌ エラー',e.message);
+    document.getElementById('back-btn').style.display='block';
+  }
+}
+
+function showResult(ok,title,msg){
+  const el=document.getElementById('result');
+  el.className='result-box '+(ok?'result-ok':'result-ng');
+  el.style.display='block';
+  document.getElementById('result-title').textContent=title;
+  document.getElementById('result-msg').textContent=msg;
+}
+
+window.addEventListener('load',()=>setTimeout(run,300));
+</script>
+</body>
+</html>
