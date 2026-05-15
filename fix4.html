@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GAS生データビューア</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;padding:12px;}
+.card{background:#1e293b;border-radius:12px;padding:14px;max-width:900px;margin:0 auto;}
+h1{color:#f97316;font-size:0.9rem;text-align:center;margin-bottom:12px;}
+.toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+input{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:0.8rem;flex:1;min-width:100px;}
+.btn{padding:7px 14px;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;}
+.btn-load{background:#1e3a5f;color:#7dd3fc;}
+.btn-del{background:#ef4444;color:white;}
+.btn-save{background:#f97316;color:white;display:none;}
+.btn-back{background:#334155;color:#94a3b8;}
+.log{font-size:0.72rem;background:#0f172a;border-radius:8px;padding:8px;margin-bottom:8px;color:#94a3b8;}
+table{width:100%;border-collapse:collapse;font-size:0.7rem;}
+th{background:#1e3a5f;color:#7dd3fc;padding:4px 6px;text-align:left;white-space:nowrap;}
+td{padding:4px 6px;border-bottom:1px solid #1e293b;vertical-align:top;word-break:break-all;}
+.del-row td{background:#2d0a0a!important;text-decoration:line-through;opacity:0.4;}
+.tbl-wrap{max-height:500px;overflow-y:auto;border:1px solid #334155;border-radius:8px;margin-bottom:10px;}
+.warn{color:#f97316;}
+.raw{color:#64748b;font-size:0.62rem;}
+.jst{font-weight:bold;}
+select{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:5px 8px;border-radius:6px;font-size:0.78rem;}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🔍 GAS生データビューア＆削除ツール</h1>
+<div class="toolbar">
+  <input type="text" id="dateInput" placeholder="日付 例: 2026-04-01" value="2026-04-01">
+  <button class="btn btn-load" onclick="load()">📥 全件取得</button>
+  <button class="btn btn-save" id="save-btn" onclick="save()">💾 削除を保存</button>
+  <button class="btn btn-back" onclick="location.href='kanri.html'">← 戻る</button>
+</div>
+<div class="log" id="log">「全件取得」を押してください</div>
+<div class="tbl-wrap" id="tbl-wrap" style="display:none">
+<table>
+<thead><tr>
+  <th>行#</th><th>日付(生)</th><th>時間(生)</th><th>→JST</th><th>区分</th><th>患者名</th><th>カードNo</th><th>操作</th>
+</tr></thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+function pad(n){return String(n).padStart(2,'0');}
+
+function toJST(v){
+  if(v===null||v===undefined||v==='')return'(空)';
+  const s=String(v);
+  const m=s.match(/^1899-12-3([01])T(\d{2}):(\d{2})/);
+  if(m){
+    const extra=parseInt(m[1])===1?1440:0;
+    const gasMin=parseInt(m[2])*60+parseInt(m[3])+extra;
+    let jst=gasMin-540; if(jst<0)jst+=1440;
+    const ex=pad(Math.floor(jst/60)%24)+':'+pad(jst%60);
+    if(SLOTS.includes(ex))return ex;
+    let best=null,bd=9999;
+    SLOTS.forEach(sl=>{const[h,mm]=sl.split(':').map(Number);const d=Math.abs(h*60+mm-jst);if(d<bd){bd=d;best=sl;}});
+    return bd<=20?best+'*':ex+'?';
+  }
+  const m2=s.trim().match(/^(\d{1,2}):(\d{2})/);
+  if(m2){const min=parseInt(m2[1])*60+parseInt(m2[2]);const ex=pad(min/60|0)+':'+pad(min%60);return SLOTS.includes(ex)?ex:ex+'?';}
+  return s.substring(0,8)+'?';
+}
+
+function toDate(v){
+  if(!v)return'';
+  const s=String(v);
+  if(s.startsWith('1899')||s.startsWith('1900'))return'(壊)';
+  if(s.includes('T'))return s.split('T')[0];
+  return s.replace(/\//g,'-').substring(0,10);
+}
+
+let allRows=[],hdr=[],delSet=new Set();
+
+function log(msg){document.getElementById('log').textContent=msg;}
+
+async function load(){
+  log('GASから取得中...');
+  try{
+    const res=await fetch(GAS+'?action=getAll&_='+Date.now(),{redirect:'follow'});
+    const raw=await res.text();
+    let data;
+    try{data=JSON.parse(raw);}catch(e){const m=raw.match(/\{[\s\S]*\}/);if(m)data=JSON.parse(m[0]);else throw new Error('パースエラー');}
+    allRows=data.bookings||[];
+    hdr=allRows[0]||[];
+    delSet=new Set();
+    
+    const filter=document.getElementById('dateInput').value.trim();
+    const rows=allRows.slice(1);
+    
+    // 日付フィルタ
+    const filtered=rows.map((r,i)=>({r,i:i+1})).filter(({r})=>{
+      if(!filter)return true;
+      const d=toDate(r[0]);
+      return d.includes(filter.replace(/\//g,'-'));
+    });
+    
+    log(`✅ 全${rows.length}行 / フィルタ後${filtered.length}行`);
+    
+    const tbody=document.getElementById('tbody');
+    tbody.innerHTML='';
+    filtered.forEach(({r,i})=>{
+      const jst=toJST(r[1]);
+      const dateStr=toDate(r[0]);
+      const rawDate=String(r[0]||'').substring(0,22);
+      const rawTime=String(r[1]||'').substring(0,22);
+      const kubun=String(r[2]||'');
+      const name=String(r[3]||'');
+      const cardId=String(r[4]||'');
+      const warn=jst.includes('?')||jst.includes('*')||dateStr==='(壊)';
+      
+      const tr=document.createElement('tr');
+      tr.id='r'+i;
+      tr.innerHTML=`
+        <td style="color:#64748b">${i}</td>
+        <td><span class="${warn?'warn':''}">${dateStr}</span><br><span class="raw">${rawDate}</span></td>
+        <td><span class="raw">${rawTime}</span></td>
+        <td class="jst ${warn?'warn':''}">${jst}</td>
+        <td>${kubun}</td>
+        <td>${name}</td>
+        <td>${cardId}</td>
+        <td><button style="padding:2px 8px;border:none;border-radius:4px;background:#450a0a;color:#ef4444;font-size:0.68rem;cursor:pointer" onclick="toggleDel(${i},this)">削除</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+    document.getElementById('tbl-wrap').style.display='block';
+    document.getElementById('save-btn').style.display='inline-block';
+  }catch(e){log('❌ '+e.message);console.error(e);}
+}
+
+function toggleDel(i,btn){
+  const tr=document.getElementById('r'+i);
+  if(delSet.has(i)){delSet.delete(i);tr.classList.remove('del-row');btn.textContent='削除';btn.style.background='#450a0a';}
+  else{delSet.add(i);tr.classList.add('del-row');btn.textContent='取消';btn.style.background='#166534';}
+  document.getElementById('save-btn').textContent=delSet.size>0?`💾 ${delSet.size}行削除して保存`:'💾 削除を保存';
+}
+
+async function save(){
+  if(delSet.size===0){alert('削除行を選択してください');return;}
+  if(!confirm(`${delSet.size}行を削除してGASに保存します。よろしいですか？`))return;
+  log('保存中...');
+  const newRows=[hdr,...allRows.slice(1).filter((_,i)=>!delSet.has(i+1))];
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(newRows)}),redirect:'follow'});
+    const d=JSON.parse(await res.text());
+    if(d.ok){
+      allRows=newRows;delSet=new Set();
+      log(`✅ 保存完了！再取得します...`);
+      setTimeout(load,800);
+    }else throw new Error(d.error||'保存エラー');
+  }catch(e){log('❌ '+e.message);}
+}
+
+window.addEventListener('load',()=>setTimeout(load,400));
+</script>
+</body>
+</html>
