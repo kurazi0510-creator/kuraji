@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>予約データ直接編集ツール</title>
+<title>予約データ直接編集ツール v2</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:16px;}
@@ -11,50 +11,52 @@ body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;min
 h1{color:#f97316;font-size:0.95rem;text-align:center;margin-bottom:4px;}
 .sub{color:#64748b;font-size:0.72rem;text-align:center;margin-bottom:14px;}
 .toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;}
-input[type=text]{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:0.8rem;flex:1;min-width:120px;}
+input[type=text]{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:0.8rem;flex:1;min-width:100px;}
 .btn{padding:7px 14px;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;white-space:nowrap;}
 .btn-search{background:#1e3a5f;color:#7dd3fc;}
-.btn-save{background:#f97316;color:white;}
+.btn-save{background:#ef4444;color:white;}
 .btn-back{background:#1e293b;color:#94a3b8;border:1px solid #334155;}
 .btn-del{background:#450a0a;color:#ef4444;border:1px solid #7f1d1d;padding:3px 8px;font-size:0.7rem;border-radius:4px;cursor:pointer;}
-.log{font-family:monospace;font-size:0.72rem;line-height:1.8;background:#0f172a;border-radius:8px;padding:10px;margin-bottom:10px;max-height:120px;overflow-y:auto;}
+.log{font-family:monospace;font-size:0.72rem;line-height:1.8;background:#0f172a;border-radius:8px;padding:10px;margin-bottom:10px;max-height:80px;overflow-y:auto;}
 .ok{color:#22c55e;}.ng{color:#ef4444;}.info{color:#94a3b8;}.warn{color:#fbbf24;}
 table{width:100%;border-collapse:collapse;font-size:0.72rem;}
-th{background:#1e3a5f;color:#7dd3fc;padding:5px 6px;text-align:left;position:sticky;top:0;}
-td{padding:4px 6px;border-bottom:1px solid #1e293b;vertical-align:middle;}
+th{background:#1e3a5f;color:#7dd3fc;padding:5px 6px;text-align:left;}
+td{padding:5px 6px;border-bottom:1px solid #1e293b;vertical-align:middle;}
 tr:hover td{background:#1e293b;}
-.del-row td{background:#2d0a0a!important;opacity:0.5;text-decoration:line-through;}
+.del-row td{background:#2d0a0a!important;opacity:0.5;}
 .tag-cont{background:#1e3a5f;color:#7dd3fc;padding:1px 5px;border-radius:3px;font-size:0.65rem;}
 .tag-main{background:#14532d;color:#22c55e;padding:1px 5px;border-radius:3px;font-size:0.65rem;}
 .tag-cancel{background:#3b1f00;color:#fbbf24;padding:1px 5px;border-radius:3px;font-size:0.65rem;}
-.tbl-wrap{max-height:420px;overflow-y:auto;border-radius:8px;border:1px solid #334155;}
-.count-badge{background:#f97316;color:white;border-radius:12px;padding:1px 8px;font-size:0.7rem;margin-left:6px;}
+.tbl-wrap{max-height:380px;overflow-y:auto;border-radius:8px;border:1px solid #334155;margin-bottom:10px;}
 .summary{background:#0f172a;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:0.75rem;color:#94a3b8;}
+.raw-time{color:#64748b;font-size:0.62rem;display:block;}
+.jst-time{color:#e2e8f0;font-weight:bold;}
+.btn-area{display:flex;gap:8px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
 <div class="card">
-  <h1>🔧 予約データ直接編集ツール</h1>
-  <p class="sub">GASスプレッドシートの予約を直接確認・削除できます</p>
+  <h1>🔧 予約データ直接編集ツール v2</h1>
+  <p class="sub">削除したい行の「削除」を押してから「GASに保存」</p>
 
   <div class="toolbar">
-    <input type="text" id="dateInput" placeholder="日付 例: 2026-04-01" value="2026-04-01">
+    <input type="text" id="dateInput" placeholder="例: 2026-04-01" value="2026-04-01">
     <input type="text" id="nameInput" placeholder="患者名（任意）" value="今井">
     <button class="btn btn-search" onclick="search()">🔍 検索</button>
   </div>
 
-  <div class="log" id="log"><div class="info">日付と患者名を入力して検索してください</div></div>
+  <div class="log" id="log"><div class="info">検索してください</div></div>
 
   <div id="summary" class="summary" style="display:none"></div>
   <div class="tbl-wrap" id="tbl-wrap" style="display:none">
     <table>
-      <thead><tr><th>時間</th><th>区分</th><th>患者名</th><th>カードNo</th><th>ルート</th><th>操作</th></tr></thead>
+      <thead><tr><th>JST時間</th><th>区分</th><th>患者名</th><th>カードNo</th><th>操作</th></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
   </div>
 
-  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-    <button class="btn btn-save" id="save-btn" style="display:none;flex:1" onclick="save()">💾 チェックした行を削除してGASに保存</button>
+  <div class="btn-area">
+    <button class="btn btn-save" id="save-btn" style="display:none;flex:1" onclick="save()">🗑️ 削除してGASに保存</button>
     <button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムへ</button>
   </div>
 </div>
@@ -62,44 +64,86 @@ tr:hover td{background:#1e293b;}
 <script>
 const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
 
-let allRows=[], hdr=[], deleteSet=new Set();
+const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
+  '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
+  '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
+  '19:00','19:20','19:40'];
+
+function pad(n){return String(n).padStart(2,'0');}
+
+// 時間をJST HH:MMに変換（GASの1899形式対応）
+function toJST(v){
+  if(!v)return{jst:'不明',raw:String(v)};
+  const raw=String(v);
+  
+  // 1899-12-30T or 1899-12-31T 形式
+  const m=raw.match(/^1899-12-3([01])T(\d{2}):(\d{2})/);
+  if(m){
+    const extraDay=parseInt(m[1])===1?1440:0;
+    const gasMin=parseInt(m[2])*60+parseInt(m[3])+extraDay;
+    let jstMin=gasMin-540;
+    if(jstMin<0)jstMin+=1440;
+    // snapSlot
+    const exact=pad(Math.floor(jstMin/60)%24)+':'+pad(jstMin%60);
+    if(SLOTS.includes(exact))return{jst:exact,raw};
+    let best=null,bestD=9999;
+    SLOTS.forEach(s=>{const[sh,sm]=s.split(':').map(Number);const d=Math.abs(sh*60+sm-jstMin);if(d<bestD){bestD=d;best=s;}});
+    return{jst:bestD<=20?best:exact,raw,approx:bestD>0&&bestD<=20};
+  }
+  
+  // 通常HH:MM
+  const m2=raw.trim().match(/^(\d{1,2}):(\d{2})/);
+  if(m2){
+    const min=parseInt(m2[1])*60+parseInt(m2[2]);
+    const exact=pad(Math.floor(min/60)%24)+':'+pad(min%60);
+    if(SLOTS.includes(exact))return{jst:exact,raw};
+    let best=null,bestD=9999;
+    SLOTS.forEach(s=>{const[sh,sm]=s.split(':').map(Number);const d=Math.abs(sh*60+sm-min);if(d<bestD){bestD=d;best=s;}});
+    return{jst:bestD<=20?best:exact,raw};
+  }
+  
+  return{jst:'不明',raw};
+}
+
+// 日付を正規化
+function toDate(v){
+  if(!v)return'';
+  const s=String(v);
+  if(s.startsWith('1899')||s.startsWith('1900'))return'';
+  if(s.includes('T'))return s.split('T')[0];
+  return s.replace(/\//g,'-').substring(0,10);
+}
+
+let allRows=[],hdr=[],deleteSet=new Set();
 
 function log(msg,cls='info'){
-  const d=document.getElementById('log');
-  d.innerHTML=`<div class="${cls}">${msg}</div>`;
+  document.getElementById('log').innerHTML=`<div class="${cls}">${msg}</div>`;
 }
 
 async function search(){
   const date=document.getElementById('dateInput').value.trim();
   const name=document.getElementById('nameInput').value.trim();
   if(!date){log('日付を入力してください','warn');return;}
-  
   log('📡 GASからデータ取得中...','info');
   try{
     const res=await fetch(GAS+'?action=getAll&_='+Date.now(),{redirect:'follow'});
     const raw=await res.text();
     let data;
-    try{data=JSON.parse(raw);}
-    catch(e){const m=raw.match(/\{[\s\S]*\}/);if(m)data=JSON.parse(m[0]);else throw new Error('パースエラー');}
+    try{data=JSON.parse(raw);}catch(e){const m=raw.match(/\{[\s\S]*\}/);if(m)data=JSON.parse(m[0]);else throw new Error('パースエラー: '+raw.slice(0,100));}
     
     allRows=data.bookings||[];
     hdr=allRows[0]||[];
     deleteSet=new Set();
     
     const dataRows=allRows.slice(1);
-    // 日付でフィルタ（部分一致対応）
-    let filtered=dataRows.map((r,i)=>({r,origIdx:i+1}))
-      .filter(({r})=>{
-        const rd=String(r[0]||'').replace(/\//g,'-');
-        return rd.includes(date.replace(/\//g,'-'));
-      });
-    
-    if(name){
-      filtered=filtered.filter(({r})=>String(r[3]||'').includes(name));
-    }
+    let filtered=dataRows.map((r,i)=>({r,origIdx:i+1})).filter(({r})=>{
+      const rd=toDate(r[0]);
+      return rd.includes(date.replace(/\//g,'-'));
+    });
+    if(name)filtered=filtered.filter(({r})=>String(r[3]||'').includes(name));
     
     if(filtered.length===0){
-      log(`「${date}」${name?'/ '+name:''}の予約が見つかりません。日付形式を確認してください（例: 2026-04-01）`,'warn');
+      log(`「${date}」${name?'/ '+name:''}の予約が見つかりません`,'warn');
       document.getElementById('tbl-wrap').style.display='none';
       document.getElementById('save-btn').style.display='none';
       document.getElementById('summary').style.display='none';
@@ -108,28 +152,26 @@ async function search(){
     
     log(`✅ ${filtered.length}件ヒット（全${dataRows.length}行中）`,'ok');
     
-    // サマリー表示
-    const names={};
+    // JST変換してサマリー作成
+    const nameMap={};
     filtered.forEach(({r})=>{
       const n=String(r[3]||'');
       const kubun=String(r[2]||'');
-      if(kubun!=='(継続)')names[n]=(names[n]||0)+1;
+      if(kubun!=='(継続)')nameMap[n]=(nameMap[n]||0)+1;
     });
-    const sumHtml=Object.entries(names).map(([n,c])=>
-      `<span>${n}: <strong style="color:${c>1?'#f97316':'#22c55e'}">${c}枠${c>1?' ⚠️重複疑い':''}</strong></span>`
-    ).join('　／　');
+    const sumHtml=Object.entries(nameMap).map(([n,c])=>
+      `<span>${n}: <strong style="color:${c>1?'#f97316':'#22c55e'}">${c}枠${c>1?' ⚠️':'✅'}</strong></span>`
+    ).join('　');
     document.getElementById('summary').innerHTML=sumHtml;
     document.getElementById('summary').style.display='block';
     
-    // テーブル表示
     const tbody=document.getElementById('tbody');
     tbody.innerHTML='';
     filtered.forEach(({r,origIdx})=>{
       const kubun=String(r[2]||'');
       const name2=String(r[3]||'');
       const cardId=String(r[4]||'');
-      const route=String(r[5]||'');
-      const time=String(r[1]||'');
+      const {jst,raw,approx}=toJST(r[1]);
       
       let tag='';
       if(kubun==='(継続)')tag='<span class="tag-cont">継続</span>';
@@ -139,11 +181,13 @@ async function search(){
       const tr=document.createElement('tr');
       tr.id='row-'+origIdx;
       tr.innerHTML=`
-        <td><strong>${time}</strong></td>
-        <td>${tag}<br><span style="color:#64748b;font-size:0.65rem">${kubun}</span></td>
+        <td>
+          <span class="jst-time">${jst}${approx?'*':''}</span>
+          <span class="raw-time">${raw.length>20?raw.substring(0,20)+'…':raw}</span>
+        </td>
+        <td>${tag}<div style="color:#64748b;font-size:0.62rem;margin-top:2px">${kubun}</div></td>
         <td>${name2}</td>
         <td style="color:#64748b">${cardId}</td>
-        <td style="color:#64748b">${route}</td>
         <td><button class="btn-del" onclick="toggleDel(${origIdx},this)">削除</button></td>
       `;
       tbody.appendChild(tr);
@@ -151,9 +195,11 @@ async function search(){
     
     document.getElementById('tbl-wrap').style.display='block';
     document.getElementById('save-btn').style.display='block';
+    updateSaveBtn();
     
   }catch(e){
     log('❌ '+e.message,'ng');
+    console.error(e);
   }
 }
 
@@ -163,19 +209,24 @@ function toggleDel(idx,btn){
     deleteSet.delete(idx);
     tr.classList.remove('del-row');
     btn.textContent='削除';
-    btn.style.background='#450a0a';
+    btn.style.cssText='background:#450a0a;color:#ef4444;border:1px solid #7f1d1d;';
   }else{
     deleteSet.add(idx);
     tr.classList.add('del-row');
     btn.textContent='取消';
-    btn.style.background='#166534';
+    btn.style.cssText='background:#166534;color:#22c55e;border:1px solid #166534;';
   }
-  const btn2=document.getElementById('save-btn');
-  btn2.textContent=deleteSet.size>0?`💾 ${deleteSet.size}行を削除してGASに保存`:'💾 チェックした行を削除してGASに保存';
+  updateSaveBtn();
+}
+
+function updateSaveBtn(){
+  const btn=document.getElementById('save-btn');
+  btn.textContent=deleteSet.size>0?`🗑️ ${deleteSet.size}行を削除してGASに保存`:'削除する行を選択してください';
+  btn.disabled=deleteSet.size===0;
 }
 
 async function save(){
-  if(deleteSet.size===0){log('削除する行を選択してください（削除ボタンをタップ）','warn');return;}
+  if(deleteSet.size===0){log('削除する行を選択してください','warn');return;}
   if(!confirm(`${deleteSet.size}行を削除してGASに保存します。よろしいですか？`))return;
   
   log('💾 保存中...','info');
@@ -194,23 +245,23 @@ async function save(){
       try{
         const newB={};
         newRows.slice(1).forEach(r=>{
-          const date=String(r[0]||'').trim();
-          const slot=String(r[1]||'').trim();
+          const date=toDate(r[0]);
+          const slot=toJST(r[1]).jst;
           const kubun=String(r[2]||'').trim();
           const name=String(r[3]||'').trim();
           const cardId=String(r[4]||'').trim();
-          if(!date||!slot)return;
+          if(!date||!slot||slot==='不明')return;
           if(!newB[date])newB[date]={};
           if(kubun==='(継続)'){newB[date][slot]={cont:true,name,cardId};}
           else if(kubun==='(キャンセル)'){newB[date][slot]={cancelled:true,name,cardId,cancelReason:String(r[18]||''),reBookedBy:String(r[17]||'')};}
           else{newB[date][slot]={kubun,name,cardId,route:String(r[5]||''),visitCount:String(r[6]||''),elapsed:String(r[7]||''),symptom:String(r[8]||''),option:String(r[9]||''),menu:String(r[10]||''),pay:r[14]?String(r[14]).split(',').filter(s=>s):[],payAmount:String(r[15]||''),kubunList:String(r[16]||kubun).split(',').filter(s=>s),bui:r[19]?String(r[19]).split(',').filter(s=>s):[]};}
         });
         localStorage.setItem('kj_bookings',JSON.stringify(newB));
-      }catch(e2){}
+      }catch(e2){console.warn(e2);}
       allRows=newRows;
       deleteSet=new Set();
-      log(`✅ ${deleteSet.size}行を削除してGASに保存完了！再検索で確認できます`,'ok');
-      setTimeout(()=>search(),800);
+      log(`✅ 保存完了！再検索で確認します...`,'ok');
+      setTimeout(()=>search(),900);
     }else{
       throw new Error(d.error||'GAS保存エラー');
     }
