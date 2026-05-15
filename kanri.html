@@ -1266,11 +1266,17 @@ function fmtTime(v){
       if(jstMin<0)jstMin+=1440;
       return snapSlot(jstMin);
     }
-    // 通常のHH:MM形式
+    // 通常のHH:MM形式（予約表シートはJST文字列で保存済み→変換不要、そのまま返す）
     const m=v.trim().match(/^(\d{1,2}):(\d{2})/);
     if(m){
-      const min=parseInt(m[1])*60+parseInt(m[2]);
-      return snapSlot(min);
+      const hh=parseInt(m[1]),mm=parseInt(m[2]);
+      const exact=pad(hh)+':'+pad(mm);
+      if(SLOTS.includes(exact))return exact;
+      // スロットにない場合のみ最近接（20分以内）
+      const min2=hh*60+mm;
+      let best2=null,bd2=9999;
+      SLOTS.forEach(s=>{const[sh,sm]=s.split(':').map(Number);const d=Math.abs(sh*60+sm-min2);if(d<bd2){bd2=d;best2=s;}});
+      return bd2<=20?best2:exact;
     }
     return v.trim();
   }
