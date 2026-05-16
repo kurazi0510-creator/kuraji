@@ -242,7 +242,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div class="fgrid">
       <div class="fg"><label>診察券No</label><input class="inp" id="c-id" type="number" placeholder="例: 2025"></div>
       <div class="fg"><label>患者名</label><input class="inp" id="c-nm" placeholder="山田 太郎"></div>
-      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="c-kana" placeholder="ヤマダ タロウ" oninput="toKatakana(this)"></div>
+      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="c-kana" placeholder="ヤマダ タロウ" oninput="if(!this._composing)toKatakana(this)" oncompositionstart="this._composing=true" oncompositionend="this._composing=false;toKatakana(this)"></div>
       <div class="fg"><label>性別</label><select class="sel" id="c-sex"><option value="女性">女性</option><option value="男性">男性</option><option value="-">-</option></select></div>
     </div>
     <!-- 生年月日：西暦・和暦同時表示 -->
@@ -987,7 +987,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div class="fgrid">
       <div class="fg"><label>診察券No</label><input class="inp" id="pe-id" readonly style="background:#f4f1eb"></div>
       <div class="fg"><label>患者名</label><input class="inp" id="pe-nm"></div>
-      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="pe-kana" placeholder="ヤマダ タロウ" oninput="toKatakana(this)"></div>
+      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="pe-kana" placeholder="ヤマダ タロウ" oninput="if(!this._composing)toKatakana(this)" oncompositionstart="this._composing=true" oncompositionend="this._composing=false;toKatakana(this)"></div>
       <div class="fg"><label>性別</label><select class="sel" id="pe-sex"><option value="女性">女性</option><option value="男性">男性</option><option value="-">-</option></select></div>
     </div>
     <div style="background:#f8f6f1;border-radius:10px;padding:10px 12px;margin-bottom:10px;border:1.5px solid var(--border)">
