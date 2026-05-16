@@ -1484,6 +1484,25 @@ async function syncAll(){
 
       // 予約データ：★localStorageを優先・GASにしかない日付のみ追加
       const brows=data.bookings||[];
+      // 売上データをGASから取得
+      const urows=data.uriage||[];
+      if(urows.length>1){
+        const uhdr=urows[0];
+        const uhi=k=>uhdr.findIndex(h=>String(h)===k);
+        urows.slice(1).forEach(r=>{
+          const d=String(r[0]||'').trim();
+          if(!d||d.startsWith('1899')||d.startsWith('日付'))return;
+          uriage[d]={
+            hoken:parseInt(r[uhi('保険')])||0,
+            jhi:parseInt(r[uhi('自費')])||0,
+            jiko:parseInt(r[uhi('交通事故')])||0,
+            bussan:parseInt(r[uhi('物販')])||0,
+            other:parseInt(r[uhi('その他')])||0,
+            pay:r[uhi('支払方法')]?String(r[uhi('支払方法')]).split(',').filter(s=>s):[],
+            memo:String(r[uhi('メモ')]||'').trim()
+          };
+        });
+      }
       if(brows.length>1){
         const newB={};
         brows.slice(1).forEach(r=>{
@@ -2454,11 +2473,16 @@ function switchU(t){
 function saveU(){
   const date=document.getElementById('u-date').value;if(!date){alert('日付を入力してください');return;}
   uriage[date]={hoken:parseInt(document.getElementById('u-ho').value)||0,jhi:parseInt(document.getElementById('u-ji').value)||0,jiko:parseInt(document.getElementById('u-ko').value)||0,bussan:parseInt(document.getElementById('u-bu').value)||0,other:parseInt(document.getElementById('u-ot').value)||0,pay:uPaySel.slice(),memo:document.getElementById('u-memo').value.trim()};
-  save();renderDayU();
+  save();renderDayU();pushU();
   ['u-ho','u-ji','u-ko','u-bu','u-ot'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('u-memo').value='';uPaySel=[];document.querySelectorAll('#u-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
 }
-function delU(date){if(!confirm(date+'の売上を削除しますか？'))return;delete uriage[date];save();renderDayU();}
+async function pushU(){
+  const hdr=['日付','保険','自費','交通事故','物販','その他','支払方法','メモ'];
+  const rows=[hdr,...Object.entries(uriage).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,u])=>[d,u.hoken||0,u.jhi||0,u.jiko||0,u.bussan||0,u.other||0,(u.pay||[]).join(','),u.memo||''])];
+  try{const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveUriage',rows:JSON.stringify(rows)}),redirect:'follow'});const d=JSON.parse(await res.text());setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');}catch(e){setStat('s-err','⚠ 保存エラー');}
+}
+function delU(date){if(!confirm(date+'の売上を削除しますか？'))return;delete uriage[date];save();renderDayU();pushU();}
 
 // ===== 売上編集モーダル =====
 let ueditDate=null, uePaySel=[];
