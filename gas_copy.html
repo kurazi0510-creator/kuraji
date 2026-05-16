@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GASコード コピー用</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:16px;}
+.card{background:#1e293b;border-radius:12px;padding:16px;max-width:800px;margin:0 auto;}
+h1{color:#f97316;font-size:0.9rem;text-align:center;margin-bottom:12px;}
+.btn{display:block;width:100%;padding:14px;background:#f97316;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:bold;cursor:pointer;margin-bottom:12px;}
+pre{background:#000;color:#22c55e;padding:14px;border-radius:8px;font-size:0.7rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all;user-select:all;}
+.note{color:#94a3b8;font-size:0.75rem;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>GASコード コピー用</h1>
+<p class="note">① 下の「全選択してコピー」を押す → ② Apps Scriptに貼り付け → ③ Ctrl+S → デプロイ</p>
+<button class="btn" onclick="copyCode()">📋 全選択してコピー</button>
+<pre id="code">function doGet(e){
+  var action=(e&&e.parameter&&e.parameter.action)||'getAll';
+  var callback=(e&&e.parameter&&e.parameter.callback)||'';
+  var result;
+  try{if(action==='getAll'){result=getAllData();}else{result={ok:true,msg:'ok'};}}
+  catch(err){result={ok:false,error:err.message};}
+  var json=JSON.stringify(result);
+  if(callback)return ContentService.createTextOutput(callback+'('+json+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+function doPost(e){
+  var body={};try{body=JSON.parse(e.postData.contents);}catch(err){}
+  var action=body.action||'',result;
+  try{
+    if(action==='getAll'){result=getAllData();}
+    else if(action==='saveBookings'){saveSheet('\u4e88\u7d04\u8868',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='saveCustomers'){saveSheet('\u60a3\u8005',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='saveUriage'){saveSheet('\u58f2\u4e0a',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='resetBookings'){resetBookings();result={ok:true};}
+    else{result={ok:false,error:'unknown action'};}
+  }catch(err){result={ok:false,error:err.message};}
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+function getAllData(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var b=ss.getSheetByName('\u4e88\u7d04\u8868');
+  var c=ss.getSheetByName('\u60a3\u8005');
+  var u=ss.getSheetByName('\u58f2\u4e0a');
+  return{ok:true,bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
+}
+function saveSheet(name,rows){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName(name);
+  if(!s)s=ss.insertSheet(name);
+  s.clearContents();
+  if(!rows||rows.length===0)return;
+  var san=rows.map(function(row){return row.map(function(cell){
+    if(cell===null||cell===undefined)return'';
+    if(cell instanceof Date){var y=cell.getFullYear(),mo=String(cell.getMonth()+1).padStart(2,'0'),d=String(cell.getDate()).padStart(2,'0');return y+'-'+mo+'-'+d;}
+    return String(cell);
+  });});
+  var range=s.getRange(1,1,san.length,san[0].length);
+  var fmt=san.map(function(r){return r.map(function(){return'@';});});
+  range.setNumberFormats(fmt);
+  range.setValues(san);
+}
+function resetBookings(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName('\u4e88\u7d04\u8868');
+  if(!s)s=ss.insertSheet('\u4e88\u7d04\u8868');
+  s.clearContents();
+  s.getRange(1,1,1,20).setValues([['\u65e5\u4ed8','\u6642\u9593','\u533a\u5206','\u60a3\u8005\u540d','\u8a3a\u5bdf\u5238No','\u4e88\u7d04\u30eb\u30fc\u30c8','\u6765\u9662\u56de\u6570','\u7d4c\u904e\u65e5\u6570','\u75c7\u72b6','\u30aa\u30d7\u30b7\u30e7\u30f3','\u81ea\u8cbb\u30e1\u30cb\u30e5\u30fc','\u51e6\u7f6e(JSON)','\u51e6\u7f6e\u30e1\u30e2','\u7269\u8ca9(JSON)','\u652f\u6255\u65b9\u6cd5','\u652f\u6255\u91d1\u984d','\u533a\u5206\u30ea\u30b9\u30c8','\u518d\u4e88\u7d04\u60c5\u5831','\u30ad\u30e3\u30f3\u30bb\u30eb\u7406\u7531','\u65bd\u8853\u90e8\u4f4d']]);
+}</pre>
+</div>
+<script>
+function copyCode(){
+  const code=document.getElementById('code').innerText;
+  navigator.clipboard.writeText(code).then(()=>{
+    document.querySelector('.btn').textContent='✅ コピーしました！Apps Scriptに貼り付けてください';
+    document.querySelector('.btn').style.background='#22c55e';
+  });
+}
+</script>
+</body>
+</html>

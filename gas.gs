@@ -1,0 +1,53 @@
+function doGet(e){
+  var action=(e&&e.parameter&&e.parameter.action)||'getAll';
+  var callback=(e&&e.parameter&&e.parameter.callback)||'';
+  var result;
+  try{if(action==='getAll'){result=getAllData();}else{result={ok:true,msg:'ok'};}}
+  catch(err){result={ok:false,error:err.message};}
+  var json=JSON.stringify(result);
+  if(callback)return ContentService.createTextOutput(callback+'('+json+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+function doPost(e){
+  var body={};try{body=JSON.parse(e.postData.contents);}catch(err){}
+  var action=body.action||'',result;
+  try{
+    if(action==='getAll'){result=getAllData();}
+    else if(action==='saveBookings'){saveSheet('yoyakuhyo',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='saveCustomers'){saveSheet('kanja',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='saveUriage'){saveSheet('uriage',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='resetBookings'){resetBookings();result={ok:true};}
+    else{result={ok:false,error:'unknown action'};}
+  }catch(err){result={ok:false,error:err.message};}
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+function getAllData(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var b=ss.getSheetByName('yoyakuhyo');
+  var c=ss.getSheetByName('kanja');
+  var u=ss.getSheetByName('uriage');
+  return{ok:true,bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
+}
+function saveSheet(name,rows){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName(name);
+  if(!s)s=ss.insertSheet(name);
+  s.clearContents();
+  if(!rows||rows.length===0)return;
+  var san=rows.map(function(row){return row.map(function(cell){
+    if(cell===null||cell===undefined)return'';
+    if(cell instanceof Date){var y=cell.getFullYear(),mo=String(cell.getMonth()+1).padStart(2,'0'),d=String(cell.getDate()).padStart(2,'0');return y+'-'+mo+'-'+d;}
+    return String(cell);
+  });});
+  var range=s.getRange(1,1,san.length,san[0].length);
+  var fmt=san.map(function(r){return r.map(function(){return'@';});});
+  range.setNumberFormats(fmt);
+  range.setValues(san);
+}
+function resetBookings(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName('yoyakuhyo');
+  if(!s)s=ss.insertSheet('yoyakuhyo');
+  s.clearContents();
+  s.getRange(1,1,1,20).setValues([['date','time','kubun','name','cardId','route','visitCount','elapsed','symptom','option','menu','shochi','shochiMemo','bussan','pay','payAmount','kubunList','reBook','cancelReason','bui']]);
+}
