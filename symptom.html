@@ -6,696 +6,600 @@
 <title>症状記入 - 倉治整骨院</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;min-height:100vh;}
-.header{background:#1e293b;color:white;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
-.header h1{font-size:0.88rem;font-weight:bold;}
-.back-btn{background:#f97316;color:white;padding:7px 14px;border:none;border-radius:7px;font-size:0.78rem;font-weight:bold;cursor:pointer;}
-.content{padding:10px;max-width:600px;margin:0 auto;}
-.patient-bar{background:white;border-radius:10px;padding:10px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+body{font-family:'Hiragino Sans',sans-serif;background:#f5f5f5;min-height:100vh;}
+.header{background:#1e293b;color:white;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.header h1{font-size:0.85rem;font-weight:bold;}
+.back-btn{background:#f97316;color:white;padding:7px 14px;border:none;border-radius:7px;font-size:0.75rem;font-weight:bold;cursor:pointer;}
+.wrap{padding:10px;max-width:560px;margin:0 auto;}
+.card{background:white;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.patient-bar{display:flex;gap:8px;flex-wrap:wrap;}
 .patient-bar input{border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:0.82rem;flex:1;min-width:110px;}
-/* 図タブ */
-.fig-tabs{display:flex;gap:4px;margin-bottom:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
-.fig-tab{padding:8px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;background:white;color:#374151;white-space:nowrap;flex-shrink:0;}
-.fig-tab.active{border-color:#f97316;background:#fff7ed;color:#c2410c;}
-/* ツールバー */
-.toolbar{background:white;border-radius:10px;padding:8px 10px;margin-bottom:8px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-.tool-btn{padding:7px 11px;border:2px solid #e2e8f0;border-radius:7px;font-size:0.73rem;font-weight:bold;cursor:pointer;background:white;color:#374151;white-space:nowrap;}
-.tool-btn.active{border-color:#f97316;background:#fff7ed;color:#c2410c;}
-.color-btn{width:30px;height:30px;border-radius:50%;border:3px solid white;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.2);flex-shrink:0;}
-.color-btn.active{box-shadow:0 0 0 3px #f97316;}
-.sz-btn{padding:5px 10px;border:2px solid #e2e8f0;border-radius:6px;font-size:0.72rem;cursor:pointer;background:white;color:#374151;}
-.sz-btn.active{border-color:#f97316;background:#fff7ed;color:#c2410c;}
-.sep{width:1px;height:26px;background:#e2e8f0;flex-shrink:0;margin:0 2px;}
-/* キャンバスエリア */
-.canvas-area{background:white;border-radius:12px;padding:12px;margin-bottom:8px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-.canvas-label{font-size:0.82rem;color:#374151;font-weight:bold;margin-bottom:8px;}
-.canvas-container{position:relative;display:inline-block;border-radius:8px;overflow:hidden;}
-#canvas-bg{display:block;}
-#canvas-draw{position:absolute;top:0;left:0;display:block;touch-action:none;cursor:crosshair;}
-/* アクションバー */
-.action-bar{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
-.btn{padding:10px 12px;border:none;border-radius:8px;font-size:0.78rem;font-weight:bold;cursor:pointer;flex:1;min-width:70px;}
-.btn-undo{background:#e2e8f0;color:#374151;}
-.btn-clear{background:#fef3c7;color:#92400e;}
-.btn-save{background:#f97316;color:white;}
-.btn-dl{background:#22c55e;color:white;}
-/* メモ */
-.memo-box{background:white;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-.memo-box label{font-size:0.76rem;color:#64748b;font-weight:bold;display:block;margin-bottom:4px;}
-.memo-box textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;font-size:0.82rem;resize:none;height:70px;}
-/* 保存履歴 */
-.saved-box{background:white;border-radius:10px;padding:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-.saved-item{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:0.76rem;}
-.mini-btn{padding:4px 10px;border:none;border-radius:5px;font-size:0.7rem;font-weight:bold;cursor:pointer;}
-/* 部位ラベル説明 */
-.legend{background:#f8fafc;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.7rem;color:#64748b;line-height:1.8;}
+.fig-tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
+.fig-tab{padding:8px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:0.74rem;font-weight:bold;cursor:pointer;background:white;color:#374151;white-space:nowrap;flex-shrink:0;}
+.fig-tab.active{border-color:#1e293b;background:#1e293b;color:white;}
+.toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.tool-btn{padding:7px 11px;border:2px solid #e2e8f0;border-radius:7px;font-size:0.73rem;font-weight:bold;cursor:pointer;background:white;color:#374151;}
+.tool-btn.active{border-color:#ef4444;background:#fef2f2;color:#dc2626;}
+.color-dot{width:28px;height:28px;border-radius:50%;border:3px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.2);flex-shrink:0;}
+.color-dot.on{box-shadow:0 0 0 3px #1e293b;}
+.sz-btn{padding:5px 10px;border:2px solid #e2e8f0;border-radius:6px;font-size:0.72rem;cursor:pointer;background:white;}
+.sz-btn.active{border-color:#1e293b;background:#1e293b;color:white;}
+.sep{width:1px;height:24px;background:#e2e8f0;flex-shrink:0;}
+.canvas-box{text-align:center;}
+.canvas-lbl{font-size:0.8rem;color:#374151;font-weight:bold;margin-bottom:6px;}
+.canvas-wrap{position:relative;display:inline-block;}
+#c-bg{display:block;}
+#c-draw{position:absolute;top:0;left:0;touch-action:none;cursor:crosshair;}
+.action-row{display:flex;gap:6px;flex-wrap:wrap;}
+.btn{padding:9px 12px;border:none;border-radius:8px;font-size:0.78rem;font-weight:bold;cursor:pointer;flex:1;min-width:60px;}
+.b-undo{background:#e2e8f0;color:#374151;}
+.b-clr{background:#fef3c7;color:#92400e;}
+.b-save{background:#1e293b;color:white;}
+.b-dl{background:#16a34a;color:white;}
+.memo-lbl{font-size:0.75rem;color:#64748b;font-weight:bold;margin-bottom:4px;}
+textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;font-size:0.82rem;resize:none;height:64px;}
+.saved-hd{font-size:0.76rem;color:#64748b;font-weight:bold;margin-bottom:6px;}
+.saved-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:0.76rem;}
+.mb{padding:4px 10px;border:none;border-radius:5px;font-size:0.7rem;font-weight:bold;cursor:pointer;}
 </style>
 </head>
 <body>
-
 <div class="header">
-  <h1>🩺 症状記入シート - 倉治整骨院</h1>
+  <h1>🩺 症状記入シート｜倉治整骨院</h1>
   <button class="back-btn" onclick="location.href='kanri.html'">← 戻る</button>
 </div>
+<div class="wrap">
 
-<div class="content">
-
-<!-- 患者情報 -->
-<div class="patient-bar">
-  <input type="text" id="pt-name" placeholder="患者名を入力">
+<div class="card patient-bar">
+  <input type="text" id="pt-name" placeholder="患者名">
   <input type="date" id="pt-date">
 </div>
 
-<!-- 図タブ -->
-<div class="fig-tabs" id="fig-tabs">
-  <button class="fig-tab active" onclick="switchFig('front',this)">🧍 正面</button>
-  <button class="fig-tab" onclick="switchFig('back',this)">🧍 背面</button>
-  <button class="fig-tab" onclick="switchFig('hand-r',this)">✋ 右手</button>
-  <button class="fig-tab" onclick="switchFig('hand-l',this)">🤚 左手</button>
-  <button class="fig-tab" onclick="switchFig('foot-r',this)">🦶 右足</button>
-  <button class="fig-tab" onclick="switchFig('foot-l',this)">🦶 左足</button>
-  <button class="fig-tab" onclick="switchFig('spine',this)">🦴 脊椎</button>
-</div>
-
-<!-- ツールバー -->
-<div class="toolbar">
-  <button class="tool-btn active" id="tool-pen" onclick="setTool('pen')">✏️ ペン</button>
-  <button class="tool-btn" id="tool-circle" onclick="setTool('circle')">⭕ 丸</button>
-  <button class="tool-btn" id="tool-arrow" onclick="setTool('arrow')">➡️ 矢印</button>
-  <button class="tool-btn" id="tool-erase" onclick="setTool('erase')">🧹 消しゴム</button>
-  <div class="sep"></div>
-  <button class="color-btn active" id="col-red"    style="background:#ef4444" onclick="setColor('#ef4444')"></button>
-  <button class="color-btn"        id="col-blue"   style="background:#3b82f6" onclick="setColor('#3b82f6')"></button>
-  <button class="color-btn"        id="col-black"  style="background:#1e293b" onclick="setColor('#1e293b')"></button>
-  <button class="color-btn"        id="col-green"  style="background:#22c55e" onclick="setColor('#22c55e')"></button>
-  <button class="color-btn"        id="col-orange" style="background:#f97316" onclick="setColor('#f97316')"></button>
-  <div class="sep"></div>
-  <button class="sz-btn active" id="sz-s" onclick="setSize(3)">細</button>
-  <button class="sz-btn"        id="sz-m" onclick="setSize(7)">中</button>
-  <button class="sz-btn"        id="sz-l" onclick="setSize(16)">太</button>
-</div>
-
-<!-- キャンバス -->
-<div class="canvas-area">
-  <div class="canvas-label" id="fig-label">正面</div>
-  <div class="canvas-container" id="canvas-container">
-    <canvas id="canvas-bg"></canvas>
-    <canvas id="canvas-draw"></canvas>
+<div class="card" style="padding:8px 10px">
+  <div class="fig-tabs" id="fig-tabs">
+    <button class="fig-tab active" onclick="sw('front',this)">正面</button>
+    <button class="fig-tab" onclick="sw('back',this)">背面</button>
+    <button class="fig-tab" onclick="sw('hand-r',this)">右手</button>
+    <button class="fig-tab" onclick="sw('hand-l',this)">左手</button>
+    <button class="fig-tab" onclick="sw('foot-r',this)">右足</button>
+    <button class="fig-tab" onclick="sw('foot-l',this)">左足</button>
+    <button class="fig-tab" onclick="sw('spine',this)">脊椎</button>
   </div>
 </div>
 
-<!-- 部位説明 -->
-<div class="legend" id="legend">
-  <strong>📍 記入方法：</strong>赤丸で痛みの場所を囲む、ペンで印をつける、矢印で方向を示す
+<div class="card">
+  <div class="toolbar">
+    <button class="tool-btn active" id="t-pen"   onclick="setT('pen')">✏️ ペン</button>
+    <button class="tool-btn"        id="t-circle" onclick="setT('circle')">⭕ 丸</button>
+    <button class="tool-btn"        id="t-arrow"  onclick="setT('arrow')">➡️ 矢印</button>
+    <button class="tool-btn"        id="t-erase"  onclick="setT('erase')">🧹 消す</button>
+    <div class="sep"></div>
+    <button class="color-dot on"  id="d-red"    style="background:#e74c3c" onclick="setC('#e74c3c')"></button>
+    <button class="color-dot"     id="d-blue"   style="background:#2980b9" onclick="setC('#2980b9')"></button>
+    <button class="color-dot"     id="d-black"  style="background:#2c3e50" onclick="setC('#2c3e50')"></button>
+    <button class="color-dot"     id="d-green"  style="background:#27ae60" onclick="setC('#27ae60')"></button>
+    <div class="sep"></div>
+    <button class="sz-btn active" id="s-s" onclick="setS(2)">細</button>
+    <button class="sz-btn"        id="s-m" onclick="setS(6)">中</button>
+    <button class="sz-btn"        id="s-l" onclick="setS(14)">太</button>
+  </div>
 </div>
 
-<!-- アクション -->
-<div class="action-bar">
-  <button class="btn btn-undo"  onclick="undo()">↩️ 1つ戻す</button>
-  <button class="btn btn-clear" onclick="clearDraw()">🗑️ 消去</button>
-  <button class="btn btn-save"  onclick="saveRecord()">💾 保存</button>
-  <button class="btn btn-dl"    onclick="downloadCurrent()">📥 画像</button>
+<div class="card canvas-box">
+  <div class="canvas-lbl" id="fig-lbl">正面</div>
+  <div class="canvas-wrap" id="cwrap">
+    <canvas id="c-bg"></canvas>
+    <canvas id="c-draw"></canvas>
+  </div>
 </div>
 
-<!-- メモ -->
-<div class="memo-box">
-  <label>📝 症状メモ（自由記入）</label>
-  <textarea id="memo" placeholder="右腰の張り、前屈時に痛み など..."></textarea>
+<div class="card action-row">
+  <button class="btn b-undo" onclick="undo()">↩️ 戻す</button>
+  <button class="btn b-clr"  onclick="clrDraw()">🗑️ 消去</button>
+  <button class="btn b-save" onclick="saveRec()">💾 保存</button>
+  <button class="btn b-dl"   onclick="dlImg()">📥 画像</button>
 </div>
 
-<!-- 保存履歴 -->
-<div class="saved-box" id="saved-box" style="display:none">
-  <div style="font-size:0.76rem;color:#64748b;font-weight:bold;margin-bottom:8px">📋 保存済み記録</div>
-  <div id="saved-items"></div>
+<div class="card">
+  <div class="memo-lbl">📝 症状メモ</div>
+  <textarea id="memo" placeholder="右腰の張り・前屈で痛み など自由に記入"></textarea>
 </div>
 
+<div class="card" id="saved-box" style="display:none">
+  <div class="saved-hd">📋 保存済み記録</div>
+  <div id="saved-list"></div>
 </div>
 
+</div><!-- /wrap -->
 <script>
 // ===== 設定 =====
-const FIGS={
-  'front':   {label:'🧍 正面',    w:260, h:440,
-    legend:'頭・首・肩・胸・腹・腰・膝・足首など正面から見た部位'},
-  'back':    {label:'🧍 背面',    w:260, h:440,
-    legend:'後頭部・首後面・肩甲骨・背中・腰・臀部・膝裏など背面から見た部位'},
-  'hand-r':  {label:'✋ 右手（手のひら側）', w:220, h:300,
-    legend:'右手の手のひら・指の付け根・指関節など。指先から手首まで'},
-  'hand-l':  {label:'🤚 左手（手のひら側）', w:220, h:300,
-    legend:'左手の手のひら・指の付け根・指関節など。指先から手首まで'},
-  'foot-r':  {label:'🦶 右足（足裏側）', w:200, h:360,
-    legend:'右足の足裏・かかと・土踏まず・足趾など'},
-  'foot-l':  {label:'🦶 左足（足裏側）', w:200, h:360,
-    legend:'左足の足裏・かかと・土踏まず・足趾など'},
-  'spine':   {label:'🦴 脊椎（後面）', w:220, h:440,
-    legend:'頸椎(C1-C7)・胸椎(T1-T12)・腰椎(L1-L5)・仙椎・尾骨を示す脊柱図'},
+const FIG={
+  front:  {lbl:'正面（前面）',    w:220,h:420},
+  back:   {lbl:'背面（後面）',    w:220,h:420},
+  'hand-r':{lbl:'右手（手のひら）',w:200,h:280},
+  'hand-l':{lbl:'左手（手のひら）',w:200,h:280},
+  'foot-r':{lbl:'右足（足裏）',   w:180,h:340},
+  'foot-l':{lbl:'左足（足裏）',   w:180,h:340},
+  spine:  {lbl:'脊椎（後面）',    w:180,h:420},
 };
+let tool='pen',color='#e74c3c',sz=2;
+let drawing=false,sx=0,sy=0,lx=0,ly=0;
+let cur='front';
+const stacks={};
 
-// ===== 状態 =====
-let tool='pen', color='#ef4444', lineSize=3;
-let drawing=false, startX=0, startY=0, lastX=0, lastY=0;
-let currentFig='front';
-const drawStacks={};// {figKey:[ImageData,...]}
+const bg=document.getElementById('c-bg');
+const dr=document.getElementById('c-draw');
+const bx=bg.getContext('2d');
+const dx=dr.getContext('2d');
 
-// ===== Canvas =====
-const bgC=document.getElementById('canvas-bg');
-const drC=document.getElementById('canvas-draw');
-const bgX=bgC.getContext('2d');
-const drX=drC.getContext('2d');
-
-function setCanvasSize(w,h){
-  bgC.width=drC.width=w;
-  bgC.height=drC.height=h;
-  bgC.style.width=drC.style.width=w+'px';
-  bgC.style.height=drC.style.height=h+'px';
-  document.getElementById('canvas-container').style.width=w+'px';
-  document.getElementById('canvas-container').style.height=h+'px';
-}
-
-// ===== 図タブ切替 =====
-function switchFig(key,btn){
-  saveCurrentDraw();
-  currentFig=key;
+// ===== 図切替 =====
+function sw(key,btn){
+  saveSnap();cur=key;
   document.querySelectorAll('.fig-tab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  const fig=FIGS[key];
-  document.getElementById('fig-label').textContent=fig.label;
-  document.getElementById('legend').innerHTML='<strong>📍 '+fig.label+'：</strong>'+fig.legend;
-  setCanvasSize(fig.w,fig.h);
-  drawBg(key);
-  restoreDraw(key);
+  document.getElementById('fig-lbl').textContent=FIG[key].lbl;
+  resize(key);drawBg(key);restoreDraw(key);
 }
-
-function saveCurrentDraw(){
-  if(!drawStacks[currentFig])drawStacks[currentFig]=[];
-  const fig=FIGS[currentFig];
-  const snap=drX.getImageData(0,0,fig.w,fig.h);
-  // 最新と同じなら保存しない
-  const st=drawStacks[currentFig];
-  if(st.length>0){}// 常に保存
-  st.push(snap);
-  if(st.length>50)st.shift();
+function resize(key){
+  const f=FIG[key];
+  bg.width=dr.width=f.w;bg.height=dr.height=f.h;
+  bg.style.width=dr.style.width=f.w+'px';
+  bg.style.height=dr.style.height=f.h+'px';
+  document.getElementById('cwrap').style.cssText=`width:${f.w}px;height:${f.h}px`;
 }
-
+function saveSnap(){
+  const f=FIG[cur];if(!stacks[cur])stacks[cur]=[];
+  stacks[cur].push(dx.getImageData(0,0,f.w,f.h));
+  if(stacks[cur].length>60)stacks[cur].shift();
+}
 function restoreDraw(key){
-  drX.clearRect(0,0,drC.width,drC.height);
-  const st=drawStacks[key];
-  if(st&&st.length>0)drX.putImageData(st[st.length-1],0,0);
+  dx.clearRect(0,0,dr.width,dr.height);
+  const st=stacks[key];
+  if(st&&st.length>0)dx.putImageData(st[st.length-1],0,0);
 }
 
-// ===== 人体図描画 =====
+// ===== 人体図（問診票スタイル・線画） =====
 function drawBg(key){
-  const fig=FIGS[key];
-  bgX.fillStyle='#fff';bgX.fillRect(0,0,fig.w,fig.h);
-  bgX.strokeStyle='#6b7280';bgX.lineWidth=1.5;
-  bgX.lineCap='round';bgX.lineJoin='round';
-
-  if(key==='front')  drawFront(bgX,fig.w,fig.h);
-  else if(key==='back')   drawBack(bgX,fig.w,fig.h);
-  else if(key==='hand-r') drawHandFig(bgX,fig.w,fig.h,'right');
-  else if(key==='hand-l') drawHandFig(bgX,fig.w,fig.h,'left');
-  else if(key==='foot-r') drawFootFig(bgX,fig.w,fig.h,'right');
-  else if(key==='foot-l') drawFootFig(bgX,fig.w,fig.h,'left');
-  else if(key==='spine')  drawSpineFig(bgX,fig.w,fig.h);
+  const f=FIG[key];
+  bx.fillStyle='#fff';bx.fillRect(0,0,f.w,f.h);
+  bx.strokeStyle='#333';bx.lineWidth=1.4;bx.lineCap='round';bx.lineJoin='round';
+  bx.fillStyle='#fff';
+  if(key==='front')    drawFront(bx,f.w,f.h);
+  else if(key==='back') drawBack(bx,f.w,f.h);
+  else if(key==='hand-r')drawHand(bx,f.w,f.h,'r');
+  else if(key==='hand-l')drawHand(bx,f.w,f.h,'l');
+  else if(key==='foot-r')drawFoot(bx,f.w,f.h,'r');
+  else if(key==='foot-l')drawFoot(bx,f.w,f.h,'l');
+  else if(key==='spine') drawSpine(bx,f.w,f.h);
 }
 
-function sq(ctx,x,y,w,h,r=4){
-  ctx.beginPath();
-  if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);
-  else ctx.rect(x,y,w,h);
-  ctx.fill();ctx.stroke();
-}
-function ci(ctx,x,y,r){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.stroke();}
-function ln(ctx,...pts){
-  ctx.beginPath();ctx.moveTo(pts[0],pts[1]);
-  for(let i=2;i<pts.length;i+=2)ctx.lineTo(pts[i],pts[i+1]);
-  ctx.stroke();
-}
-function label(ctx,text,x,y,size=9,color='#9ca3af'){
-  ctx.save();ctx.fillStyle=color;ctx.font=`${size}px sans-serif`;ctx.textAlign='center';ctx.fillText(text,x,y);ctx.restore();
-}
-
+// ベジェ曲線で滑らかな人体輪郭を描く
 function drawFront(ctx,W,H){
   const cx=W/2;
-  ctx.fillStyle='#f8fafc';
-  // 頭
-  ci(ctx,cx,32,25);
-  // 顔のパーツ（目・鼻・口）
-  ctx.save();ctx.strokeStyle='#d1d5db';ctx.lineWidth=1;ctx.fillStyle='#d1d5db';
-  ci(ctx,cx-8,27,3);ci(ctx,cx+8,27,3); // 目
-  ctx.beginPath();ctx.arc(cx,36,6,0,Math.PI);ctx.stroke(); // 口
+  ctx.strokeStyle='#222';ctx.lineWidth=1.5;
+
+  // 頭（やや縦長の楕円）
+  ctx.beginPath();ctx.ellipse(cx,28,18,22,0,0,Math.PI*2);ctx.stroke();
+  // 耳
+  ctx.beginPath();ctx.ellipse(cx-19,28,3,5,0,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.ellipse(cx+19,28,3,5,0,0,Math.PI*2);ctx.stroke();
+  // 顔パーツ（目・鼻・口）
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle='#555';
+  ctx.beginPath();ctx.ellipse(cx-6,24,3,2,0,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.ellipse(cx+6,24,3,2,0,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,27);ctx.lineTo(cx-1,31);ctx.lineTo(cx+1,31);ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,35,4,0.1,Math.PI-0.1);ctx.stroke();
   ctx.restore();
+
   // 首
-  sq(ctx,cx-9,57,18,18,4);
-  // 鎖骨
-  ctx.save();ctx.strokeStyle='#94a3b8';ctx.lineWidth=1.8;
-  ctx.beginPath();ctx.moveTo(cx-9,73);ctx.bezierCurveTo(cx-20,70,cx-36,74,cx-44,82);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(cx+9,73);ctx.bezierCurveTo(cx+20,70,cx+36,74,cx+44,82);ctx.stroke();
-  ctx.restore();
-  // 胴体
-  ctx.fillStyle='#f8fafc';
-  ctx.beginPath();ctx.moveTo(cx-40,75);ctx.lineTo(cx+40,75);ctx.lineTo(cx+34,195);ctx.lineTo(cx-34,195);ctx.closePath();ctx.fill();ctx.stroke();
-  // 腹部中心線（薄い点線）
-  ctx.save();ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;ctx.setLineDash([4,5]);
-  ln(ctx,cx,90,cx,193);ctx.restore();
-  // 肋骨（簡略）
-  ctx.save();ctx.strokeStyle='#cbd5e1';ctx.lineWidth=1;ctx.setLineDash([2,4]);
-  [105,120,135,150].forEach(y=>{
-    ctx.beginPath();ctx.moveTo(cx-6,y);ctx.bezierCurveTo(cx-20,y+5,cx-36,y+8,cx-40,y+12);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(cx+6,y);ctx.bezierCurveTo(cx+20,y+5,cx+36,y+8,cx+40,y+12);ctx.stroke();
-  });
-  ctx.restore();
-  // 骨盤
-  ctx.fillStyle='#f1f5f9';
-  ctx.beginPath();ctx.ellipse(cx,205,36,14,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-  sq(ctx,cx-32,197,64,30,4);
-  // 上腕・前腕・手
-  [[-48,78],[ 36,78]].forEach(([x,_],si)=>{
-    const s=si===0?-1:1;
-    sq(ctx,x,78,26,85,9);      // 上腕
-    sq(ctx,x+2,160,22,75,8);   // 前腕
-    ctx.fillStyle='#f8fafc';
-    ctx.beginPath();ctx.ellipse(x+13,248,14,10,0,0,Math.PI*2);ctx.fill();ctx.stroke();// 手
-    // 指先5本
-    for(let f=0;f<5;f++){
-      const fx=x+2+f*5-2;
-      sq(ctx,fx,237,4,16,2);
-    }
-    ctx.fillStyle='#f8fafc';
-  });
-  ctx.fillStyle='#f8fafc';
-  // 大腿・膝・下腿・足
-  [[cx-26,227],[cx+2,227]].forEach(([x,_])=>{
-    sq(ctx,x,227,24,98,8);     // 大腿
-    ci(ctx,x+12,330,17);       // 膝蓋骨
-    sq(ctx,x+1,345,22,78,7);   // 下腿
-    sq(ctx,x-2,420,26,14,4);   // 足首
-    sq(ctx,x-6,432,36,10,4);   // 足先
-    label(bgX,x<cx?'左':'右',x+12,348,8,'#94a3b8');
-  });
-  // 部位ラベル
-  label(ctx,'頭',cx,12);
-  label(ctx,'首',cx+30,68);
-  label(ctx,'右肩',cx-52,78);label(ctx,'左肩',cx+54,78);
-  label(ctx,'胸',cx+46,110);
-  label(ctx,'腹',cx+46,155);
-  label(ctx,'腰',cx+42,195);
-  label(ctx,'股関節',cx-52,215,8);
+  ctx.beginPath();ctx.moveTo(cx-7,49);ctx.lineTo(cx-7,65);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+7,49);ctx.lineTo(cx+7,65);ctx.stroke();
+
+  // 肩〜体幹の輪郭（左側）
+  ctx.beginPath();
+  ctx.moveTo(cx-7,65);
+  ctx.bezierCurveTo(cx-18,65,cx-36,66,cx-42,72);// 左肩
+  ctx.bezierCurveTo(cx-46,78,cx-45,90,cx-44,100);// 左脇
+  ctx.bezierCurveTo(cx-42,130,cx-38,165,cx-36,190);// 左胴体
+  ctx.bezierCurveTo(cx-35,200,cx-34,208,cx-32,215);// 左腰
+  ctx.stroke();
+
+  // 肩〜体幹の輪郭（右側）
+  ctx.beginPath();
+  ctx.moveTo(cx+7,65);
+  ctx.bezierCurveTo(cx+18,65,cx+36,66,cx+42,72);
+  ctx.bezierCurveTo(cx+46,78,cx+45,90,cx+44,100);
+  ctx.bezierCurveTo(cx+42,130,cx+38,165,cx+36,190);
+  ctx.bezierCurveTo(cx+35,200,cx+34,208,cx+32,215);
+  ctx.stroke();
+
+  // 股下〜脚
+  ctx.beginPath();ctx.moveTo(cx-32,215);ctx.bezierCurveTo(cx-30,222,cx-20,228,cx-8,230);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+32,215);ctx.bezierCurveTo(cx+30,222,cx+20,228,cx+8,230);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,215);ctx.bezierCurveTo(cx-2,220,cx-4,226,cx-5,230);ctx.stroke();// 股間
+
+  // 左脚
+  ctx.beginPath();
+  ctx.moveTo(cx-8,230);ctx.bezierCurveTo(cx-14,240,cx-18,270,cx-18,300);// 大腿外側
+  ctx.bezierCurveTo(cx-18,318,cx-16,330,cx-15,345);// 膝
+  ctx.bezierCurveTo(cx-14,360,cx-13,390,cx-12,415);// 下腿
+  ctx.bezierCurveTo(cx-12,418,cx-16,420,cx-22,421);// 足首
+  ctx.bezierCurveTo(cx-30,422,cx-38,421,cx-38,419);// 足先外
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx-5,230);ctx.bezierCurveTo(cx-6,240,cx-8,270,cx-8,300);
+  ctx.bezierCurveTo(cx-8,318,cx-7,330,cx-6,345);
+  ctx.bezierCurveTo(cx-5,360,cx-4,390,cx-3,415);
+  ctx.bezierCurveTo(cx-3,418,cx-2,420,cx+2,421);
+  ctx.bezierCurveTo(cx+10,422,cx+15,420,cx+15,418);// 足先内
+  ctx.stroke();
+
+  // 右脚
+  ctx.beginPath();
+  ctx.moveTo(cx+8,230);ctx.bezierCurveTo(cx+14,240,cx+18,270,cx+18,300);
+  ctx.bezierCurveTo(cx+18,318,cx+16,330,cx+15,345);
+  ctx.bezierCurveTo(cx+14,360,cx+13,390,cx+12,415);
+  ctx.bezierCurveTo(cx+12,418,cx+16,420,cx+22,421);
+  ctx.bezierCurveTo(cx+30,422,cx+38,421,cx+38,419);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx+5,230);ctx.bezierCurveTo(cx+6,240,cx+8,270,cx+8,300);
+  ctx.bezierCurveTo(cx+8,318,cx+7,330,cx+6,345);
+  ctx.bezierCurveTo(cx+5,360,cx+4,390,cx+3,415);
+  ctx.bezierCurveTo(cx+3,418,cx+2,420,cx-2,421);
+  ctx.bezierCurveTo(cx-10,422,cx-15,420,cx-15,418);
+  ctx.stroke();
+
+  // 左腕（外側）
+  ctx.beginPath();
+  ctx.moveTo(cx-42,72);
+  ctx.bezierCurveTo(cx-50,76,cx-55,90,cx-56,110);
+  ctx.bezierCurveTo(cx-57,130,cx-54,155,cx-52,170);// 肘
+  ctx.bezierCurveTo(cx-50,185,cx-48,200,cx-46,215);
+  ctx.bezierCurveTo(cx-45,222,cx-43,228,cx-40,232);// 手首
+  ctx.stroke();
+  // 左腕（内側）
+  ctx.beginPath();
+  ctx.moveTo(cx-44,100);
+  ctx.bezierCurveTo(cx-46,115,cx-46,140,cx-44,170);
+  ctx.bezierCurveTo(cx-42,185,cx-40,200,cx-38,215);
+  ctx.bezierCurveTo(cx-37,222,cx-36,228,cx-34,232);
+  ctx.stroke();
+  // 左手
+  ctx.beginPath();ctx.ellipse(cx-37,238,8,7,0.2,0,Math.PI*2);ctx.stroke();
+
+  // 右腕（外側）
+  ctx.beginPath();
+  ctx.moveTo(cx+42,72);
+  ctx.bezierCurveTo(cx+50,76,cx+55,90,cx+56,110);
+  ctx.bezierCurveTo(cx+57,130,cx+54,155,cx+52,170);
+  ctx.bezierCurveTo(cx+50,185,cx+48,200,cx+46,215);
+  ctx.bezierCurveTo(cx+45,222,cx+43,228,cx+40,232);
+  ctx.stroke();
+  // 右腕（内側）
+  ctx.beginPath();
+  ctx.moveTo(cx+44,100);
+  ctx.bezierCurveTo(cx+46,115,cx+46,140,cx+44,170);
+  ctx.bezierCurveTo(cx+42,185,cx+40,200,cx+38,215);
+  ctx.bezierCurveTo(cx+37,222,cx+36,228,cx+34,232);
+  ctx.stroke();
+  // 右手
+  ctx.beginPath();ctx.ellipse(cx+37,238,8,7,-0.2,0,Math.PI*2);ctx.stroke();
+
+  // 左右ラベル
+  ctx.save();ctx.fillStyle='#666';ctx.font='11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('右',cx-50,12);ctx.fillText('左',cx+50,12);ctx.restore();
 }
 
 function drawBack(ctx,W,H){
   const cx=W/2;
-  ctx.fillStyle='#f8fafc';
+  ctx.strokeStyle='#222';ctx.lineWidth=1.5;
+
   // 頭（後頭部）
-  ci(ctx,cx,32,25);
-  // 首後面
-  sq(ctx,cx-9,57,18,18,4);
-  // 胴体
-  ctx.beginPath();ctx.moveTo(cx-40,75);ctx.lineTo(cx+40,75);ctx.lineTo(cx+34,195);ctx.lineTo(cx-34,195);ctx.closePath();ctx.fill();ctx.stroke();
-  // 脊柱（点線）
-  ctx.save();ctx.strokeStyle='#94a3b8';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
-  ln(ctx,cx,75,cx,195);ctx.restore();
+  ctx.beginPath();ctx.ellipse(cx,28,18,22,0,0,Math.PI*2);ctx.stroke();
+  // 耳
+  ctx.beginPath();ctx.ellipse(cx-19,28,3,5,0,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.ellipse(cx+19,28,3,5,0,0,Math.PI*2);ctx.stroke();
+  // 後頭部の線
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle='#888';ctx.setLineDash([3,4]);
+  ctx.beginPath();ctx.moveTo(cx,10);ctx.lineTo(cx,46);ctx.stroke();
+  ctx.restore();
+
+  // 首
+  ctx.beginPath();ctx.moveTo(cx-7,49);ctx.lineTo(cx-7,65);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+7,49);ctx.lineTo(cx+7,65);ctx.stroke();
+
+  // 体幹（背面）
+  ctx.beginPath();ctx.moveTo(cx-7,65);ctx.bezierCurveTo(cx-18,65,cx-36,66,cx-42,72);ctx.bezierCurveTo(cx-46,78,cx-45,90,cx-44,100);ctx.bezierCurveTo(cx-42,130,cx-38,165,cx-36,190);ctx.bezierCurveTo(cx-35,200,cx-34,208,cx-32,215);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+7,65);ctx.bezierCurveTo(cx+18,65,cx+36,66,cx+42,72);ctx.bezierCurveTo(cx+46,78,cx+45,90,cx+44,100);ctx.bezierCurveTo(cx+42,130,cx+38,165,cx+36,190);ctx.bezierCurveTo(cx+35,200,cx+34,208,cx+32,215);ctx.stroke();
+
+  // 脊柱（実線）
+  ctx.save();ctx.lineWidth=1.2;ctx.strokeStyle='#555';
+  ctx.beginPath();ctx.moveTo(cx,65);ctx.lineTo(cx,215);ctx.stroke();
+  ctx.restore();
+
   // 肩甲骨
-  ctx.save();ctx.strokeStyle='#6b7280';ctx.fillStyle='#e2e8f0';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(cx-16,88);ctx.lineTo(cx-38,88);ctx.lineTo(cx-42,138);ctx.lineTo(cx-22,148);ctx.closePath();ctx.fill();ctx.stroke();
-  ctx.beginPath();ctx.moveTo(cx+16,88);ctx.lineTo(cx+38,88);ctx.lineTo(cx+42,138);ctx.lineTo(cx+22,148);ctx.closePath();ctx.fill();ctx.stroke();
-  // 肩甲骨の棘
-  ln(ctx,cx-16,100,cx-40,96);
-  ln(ctx,cx+16,100,cx+40,96);
+  ctx.save();ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(cx-12,78);ctx.lineTo(cx-36,82);ctx.lineTo(cx-40,130);ctx.lineTo(cx-20,140);ctx.closePath();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+12,78);ctx.lineTo(cx+36,82);ctx.lineTo(cx+40,130);ctx.lineTo(cx+20,140);ctx.closePath();ctx.stroke();
+  // 肩甲棘
+  ctx.beginPath();ctx.moveTo(cx-12,88);ctx.lineTo(cx-40,88);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+12,88);ctx.lineTo(cx+40,88);ctx.stroke();
   ctx.restore();
-  // 骨盤
-  ctx.fillStyle='#f1f5f9';
-  ctx.beginPath();ctx.ellipse(cx,205,36,14,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-  sq(ctx,cx-32,197,64,30,4);
-  // 臀部
-  ctx.beginPath();ctx.ellipse(cx-16,222,20,15,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-  ctx.beginPath();ctx.ellipse(cx+16,222,20,15,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-  // 上腕・前腕
-  [[-48,78],[36,78]].forEach(([x])=>{
-    sq(ctx,x,78,26,85,9);sq(ctx,x+2,160,22,75,8);
-    ctx.fillStyle='#f8fafc';ctx.beginPath();ctx.ellipse(x+13,248,14,10,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#f8fafc';
+
+  // 股〜脚（背面）
+  ctx.beginPath();ctx.moveTo(cx-32,215);ctx.bezierCurveTo(cx-30,222,cx-20,228,cx-8,230);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+32,215);ctx.bezierCurveTo(cx+30,222,cx+20,228,cx+8,230);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,215);ctx.bezierCurveTo(cx-2,220,cx-4,226,cx-5,230);ctx.stroke();
+
+  // 脚（左右）
+  [[-1],[1]].forEach(([s])=>{
+    const m=s<0?-1:1;
+    ctx.beginPath();ctx.moveTo(cx+m*8,230);ctx.bezierCurveTo(cx+m*14,240,cx+m*18,270,cx+m*18,300);ctx.bezierCurveTo(cx+m*18,318,cx+m*16,330,cx+m*15,345);ctx.bezierCurveTo(cx+m*14,360,cx+m*13,390,cx+m*12,415);ctx.bezierCurveTo(cx+m*12,418,cx+m*16,420,cx+m*22,421);ctx.bezierCurveTo(cx+m*30,422,cx+m*38,421,cx+m*38,419);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+m*5,230);ctx.bezierCurveTo(cx+m*6,240,cx+m*8,270,cx+m*8,300);ctx.bezierCurveTo(cx+m*8,318,cx+m*7,330,cx+m*6,345);ctx.bezierCurveTo(cx+m*5,360,cx+m*4,390,cx+m*3,415);ctx.bezierCurveTo(cx+m*3,418,cx+m*2,420,cx-m*2,421);ctx.bezierCurveTo(cx-m*10,422,cx-m*15,420,cx-m*15,418);ctx.stroke();
   });
-  ctx.fillStyle='#f8fafc';
-  // 大腿・膝裏・下腿
-  [[cx-26,227],[cx+2,227]].forEach(([x])=>{
-    sq(ctx,x,227,24,98,8);
-    ctx.beginPath();ctx.ellipse(x+12,330,16,12,0,0,Math.PI*2);ctx.fill();ctx.stroke();// 膝裏
-    sq(ctx,x+1,345,22,78,7);
-    sq(ctx,x-2,420,26,14,4);
-    sq(ctx,x-6,432,36,10,4);
+
+  // 腕（背面）
+  [[-1],[1]].forEach(([s])=>{
+    const m=s<0?-1:1;
+    ctx.beginPath();ctx.moveTo(cx+m*42,72);ctx.bezierCurveTo(cx+m*50,76,cx+m*55,90,cx+m*56,110);ctx.bezierCurveTo(cx+m*57,130,cx+m*54,155,cx+m*52,170);ctx.bezierCurveTo(cx+m*50,185,cx+m*48,200,cx+m*46,215);ctx.bezierCurveTo(cx+m*45,222,cx+m*43,228,cx+m*40,232);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+m*44,100);ctx.bezierCurveTo(cx+m*46,115,cx+m*46,140,cx+m*44,170);ctx.bezierCurveTo(cx+m*42,185,cx+m*40,200,cx+m*38,215);ctx.bezierCurveTo(cx+m*37,222,cx+m*36,228,cx+m*34,232);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(cx+m*37,238,8,7,m*0.2,0,Math.PI*2);ctx.stroke();
   });
-  // ラベル
-  label(ctx,'後頭部',cx,12);label(ctx,'首後面',cx+30,68);
-  label(ctx,'右肩甲骨',cx-44,160,8);label(ctx,'左肩甲骨',cx+46,160,8);
-  label(ctx,'背中',cx+46,130);label(ctx,'腰',cx+42,185);
-  label(ctx,'右臀部',cx-36,235,8);label(ctx,'左臀部',cx+38,235,8);
+
+  // 臀部の割れ目
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle='#888';
+  ctx.beginPath();ctx.moveTo(cx,215);ctx.bezierCurveTo(cx,218,cx,224,cx,230);ctx.stroke();
+  ctx.restore();
+
+  ctx.save();ctx.fillStyle='#666';ctx.font='11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('右',cx-50,12);ctx.fillText('左',cx+50,12);ctx.restore();
 }
 
-function drawHandFig(ctx,W,H,side){
-  const cx=W/2, by=H-20;
-  ctx.fillStyle='#f8fafc';
+function drawHand(ctx,W,H,side){
+  const cx=W/2, by=H-15;
+  const s=side==='r'?-1:1;
+  ctx.strokeStyle='#222';ctx.lineWidth=1.4;
+
   // 手首
-  sq(ctx,cx-35,by-50,70,32,6);
-  label(ctx,'手首',cx,by-30,9,'#94a3b8');
-  // 手のひら
-  ctx.beginPath();ctx.ellipse(cx,by-100,44,55,0,0,Math.PI*2);ctx.fill();ctx.stroke();
-  // 手の甲の骨（細い線）
-  ctx.save();ctx.strokeStyle='#cbd5e1';ctx.lineWidth=1;
-  const fxs=side==='right'?[-28,-14,0,14,28]:[-28,-14,0,14,28];
-  fxs.forEach(fx=>{ln(ctx,cx+fx,by-152,cx+fx*0.7,by-75);});
+  ctx.beginPath();ctx.moveTo(cx-30,by-30);ctx.lineTo(cx+30,by-30);
+  ctx.bezierCurveTo(cx+32,by-15,cx+32,by,cx+28,by);
+  ctx.lineTo(cx-28,by);ctx.bezierCurveTo(cx-32,by,cx-32,by-15,cx-30,by-30);ctx.stroke();
+
+  // 手のひら輪郭
+  ctx.beginPath();
+  ctx.moveTo(cx-30,by-30);
+  ctx.bezierCurveTo(cx-32,by-80,cx-30,by-140,cx-26,by-155);
+  ctx.bezierCurveTo(cx-22,by-168,cx-10,by-170,cx,by-172);
+  ctx.bezierCurveTo(cx+10,by-170,cx+22,by-168,cx+26,by-155);
+  ctx.bezierCurveTo(cx+30,by-140,cx+32,by-80,cx+30,by-30);ctx.stroke();
+
+  // 指の付け根ライン
+  ctx.save();ctx.lineWidth=1;ctx.strokeStyle='#888';
+  ctx.beginPath();ctx.moveTo(cx-26,by-155);ctx.bezierCurveTo(cx-10,by-160,cx+10,by-160,cx+26,by-155);ctx.stroke();
   ctx.restore();
+
   // 4本指
-  const fdata=[{dx:-30,fw:16,fh:70},{dx:-12,fw:17,fh:82},{dx:6,fw:17,fh:78},{dx:24,fw:15,fh:65}];
-  fdata.forEach((f,i)=>{
-    sq(ctx,cx+f.dx,by-155-f.fh,f.fw,f.fh,7);
-    // 関節線
-    ctx.save();ctx.strokeStyle='#d1d5db';ctx.lineWidth=1;
-    [0.35,0.65].forEach(t=>{ln(ctx,cx+f.dx+1,by-155-f.fh+f.fh*t,cx+f.dx+f.fw-1,by-155-f.fh+f.fh*t);});
-    ctx.restore();
+  const fpos=[{x:cx-20,w:13,h:55},{x:cx-6,w:14,h:65},{x:cx+8,w:14,h:62},{x:cx+22,w:12,h:50}];
+  fpos.forEach((f,i)=>{
+    ctx.beginPath();
+    ctx.moveTo(f.x,by-155);ctx.lineTo(f.x,by-155-f.h+8);
+    ctx.bezierCurveTo(f.x,by-155-f.h,f.x+f.w,by-155-f.h,f.x+f.w,by-155-f.h+8);
+    ctx.lineTo(f.x+f.w,by-155);ctx.stroke();
+    // 関節
+    ctx.save();ctx.lineWidth=0.8;ctx.strokeStyle='#aaa';
+    [0.35,0.65].forEach(t=>{
+      ctx.beginPath();ctx.moveTo(f.x+1,by-155-f.h*t);ctx.lineTo(f.x+f.w-1,by-155-f.h*t);ctx.stroke();
+    });ctx.restore();
   });
+
   // 親指
-  const ts=side==='right'?-1:1;
-  ctx.save();ctx.translate(cx+ts*44,by-130);ctx.rotate(ts*0.6);
-  sq(ctx,-9,-55,18,58,8);
-  // 親指関節
-  ctx.save();ctx.strokeStyle='#d1d5db';ctx.lineWidth=1;
-  ln(ctx,-8,-25,8,-25);ctx.restore();
-  ctx.restore();
-  // 指名ラベル
-  const names=side==='right'
-    ?['小指','薬指','中指','人差','親指']
-    :['親指','人差','中指','薬指','小指'];
-  fdata.forEach((f,i)=>label(ctx,names[i+1],cx+f.dx+f.fw/2,by-158-fdata[i].fh-4,8));
-  label(ctx,names[0],cx+ts*50,by-195,8);
-  label(ctx,side==='right'?'右手(手のひら)':'左手(手のひら)',cx,H-5,10,'#9ca3af');
-}
+  ctx.save();ctx.translate(cx+s*32,by-110);ctx.rotate(s*0.7);
+  ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-7,-46+8);
+  ctx.bezierCurveTo(-7,-46,-7+14,-46,-7+14,-46+8);
+  ctx.lineTo(-7+14,0);ctx.stroke();
+  ctx.save();ctx.lineWidth=0.8;ctx.strokeStyle='#aaa';
+  ctx.beginPath();ctx.moveTo(-6,-20);ctx.lineTo(6,-20);ctx.stroke();
+  ctx.restore();ctx.restore();
 
-function drawFootFig(ctx,W,H,side){
-  const cx=W/2;
-  ctx.fillStyle='#f8fafc';
-  // かかと
-  ci(ctx,cx,H-35,35);
-  label(ctx,'かかと',cx,H-28,8,'#94a3b8');
-  // 足の輪郭
-  const s=side==='right'?-1:1;
-  ctx.beginPath();
-  ctx.moveTo(cx-33,H-55);ctx.lineTo(cx+s*38,H-65);
-  ctx.bezierCurveTo(cx+s*40,H-160,cx+s*35,H-240,cx+s*20,H-300);
-  ctx.lineTo(cx+s*5,H-310);
-  ctx.lineTo(cx-s*20,H-310);
-  ctx.bezierCurveTo(cx-s*28,H-240,cx-s*36,H-160,cx-33,H-55);
-  ctx.closePath();ctx.fill();ctx.stroke();
-  // 土踏まずアーチ（点線）
-  ctx.save();ctx.strokeStyle='#cbd5e1';ctx.setLineDash([3,5]);ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(cx+s*30,H-80);ctx.bezierCurveTo(cx+s*10,H-180,cx+s*5,H-240,cx+s*8,H-295);ctx.stroke();
-  ctx.restore();
-  // 5本指
-  const toes=[{dx:-26,tw:22,th:38},{dx:-8,tw:24,th:48},{dx:12,tw:22,th:44},{dx:30,tw:18,th:38},{dx:46*s,tw:14,th:30}];
-  toes.forEach((t,i)=>{
-    sq(ctx,cx+t.dx,H-315-t.th,t.tw,t.th,8);
-    label(ctx,(i+1)+'趾',cx+t.dx+t.tw/2,H-318-t.th,7,'#94a3b8');
-  });
   // ラベル
-  label(ctx,'足趾',cx,H-330,9,'#64748b');
-  label(ctx,'足背',cx+s*10,H-240,9,'#64748b');
-  label(ctx,'土踏まず',cx-s*20,H-180,8,'#94a3b8');
-  label(ctx,side==='right'?'右足(足裏)':'左足(足裏)',cx,H-5,10,'#9ca3af');
+  ctx.save();ctx.fillStyle='#555';ctx.font='10px sans-serif';ctx.textAlign='center';
+  const names=side==='r'?['小','薬','中','人','親']:['親','人','中','薬','小'];
+  fpos.forEach((f,i)=>ctx.fillText(names[i+1],f.x+f.w/2,by-155-fpos[i].h-5));
+  ctx.fillText(names[0],cx+s*38,by-148);
+  ctx.fillText(side==='r'?'右手（手のひら）':'左手（手のひら）',cx,H-2);
+  ctx.restore();
 }
 
-function drawSpineFig(ctx,W,H){
+function drawFoot(ctx,W,H,side){
   const cx=W/2;
-  ctx.fillStyle='#f8fafc';
-  // 頭蓋骨
-  ci(ctx,cx,22,18);
-  // 脊椎セクション定義
-  const sections=[
-    {name:'C',label:'頸椎',count:7,color:'#dbeafe',start:45,gh:20,gw:52},
-    {name:'T',label:'胸椎',count:12,color:'#dcfce7',start:190,gh:16,gw:46},
-    {name:'L',label:'腰椎',count:5,color:'#fef9c3',start:388,gh:20,gw:54},
-    {name:'S',label:'仙椎',count:1,color:'#fce7f3',start:492,gh:36,gw:60},
-    {name:'Co',label:'尾骨',count:1,color:'#f3e8ff',start:534,gh:18,gw:40},
-  ];
-  // 中心ライン
-  ctx.save();ctx.strokeStyle='#93c5fd';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
-  ln(ctx,cx,40,cx,H-20);ctx.restore();
-  sections.forEach(sec=>{
-    for(let i=0;i<sec.count;i++){
-      const y=sec.start+i*(sec.gh+2);
-      ctx.fillStyle=sec.color;
-      sq(ctx,cx-sec.gw/2,y,sec.gw,sec.gh,4);
-      // 椎体番号
-      ctx.fillStyle='#374151';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
-      ctx.fillText(sec.name+(i+1),cx,y+sec.gh-5);
-      // 横突起
-      ctx.save();ctx.strokeStyle='#9ca3af';ctx.lineWidth=1.2;
-      ln(ctx,cx-sec.gw/2,y+sec.gh/2,cx-sec.gw/2-10,y+sec.gh/2+3);
-      ln(ctx,cx+sec.gw/2,y+sec.gh/2,cx+sec.gw/2+10,y+sec.gh/2+3);
-      ctx.restore();
-    }
-    // セクションラベル
-    ctx.fillStyle='#6b7280';ctx.font='bold 10px sans-serif';ctx.textAlign='right';
-    ctx.fillText(sec.label,cx-sec.gw/2-12,sec.start+sec.gh/2+4);
-  });
-  label(ctx,'脊椎（後面）',cx,H-5,10,'#9ca3af');
-}
+  const s=side==='r'?-1:1;
+  ctx.strokeStyle='#222';ctx.lineWidth=1.4;
 
-// ===== タッチ・マウスイベント =====
-function getPos(e){
-  const rect=drC.getBoundingClientRect();
-  const sx=drC.width/rect.width, sy=drC.height/rect.height;
-  const src=e.touches?e.touches[0]:e;
-  return{x:(src.clientX-rect.left)*sx, y:(src.clientY-rect.top)*sy};
-}
-
-drC.addEventListener('mousedown',onStart);drC.addEventListener('touchstart',onStart,{passive:false});
-drC.addEventListener('mousemove',onMove);drC.addEventListener('touchmove',onMove,{passive:false});
-drC.addEventListener('mouseup',onEnd);drC.addEventListener('touchend',onEnd,{passive:false});
-
-function onStart(e){
-  e.preventDefault();drawing=true;
-  const p=getPos(e);startX=lastX=p.x;startY=lastY=p.y;
-  // undoスタックに保存
-  if(!drawStacks[currentFig])drawStacks[currentFig]=[];
-  const fig=FIGS[currentFig];
-  drawStacks[currentFig].push(drX.getImageData(0,0,fig.w,fig.h));
-  if(drawStacks[currentFig].length>50)drawStacks[currentFig].shift();
-  drX.globalCompositeOperation='source-over';
-}
-
-function onMove(e){
-  e.preventDefault();if(!drawing)return;
-  const p=getPos(e);
-  if(tool==='pen'){
-    drX.globalCompositeOperation='source-over';
-    drX.strokeStyle=color;drX.lineWidth=lineSize;drX.lineCap='round';drX.lineJoin='round';
-    drX.beginPath();drX.moveTo(lastX,lastY);drX.lineTo(p.x,p.y);drX.stroke();
-    lastX=p.x;lastY=p.y;
-  } else if(tool==='erase'){
-    // 描画レイヤーのみ消去（背景は触らない）
-    drX.globalCompositeOperation='destination-out';
-    drX.strokeStyle='rgba(0,0,0,1)';drX.lineWidth=lineSize*5;drX.lineCap='round';
-    drX.beginPath();drX.moveTo(lastX,lastY);drX.lineTo(p.x,p.y);drX.stroke();
-    lastX=p.x;lastY=p.y;
-  } else if(tool==='circle'||tool==='arrow'){
-    // プレビュー描画（undoスタックの最新に戻してから描く）
-    const st=drawStacks[currentFig];
-    drX.globalCompositeOperation='source-over';
-    drX.clearRect(0,0,drC.width,drC.height);
-    if(st&&st.length>0)drX.putImageData(st[st.length-1],0,0);
-    drX.strokeStyle=color;drX.lineWidth=lineSize;drX.lineCap='round';
-    if(tool==='circle'){
-      const r=Math.hypot(p.x-startX,p.y-startY);
-      drX.beginPath();drX.arc(startX,startY,r,0,Math.PI*2);drX.stroke();
-    } else {
-      drawArrow(drX,startX,startY,p.x,p.y);
-    }
-  }
-}
-
-function onEnd(e){
-  e.preventDefault();drawing=false;
-  drX.globalCompositeOperation='source-over';
-}
-
-function drawArrow(ctx,x1,y1,x2,y2){
-  const angle=Math.atan2(y2-y1,x2-x1);
-  const len=Math.min(22,Math.hypot(x2-x1,y2-y1)*0.35);
-  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  // 足の輪郭（問診票スタイル）
   ctx.beginPath();
-  ctx.moveTo(x2,y2);
-  ctx.lineTo(x2-len*Math.cos(angle-0.45),y2-len*Math.sin(angle-0.45));
-  ctx.lineTo(x2-len*Math.cos(angle+0.45),y2-len*Math.sin(angle+0.45));
-  ctx.closePath();ctx.fillStyle=color;ctx.fill();
+  // かかと
+  ctx.arc(cx,H-40,28,0,Math.PI*2);ctx.stroke();
+  // 足の本体輪郭
+  ctx.beginPath();
+  ctx.moveTo(cx-28,H-40);
+  ctx.bezierCurveTo(cx-32,H-80,cx+s*14,H-160,cx+s*18,H-240);
+  ctx.bezierCurveTo(cx+s*20,H-280,cx+s*16,H-300,cx+s*8,H-305);
+  ctx.lineTo(cx+s*4,H-310);
+  ctx.lineTo(cx-s*22,H-308);
+  ctx.bezierCurveTo(cx-s*26,H-280,cx-s*28,H-260,cx-s*26,H-240);
+  ctx.bezierCurveTo(cx-s*22,H-160,cx+28,H-80,cx+28,H-40);ctx.stroke();
+
+  // 土踏まずライン
+  ctx.save();ctx.setLineDash([3,5]);ctx.lineWidth=1;ctx.strokeStyle='#aaa';
+  ctx.beginPath();ctx.moveTo(cx-s*26,H-80);ctx.bezierCurveTo(cx-s*8,H-160,cx-s*4,H-240,cx-s*6,H-295);ctx.stroke();
+  ctx.restore();
+
+  // 5本の足趾（指）
+  const toes=[
+    {x:cx-s*22,w:18,h:32},{x:cx-s*6,w:18,h:40},{x:cx+s*8,w:17,h:38},
+    {x:cx+s*22,w:15,h:32},{x:cx+s*34,w:13,h:24}
+  ];
+  toes.forEach((t,i)=>{
+    ctx.beginPath();
+    ctx.moveTo(t.x,H-310);ctx.lineTo(t.x,H-310-t.h+6);
+    ctx.bezierCurveTo(t.x,H-310-t.h,t.x+t.w,H-310-t.h,t.x+t.w,H-310-t.h+6);
+    ctx.lineTo(t.x+t.w,H-310);ctx.stroke();
+    ctx.save();ctx.fillStyle='#888';ctx.font='8px sans-serif';ctx.textAlign='center';
+    ctx.fillText((i+1)+'趾',t.x+t.w/2,H-313-t.h);ctx.restore();
+  });
+
+  ctx.save();ctx.fillStyle='#555';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('かかと',cx,H-25);
+  ctx.fillText(side==='r'?'右足（足裏）':'左足（足裏）',cx,H-2);ctx.restore();
 }
 
-// ===== ツール/色/サイズ =====
-function setTool(t){
-  tool=t;
-  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('tool-'+t).classList.add('active');
-}
-function setColor(c){
-  color=c;
-  document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
-  const m={'#ef4444':'col-red','#3b82f6':'col-blue','#1e293b':'col-black','#22c55e':'col-green','#f97316':'col-orange'};
-  if(m[c])document.getElementById(m[c]).classList.add('active');
-}
-function setSize(s){
-  lineSize=s;
-  document.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('active'));
-  const m={3:'sz-s',7:'sz-m',16:'sz-l'};
-  if(m[s])document.getElementById(m[s]).classList.add('active');
+function drawSpine(ctx,W,H){
+  const cx=W/2;
+  ctx.strokeStyle='#222';ctx.lineWidth=1.4;
+  // 頭蓋骨下端
+  ctx.beginPath();ctx.ellipse(cx,18,14,16,0,0,Math.PI*2);ctx.stroke();
+  // 脊椎セクション
+  const secs=[
+    {n:'C',lbl:'頸椎',cnt:7,c:'#dbeafe',y:38,gh:18,gw:48},
+    {n:'T',lbl:'胸椎',cnt:12,c:'#dcfce7',y:168,gh:14,gw:44},
+    {n:'L',lbl:'腰椎',cnt:5,c:'#fef9c3',y:350,gh:18,gw:50},
+    {n:'S',lbl:'仙椎',cnt:1,c:'#fce7f3',y:444,gh:34,gw:56},
+    {n:'Co',lbl:'尾骨',cnt:1,c:'#f3e8ff',y:482,gh:16,gw:36},
+  ];
+  // 中央ライン
+  ctx.save();ctx.setLineDash([4,4]);ctx.lineWidth=1;ctx.strokeStyle='#93c5fd';
+  ctx.beginPath();ctx.moveTo(cx,34);ctx.lineTo(cx,H-15);ctx.stroke();ctx.restore();
+
+  secs.forEach(s=>{
+    for(let i=0;i<s.cnt;i++){
+      const y=s.y+i*(s.gh+2);
+      ctx.fillStyle=s.c;
+      ctx.beginPath();
+      if(ctx.roundRect)ctx.roundRect(cx-s.gw/2,y,s.gw,s.gh,3);
+      else ctx.rect(cx-s.gw/2,y,s.gw,s.gh);
+      ctx.fill();ctx.stroke();
+      // 横突起
+      ctx.beginPath();ctx.moveTo(cx-s.gw/2,y+s.gh/2);ctx.lineTo(cx-s.gw/2-10,y+s.gh/2+2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx+s.gw/2,y+s.gh/2);ctx.lineTo(cx+s.gw/2+10,y+s.gh/2+2);ctx.stroke();
+      ctx.fillStyle='#1e293b';ctx.font='bold 8px sans-serif';ctx.textAlign='center';
+      ctx.fillText(s.n+(i+1),cx,y+s.gh-4);
+    }
+    ctx.fillStyle='#374151';ctx.font='bold 9px sans-serif';ctx.textAlign='right';
+    ctx.fillText(s.lbl,cx-s.gw/2-12,s.y+s.gh/2+4);
+  });
+  ctx.fillStyle='#9ca3af';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('脊椎（後面）',cx,H-4);
 }
 
-// ===== 戻す / 消去 =====
-function undo(){
-  const st=drawStacks[currentFig];
-  if(!st||st.length===0)return;
-  const prev=st.pop();
-  drX.globalCompositeOperation='source-over';
-  drX.clearRect(0,0,drC.width,drC.height);
-  drX.putImageData(prev,0,0);
+// ===== イベント =====
+function getP(e){
+  const r=dr.getBoundingClientRect();
+  const sx2=dr.width/r.width,sy2=dr.height/r.height;
+  const s2=e.touches?e.touches[0]:e;
+  return{x:(s2.clientX-r.left)*sx2,y:(s2.clientY-r.top)*sy2};
 }
-function clearDraw(){
-  if(!confirm('この図の書き込みをすべて消しますか？（人体図は消えません）'))return;
-  const fig=FIGS[currentFig];
-  if(!drawStacks[currentFig])drawStacks[currentFig]=[];
-  drawStacks[currentFig].push(drX.getImageData(0,0,fig.w,fig.h));
-  drX.clearRect(0,0,fig.w,fig.h);
-}
+dr.addEventListener('mousedown',onS);dr.addEventListener('touchstart',onS,{passive:false});
+dr.addEventListener('mousemove',onM);dr.addEventListener('touchmove',onM,{passive:false});
+dr.addEventListener('mouseup',onE);dr.addEventListener('touchend',onE,{passive:false});
 
-// ===== 保存 / ダウンロード =====
-function mergeImg(key){
-  const fig=FIGS[key];
-  const tmp=document.createElement('canvas');
-  tmp.width=fig.w;tmp.height=fig.h;
-  const tc=tmp.getContext('2d');
-  tc.fillStyle='#fff';tc.fillRect(0,0,fig.w,fig.h);
-  // 背景図を再描画
-  drawBg.call({bgX:tc},key);// bgXがtcに向かないので別途
-  const bgTmp=document.createElement('canvas');bgTmp.width=fig.w;bgTmp.height=fig.h;
-  const bgTc=bgTmp.getContext('2d');
-  if(key===currentFig){bgTc.drawImage(bgC,0,0);}
-  else{
-    bgTc.fillStyle='#fff';bgTc.fillRect(0,0,fig.w,fig.h);
-    const savedBgX=bgX;
-    // 一時描画
-    setCanvasSize(fig.w,fig.h);
-    drawBg(key);
-    bgTc.drawImage(bgC,0,0);
-    // 現在の図に戻す
-    const cur=FIGS[currentFig];
-    setCanvasSize(cur.w,cur.h);
-    drawBg(currentFig);
-    restoreDraw(currentFig);
+function onS(e){
+  e.preventDefault();drawing=true;
+  const p=getP(e);sx=lx=p.x;sy=ly=p.y;
+  if(!stacks[cur])stacks[cur]=[];
+  stacks[cur].push(dx.getImageData(0,0,dr.width,dr.height));
+  if(stacks[cur].length>60)stacks[cur].shift();
+  dx.globalCompositeOperation='source-over';
+}
+function onM(e){
+  e.preventDefault();if(!drawing)return;
+  const p=getP(e);
+  if(tool==='pen'){
+    dx.globalCompositeOperation='source-over';
+    dx.strokeStyle=color;dx.lineWidth=sz;dx.lineCap='round';dx.lineJoin='round';
+    dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();
+    lx=p.x;ly=p.y;
+  }else if(tool==='erase'){
+    dx.globalCompositeOperation='destination-out';
+    dx.lineWidth=sz*6;dx.lineCap='round';
+    dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();
+    lx=p.x;ly=p.y;
+  }else{
+    const st=stacks[cur];
+    dx.globalCompositeOperation='source-over';
+    dx.clearRect(0,0,dr.width,dr.height);
+    if(st&&st.length>0)dx.putImageData(st[st.length-1],0,0);
+    dx.strokeStyle=color;dx.lineWidth=sz;dx.lineCap='round';
+    if(tool==='circle'){
+      const r=Math.hypot(p.x-sx,p.y-sy);
+      dx.beginPath();dx.arc(sx,sy,r,0,Math.PI*2);dx.stroke();
+    }else{
+      const ang=Math.atan2(p.y-sy,p.x-sx),len=Math.min(20,Math.hypot(p.x-sx,p.y-sy)*0.35);
+      dx.beginPath();dx.moveTo(sx,sy);dx.lineTo(p.x,p.y);dx.stroke();
+      dx.beginPath();dx.moveTo(p.x,p.y);dx.lineTo(p.x-len*Math.cos(ang-0.45),p.y-len*Math.sin(ang-0.45));dx.lineTo(p.x-len*Math.cos(ang+0.45),p.y-len*Math.sin(ang+0.45));dx.closePath();dx.fillStyle=color;dx.fill();
+    }
   }
-  tc.drawImage(bgTmp,0,0);
-  // 描画レイヤー
-  const st=drawStacks[key];
-  if(key===currentFig){
-    tc.drawImage(drC,0,0);
-  } else if(st&&st.length>0){
-    const dTmp=document.createElement('canvas');dTmp.width=fig.w;dTmp.height=fig.h;
-    dTmp.getContext('2d').putImageData(st[st.length-1],0,0);
-    tc.drawImage(dTmp,0,0);
-  }
-  return tmp;
 }
+function onE(e){e.preventDefault();drawing=false;dx.globalCompositeOperation='source-over';}
 
-function downloadCurrent(){
-  // 現在の図のみをシンプルにダウンロード
-  const tmp=document.createElement('canvas');
-  tmp.width=bgC.width+40;tmp.height=bgC.height+50;
+// ===== ツール =====
+function setT(t){tool=t;document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));document.getElementById('t-'+t).classList.add('active');}
+function setC(c){color=c;document.querySelectorAll('.color-dot').forEach(b=>b.classList.remove('on'));const m={'#e74c3c':'d-red','#2980b9':'d-blue','#2c3e50':'d-black','#27ae60':'d-green'};if(m[c])document.getElementById(m[c]).classList.add('on');}
+function setS(s){sz=s;document.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('active'));const m={2:'s-s',6:'s-m',14:'s-l'};if(m[s])document.getElementById(m[s]).classList.add('active');}
+
+// ===== 戻す・消去 =====
+function undo(){const st=stacks[cur];if(!st||!st.length)return;const p=st.pop();dx.globalCompositeOperation='source-over';dx.clearRect(0,0,dr.width,dr.height);dx.putImageData(p,0,0);}
+function clrDraw(){if(!confirm('この図の書き込みを消去しますか？'))return;saveSnap();dx.clearRect(0,0,dr.width,dr.height);}
+
+// ===== 保存・DL =====
+function makeImg(){
+  const tmp=document.createElement('canvas');tmp.width=bg.width+40;tmp.height=bg.height+50;
   const tc=tmp.getContext('2d');
   tc.fillStyle='#fff';tc.fillRect(0,0,tmp.width,tmp.height);
-  // ヘッダー情報
-  const name=document.getElementById('pt-name').value||'患者名未入力';
-  const date=document.getElementById('pt-date').value||new Date().toISOString().split('T')[0];
-  tc.fillStyle='#1e293b';tc.font='bold 14px sans-serif';tc.textAlign='left';
-  tc.fillText('倉治整骨院 症状記入シート',20,22);
-  tc.font='12px sans-serif';tc.fillStyle='#374151';
-  tc.fillText(date+'  '+name+'  '+FIGS[currentFig].label,20,40);
-  // 図
-  tc.drawImage(bgC,20,50);
-  tc.drawImage(drC,20,50);
-  // メモ
+  const name=document.getElementById('pt-name').value||'患者名';
+  const date=document.getElementById('pt-date').value||'';
+  tc.fillStyle='#1e293b';tc.font='bold 13px sans-serif';tc.textAlign='left';
+  tc.fillText('倉治整骨院 症状記入',20,18);
+  tc.font='11px sans-serif';tc.fillStyle='#374151';
+  tc.fillText(date+'  '+name+'  '+FIG[cur].lbl,20,34);
+  tc.drawImage(bg,20,44);tc.drawImage(dr,20,44);
   const memo=document.getElementById('memo').value;
-  if(memo){tc.font='11px sans-serif';tc.fillStyle='#374151';tc.fillText('症状：'+memo,20,tmp.height-5);}
-  const a=document.createElement('a');
-  a.download=date+'_'+name+'_'+FIGS[currentFig].label.replace(/[^\w\u3040-\u9fff]/g,'')+'.png';
-  a.href=tmp.toDataURL();a.click();
+  if(memo){tc.font='10px sans-serif';tc.fillStyle='#374151';tc.fillText('症状：'+memo.slice(0,60),20,tmp.height-4);}
+  return tmp;
 }
-
-function saveRecord(){
+function dlImg(){const a=document.createElement('a');const n=document.getElementById('pt-name').value||'症状図';const d=document.getElementById('pt-date').value||'';a.download=d+'_'+n+'_'+FIG[cur].lbl.replace(/[^\w\u3040-\u9fff]/g,'')+'.png';a.href=makeImg().toDataURL();a.click();}
+function saveRec(){
   const name=document.getElementById('pt-name').value.trim()||'(名前なし)';
   const date=document.getElementById('pt-date').value||new Date().toISOString().split('T')[0];
   const memo=document.getElementById('memo').value.trim();
-  // 現在の図だけ保存（全図は重すぎるため）
-  const tmp=document.createElement('canvas');
-  tmp.width=bgC.width;tmp.height=bgC.height;
-  const tc=tmp.getContext('2d');
-  tc.drawImage(bgC,0,0);tc.drawImage(drC,0,0);
-  const imgData=tmp.toDataURL('image/jpeg',0.75);
-  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
-  records.unshift({id:Date.now(),name,date,memo,fig:currentFig,img:imgData});
-  localStorage.setItem('kj_symptom_records',JSON.stringify(records.slice(0,40)));
-  renderSaved();
-  alert('✅ 保存しました！');
+  const tmp=document.createElement('canvas');tmp.width=bg.width;tmp.height=bg.height;
+  const tc=tmp.getContext('2d');tc.drawImage(bg,0,0);tc.drawImage(dr,0,0);
+  const recs=JSON.parse(localStorage.getItem('kj_sym')||'[]');
+  recs.unshift({id:Date.now(),name,date,memo,fig:cur,img:tmp.toDataURL('image/jpeg',0.75)});
+  localStorage.setItem('kj_sym',JSON.stringify(recs.slice(0,40)));
+  renderSaved();alert('✅ 保存しました');
 }
-
 function renderSaved(){
-  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
-  const box=document.getElementById('saved-box');
-  const items=document.getElementById('saved-items');
-  if(!records.length){box.style.display='none';return;}
+  const recs=JSON.parse(localStorage.getItem('kj_sym')||'[]');
+  const box=document.getElementById('saved-box'),lst=document.getElementById('saved-list');
+  if(!recs.length){box.style.display='none';return;}
   box.style.display='block';
-  items.innerHTML=records.map((r,i)=>`
-    <div class="saved-item">
-      <span style="flex:1;color:#374151">${r.date} <strong>${r.name}</strong> [${FIGS[r.fig]?.label||r.fig}]
-        ${r.memo?'<br><span style="color:#64748b;font-size:0.68rem">'+r.memo.slice(0,20)+'</span>':''}</span>
-      <button class="mini-btn" style="background:#eff6ff;color:#1d4ed8;margin-right:4px" onclick="loadImg(${i})">表示</button>
-      <button class="mini-btn" style="background:#fee2e2;color:#dc2626" onclick="deleteRecord(${i})">削除</button>
-    </div>
-  `).join('');
+  lst.innerHTML=recs.map((r,i)=>`<div class="saved-row"><span style="flex:1">${r.date} <b>${r.name}</b> [${FIG[r.fig]?.lbl||r.fig}]${r.memo?'<br><small style="color:#64748b">'+r.memo.slice(0,20)+'</small>':''}</span><button class="mb" style="background:#eff6ff;color:#1d4ed8;margin-right:4px" onclick="loadRec(${i})">表示</button><button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delRec(${i})">削除</button></div>`).join('');
 }
-
-function loadImg(i){
-  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
-  const r=records[i];
-  // 該当の図タブに切り替え
-  const tabBtns=document.querySelectorAll('.fig-tab');
-  const keys=Object.keys(FIGS);
-  const idx=keys.indexOf(r.fig);
-  if(idx>=0)switchFig(r.fig,tabBtns[idx]);
-  // 画像を読み込み
-  const img=new Image();
-  img.onload=()=>{
-    drX.clearRect(0,0,drC.width,drC.height);
-    // 背景を除いた描画部分だけを復元（近似）
-    const tmp=document.createElement('canvas');
-    tmp.width=drC.width;tmp.height=drC.height;
-    const tc=tmp.getContext('2d');
-    tc.drawImage(img,0,0,drC.width,drC.height);
-    drX.drawImage(tmp,0,0);
-  };
-  img.src=r.img;
+function loadRec(i){
+  const recs=JSON.parse(localStorage.getItem('kj_sym')||'[]');const r=recs[i];
+  const keys=Object.keys(FIG),idx=keys.indexOf(r.fig);
+  if(idx>=0)sw(r.fig,document.querySelectorAll('.fig-tab')[idx]);
   document.getElementById('pt-name').value=r.name;
   document.getElementById('pt-date').value=r.date;
   document.getElementById('memo').value=r.memo||'';
+  const img=new Image();img.onload=()=>{dx.clearRect(0,0,dr.width,dr.height);dx.drawImage(img,0,0,dr.width,dr.height);};img.src=r.img;
 }
-
-function deleteRecord(i){
-  if(!confirm('この記録を削除しますか？'))return;
-  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
-  records.splice(i,1);
-  localStorage.setItem('kj_symptom_records',JSON.stringify(records));
-  renderSaved();
-}
+function delRec(i){if(!confirm('削除しますか？'))return;const recs=JSON.parse(localStorage.getItem('kj_sym')||'[]');recs.splice(i,1);localStorage.setItem('kj_sym',JSON.stringify(recs));renderSaved();}
 
 // ===== 初期化 =====
 document.getElementById('pt-date').value=new Date().toISOString().split('T')[0];
-setCanvasSize(FIGS['front'].w,FIGS['front'].h);
-drawBg('front');
+resize('front');drawBg('front');
 renderSaved();
 </script>
 </body>

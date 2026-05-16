@@ -381,7 +381,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <div style="font-size:0.62rem;color:var(--muted);margin-top:2px">S=昭和 H=平成 R=令和</div>
         </div>
       </div>
-      <div id="c-dob-both" style="font-size:0.78rem;padding:6px 10px;background:white;border-radius:7px;color:var(--primary);font-weight:700;display:none;border:1.5px solid #bfdbfe"></div>
+      <div id="c-dob-both" style="font-size:1rem;padding:10px 14px;background:#eff6ff;border-radius:9px;color:#1e40af;font-weight:800;display:none;border:2px solid #93c5fd;text-align:center;letter-spacing:0.05em"></div>
     </div>
     <div class="fgrid">
       <div class="fg"><label>電話番号</label><input class="inp" id="c-tel" placeholder="090-xxxx-xxxx" inputmode="numeric"></div>
@@ -1037,7 +1037,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <div style="font-size:0.62rem;color:var(--muted);margin-top:2px">S=昭和 H=平成 R=令和</div>
         </div>
       </div>
-      <div id="pe-dob-both" style="font-size:0.78rem;padding:6px 10px;background:white;border-radius:7px;color:var(--primary);font-weight:700;display:none;border:1.5px solid #bfdbfe"></div>
+      <div id="pe-dob-both" style="font-size:1rem;padding:10px 14px;background:#eff6ff;border-radius:9px;color:#1e40af;font-weight:800;display:none;border:2px solid #93c5fd;text-align:center;letter-spacing:0.05em"></div>
     </div>
     <div class="fgrid">
       <div class="fg"><label>電話番号</label><input class="inp" id="pe-tel" inputmode="numeric"></div>
@@ -2601,7 +2601,8 @@ function switchU(t){
 function saveU(){
   const date=document.getElementById('u-date').value;if(!date){alert('日付を入力してください');return;}
   uriage[date]={hoken:parseInt(document.getElementById('u-ho').value)||0,jhi:parseInt(document.getElementById('u-ji').value)||0,jiko:parseInt(document.getElementById('u-ko').value)||0,bussan:parseInt(document.getElementById('u-bu').value)||0,other:parseInt(document.getElementById('u-ot').value)||0,pay:uPaySel.slice(),memo:document.getElementById('u-memo').value.trim()};
-  save();renderDayU();pushU();
+  save();renderDayU();
+  pushU().then(()=>{}).catch(e=>console.error('pushU error:',e));
   ['u-ho','u-ji','u-ko','u-bu','u-ot'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('u-memo').value='';uPaySel=[];document.querySelectorAll('#u-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
 }
