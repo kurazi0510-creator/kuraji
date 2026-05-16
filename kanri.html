@@ -1412,16 +1412,20 @@ async function syncAll(){
           // 住所: ヘッダー「住所」の位置 と [4] の両方を確認、住所らしい方を採用
           const rv_city_hdr = hi('住所')>-1 ? String(r[hi('住所')]||'').trim() : '';
           const rv_city_r4  = String(r[4]||'').trim();
-          // 住所判定: 数字や「市」「町」「丁」を含む、または長い方を採用
+          const rv_city_r6  = String(r[6]||'').trim();
+          // 住所判定: 数字や「市」「町」「丁」を含む
           const isAddress = v => v && (v.includes('市')||v.includes('町')||v.includes('丁')||v.includes('番')||v.match(/\d+-\d+/));
+          // 住所: ヘッダー位置を優先、なければr[5]、r[6]も候補
           const rv_city = isAddress(rv_city_hdr) ? rv_city_hdr :
                           isAddress(rv_city_r4)  ? rv_city_r4  :
+                          isAddress(rv_city_r6)  ? rv_city_r6  :
                           rv_city_hdr||rv_city_r4;
 
           // 職業: ヘッダー「職業」の位置 と [5] の両方確認
           const rv_job_hdr = hi('職業')>-1 ? String(r[hi('職業')]||'').trim() : '';
           const rv_job_r5  = String(r[5]||'').trim();
-          const rv_job = rv_job_hdr||rv_job_r5;
+          // 住所が職業欄に混入するのを防ぐ
+          const rv_job = isAddress(rv_job_hdr) ? '' : (rv_job_hdr || (isAddress(rv_job_r5)?'':rv_job_r5));
 
           // 流入元: ヘッダー「流入元」の位置 と [6]
           const rv_src_hdr = hi('流入元')>-1 ? String(r[hi('流入元')]||'').trim() : '';
