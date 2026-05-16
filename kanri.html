@@ -252,7 +252,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div class="fg">
           <label style="font-size:0.68rem">西暦入力 または 年・月・日を選択</label>
-          <input type="date" class="inp" id="c-dob" onchange="syncDobFromSeireki('c')" style="margin-bottom:4px">
+          <input type="date" class="inp" id="c-dob" onchange="syncDobFromSeireki('c')" oninput="syncDobFromSeireki('c')" style="margin-bottom:4px">
           <!-- 年・月・日ドロップダウン -->
           <div style="display:flex;gap:3px">
             <select class="sel" id="c-dob-year" onchange="syncDobFromDropdown('c')" style="flex:2;font-size:0.75rem;padding:4px 3px">
@@ -373,7 +373,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
               <option value="01">1</option><option value="02">2</option><option value="03">3</option><option value="04">4</option><option value="05">5</option><option value="06">6</option><option value="07">7</option><option value="08">8</option><option value="09">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option>
             </select>
           </div>
-          <div id="c-dob-seireki-hint" style="font-size:0.68rem;color:var(--primary);font-weight:700;margin-top:3px;min-height:1em"></div>
+          <div id="c-dob-seireki-hint" style="font-size:0.95rem;color:#1e40af;font-weight:800;margin-top:5px;min-height:1.4em;padding:6px 10px;background:#eff6ff;border-radius:8px;border:2px solid #93c5fd;text-align:center;display:none"></div>
         </div>
         <div class="fg">
           <label style="font-size:0.68rem">和暦入力（例: S40.5.3）</label>
@@ -1028,8 +1028,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div class="fg">
           <label style="font-size:0.68rem">西暦入力</label>
-          <input type="date" class="inp" id="pe-dob" onchange="syncDobFromSeireki('pe')">
-          <div id="pe-dob-seireki-hint" style="font-size:0.68rem;color:var(--primary);font-weight:700;margin-top:3px;min-height:1em"></div>
+          <input type="date" class="inp" id="pe-dob" onchange="syncDobFromSeireki('pe')" oninput="syncDobFromSeireki('pe')">
+          <div id="pe-dob-seireki-hint" style="font-size:0.95rem;color:#1e40af;font-weight:800;margin-top:5px;min-height:1.4em;padding:6px 10px;background:#eff6ff;border-radius:8px;border:2px solid #93c5fd;text-align:center;display:none"></div>
         </div>
         <div class="fg">
           <label style="font-size:0.68rem">和暦入力（例: S40.5.3）</label>
@@ -2240,12 +2240,20 @@ function syncDobFromSeireki(prefix){
   else if(yr>=1912){era='大正';n=yr-1911;}
   else{era='明治';n=yr-1867;}
   const warekiFull=era+n+'年'+mo+'月'+day+'日';
-  if(hint)hint.innerHTML=`→ <span style="color:var(--gold)">${warekiFull}</span>`;
+  if(hint){
+    hint.style.display='block';
+    hint.innerHTML=`<span style="font-size:0.8rem;color:#64748b">和暦：</span><span style="color:#1e40af">${warekiFull}</span>`;
+  }
   document.getElementById(prefix+'-dob-wareki').value=era[0]+n+'.'+mo+'.'+day;
   const age=calcAge(iso);
   const el=document.getElementById(prefix+'-dob-both');
   el.style.display='block';
-  el.innerHTML=`📅 <strong>${yr}年${mo}月${day}日</strong>　＝　<span style="color:var(--gold)">${warekiFull}</span>${age?' <span style="color:var(--accent2);font-weight:800">（'+age+'歳・'+mo+'月生まれ）</span>':''}`;
+  el.innerHTML=`📅 <strong>${yr}年${mo}月${day}日</strong>　＝　<span style="color:var(--gold)">${warekiFull}</span>${age?' <span style="color:var(--accent2);font-weight:800">（'+age+'歳）</span>':''}`;
+  // hintにも和暦を表示
+  if(hint){
+    hint.style.display='block';
+    hint.innerHTML=`<span style="font-size:0.8rem;color:#64748b">和暦：</span><span style="color:#1e40af">${warekiFull}</span>${age?' <span style="color:#dc2626;font-size:0.85rem">　'+age+'歳</span>':''}`;
+  }
 }
 function syncDobFromWareki(prefix){
   const raw=document.getElementById(prefix+'-dob-wareki').value;
@@ -2263,7 +2271,10 @@ function syncDobFromWareki(prefix){
     else if(yr>=1912){era='大正';n=yr-1911;}
     else{era='明治';n=yr-1867;}
     const warekiFull=era+n+'年'+mo+'月'+day+'日';
-    if(hint)hint.innerHTML=`→ <span style="color:var(--gold)">${warekiFull}</span>`;
+    if(hint){
+    hint.style.display='block';
+    hint.innerHTML=`<span style="font-size:0.8rem;color:#64748b">和暦：</span><span style="color:#1e40af">${warekiFull}</span>`;
+  }
     const age=calcAge(iso);
     el.style.display='block';
     el.innerHTML=`📅 <strong>${yr}年${mo}月${day}日</strong>　＝　<span style="color:var(--gold)">${warekiFull}</span>${age?' <span style="color:var(--accent2);font-weight:800">（'+age+'歳・'+mo+'月生まれ）</span>':''}`;
