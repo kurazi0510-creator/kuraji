@@ -1849,8 +1849,23 @@ function renderMShochiBtns(){
 }
 
 function calcMShochiTotal(){
-  let total=0;shochiMaster.forEach(sh=>{const q=mShochiSel[sh.id]||0;total+=sh.price*q;});
-  document.getElementById('m-shochi-total').textContent=yen(total);updateMTotal();
+  let total=0;
+  const selected=[];
+  shochiMaster.forEach(sh=>{
+    const q=mShochiSel[sh.id]||0;
+    total+=sh.price*q;
+    if(q>0)selected.push(sh.name+(q>1?'×'+q:''));
+  });
+  document.getElementById('m-shochi-total').textContent=yen(total);
+  // 処置内容を自費メニュー欄に自動反映
+  const menuEl=document.getElementById('m-menu');
+  const menuPriceEl=document.getElementById('m-menu-price');
+  if(menuEl&&selected.length>0){
+    menuEl.value=selected.join('・');
+    if(menuPriceEl)menuPriceEl.value=total;
+    updateMenuTotal();
+  }
+  updateMTotal();
 }
 function renderMBussanItems(){
   const area=document.getElementById('m-bussan-items');area.innerHTML='';
