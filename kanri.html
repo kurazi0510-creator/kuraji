@@ -2545,7 +2545,7 @@ function saveUedit(){
     delete uriage[ueditDate];
   }
   uriage[newDate]=newData;
-  save();closeUedit();renderDayU();
+  save();closeUedit();renderDayU();pushU();
   // 現在表示中のタブを再描画
   if(document.getElementById('u-week').style.display!=='none')renderWeekU();
   if(document.getElementById('u-month').style.display!=='none')renderMonthU();
