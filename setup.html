@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>システムセットアップ</title>
+<title>システムリセット</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;}
@@ -11,82 +11,84 @@ body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;pad
 h1{color:#f97316;font-size:1rem;text-align:center;margin-bottom:6px;}
 .sub{color:#64748b;font-size:0.75rem;text-align:center;margin-bottom:20px;}
 .step{background:#0f172a;border-radius:10px;padding:14px;margin-bottom:12px;}
-.step-num{color:#f97316;font-size:0.8rem;font-weight:bold;margin-bottom:6px;}
-.step-title{color:#e2e8f0;font-size:0.85rem;font-weight:bold;margin-bottom:8px;}
-.step-desc{color:#94a3b8;font-size:0.75rem;margin-bottom:10px;line-height:1.6;}
-.btn{width:100%;padding:11px;border:none;border-radius:8px;font-size:0.85rem;font-weight:bold;cursor:pointer;margin-top:4px;}
+.step-num{color:#f97316;font-size:0.75rem;font-weight:bold;margin-bottom:4px;}
+.step-title{color:#e2e8f0;font-size:0.88rem;font-weight:bold;margin-bottom:6px;}
+.step-desc{color:#64748b;font-size:0.75rem;margin-bottom:10px;line-height:1.6;}
+.btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:0.88rem;font-weight:bold;cursor:pointer;}
 .btn-danger{background:#ef4444;color:white;}
 .btn-warn{background:#f97316;color:white;}
 .btn-ok{background:#22c55e;color:white;}
-.btn-back{background:#1e3a5f;color:#7dd3fc;}
-.status{border-radius:6px;padding:8px 12px;font-size:0.75rem;margin-top:8px;display:none;}
-.status-ok{background:#14532d;color:#22c55e;}
-.status-ng{background:#450a0a;color:#ef4444;}
-.status-info{background:#1e3a5f;color:#7dd3fc;}
-.log{font-family:monospace;font-size:0.72rem;background:#0f172a;border-radius:6px;padding:8px;max-height:150px;overflow-y:auto;margin-top:8px;color:#94a3b8;display:none;}
+.btn-back{background:#1e3a5f;color:#7dd3fc;margin-top:8px;}
+.status{border-radius:6px;padding:8px 12px;font-size:0.75rem;margin-top:8px;display:none;line-height:1.6;}
+.s-ok{background:#14532d;color:#22c55e;}
+.s-ng{background:#450a0a;color:#ef4444;}
+.s-info{background:#1e3a5f;color:#7dd3fc;}
 </style>
 </head>
 <body>
 <div class="card">
-  <h1>🛠️ システムセットアップ</h1>
-  <p class="sub">明日の作業手順 — 上から順番に実行してください</p>
+  <h1>🛠️ システムリセットツール</h1>
+  <p class="sub">順番通りにボタンを押すだけでOKです</p>
 
-  <!-- STEP 1 -->
   <div class="step">
     <div class="step-num">STEP 1</div>
-    <div class="step-title">🗑️ GASの予約表シートをリセット</div>
-    <div class="step-desc">「予約表」シートのデータを全削除してヘッダーだけ残します。壊れたデータを完全に消去します。</div>
-    <button class="btn btn-danger" onclick="resetGAS()">GAS予約表をリセット（全削除）</button>
+    <div class="step-title">🗑️ GASの予約表を全消去</div>
+    <div class="step-desc">壊れたデータを全部消してヘッダーだけ残します。GASコードの変更は不要です。</div>
+    <button class="btn btn-danger" id="btn1" onclick="resetGAS()">GAS予約表をリセット</button>
     <div class="status" id="s1"></div>
   </div>
 
-  <!-- STEP 2 -->
   <div class="step">
     <div class="step-num">STEP 2</div>
-    <div class="step-title">💾 このデバイスのlocalStorageをリセット</div>
-    <div class="step-desc">HPのChromeに残っている壊れたキャッシュデータを消去します。</div>
-    <button class="btn btn-warn" onclick="resetLocal()">localStorageをリセット</button>
+    <div class="step-title">💾 このPCのキャッシュを消去</div>
+    <div class="step-desc">HPのChromeに残っている壊れたデータを消します。</div>
+    <button class="btn btn-warn" id="btn2" onclick="resetLocal()">localStorageをリセット</button>
     <div class="status" id="s2"></div>
   </div>
 
-  <!-- STEP 3 -->
   <div class="step">
     <div class="step-num">STEP 3</div>
-    <div class="step-title">✅ 動作確認</div>
-    <div class="step-desc">管理システムを開いて「最新データ取得」を押し、予約が全部空になっていることを確認してください。その後、手書き台帳を見ながら予約を入力します。</div>
-    <button class="btn btn-ok" onclick="location.href='kanri.html'">管理システムを開く</button>
+    <div class="step-title">✅ 管理システムで確認</div>
+    <div class="step-desc">管理システムを開いて「最新データ取得」を押し、予約が全部空になっていることを確認してから手書き台帳を見て入力してください。</div>
+    <button class="btn btn-ok" onclick="location.href='kanri.html'">管理システムを開く →</button>
   </div>
 
-  <button class="btn btn-back" style="margin-top:8px" onclick="location.href='kanri.html'">← 戻る</button>
+  <button class="btn btn-back" onclick="location.href='kanri.html'">← 戻る</button>
 </div>
 
 <script>
 const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+const HDR=[['日付','時間','区分','患者名','診察券No','予約ルート','来院回数','経過日数',
+  '症状','オプション','自費メニュー','処置(JSON)','処置メモ','物販(JSON)',
+  '支払方法','支払金額','区分リスト','再予約情報','キャンセル理由','施術部位']];
 
-function showStatus(id, msg, type){
+function show(id,msg,cls){
   const el=document.getElementById(id);
-  el.className='status status-'+type;
+  el.className='status '+cls;
   el.textContent=msg;
   el.style.display='block';
 }
 
 async function resetGAS(){
-  showStatus('s1','GASに接続中...','info');
+  document.getElementById('btn1').disabled=true;
+  show('s1','GASに接続中...','s-info');
   try{
+    // ヘッダーのみのrowsをsaveBookingsで送信→予約表が空になる
     const res=await fetch(GAS,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'resetBookings'}),
+      body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(HDR)}),
       redirect:'follow'
     });
     const d=JSON.parse(await res.text());
     if(d.ok){
-      showStatus('s1','✅ 完了！予約表シートをリセットしました。STEP 2へ進んでください。','ok');
+      show('s1','✅ 完了！壊れたデータを全消去しました。STEP 2へ進んでください。','s-ok');
     }else{
       throw new Error(d.error||'エラー');
     }
   }catch(e){
-    showStatus('s1','❌ '+e.message+'\n→ GASのコードを最新版に更新してからやり直してください','ng');
+    show('s1','❌ '+e.message,'s-ng');
+    document.getElementById('btn1').disabled=false;
   }
 }
 
@@ -94,7 +96,7 @@ function resetLocal(){
   localStorage.removeItem('kj_bookings');
   localStorage.removeItem('kj_patients');
   localStorage.removeItem('kj_uriage');
-  showStatus('s2','✅ 完了！localStorageをリセットしました。STEP 3へ進んでください。','ok');
+  show('s2','✅ 完了！キャッシュを消去しました。STEP 3へ進んでください。','s-ok');
 }
 </script>
 </body>
