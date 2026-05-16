@@ -2046,8 +2046,7 @@ function setupKanaInput(id){
   el.addEventListener('compositionstart',()=>{composing=true;});
   el.addEventListener('compositionend',()=>{
     composing=false;
-    // compositionend後のinputより先に変換を適用
-    setTimeout(()=>toKatakana(el),0);
+    setTimeout(()=>{toKatakana(el);},10);
   });
   el.addEventListener('input',()=>{
     if(!composing)toKatakana(el);
