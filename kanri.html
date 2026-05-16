@@ -3165,6 +3165,12 @@ function goPage(id){
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded',async()=>{
+  // ?clear=1 でlocalStorage完全リセット
+  if(new URLSearchParams(location.search).get('clear')==='1'){
+    ['kj_bookings','kj_patients','kj_uriage'].forEach(k=>localStorage.removeItem(k));
+    bookings={};patients=[];uriage=[];
+    history.replaceState(null,'',location.pathname);
+  }
   document.getElementById('selDate').value=today();
   document.getElementById('bs-date').value=today();
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
