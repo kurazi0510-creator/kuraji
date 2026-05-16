@@ -881,12 +881,6 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <select class="sel" id="m-menu-sel" style="flex:1;min-width:120px" onchange="applyMenuPreset()">
               <option value="">── プルダウンから選択 ──</option>
-              <option value="骨盤矯正">骨盤矯正</option>
-              <option value="姿勢改善">姿勢改善</option>
-              <option value="産後矯正">産後矯正</option>
-              <option value="美容矯正">美容矯正</option>
-              <option value="全身調整">全身調整</option>
-              <option value="custom">── 自由入力 ──</option>
             </select>
             <input class="inp" id="m-menu" placeholder="メニュー名（自由入力可）" style="flex:2;min-width:120px">
             <input class="inp" id="m-menu-price" type="number" placeholder="金額(円)" style="width:90px" oninput="updateMenuTotal()">
@@ -1158,8 +1152,12 @@ const DEFAULT_SHOCHI_MASTER=[
   {id:'sh003',name:'シリカアンカール',price:770,unit:'回',stockId:''},
   {id:'sh004',name:'ツイスター',price:770,unit:'回',stockId:''},
   {id:'sh005',name:'水素5分',price:770,unit:'回',stockId:''},
+  {id:'sh008',name:'水素+ツイスター',price:1100,unit:'回',stockId:''},
+  {id:'sh009',name:'水素+シリカアンカール',price:1100,unit:'回',stockId:''},
+  {id:'sh010',name:'ツイスター+シリカアンカール',price:1100,unit:'回',stockId:''},
   {id:'sh006',name:'水素+ツイスター+シリカアンカール',price:1650,unit:'回',stockId:''},
   {id:'sh007',name:'超音波10分',price:1100,unit:'回',stockId:''},
+  {id:'sh011',name:'整体10分',price:1100,unit:'回',stockId:''},
 ];
 const DEFAULT_STOCK=[
   {id:'st001',name:'クラウドテープS',price:300,unit:'枚',qty:104,alert:50},
@@ -1527,10 +1525,12 @@ async function syncAll(){
       if(urows.length>1){
         const uhdr=urows[0];
         const uhi=k=>uhdr.findIndex(h=>String(h)===k);
+        // GASの売上データで上書き（localStorageより優先）
+        const newU={};
         urows.slice(1).forEach(r=>{
           const d=String(r[0]||'').trim();
           if(!d||d.startsWith('1899')||d.startsWith('日付'))return;
-          uriage[d]={
+          newU[d]={
             hoken:parseInt(r[uhi('保険')])||0,
             jhi:parseInt(r[uhi('自費')])||0,
             jiko:parseInt(r[uhi('交通事故')])||0,
@@ -1540,6 +1540,8 @@ async function syncAll(){
             memo:String(r[uhi('メモ')]||'').trim()
           };
         });
+        // localStorageにしかないデータを保持しつつGASデータをマージ
+        Object.keys(newU).forEach(d=>uriage[d]=newU[d]);
       }
       if(brows.length>1){
         const newB={};
@@ -1894,6 +1896,21 @@ function openModal(date,slot){
   ['m-id','m-nm','m-sym','m-opt','m-menu','m-menu-price','m-opt-price','m-psearch'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['m-menu-sel','m-opt-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   mSlotCount=1;setSlotCount(1);updateMenuTotal();
+  // 自費メニュープルダウンを処置マスターから動的生成
+  const menuSel=document.getElementById('m-menu-sel');
+  if(menuSel){
+    menuSel.innerHTML='<option value="">── プルダウンから選択 ──</option>';
+    shochiMaster.forEach(s=>{
+      const op=document.createElement('option');
+      op.value=s.name+':'+s.price;
+      op.textContent=s.name+'（'+s.price.toLocaleString()+'円）';
+      menuSel.appendChild(op);
+    });
+    const custom=document.createElement('option');
+    custom.value='custom';
+    custom.textContent='── 自由入力 ──';
+    menuSel.appendChild(custom);
+  }
   document.getElementById('m-rt').value='LINE';
   document.getElementById('m-patient-list').style.display='none';
   document.getElementById('m-selected-info').style.display='none';
