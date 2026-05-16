@@ -242,7 +242,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div class="fgrid">
       <div class="fg"><label>診察券No</label><input class="inp" id="c-id" type="number" placeholder="例: 2025"></div>
       <div class="fg"><label>患者名</label><input class="inp" id="c-nm" placeholder="山田 太郎"></div>
-      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="c-kana" placeholder="ヤマダ タロウ" oninput="if(!this._composing)toKatakana(this)" oncompositionstart="this._composing=true" oncompositionend="this._composing=false;toKatakana(this)"></div>
+      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="c-kana" placeholder="ヤマダ タロウ"></div>
       <div class="fg"><label>性別</label><select class="sel" id="c-sex"><option value="女性">女性</option><option value="男性">男性</option><option value="-">-</option></select></div>
     </div>
     <!-- 生年月日：西暦・和暦同時表示 -->
@@ -987,7 +987,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div class="fgrid">
       <div class="fg"><label>診察券No</label><input class="inp" id="pe-id" readonly style="background:#f4f1eb"></div>
       <div class="fg"><label>患者名</label><input class="inp" id="pe-nm"></div>
-      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="pe-kana" placeholder="ヤマダ タロウ" oninput="if(!this._composing)toKatakana(this)" oncompositionstart="this._composing=true" oncompositionend="this._composing=false;toKatakana(this)"></div>
+      <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="pe-kana" placeholder="ヤマダ タロウ"></div>
       <div class="fg"><label>性別</label><select class="sel" id="pe-sex"><option value="女性">女性</option><option value="男性">男性</option><option value="-">-</option></select></div>
     </div>
     <div style="background:#f8f6f1;border-radius:10px;padding:10px 12px;margin-bottom:10px;border:1.5px solid var(--border)">
@@ -2037,6 +2037,21 @@ function toKatakana(el){
   const h="ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろわをんー";
   const k="ァアィイゥウェエォオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂッツヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロワヲンー";
   el.value=el.value.split('').map(ch=>{const i=h.indexOf(ch);return i>=0?k[i]:ch;}).join('');
+}
+// ふりがな入力：IME二重入力対策（Windows Chrome対応）
+function setupKanaInput(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  let composing=false;
+  el.addEventListener('compositionstart',()=>{composing=true;});
+  el.addEventListener('compositionend',()=>{
+    composing=false;
+    // compositionend後のinputより先に変換を適用
+    setTimeout(()=>toKatakana(el),0);
+  });
+  el.addEventListener('input',()=>{
+    if(!composing)toKatakana(el);
+  });
 }
 
 // ===== 西暦↔和暦 同期 =====
@@ -3182,6 +3197,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
   load();renderSched();renderPatients();
   // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
+  // ふりがな入力IME対策初期化
+  setupKanaInput('c-kana');
+  setupKanaInput('pe-kana');
 });
 document.getElementById('bmodal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 document.getElementById('stockAddModal').addEventListener('click',function(e){if(e.target===this)closeStockAdd();});
