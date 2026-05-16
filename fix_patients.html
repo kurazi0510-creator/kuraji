@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>患者データ修復ツール</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;}
+.card{background:#1e293b;border-radius:14px;padding:20px;max-width:700px;margin:0 auto;}
+h1{color:#f97316;font-size:0.95rem;text-align:center;margin-bottom:4px;}
+.sub{color:#64748b;font-size:0.73rem;text-align:center;margin-bottom:16px;}
+.log{font-family:monospace;font-size:0.72rem;line-height:1.9;background:#0f172a;border-radius:8px;padding:12px;margin-bottom:12px;max-height:300px;overflow-y:auto;}
+.ok{color:#22c55e;}.ng{color:#ef4444;}.info{color:#94a3b8;}.warn{color:#fbbf24;}
+.prog-bar{background:#0f172a;border-radius:6px;height:8px;margin:8px 0;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,#f97316,#22c55e);border-radius:6px;transition:width 0.3s;width:0%;}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:0.9rem;font-weight:bold;cursor:pointer;margin-top:8px;}
+.btn-go{background:#f97316;color:white;}
+.btn-back{background:#1e3a5f;color:#7dd3fc;}
+table{width:100%;border-collapse:collapse;font-size:0.68rem;margin-top:8px;}
+th{background:#1e3a5f;color:#7dd3fc;padding:4px 6px;text-align:left;}
+td{padding:4px 6px;border-bottom:1px solid #1e293b;}
+.fix{color:#22c55e;}.bad{color:#f97316;}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🔧 患者データ修復ツール</h1>
+<p class="sub">GASの患者シートの列ズレを自動修復します</p>
+<div class="prog-bar"><div class="prog-fill" id="prog"></div></div>
+<div class="log" id="log"><div class="info">「修復開始」を押してください</div></div>
+<button class="btn btn-go" id="go-btn" onclick="run()">🚀 患者データを修復してGASに保存</button>
+<button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムへ</button>
+</div>
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+
+function log(msg,cls='info'){
+  const d=document.getElementById('log');
+  d.innerHTML+=`<div class="${cls}">${msg}</div>`;
+  d.scrollTop=d.scrollHeight;
+}
+function prog(v){document.getElementById('prog').style.width=v+'%';}
+
+function normTel(v){
+  if(!v)return'';
+  const d=String(v).replace(/[^0-9]/g,'');
+  return d.startsWith('0')?d:'0'+d;
+}
+function isAddress(v){
+  if(!v)return false;
+  return v.includes('市')||v.includes('町')||v.includes('丁')||v.includes('番')||/\d+-\d+/.test(v);
+}
+function fmtDate(v){
+  if(!v&&v!==0)return'';
+  if(v instanceof Date){const y=v.getFullYear();if(y<1970)return'';return y+'-'+(''+(v.getMonth()+1)).padStart(2,'0')+'-'+(''+ v.getDate()).padStart(2,'0');}
+  const s=String(v);
+  if(s.startsWith('1899')||s.startsWith('1900')||s.startsWith('1905'))return'';
+  if(s.includes('T'))return s.split('T')[0];
+  return s.replace(/\//g,'-').substring(0,10);
+}
+function isGarbage(v){
+  if(!v)return false;
+  const s=String(v);
+  return s.match(/\d+日前/)||s.match(/^1899-|^1900-|^1905-/)||s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:/);
+}
+
+async function run(){
+  document.getElementById('go-btn').disabled=true;
+  log('📡 GASから患者データを取得中...','info');
+  prog(10);
+  try{
+    const res=await fetch(GAS+'?action=getAll&_='+Date.now(),{redirect:'follow'});
+    const raw=await res.text();
+    let data;
+    try{data=JSON.parse(raw);}catch(e){const m=raw.match(/\{[\s\S]*\}/);if(m)data=JSON.parse(m[0]);else throw new Error('パースエラー');}
+    const prows=data.customers||[];
+    if(prows.length<2){log('患者データなし','warn');return;}
+    prog(30);
+    log(`✅ ${prows.length-1}名取得`,'ok');
+
+    const HDR=prows[0].map(h=>String(h||'').trim());
+    const hi=k=>HDR.indexOf(k);
+    const validSrc=['LINE','紹介','その他','三四郎','-'];
+    const validLine=['あり','なし','-'];
+
+    // 正しい列順で再構築
+    const newHdr=['診察券No','患者名','性別','電話番号','LINE','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考'];
+    const newRows=[newHdr];
+    let fixCount=0;
+
+    prows.slice(1).forEach(r=>{
+      const gv=(k,fb)=>String((hi(k)>-1?r[hi(k)]:r[fb])||'').trim();
+      const id=String(r[0]||'').trim();
+      const name=String(r[1]||'').trim();
+      if(!id||!name)return;
+
+      // 性別
+      const sex=gv('性別',2);
+
+      // 電話: ヘッダー位置 or [3]
+      const telRaw=(gv('電話番号',3)||gv('電話',3)).replace(/[^0-9]/g,'');
+      const tel=normTel(telRaw);
+
+      // LINE: 'あり'/'なし'/'-'のみ有効
+      const lineRaw=gv('LINE',4);
+      const line=validLine.includes(lineRaw)?lineRaw:'';
+
+      // 住所: 住所らしい文字列を探す
+      const cityFromHdr=hi('住所')>-1?String(r[hi('住所')]||'').trim():'';
+      const cityFrom4=String(r[4]||'').trim();
+      const cityFrom5=String(r[5]||'').trim();
+      const city=isAddress(cityFromHdr)?cityFromHdr:isAddress(cityFrom4)?cityFrom4:isAddress(cityFrom5)?cityFrom5:cityFromHdr;
+
+      // 職業: 住所でないもの
+      const jobRaw=gv('職業',6);
+      const job=isAddress(jobRaw)?'':jobRaw;
+
+      // 流入元: 有効値のみ
+      const srcRaw=gv('流入元',7);
+      const srcFrom6=String(r[6]||'').trim();
+      const src=validSrc.includes(srcRaw)?srcRaw:validSrc.includes(srcFrom6)?srcFrom6:'';
+
+      // 症状
+      const symRaw=gv('症状',8);
+      const sym=isGarbage(symRaw)?'':symRaw;
+
+      // 前回通院日
+      const lastRaw=hi('前回通院日')>-1?fmtDate(r[hi('前回通院日')]):fmtDate(r[9]);
+      const last=isGarbage(lastRaw)?'':lastRaw;
+
+      // 通院回数: 1900以上は生年月日と判断して0
+      const cntRaw=hi('通院回数')>-1?r[hi('通院回数')]:r[10];
+      const cntNum=parseInt(cntRaw)||0;
+      const cnt=cntNum>1900?0:cntNum;
+
+      // 生年月日
+      const dobRaw=hi('生年月日')>-1?r[hi('生年月日')]:r[11];
+      let dob='';
+      if(dobRaw){
+        const s=String(dobRaw).trim();
+        if(s&&!isGarbage(s)&&s!=='-'){
+          if(/^\d{4}-\d{2}-\d{2}$/.test(s))dob=s;
+          else dob=fmtDate(dobRaw)||'';
+        }
+        // cntNumが1900年代なら生年月日として使う
+        if(!dob&&cntNum>1900)dob=String(cntNum)+'-01-01';
+      }
+
+      // 備考
+      const note=gv('備考',12);
+
+      newRows.push([id,name,sex,tel,line,city,job,src,sym,last,cnt,dob,note]);
+      fixCount++;
+    });
+
+    prog(60);
+    log(`📋 ${fixCount}名のデータを修復 → GASに保存中...`,'info');
+
+    const res2=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveCustomers',rows:JSON.stringify(newRows)}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res2.text());
+    prog(100);
+    if(d.ok){
+      log(`✅ 完了！${fixCount}名の患者データを正しい列順で保存しました`,'ok');
+      log('「管理システムへ」→「最新データ取得」で確認してください','info');
+      document.getElementById('go-btn').style.display='none';
+    }else{
+      throw new Error(d.error||'保存エラー');
+    }
+  }catch(e){
+    log('❌ '+e.message,'ng');
+    document.getElementById('go-btn').disabled=false;
+  }
+}
+</script>
+</body>
+</html>
