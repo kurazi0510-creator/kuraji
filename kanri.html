@@ -1235,7 +1235,10 @@ function load(){
     const bm=JSON.parse(localStorage.getItem('kj_bm')||'null');
     bussanMaster=bm||DEFAULT_BUSSAN_MASTER;
     const sm=JSON.parse(localStorage.getItem('kj_sm')||'null');
-    shochiMaster=sm||DEFAULT_SHOCHI_MASTER;
+    // バージョンチェック：新メニュー(sh008〜sh011)がなければリセット
+    const hasNewMenus=sm&&sm.some(s=>['sh008','sh009','sh010','sh011'].includes(s.id));
+    shochiMaster=hasNewMenus?sm:DEFAULT_SHOCHI_MASTER;
+    if(!hasNewMenus&&sm)localStorage.setItem('kj_sm',JSON.stringify(DEFAULT_SHOCHI_MASTER));
     const st=JSON.parse(localStorage.getItem('kj_st')||'null');
     stockData=st||DEFAULT_STOCK;
   }catch(e){
