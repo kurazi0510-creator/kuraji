@@ -213,6 +213,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div id="daybadge" class="day-b" style="margin-top:16px"></div>
       </div>
       <button class="btn bp bsm" onclick="syncAll()" style="margin-top:16px">🔄 最新データ取得</button>
+      <button class="btn bp bsm" onclick="toggleDayMemo()" style="margin-top:16px;background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
     </div>
   </div>
@@ -223,6 +224,14 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div class="sbox" onclick="editStat(3)" title="タップで編集"><div class="n" id="s3">0</div><div class="l">交通事故</div><div style="font-size:0.55rem;color:var(--accent);opacity:0.7">✏️</div></div>
     <div class="sbox" onclick="editStat(4)" title="タップで編集"><div class="n" id="s4">0</div><div class="l">新規</div><div style="font-size:0.55rem;color:var(--accent);opacity:0.7">✏️</div></div>
     <div class="sbox"><div class="n" id="s5">0%</div><div class="l">稼働率</div></div>
+    <div class="sbox"><div class="n" id="s6" style="font-size:1.2rem">0</div><div class="l">未会計</div></div>
+  </div>
+  <!-- 本日メモ（折りたたみ） -->
+  <div id="day-memo-area" style="display:none;margin-bottom:10px">
+    <div style="background:#fefce8;border:1.5px solid #fbbf24;border-radius:10px;padding:10px 14px">
+      <div style="font-size:0.78rem;font-weight:bold;color:#92400e;margin-bottom:6px">📝 本日の申し送り・メモ</div>
+      <textarea id="day-memo-text" placeholder="本日の注意事項・スタッフへの申し送りなど" style="width:100%;height:70px;border:1.5px solid #fcd34d;border-radius:6px;padding:8px;font-size:0.82rem;resize:none;background:#fffbeb" oninput="saveDayMemo()"></textarea>
+    </div>
   </div>
   <div class="card">
     <div class="ctitle">予約表（20分枠）</div>
@@ -1705,6 +1714,30 @@ function loadBui(arr){
 }
 
 // ===== SCHEDULE =====
+function toggleDayMemo(){
+  const area=document.getElementById('day-memo-area');
+  area.style.display=area.style.display==='none'?'block':'none';
+  if(area.style.display==='block'){
+    const date=document.getElementById('yoyaku-date').value;
+    const memo=JSON.parse(localStorage.getItem('kj_day_memos')||'{}');
+    document.getElementById('day-memo-text').value=memo[date]||'';
+  }
+}
+function saveDayMemo(){
+  const date=document.getElementById('yoyaku-date').value;
+  const text=document.getElementById('day-memo-text').value;
+  const memos=JSON.parse(localStorage.getItem('kj_day_memos')||'{}');
+  if(text)memos[date]=text;else delete memos[date];
+  localStorage.setItem('kj_day_memos',JSON.stringify(memos));
+}
+function loadDayMemo(date){
+  const memos=JSON.parse(localStorage.getItem('kj_day_memos')||'{}');
+  const text=memos[date]||'';
+  const btn=document.querySelector('[onclick="toggleDayMemo()"]');
+  if(btn)btn.style.background=text?'#fbbf24':'#fef3c7';
+  const el=document.getElementById('day-memo-text');
+  if(el)el.value=text;
+}
 function dayType(d){const w=new Date(d+'T00:00:00').getDay();return w===0?'nichi':(w===4||w===6)?'moku':'hei';}
 function getSlots(dt){if(dt==='nichi')return[];const mo=[];let h=8,m=30;while(!(h===12&&m===30)){mo.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}if(dt==='moku')return mo;const af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}return[...mo,'BREAK',...af];}
 
@@ -1751,9 +1784,9 @@ function renderSched(){
         <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td>
         <td><span class="rt ${rc}">${bk.route||''}</span></td>
         <td style="font-size:0.72rem">${bk.visitCount||''}</td>
-        <td style="font-size:0.72rem;color:var(--accent2);font-weight:600">${bk.elapsed?bk.elapsed+'日':''}</td>
+        <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=30?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:1px 4px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':'color:var(--accent2)'}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=30?' ⚠️':''}</td>
         <td>${buiHtml?buiHtml+'<br>':''} ${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td>
-        <td>${payHtml||'-'}${bk.payAmount?'<br><span style="font-size:0.68rem;color:var(--muted)">'+yen(bk.payAmount)+'</span>':''}</td>
+        <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':'<br><span style="font-size:0.68rem;color:#f97316">💴 未会計</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn bc bsm" onclick="editBk('${date}','${s}')">編集</button>
           <button class="btn bcancel bsm" onclick="openCancelModal('${date}','${s}')" style="margin-top:2px">ｷｬﾝｾﾙ</button>
@@ -1791,6 +1824,10 @@ function updateStats(date,sl){
   document.getElementById('s3').textContent=statOverride[3]!==undefined?statOverride[3]:ko;
   document.getElementById('s4').textContent=statOverride[4]!==undefined?statOverride[4]:sh;
   document.getElementById('s5').textContent=(sl.length?Math.round(used/sl.length*100):0)+'%';
+  // 未会計件数
+  const uncounted=e.filter(b=>!(b.payAmount&&parseInt(b.payAmount)>0)).length;
+  const s6=document.getElementById('s6');
+  if(s6){s6.textContent=uncounted;s6.closest('.sbox').style.background=uncounted>0?'rgba(249,115,22,0.15)':'';s6.style.color=uncounted>0?'#f97316':'inherit';}
 }
 
 // ===== キャンセル =====
@@ -2530,7 +2567,7 @@ function renderPatients(){
       <td style="font-size:0.7rem">${p.city||'−'}</td>
       <td style="font-size:0.7rem">${p.job||'−'}</td>
       <td>${srcBadge}</td>
-      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+'">'+p.last+(elDays?'('+elDays+'日前)':'')+'</span>':''}</td>
+      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'('+elDays+'日前)':'')+(elDays>=60?' 🚨':elDays>=30?' ⚠️':'')+'</span>':''}</td>
       <td><button class="btn be bsm" onclick="openPEdit('${p.id}')">編集</button></td>
     </tr>`;
   }).join('');
