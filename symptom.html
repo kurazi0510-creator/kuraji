@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>症状記入 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Hiragino Sans',sans-serif;background:#f8fafc;min-height:100vh;padding:12px;}
+.header{background:#1e293b;color:white;border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.header h1{font-size:0.9rem;font-weight:bold;}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;}
+.tool-btn{padding:7px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;background:white;color:#374151;transition:all 0.15s;}
+.tool-btn.active{border-color:#3b82f6;background:#eff6ff;color:#1d4ed8;}
+.color-btn{width:32px;height:32px;border-radius:50%;border:3px solid white;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
+.color-btn.active{box-shadow:0 0 0 3px #3b82f6;}
+.size-btn{padding:5px 10px;border:2px solid #e2e8f0;border-radius:6px;font-size:0.72rem;cursor:pointer;background:white;}
+.size-btn.active{border-color:#3b82f6;background:#eff6ff;color:#1d4ed8;}
+.canvas-wrap{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.figure-card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);padding:10px;flex:1;min-width:160px;max-width:240px;}
+.figure-label{text-align:center;font-size:0.75rem;color:#64748b;font-weight:bold;margin-bottom:6px;}
+canvas{display:block;border-radius:8px;border:1.5px solid #e2e8f0;touch-action:none;cursor:crosshair;width:100%;height:auto;}
+.btn{padding:10px 18px;border:none;border-radius:8px;font-size:0.82rem;font-weight:bold;cursor:pointer;}
+.btn-primary{background:#3b82f6;color:white;}
+.btn-danger{background:#fee2e2;color:#dc2626;}
+.btn-success{background:#f97316;color:white;}
+.patient-info{background:white;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.patient-info input{border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:0.8rem;flex:1;min-width:120px;}
+.memo-area{background:white;border-radius:10px;padding:10px 14px;margin-top:10px;}
+.memo-area textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;font-size:0.8rem;resize:none;height:60px;}
+.saved-list{background:white;border-radius:10px;padding:10px 14px;margin-top:10px;}
+.saved-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:0.78rem;}
+.back-btn{background:#1e3a5f;color:#7dd3fc;padding:8px 14px;border:none;border-radius:8px;font-size:0.8rem;font-weight:bold;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🩺 症状記入シート</h1>
+  <button class="back-btn" onclick="location.href='kanri.html'">← 管理システム</button>
+</div>
+
+<!-- 患者情報 -->
+<div class="patient-info">
+  <input type="text" id="pt-name" placeholder="患者名">
+  <input type="date" id="pt-date">
+</div>
+
+<!-- ツールバー -->
+<div class="toolbar">
+  <button class="tool-btn active" id="tool-pen" onclick="setTool('pen')">✏️ ペン</button>
+  <button class="tool-btn" id="tool-circle" onclick="setTool('circle')">⭕ 丸</button>
+  <button class="tool-btn" id="tool-arrow" onclick="setTool('arrow')">➡️ 矢印</button>
+  <button class="tool-btn" id="tool-text" onclick="setTool('text')">T テキスト</button>
+  <button class="tool-btn" id="tool-erase" onclick="setTool('erase')">🧹 消しゴム</button>
+  <span style="width:1px;height:28px;background:#e2e8f0;margin:0 2px"></span>
+  <button class="color-btn active" id="col-red" style="background:#ef4444" onclick="setColor('#ef4444')"></button>
+  <button class="color-btn" id="col-blue" style="background:#3b82f6" onclick="setColor('#3b82f6')"></button>
+  <button class="color-btn" id="col-black" style="background:#1e293b" onclick="setColor('#1e293b')"></button>
+  <button class="color-btn" id="col-green" style="background:#22c55e" onclick="setColor('#22c55e')"></button>
+  <span style="width:1px;height:28px;background:#e2e8f0;margin:0 2px"></span>
+  <button class="size-btn active" id="sz-s" onclick="setSize(3)">細</button>
+  <button class="size-btn" id="sz-m" onclick="setSize(6)">中</button>
+  <button class="size-btn" id="sz-l" onclick="setSize(12)">太</button>
+</div>
+
+<!-- 人体図キャンバス -->
+<div class="canvas-wrap">
+  <div class="figure-card">
+    <div class="figure-label">正面</div>
+    <canvas id="canvas-front" width="300" height="480"></canvas>
+  </div>
+  <div class="figure-card">
+    <div class="figure-label">背面</div>
+    <canvas id="canvas-back" width="300" height="480"></canvas>
+  </div>
+</div>
+
+<!-- メモ -->
+<div class="memo-area">
+  <div style="font-size:0.75rem;color:#64748b;margin-bottom:4px;font-weight:bold">📝 症状メモ</div>
+  <textarea id="memo" placeholder="症状の詳細を自由に記入..."></textarea>
+</div>
+
+<!-- ボタン -->
+<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+  <button class="btn btn-success" onclick="saveRecord()" style="flex:1">💾 保存</button>
+  <button class="btn btn-danger" onclick="clearAll()" style="flex:0">🗑️ リセット</button>
+</div>
+
+<!-- 保存履歴 -->
+<div class="saved-list" id="saved-list" style="display:none">
+  <div style="font-size:0.78rem;color:#64748b;font-weight:bold;margin-bottom:8px">📋 保存済み記録</div>
+  <div id="saved-items"></div>
+</div>
+
+<script>
+// ===== 状態 =====
+let tool='pen', color='#ef4444', lineSize=3;
+let drawing=false, startX=0, startY=0;
+let snapshots={front:null, back:null};
+
+// ===== Canvas初期化 =====
+const canvases={
+  front: document.getElementById('canvas-front'),
+  back:  document.getElementById('canvas-back')
+};
+const ctxs={};
+
+function initCanvas(key){
+  const c=canvases[key];
+  const ctx=c.getContext('2d');
+  ctxs[key]=ctx;
+  drawBody(ctx, key);
+  snapshots[key]=ctx.getImageData(0,0,c.width,c.height);
+  bindEvents(c, key);
+}
+
+// ===== 人体図描画 =====
+function drawBody(ctx, side){
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,0,300,480);
+  ctx.strokeStyle='#94a3b8';
+  ctx.lineWidth=2;
+  ctx.fillStyle='#f1f5f9';
+
+  // 頭
+  ctx.beginPath();ctx.arc(150,45,35,0,Math.PI*2);ctx.fill();ctx.stroke();
+
+  // 首
+  ctx.beginPath();ctx.rect(136,78,28,22);ctx.fill();ctx.stroke();
+
+  // 胴体
+  ctx.beginPath();ctx.roundRect(100,100,100,140,6);ctx.fill();ctx.stroke();
+
+  // 骨盤
+  ctx.beginPath();ctx.roundRect(105,235,90,40,4);ctx.fill();ctx.stroke();
+
+  if(side==='front'){
+    // 正面：腕（左右）
+    ctx.beginPath();ctx.roundRect(68,100,30,120,8);ctx.fill();ctx.stroke(); // 左腕
+    ctx.beginPath();ctx.roundRect(202,100,30,120,8);ctx.fill();ctx.stroke(); // 右腕
+    // 前腕
+    ctx.beginPath();ctx.roundRect(62,218,28,90,8);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(210,218,28,90,8);ctx.fill();ctx.stroke();
+    // 手
+    ctx.beginPath();ctx.arc(76,320,18,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.arc(224,320,18,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // 大腿
+    ctx.beginPath();ctx.roundRect(110,272,36,110,8);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(154,272,36,110,8);ctx.fill();ctx.stroke();
+    // 膝
+    ctx.beginPath();ctx.arc(128,390,20,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.arc(172,390,20,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // 下腿
+    ctx.beginPath();ctx.roundRect(114,408,28,55,6);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(158,408,28,55,6);ctx.fill();ctx.stroke();
+    // 足
+    ctx.beginPath();ctx.roundRect(106,458,40,16,4);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(154,458,40,16,4);ctx.fill();ctx.stroke();
+    // 鎖骨
+    ctx.beginPath();ctx.moveTo(136,100);ctx.lineTo(100,108);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(164,100);ctx.lineTo(200,108);ctx.stroke();
+    // ラベル
+    ctx.fillStyle='#94a3b8';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('正面',150,15);
+  } else {
+    // 背面：腕
+    ctx.beginPath();ctx.roundRect(68,100,30,120,8);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(202,100,30,120,8);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(62,218,28,90,8);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(210,218,28,90,8);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.arc(76,320,18,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.arc(224,320,18,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // 大腿
+    ctx.beginPath();ctx.roundRect(110,272,36,110,8);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(154,272,36,110,8);ctx.fill();ctx.stroke();
+    // 膝裏
+    ctx.beginPath();ctx.arc(128,390,20,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.arc(172,390,20,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // 下腿
+    ctx.beginPath();ctx.roundRect(114,408,28,55,6);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(158,408,28,55,6);ctx.fill();ctx.stroke();
+    // 足
+    ctx.beginPath();ctx.roundRect(106,458,40,16,4);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.roundRect(154,458,40,16,4);ctx.fill();ctx.stroke();
+    // 脊柱
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(150,100);ctx.lineTo(150,240);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#94a3b8';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('背面',150,15);
+  }
+}
+
+// ===== タッチ・マウスイベント =====
+function getPos(c, e){
+  const rect=c.getBoundingClientRect();
+  const scaleX=c.width/rect.width;
+  const scaleY=c.height/rect.height;
+  const src=e.touches?e.touches[0]:e;
+  return{x:(src.clientX-rect.left)*scaleX, y:(src.clientY-rect.top)*scaleY};
+}
+
+function bindEvents(c, key){
+  const ctx=ctxs[key];
+
+  function start(e){
+    e.preventDefault();
+    drawing=true;
+    const pos=getPos(c,e);
+    startX=pos.x;startY=pos.y;
+    if(tool==='pen'||tool==='erase'){
+      ctx.beginPath();ctx.moveTo(pos.x,pos.y);
+    }
+    snapshots[key]=ctx.getImageData(0,0,c.width,c.height);
+  }
+
+  function move(e){
+    e.preventDefault();
+    if(!drawing)return;
+    const pos=getPos(c,e);
+    ctx.putImageData(snapshots[key],0,0);
+    ctx.strokeStyle=tool==='erase'?'#ffffff':color;
+    ctx.lineWidth=tool==='erase'?lineSize*4:lineSize;
+    ctx.lineCap='round';ctx.lineJoin='round';
+
+    if(tool==='pen'||tool==='erase'){
+      ctx.beginPath();ctx.moveTo(startX,startY);ctx.lineTo(pos.x,pos.y);ctx.stroke();
+      startX=pos.x;startY=pos.y;
+      snapshots[key]=ctx.getImageData(0,0,c.width,c.height);
+    } else if(tool==='circle'){
+      const r=Math.sqrt((pos.x-startX)**2+(pos.y-startY)**2);
+      ctx.beginPath();ctx.arc(startX,startY,r,0,Math.PI*2);ctx.stroke();
+    } else if(tool==='arrow'){
+      drawArrow(ctx,startX,startY,pos.x,pos.y);
+    }
+  }
+
+  function end(e){
+    e.preventDefault();
+    if(!drawing)return;
+    drawing=false;
+    if(tool==='text'){
+      const pos=getPos(c,e);
+      const txt=prompt('テキストを入力:');
+      if(txt){
+        ctx.fillStyle=color;
+        ctx.font='bold '+(lineSize*4+10)+'px sans-serif';
+        ctx.fillText(txt,startX,startY);
+      }
+    }
+    snapshots[key]=ctx.getImageData(0,0,c.width,c.height);
+  }
+
+  c.addEventListener('mousedown',start);
+  c.addEventListener('mousemove',move);
+  c.addEventListener('mouseup',end);
+  c.addEventListener('touchstart',start,{passive:false});
+  c.addEventListener('touchmove',move,{passive:false});
+  c.addEventListener('touchend',end,{passive:false});
+}
+
+function drawArrow(ctx,x1,y1,x2,y2){
+  const angle=Math.atan2(y2-y1,x2-x1);
+  const len=15;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-len*Math.cos(angle-0.4),y2-len*Math.sin(angle-0.4));
+  ctx.lineTo(x2-len*Math.cos(angle+0.4),y2-len*Math.sin(angle+0.4));
+  ctx.closePath();ctx.fillStyle=color;ctx.fill();
+}
+
+// ===== ツール・色・サイズ =====
+function setTool(t){
+  tool=t;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tool-'+t).classList.add('active');
+}
+function setColor(c){
+  color=c;
+  document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
+  const map={'#ef4444':'col-red','#3b82f6':'col-blue','#1e293b':'col-black','#22c55e':'col-green'};
+  if(map[c])document.getElementById(map[c]).classList.add('active');
+}
+function setSize(s){
+  lineSize=s;
+  document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('active'));
+  const map={3:'sz-s',6:'sz-m',12:'sz-l'};
+  if(map[s])document.getElementById(map[s]).classList.add('active');
+}
+
+// ===== 保存・クリア =====
+function saveRecord(){
+  const name=document.getElementById('pt-name').value.trim()||'(名前なし)';
+  const date=document.getElementById('pt-date').value||new Date().toISOString().split('T')[0];
+  const memo=document.getElementById('memo').value.trim();
+  const frontImg=canvases.front.toDataURL('image/png');
+  const backImg=canvases.back.toDataURL('image/png');
+  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
+  records.unshift({id:Date.now(),name,date,memo,front:frontImg,back:backImg});
+  localStorage.setItem('kj_symptom_records',JSON.stringify(records.slice(0,50)));
+  renderSaved();
+  alert('✅ 保存しました！');
+}
+
+function clearAll(){
+  if(!confirm('記入内容をリセットしますか？'))return;
+  Object.keys(ctxs).forEach(key=>{
+    drawBody(ctxs[key],key);
+    snapshots[key]=ctxs[key].getImageData(0,0,canvases[key].width,canvases[key].height);
+  });
+  document.getElementById('memo').value='';
+}
+
+function renderSaved(){
+  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
+  const list=document.getElementById('saved-list');
+  const items=document.getElementById('saved-items');
+  if(!records.length){list.style.display='none';return;}
+  list.style.display='block';
+  items.innerHTML=records.map((r,i)=>`
+    <div class="saved-item">
+      <span>${r.date} ${r.name}</span>
+      <div style="display:flex;gap:6px">
+        <button onclick="loadRecord(${i})" style="padding:4px 10px;border:none;border-radius:6px;background:#eff6ff;color:#1d4ed8;font-size:0.72rem;cursor:pointer">表示</button>
+        <button onclick="downloadRecord(${i})" style="padding:4px 10px;border:none;border-radius:6px;background:#f0fdf4;color:#15803d;font-size:0.72rem;cursor:pointer">保存</button>
+        <button onclick="deleteRecord(${i})" style="padding:4px 10px;border:none;border-radius:6px;background:#fee2e2;color:#dc2626;font-size:0.72rem;cursor:pointer">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function loadRecord(i){
+  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
+  const r=records[i];
+  document.getElementById('pt-name').value=r.name;
+  document.getElementById('pt-date').value=r.date;
+  document.getElementById('memo').value=r.memo||'';
+  const frontImg=new Image();frontImg.onload=()=>{ctxs.front.drawImage(frontImg,0,0);snapshots.front=ctxs.front.getImageData(0,0,300,480);};frontImg.src=r.front;
+  const backImg=new Image();backImg.onload=()=>{ctxs.back.drawImage(backImg,0,0);snapshots.back=ctxs.back.getImageData(0,0,300,480);};backImg.src=r.back;
+}
+
+function downloadRecord(i){
+  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
+  const r=records[i];
+  // 合成キャンバス
+  const c=document.createElement('canvas');c.width=700;c.height=520;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,700,520);
+  ctx.fillStyle='#1e293b';ctx.font='bold 16px sans-serif';
+  ctx.fillText(r.date+' '+r.name,10,25);
+  if(r.memo){ctx.font='13px sans-serif';ctx.fillStyle='#374151';ctx.fillText('症状: '+r.memo,10,48);}
+  const f=new Image();f.onload=()=>{
+    ctx.drawImage(f,10,60,300,480);
+    const b=new Image();b.onload=()=>{
+      ctx.drawImage(b,360,60,300,480);
+      const a=document.createElement('a');a.download=r.date+'_'+r.name+'_症状記入.png';a.href=c.toDataURL();a.click();
+    };b.src=r.back;
+  };f.src=r.front;
+}
+
+function deleteRecord(i){
+  if(!confirm('削除しますか？'))return;
+  const records=JSON.parse(localStorage.getItem('kj_symptom_records')||'[]');
+  records.splice(i,1);
+  localStorage.setItem('kj_symptom_records',JSON.stringify(records));
+  renderSaved();
+}
+
+// ===== 初期化 =====
+document.getElementById('pt-date').value=new Date().toISOString().split('T')[0];
+initCanvas('front');
+initCanvas('back');
+renderSaved();
+</script>
+</body>
+</html>
