@@ -867,9 +867,47 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div class="fg"><label>予約ルート</label>
           <select class="sel" id="m-rt"><option value="LINE">LINE</option><option value="次回予約">次回予約</option><option value="電話">電話</option><option value="飛び込み">飛び込み</option><option value="当日LINE予約">当日LINE予約</option><option value="当日電話予約">当日電話予約</option></select>
         </div>
-        <div class="fg" style="grid-column:1/-1"><label>症状</label><input class="inp" id="m-sym" placeholder="腰痛・骨盤矯正など"></div>
-        <div class="fg" style="grid-column:1/-1"><label>自費メニュー</label><input class="inp" id="m-menu" placeholder="骨盤矯正・姿勢改善など"></div>
-        <div class="fg" style="grid-column:1/-1"><label>オプション</label><input class="inp" id="m-opt" placeholder="延長・電気・WBなど"></div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>予約枠数</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="pay-btn" id="slot-btn-1" onclick="setSlotCount(1)" style="min-width:50px">1枠</button>
+            <button class="pay-btn" id="slot-btn-2" onclick="setSlotCount(2)" style="min-width:50px">2枠</button>
+            <button class="pay-btn" id="slot-btn-3" onclick="setSlotCount(3)" style="min-width:50px">3枠</button>
+          </div>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label>本日の症状</label><input class="inp" id="m-sym" placeholder="腰痛・肩こりなど"></div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>自費メニュー</label>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select class="sel" id="m-menu-sel" style="flex:1;min-width:120px" onchange="applyMenuPreset()">
+              <option value="">── プルダウンから選択 ──</option>
+              <option value="骨盤矯正">骨盤矯正</option>
+              <option value="姿勢改善">姿勢改善</option>
+              <option value="産後矯正">産後矯正</option>
+              <option value="美容矯正">美容矯正</option>
+              <option value="全身調整">全身調整</option>
+              <option value="custom">── 自由入力 ──</option>
+            </select>
+            <input class="inp" id="m-menu" placeholder="メニュー名（自由入力可）" style="flex:2;min-width:120px">
+            <input class="inp" id="m-menu-price" type="number" placeholder="金額(円)" style="width:90px" oninput="updateMenuTotal()">
+          </div>
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>オプション</label>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select class="sel" id="m-opt-sel" style="flex:1;min-width:120px" onchange="applyOptPreset()">
+              <option value="">── プルダウンから選択 ──</option>
+              <option value="整体10分:1100">整体10分（1,100円）</option>
+              <option value="超音波10分:1100">超音波10分（1,100円）</option>
+              <option value="custom">── 自由入力 ──</option>
+            </select>
+            <input class="inp" id="m-opt" placeholder="オプション名（自由入力可）" style="flex:2;min-width:120px">
+            <input class="inp" id="m-opt-price" type="number" placeholder="金額(円)" style="width:90px" oninput="updateMenuTotal()">
+          </div>
+        </div>
+        <div style="grid-column:1/-1;background:#f0fdf4;border-radius:8px;padding:8px 12px;font-size:0.78rem">
+          自費メニュー＋オプション合計：<strong id="m-menu-total" style="color:var(--primary)">0円</strong>
+        </div>
       </div>
     </div>
 
@@ -1853,7 +1891,9 @@ function loadKubun(kubunList){
 function openModal(date,slot){
   editDate=date;editSlot=slot;
   document.getElementById('mtitle').textContent='予約入力 '+slot;
-  ['m-id','m-nm','m-sym','m-opt','m-menu','m-psearch'].forEach(id=>document.getElementById(id).value='');
+  ['m-id','m-nm','m-sym','m-opt','m-menu','m-menu-price','m-opt-price','m-psearch'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['m-menu-sel','m-opt-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  mSlotCount=1;setSlotCount(1);updateMenuTotal();
   document.getElementById('m-rt').value='LINE';
   document.getElementById('m-patient-list').style.display='none';
   document.getElementById('m-selected-info').style.display='none';
@@ -2020,14 +2060,16 @@ async function saveBk(){
   const vc=p?(parseInt(p.count)||0)+1:'';
   const kubun=getKubunPrimary();
   const kubunList=mKubunSel.slice();
-  const extra=getKubunSlots()-1;
+  const extra=mSlotCount-1;
   // 区分別料金収集
   const kubunFee={};
   mKubunSel.forEach(k=>{const el=document.getElementById('fee-'+k);if(el&&el.value)kubunFee[k]=parseInt(el.value)||0;});
   // キャンセルだった場合は再予約情報を記録
   const prevBk=bookings[date][slot];
   const wasCancel=prevBk&&prevBk.cancelled;
-  bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,option,menu,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,elapsed:el,visitCount:vc};
+  const menuPrice=parseInt(document.getElementById('m-menu-price')?.value)||0;
+  const optPrice=parseInt(document.getElementById('m-opt-price')?.value)||0;
+  bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,elapsed:el,visitCount:vc};
   // 継続枠（安全版：空枠か自分のcont枠のみ設定。他の患者の予約は絶対に上書きしない）
   for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){const existing=bookings[date][sl[ni]];if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
     if(!existing||(existing.cont&&existing.cardId===cardId)){bookings[date][sl[ni]]={cont:true,name,cardId};}
@@ -2049,6 +2091,56 @@ async function delBk(date,slot){
   const delCardId=bookings[date]?.[slot]?.cardId;
   for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){const ex=bookings[date]?.[sl[ni]];if(ex?.cont&&(!delCardId||ex.cardId===delCardId))delete bookings[date][sl[ni]];else break;}}
   delete bookings[date][slot];save();renderSched();await pushB();
+}
+
+// ===== 自費メニュー・オプションプリセット =====
+function applyMenuPreset(){
+  const sel=document.getElementById('m-menu-sel');
+  const val=sel.value;
+  if(!val||val==='custom'){
+    document.getElementById('m-menu').focus();
+    return;
+  }
+  // "名前:金額" 形式の場合
+  if(val.includes(':')){
+    const[nm,pr]=val.split(':');
+    document.getElementById('m-menu').value=nm;
+    document.getElementById('m-menu-price').value=pr;
+  }else{
+    document.getElementById('m-menu').value=val;
+  }
+  updateMenuTotal();
+}
+function applyOptPreset(){
+  const sel=document.getElementById('m-opt-sel');
+  const val=sel.value;
+  if(!val||val==='custom'){
+    document.getElementById('m-opt').focus();
+    return;
+  }
+  if(val.includes(':')){
+    const[nm,pr]=val.split(':');
+    document.getElementById('m-opt').value=nm;
+    document.getElementById('m-opt-price').value=pr;
+  }else{
+    document.getElementById('m-opt').value=val;
+  }
+  updateMenuTotal();
+}
+function updateMenuTotal(){
+  const mp=parseInt(document.getElementById('m-menu-price')?.value)||0;
+  const op=parseInt(document.getElementById('m-opt-price')?.value)||0;
+  const el=document.getElementById('m-menu-total');
+  if(el)el.textContent=(mp+op).toLocaleString()+'円';
+}
+// ===== 枠数選択 =====
+let mSlotCount=1;
+function setSlotCount(n){
+  mSlotCount=n;
+  [1,2,3].forEach(i=>{
+    const btn=document.getElementById('slot-btn-'+i);
+    if(btn)btn.classList.toggle('on',i===n);
+  });
 }
 
 // ===== カタカナ変換 =====
