@@ -797,6 +797,16 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <div class="page" id="page-master">
   <div style="margin-top:14px">
     <div class="card">
+      <div class="ctitle">📱 LINE Notify設定</div>
+      <div style="font-size:0.76rem;color:var(--muted);margin-bottom:10px">notify-bot.line.me/my でトークンを発行してここに貼り付けてください。21日以上来院なし・キャンセル発生時に通知が届きます。</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="inp" id="line-notify-token" type="password" placeholder="LINE Notifyトークンを貼り付け" style="flex:1">
+        <button class="btn bp bsm" onclick="saveLineToken()">💾 保存</button>
+        <button class="btn bp bsm" onclick="testLineNotify()">🧪 テスト</button>
+      </div>
+      <div id="line-token-status" style="font-size:0.74rem;color:var(--muted);margin-top:6px"></div>
+    </div>
+    <div class="card">
       <div class="ctitle">🛍 物販商品マスター <button class="btn bp bsm" onclick="addBussanMaster()">＋ 追加</button></div>
       <div id="bussan-master-list"></div>
     </div>
@@ -992,16 +1002,20 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div id="cancel-info" style="font-size:0.82rem;color:var(--muted);margin-bottom:12px;padding:8px;background:#f8f6f1;border-radius:8px;"></div>
     <div class="fg" style="margin-bottom:10px">
       <label>キャンセル理由</label>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px" id="cancel-reason-btns">
-        <button class="pay-btn" data-v="体調不良" onclick="selectCancelReason(this)">🤒 体調不良</button>
-        <button class="pay-btn" data-v="忘れてた" onclick="selectCancelReason(this)">😅 忘れてた</button>
-        <button class="pay-btn" data-v="仕事都合" onclick="selectCancelReason(this)">💼 仕事都合</button>
-        <button class="pay-btn" data-v="家庭都合" onclick="selectCancelReason(this)">🏠 家庭都合</button>
-        <button class="pay-btn" data-v="その他" onclick="selectCancelReason(this)">📝 その他</button>
-      </div>
+      <select class="sel" id="cancel-reason-sel" onchange="onCancelReasonSel()" style="margin-top:6px;width:100%;font-size:0.85rem">
+        <option value="">── 選択してください ──</option>
+        <option value="体調不良">🤒 体調不良</option>
+        <option value="仕事が入った">💼 仕事が入った</option>
+        <option value="忘れてた">😅 忘れてた</option>
+        <option value="家庭都合">🏠 家庭都合</option>
+        <option value="痛みが引いた">✅ 痛みが引いた</option>
+        <option value="金銭的都合">💰 金銭的都合</option>
+        <option value="交通手段なし">🚗 交通手段なし</option>
+        <option value="other">📝 その他（自由記入）</option>
+      </select>
     </div>
-    <div class="fg" style="margin-bottom:14px">
-      <label>自由記入</label>
+    <div class="fg" style="margin-bottom:14px" id="cancel-note-wrap">
+      <label>詳細・自由記入</label>
       <input class="inp" id="cancel-note" placeholder="詳細があれば記入">
     </div>
     <div style="display:flex;gap:6px;justify-content:flex-end">
@@ -1587,6 +1601,9 @@ async function syncAll(){
       }
       save();
       setStat('s-ok','✅ 同期済み');
+      // 21日未来院アラートチェック（バックグラウンドで実行）
+      const curDate=document.getElementById('yoyaku-date')?.value||today();
+      setTimeout(()=>checkElapsedAlert(curDate),2000);
     }catch(e){
       clearTimeout(tid);
       throw e;
@@ -1714,6 +1731,56 @@ function loadBui(arr){
 }
 
 // ===== SCHEDULE =====
+// ===== LINE Notify =====
+function saveLineToken(){
+  const token=document.getElementById('line-notify-token').value.trim();
+  if(!token)return;
+  localStorage.setItem('kj_line_token',token);
+  document.getElementById('line-token-status').innerHTML='✅ トークンを保存しました';
+}
+function getLineToken(){return localStorage.getItem('kj_line_token')||'';}
+async function sendLineNotify(msg){
+  const token=getLineToken();
+  if(!token)return false;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'lineNotify',token,message:msg}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res.text());
+    return d.ok;
+  }catch(e){console.error('LINE Notify error:',e);return false;}
+}
+async function testLineNotify(){
+  const token=document.getElementById('line-notify-token').value.trim()||getLineToken();
+  if(!token){document.getElementById('line-token-status').innerHTML='❌ トークンを入力してください';return;}
+  document.getElementById('line-token-status').innerHTML='📤 送信中...';
+  localStorage.setItem('kj_line_token',token);
+  const ok=await sendLineNotify('\n【倉治整骨院 管理システム】\nLINE Notify接続テスト成功✅\n'+new Date().toLocaleString('ja-JP'));
+  document.getElementById('line-token-status').innerHTML=ok?'✅ 送信成功！LINEを確認してください':'❌ 送信失敗。トークンを確認してください';
+}
+// 起動時にトークンをフォームに反映
+function loadLineTokenUI(){
+  const token=getLineToken();
+  const el=document.getElementById('line-notify-token');
+  if(el&&token)el.value=token;
+}
+// 21日以上未来院チェック（起動時・日付変更時に実行）
+async function checkElapsedAlert(date){
+  const token=getLineToken();if(!token)return;
+  const alerts=patients.filter(p=>{
+    if(!p.last||isGarbageData(p.last))return false;
+    const days=elapsed(p.last);
+    return days>=21&&days<=22;// 21日目に1回だけ通知
+  });
+  if(!alerts.length)return;
+  const msg='\n【倉治整骨院 管理システム】\n⚠️ 21日未来院アラート（'+date+'）\n'+
+    alerts.map(p=>'・'+p.name+'（'+p.id+'号）前回:'+p.last+' '+elapsed(p.last)+'日経過').join('\n')+
+    '\n→ 来院促進のご連絡をお願いします';
+  await sendLineNotify(msg);
+}
 function toggleDayMemo(){
   const area=document.getElementById('day-memo-area');
   area.style.display=area.style.display==='none'?'block':'none';
@@ -1784,7 +1851,7 @@ function renderSched(){
         <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td>
         <td><span class="rt ${rc}">${bk.route||''}</span></td>
         <td style="font-size:0.72rem">${bk.visitCount||''}</td>
-        <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=30?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:1px 4px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':'color:var(--accent2)'}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=30?' ⚠️':''}</td>
+        <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=21?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:2px 5px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':"color:var(--accent2)"}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=21?' ⚠️初診料':''}</td>
         <td>${buiHtml?buiHtml+'<br>':''} ${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td>
         <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':'<br><span style="font-size:0.68rem;color:#f97316">💴 未会計</span>'}</td>
         <td style="white-space:nowrap">
@@ -1837,6 +1904,11 @@ function openCancelModal(date,slot){
   document.getElementById('cancel-info').innerHTML=`<strong>${date} ${slot}</strong><br>${bk.name||''} 様`;
   document.querySelectorAll('#cancel-reason-btns .pay-btn').forEach(b=>b.classList.remove('on'));
   document.getElementById('cancel-note').value='';
+  const sel=document.getElementById('cancel-reason-sel');
+  if(sel)sel.value='';
+  cancelReasonVal='';
+  const nw=document.getElementById('cancel-note-wrap');
+  if(nw)nw.style.display='none';
   document.getElementById('cancelModal').classList.add('on');
 }
 function closeCancelModal(){document.getElementById('cancelModal').classList.remove('on');cancelDate=null;cancelSlot=null;}
@@ -1845,11 +1917,19 @@ function selectCancelReason(btn){
   btn.classList.add('on');
   cancelReasonVal=btn.getAttribute('data-v');
 }
+function onCancelReasonSel(){
+  const sel=document.getElementById('cancel-reason-sel');
+  cancelReasonVal=sel.value==='other'?'':sel.value;
+  const noteWrap=document.getElementById('cancel-note-wrap');
+  if(noteWrap)noteWrap.style.display=sel.value===''?'none':'block';
+}
 async function execCancel(){
   if(!cancelDate||!cancelSlot)return;
   const bk=bookings[cancelDate]?.[cancelSlot];if(!bk)return;
+  const sel=document.getElementById('cancel-reason-sel');
+  const selVal=sel?sel.value==='other'?'':sel.value:cancelReasonVal;
   const note=document.getElementById('cancel-note').value.trim();
-  const reason=cancelReasonVal+(note?'：'+note:'');
+  const reason=(selVal||cancelReasonVal)+(note?'：'+note:'');
   const name=bk.name||'';
   const cardId=bk.cardId||'';
   // 継続枠も削除
@@ -1858,6 +1938,12 @@ async function execCancel(){
   // キャンセル記録に変換（空き枠として再利用可能にする）
   bookings[cancelDate][cancelSlot]={cancelled:true,name,cardId,cancelReason:reason,reBookedBy:''};
   save();closeCancelModal();renderSched();await pushB();
+  // LINE Notify送信
+  const token=getLineToken();
+  if(token){
+    const msg='\n【倉治整骨院】\n❌ キャンセル発生\n患者: '+name+'（'+cardId+'号）\n日時: '+cancelDate+' '+cancelSlot+'\n理由: '+(reason||'未記入')+'\n→ 空き枠が発生しました';
+    sendLineNotify(msg);
+  }
 }
 
 // ===== モーダルタブ =====
@@ -2556,7 +2642,7 @@ function renderPatients(){
     const lineBadge=lineVal==='あり'?'<span style="background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">あり</span>':lineVal==='なし'?'<span style="background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:3px;font-size:0.65rem">なし</span>':'−';
     const srcBadge=p.src==='LINE'?'<span style="background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">LINE</span>':p.src==='紹介'?'<span style="background:#ede9fe;color:#5b21b6;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">紹介</span>':p.src==='三四郎'?'<span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">三四郎</span>':p.src||'−';
     const elDays=p.last?elapsed(p.last):'';
-    const elColor=elDays>=60?'#dc2626':elDays>=30?'#d97706':'var(--muted)';
+    const elColor=elDays>=21?'#dc2626':elDays>=14?'#d97706':'var(--muted)';
     return`<tr>
       <td><strong>${p.id}</strong></td>
       <td><strong>${p.name}</strong>${p.kana?'<br><span style="font-size:0.6rem;color:var(--muted)">'+p.kana+'</span>':''}</td>
@@ -2567,7 +2653,7 @@ function renderPatients(){
       <td style="font-size:0.7rem">${p.city||'−'}</td>
       <td style="font-size:0.7rem">${p.job||'−'}</td>
       <td>${srcBadge}</td>
-      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'('+elDays+'日前)':'')+(elDays>=60?' 🚨':elDays>=30?' ⚠️':'')+'</span>':''}</td>
+      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'('+elDays+'日前)':'')+(elDays>=21?' 🚨初診料注意':elDays>=14?' ⚠️まもなく21日':'')+'</span>':''}</td>
       <td><button class="btn be bsm" onclick="openPEdit('${p.id}')">編集</button></td>
     </tr>`;
   }).join('');
@@ -3376,6 +3462,7 @@ function goPage(id){
   document.querySelectorAll('.nav-t').forEach((t,i)=>{if(pages[i]===id)t.classList.add('on');});
   if(id==='patients')renderPatients();
   if(id==='uriage'){renderDayU();document.getElementById('u-date').value=today();}
+  if(id==='master'){loadLineTokenUI();}
   if(id==='bussan'){renderBsPatients();renderBsProductList();}
   if(id==='stock')renderStock();
   if(id==='ltv'){switchLtv('ltv_main');}
