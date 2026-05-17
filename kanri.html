@@ -438,6 +438,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="utab" onclick="switchU('month')">🗓 月別</div>
       <div class="utab" onclick="switchU('year')">📊 年別</div>
       <div class="utab" onclick="switchU('pay')">💳 支払別</div>
+      <button class="btn bsm" onclick="forcePushU()" style="margin-left:8px;padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">📤 GAS保存</button>
     </div>
     <div id="u-day">
       <div class="card">
@@ -2812,6 +2813,30 @@ function saveU(){
   pushU().then(()=>{}).catch(e=>console.error('pushU error:',e));
   ['u-ho','u-ji','u-ko','u-bu','u-ot'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('u-memo').value='';uPaySel=[];document.querySelectorAll('#u-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+}
+async function forcePushU(){
+  if(!Object.keys(uriage).length){
+    alert('売上データがありません。先に売上を入力してください。');
+    return;
+  }
+  setStat('s-err','📤 GASに送信中...');
+  const hdr=['日付','保険','自費','交通事故','物販','その他','支払方法','メモ'];
+  const rows=[hdr,...Object.entries(uriage).sort((a,b)=>a[0].localeCompare(b[0])).map(([d,u])=>[d,u.hoken||0,u.jhi||0,u.jiko||0,u.bussan||0,u.other||0,(u.pay||[]).join(','),u.memo||''])];
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveUriage',rows:JSON.stringify(rows)}),redirect:'follow'});
+    const txt=await res.text();
+    const d=JSON.parse(txt);
+    if(d.ok){
+      setStat('s-ok','✅ 売上データをGASに保存しました！');
+      alert('✅ 売上データをGASに保存しました！\n'+Object.keys(uriage).length+'件のデータが保存されました。');
+    }else{
+      setStat('s-err','❌ 保存失敗：'+JSON.stringify(d));
+      alert('❌ 保存失敗\n'+JSON.stringify(d));
+    }
+  }catch(e){
+    setStat('s-err','❌ エラー：'+e.message);
+    alert('❌ エラー：'+e.message+'\nGASのデプロイURLを確認してください。');
+  }
 }
 async function pushU(){
   const hdr=['日付','保険','自費','交通事故','物販','その他','支払方法','メモ'];
