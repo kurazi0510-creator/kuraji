@@ -2821,30 +2821,27 @@ function calcUriageFromBookings(){
   Object.entries(bookings).forEach(([date,slots])=>{
     Object.values(slots).forEach(bk=>{
       if(!bk||bk.cont||bk.cancelled)return;
-      const d=date;
-      if(!calc[d])calc[d]={hoken:0,jhi:0,jiko:0,bussan:0,other:0,pay:[],memo:''};
       const totalAmount=parseInt(bk.payAmount||0);
       if(!totalAmount)return;
+      if(!calc[date])calc[date]={hoken:0,jhi:0,jiko:0,bussan:0,other:0,pay:[],memo:''};
+      const c=calc[date];
+      
       // 物販合計を計算
       const bussanArr=bk.bussan||[];
       const bussanTotal=bussanArr.reduce((s,b)=>s+b.price*(b.qty||1),0);
-      // 施術料 = 合計 - 物販（マイナスにならないよう）
+      c.bussan+=bussanTotal;
+      
+      // 施術料 = 合計 - 物販
       const seturyoAmount=Math.max(0,totalAmount-bussanTotal);
-      // 物販: bussanTotalと実際の支払いの小さい方（物販が施術料を超えないように）
-      const actualBussan=Math.min(bussanTotal,totalAmount);
-      calc[d].bussan+=actualBussan;
       if(seturyoAmount>0){
         const kubunList=bk.kubunList||[bk.kubun||''];
-        if(kubunList.includes('保険'))calc[d].hoken+=seturyoAmount;
-        else if(kubunList.includes('交通事故'))calc[d].jiko+=seturyoAmount;
-        else calc[d].jhi+=seturyoAmount;
+        if(kubunList.includes('保険'))c.hoken+=seturyoAmount;
+        else if(kubunList.includes('交通事故'))c.jiko+=seturyoAmount;
+        else c.jhi+=seturyoAmount;
       }
-      // 物販のみの場合（施術料0）でtotalAmountがある場合はbussanに全額
-      if(seturyoAmount===0&&bussanTotal===0&&totalAmount>0){
-        calc[d].bussan+=totalAmount;
-      }
-      // 支払方法
-      (bk.pay||[]).forEach(p=>{if(!calc[d].pay.includes(p))calc[d].pay.push(p);});
+      
+      // 支払方法（重複なし）
+      (bk.pay||[]).forEach(p=>{if(!c.pay.includes(p))c.pay.push(p);});
     });
   });
   return calc;
@@ -2852,19 +2849,35 @@ function calcUriageFromBookings(){
 async function syncUriageFromBookings(){
   const calc=calcUriageFromBookings();
   const dates=Object.keys(calc);
-  if(!dates.length){alert('予約データに支払金額が入っているデータがありません。');return;}
-  // 既存のuriageとマージ（予約データを優先）
+  if(!dates.length){alert('予約データに支払金額が入っているデータがありません。\n予約に支払金額を入力してから実行してください。');return;}
+  
+  // 確認ダイアログ
+  const msg='予約データから売上を集計します。\n\n'
+    +dates.map(d=>{const c=calc[d];const total=(c.hoken+c.jhi+c.jiko+c.bussan);return d+': 合計'+total.toLocaleString()+'円';}).join('\n')
+    +'\n\n既存の売上データは上書きされます。続けますか？';
+  if(!confirm(msg))return;
+  
+  // 対象日のデータを完全リセットしてから新しいデータをセット
   let updated=0;
   dates.forEach(d=>{
     const c=calc[d];
-    if(c.hoken||c.jhi||c.jiko||c.bussan){
-      // 既存データを上書き（重複防止）
-      uriage[d]={hoken:c.hoken,jhi:c.jhi,jiko:c.jiko,bussan:c.bussan,other:uriage[d]?.other||0,pay:c.pay,memo:uriage[d]?.memo||''};
+    const total=c.hoken+c.jhi+c.jiko+c.bussan;
+    if(total>0){
+      // 完全上書き（追加ではなく置き換え）
+      uriage[d]={
+        hoken:c.hoken,
+        jhi:c.jhi,
+        jiko:c.jiko,
+        bussan:c.bussan,
+        other:0,
+        pay:c.pay,
+        memo:''
+      };
       updated++;
     }
   });
   save();renderDayU();
-  alert('✅ 予約データから'+updated+'日分の売上を自動集計しました。\n内容を確認してからGAS保存してください。');
+  alert('✅ '+updated+'日分の売上を集計しました。\n内容を確認してから「📤 GAS保存」を押してください。');
 }
 async function forcePushU(){
   if(!Object.keys(uriage).length){
