@@ -798,7 +798,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
   <div style="margin-top:14px">
     <div class="card">
       <div class="ctitle">📱 LINE Notify設定</div>
-      <div style="font-size:0.76rem;color:var(--muted);margin-bottom:10px">21日以上来院なし・キャンセル発生時に自分のLINEに通知が届きます。初回はセットアップガイドで設定してください。</div>
+      <div style="font-size:0.76rem;color:var(--muted);margin-bottom:10px">20日未来院（翌日初診料発生）・キャンセル発生時に自分のLINEに通知が届きます。初回はセットアップガイドで設定してください。</div>
       <div id="line-token-status" style="font-size:0.78rem;margin-bottom:8px"></div>
       <button class="btn bp bsm" onclick="location.href='line_setup.html'" style="background:#22c55e;color:white;border-color:#22c55e">📱 LINE通知をセットアップする（5分）</button>
       <button class="btn bp bsm" onclick="testLineNotify2()" style="margin-top:6px">🧪 テスト送信</button>
@@ -1785,12 +1785,12 @@ async function checkElapsedAlert(date){
   const alerts=patients.filter(p=>{
     if(!p.last||isGarbageData(p.last))return false;
     const days=elapsed(p.last);
-    return days>=21&&days<=22;// 21日目に1回だけ通知
+    return days>=20&&days<=21;// 20日目に1回だけ通知（21日で初診料のため前日）
   });
   if(!alerts.length)return;
-  const msg='\n【倉治整骨院 管理システム】\n⚠️ 21日未来院アラート（'+date+'）\n'+
-    alerts.map(p=>'・'+p.name+'（'+p.id+'号）前回:'+p.last+' '+elapsed(p.last)+'日経過').join('\n')+
-    '\n→ 来院促進のご連絡をお願いします';
+  const msg='\n【倉治整骨院 管理システム】\n⚠️ 明日で初診料発生アラート（'+date+'）\n'+
+    alerts.map(p=>'・'+p.name+'（'+p.id+'号）前回:'+p.last+' '+elapsed(p.last)+'日経過\n　→ 明日来院なければ次回初診料').join('\n')+
+    '\n⚠️ 明日が21日目です。来院を促してください！';
   await sendLineNotify(msg);
 }
 function toggleDayMemo(){
@@ -1863,7 +1863,7 @@ function renderSched(){
         <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td>
         <td><span class="rt ${rc}">${bk.route||''}</span></td>
         <td style="font-size:0.72rem">${bk.visitCount||''}</td>
-        <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=21?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:2px 5px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':"color:var(--accent2)"}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=21?' ⚠️初診料':''}</td>
+        <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=20?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:2px 5px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':"color:var(--accent2)"}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=20?' ⚠️初診料':''}</td>
         <td>${buiHtml?buiHtml+'<br>':''} ${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td>
         <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':'<br><span style="font-size:0.68rem;color:#f97316">💴 未会計</span>'}</td>
         <td style="white-space:nowrap">
@@ -2654,7 +2654,7 @@ function renderPatients(){
     const lineBadge=lineVal==='あり'?'<span style="background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">あり</span>':lineVal==='なし'?'<span style="background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:3px;font-size:0.65rem">なし</span>':'−';
     const srcBadge=p.src==='LINE'?'<span style="background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">LINE</span>':p.src==='紹介'?'<span style="background:#ede9fe;color:#5b21b6;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">紹介</span>':p.src==='三四郎'?'<span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700">三四郎</span>':p.src||'−';
     const elDays=p.last?elapsed(p.last):'';
-    const elColor=elDays>=21?'#dc2626':elDays>=14?'#d97706':'var(--muted)';
+    const elColor=elDays>=20?'#dc2626':elDays>=14?'#d97706':'var(--muted)';
     return`<tr>
       <td><strong>${p.id}</strong></td>
       <td><strong>${p.name}</strong>${p.kana?'<br><span style="font-size:0.6rem;color:var(--muted)">'+p.kana+'</span>':''}</td>
@@ -2665,7 +2665,7 @@ function renderPatients(){
       <td style="font-size:0.7rem">${p.city||'−'}</td>
       <td style="font-size:0.7rem">${p.job||'−'}</td>
       <td>${srcBadge}</td>
-      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'('+elDays+'日前)':'')+(elDays>=21?' 🚨初診料注意':elDays>=14?' ⚠️まもなく21日':'')+'</span>':''}</td>
+      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'('+elDays+'日前)':'')+(elDays>=20?' 🚨初診料注意':elDays>=14?' ⚠️まもなく初診料':'')  +'</span>':''}</td>
       <td><button class="btn be bsm" onclick="openPEdit('${p.id}')">編集</button></td>
     </tr>`;
   }).join('');
