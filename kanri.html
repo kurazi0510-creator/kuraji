@@ -798,13 +798,10 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
   <div style="margin-top:14px">
     <div class="card">
       <div class="ctitle">📱 LINE Notify設定</div>
-      <div style="font-size:0.76rem;color:var(--muted);margin-bottom:10px">notify-bot.line.me/my でトークンを発行してここに貼り付けてください。21日以上来院なし・キャンセル発生時に通知が届きます。</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input class="inp" id="line-notify-token" type="password" placeholder="LINE Notifyトークンを貼り付け" style="flex:1">
-        <button class="btn bp bsm" onclick="saveLineToken()">💾 保存</button>
-        <button class="btn bp bsm" onclick="testLineNotify()">🧪 テスト</button>
-      </div>
-      <div id="line-token-status" style="font-size:0.74rem;color:var(--muted);margin-top:6px"></div>
+      <div style="font-size:0.76rem;color:var(--muted);margin-bottom:10px">21日以上来院なし・キャンセル発生時に自分のLINEに通知が届きます。初回はセットアップガイドで設定してください。</div>
+      <div id="line-token-status" style="font-size:0.78rem;margin-bottom:8px"></div>
+      <button class="btn bp bsm" onclick="location.href='line_setup.html'" style="background:#22c55e;color:white;border-color:#22c55e">📱 LINE通知をセットアップする（5分）</button>
+      <button class="btn bp bsm" onclick="testLineNotify2()" style="margin-top:6px">🧪 テスト送信</button>
     </div>
     <div class="card">
       <div class="ctitle">🛍 物販商品マスター <button class="btn bp bsm" onclick="addBussanMaster()">＋ 追加</button></div>
@@ -1740,18 +1737,26 @@ function saveLineToken(){
 }
 function getLineToken(){return localStorage.getItem('kj_line_token')||'';}
 async function sendLineNotify(msg){
-  const token=getLineToken();
+  const token=localStorage.getItem('kj_line_token2')||getLineToken();
+  const userId=localStorage.getItem('kj_line_userid')||'';
   if(!token)return false;
   try{
-    const res=await fetch(GAS,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'lineNotify',token,message:msg}),
-      redirect:'follow'
-    });
+    const body=userId
+      ?{action:'lineNotifyV2',token,userId,message:msg}
+      :{action:'lineNotify',token,message:msg};
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body),redirect:'follow'});
     const d=JSON.parse(await res.text());
     return d.ok;
   }catch(e){console.error('LINE Notify error:',e);return false;}
+}
+async function testLineNotify2(){
+  const token=localStorage.getItem('kj_line_token2')||getLineToken();
+  const userId=localStorage.getItem('kj_line_userid')||'';
+  const st=document.getElementById('line-token-status');
+  if(!token){if(st)st.innerHTML='❌ まずセットアップしてください';return;}
+  if(st)st.innerHTML='📤 送信中...';
+  const ok=await sendLineNotify('\n【倉治整骨院 管理システム】\nLINE通知テスト✅\n'+new Date().toLocaleString('ja-JP'));
+  if(st)st.innerHTML=ok?'✅ 送信成功！LINEを確認してください':'❌ 送信失敗。セットアップをやり直してください';
 }
 async function testLineNotify(){
   const token=document.getElementById('line-notify-token').value.trim()||getLineToken();
@@ -1763,9 +1768,14 @@ async function testLineNotify(){
 }
 // 起動時にトークンをフォームに反映
 function loadLineTokenUI(){
-  const token=getLineToken();
-  const el=document.getElementById('line-notify-token');
-  if(el&&token)el.value=token;
+  const token=localStorage.getItem('kj_line_token2')||getLineToken();
+  const userId=localStorage.getItem('kj_line_userid')||'';
+  const st=document.getElementById('line-token-status');
+  if(st){
+    if(token&&userId)st.innerHTML='✅ LINE通知設定済み（ユーザーID: '+userId.slice(0,8)+'...）';
+    else if(token)st.innerHTML='⚠️ ユーザーID未設定 → セットアップをやり直してください';
+    else st.innerHTML='❌ 未設定';
+  }
 }
 // 21日以上未来院チェック（起動時・日付変更時に実行）
 async function checkElapsedAlert(date){

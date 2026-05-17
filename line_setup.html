@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LINE通知セットアップ - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;padding:16px;}
+.card{background:white;border-radius:12px;padding:16px;max-width:600px;margin:0 auto 12px;}
+h1{color:#1e293b;font-size:1rem;text-align:center;margin-bottom:4px;}
+.sub{color:#64748b;font-size:0.75rem;text-align:center;margin-bottom:16px;}
+.step{background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #f97316;}
+.step-num{color:#f97316;font-size:0.72rem;font-weight:bold;margin-bottom:4px;}
+.step-title{color:#1e293b;font-size:0.88rem;font-weight:bold;margin-bottom:8px;}
+.step-desc{color:#374151;font-size:0.78rem;line-height:1.8;}
+.url-box{background:#1e293b;color:#22c55e;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:0.78rem;margin:8px 0;word-break:break-all;cursor:pointer;}
+.inp-area{background:white;border-radius:10px;padding:14px;border:2px solid #e2e8f0;}
+.inp{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px 12px;font-size:0.82rem;margin-bottom:8px;}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:0.88rem;font-weight:bold;cursor:pointer;margin-top:6px;}
+.btn-primary{background:#f97316;color:white;}
+.btn-green{background:#22c55e;color:white;}
+.btn-back{background:#1e3a5f;color:#7dd3fc;}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.68rem;font-weight:bold;}
+.free{background:#dcfce7;color:#166534;}
+.warn{background:#fef3c7;color:#92400e;}
+.tip{background:#eff6ff;border-radius:8px;padding:10px;font-size:0.76rem;color:#1e40af;margin-top:8px;line-height:1.7;}
+.result{border-radius:8px;padding:10px;margin-top:8px;display:none;font-size:0.78rem;}
+.result-ok{background:#dcfce7;color:#166534;}
+.result-ng{background:#fee2e2;color:#dc2626;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📱 LINE通知セットアップガイド</h1>
+  <p class="sub">倉治整骨院 管理システム ｜ 21日アラート・キャンセル通知を自分のLINEに送る</p>
+  <div style="text-align:center;margin-bottom:12px">
+    <span class="badge free">月200通まで無料</span>&nbsp;
+    <span class="badge warn">所要時間：約5分</span>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <div class="step-title">🏢 LINE公式アカウントを作成する</div>
+    <div class="step-desc">
+      以下のURLにアクセスしてLINEアカウントでログインします。<br>
+      （すでに倉治整骨院のLINE公式アカウントをお持ちの場合はSTEP 2へ）
+    </div>
+    <div class="url-box" onclick="navigator.clipboard.writeText('https://manager.line.biz/')">
+      https://manager.line.biz/ （タップでコピー）
+    </div>
+    <div class="step-desc">
+      ① LINEアカウントでログイン<br>
+      ② 「アカウントを作成」→ 店舗名「倉治整骨院管理通知」などで作成<br>
+      ③ 業種は「医療・健康」を選択
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <div class="step-title">⚙️ Messaging APIを有効にする</div>
+    <div class="step-desc">
+      ① LINE Official Account Manager にログイン<br>
+      ② 右上「設定」→ 左メニュー「Messaging API」<br>
+      ③「Messaging APIを利用する」をクリック<br>
+      ④ プロバイダー名を入力（例：倉治整骨院）して同意・OK<br>
+      ⑤「LINE Developersコンソールで確認する」をクリック
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-num">STEP 3</div>
+    <div class="step-title">🔑 アクセストークンを発行する</div>
+    <div class="step-desc">
+      LINE Developersコンソール（developers.line.biz）で：<br>
+      ① 作成したチャネルを選択<br>
+      ② 「Messaging API設定」タブを選択<br>
+      ③ 下にスクロール → 「チャネルアクセストークン（長期）」の「発行」をクリック<br>
+      ④ 表示されたトークンをコピーしておく
+    </div>
+    <div class="tip">
+      💡 トークンは長い文字列（約180文字）です。全部コピーしてください。
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-num">STEP 4</div>
+    <div class="step-title">👤 自分のユーザーIDを確認する</div>
+    <div class="step-desc">
+      ① LINE Developersコンソール → 作成したチャネル<br>
+      ② 「Messaging API設定」タブ → QRコードが表示される<br>
+      ③ そのQRコードを自分のLINEで読み取り「友だち追加」する<br>
+      ④ 「チャネル基本設定」タブ → 「あなたのユーザーID」をコピー（Uで始まる文字列）
+    </div>
+    <div class="tip">
+      ⚠️ 友だち追加しないとメッセージが届きません。必ず自分で友だち追加してください。
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step">
+    <div class="step-num">STEP 5</div>
+    <div class="step-title">✅ 管理システムに設定する</div>
+    <div class="step-desc">下記に入力してテスト送信してください</div>
+  </div>
+
+  <!-- 設定フォーム -->
+  <div class="inp-area">
+    <label style="font-size:0.76rem;font-weight:bold;color:#374151;display:block;margin-bottom:4px">チャネルアクセストークン（長期）</label>
+    <input class="inp" type="password" id="token-input" placeholder="発行したトークンを貼り付け">
+    <label style="font-size:0.76rem;font-weight:bold;color:#374151;display:block;margin-bottom:4px;margin-top:8px">あなたのユーザーID（Uで始まる）</label>
+    <input class="inp" type="text" id="userid-input" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+    <button class="btn btn-green" onclick="testSend()">🧪 テスト送信してLINEに届くか確認</button>
+    <div class="result" id="test-result"></div>
+    <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:10px">💾 管理システムに保存して完了</button>
+  </div>
+
+  <button class="btn btn-back" onclick="location.href='kanri.html'" style="margin-top:10px">← 管理システムに戻る</button>
+</div>
+
+<script>
+// GAS URL
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+
+// 保存済みの値を読み込む
+window.addEventListener('load',()=>{
+  const t=localStorage.getItem('kj_line_token2')||'';
+  const u=localStorage.getItem('kj_line_userid')||'';
+  if(t)document.getElementById('token-input').value=t;
+  if(u)document.getElementById('userid-input').value=u;
+});
+
+async function testSend(){
+  const token=document.getElementById('token-input').value.trim();
+  const userId=document.getElementById('userid-input').value.trim();
+  const res=document.getElementById('test-result');
+  if(!token||!userId){res.className='result result-ng';res.style.display='block';res.textContent='❌ トークンとユーザーIDを両方入力してください';return;}
+  res.className='result';res.style.display='block';res.textContent='📤 送信中...';
+  try{
+    const r=await fetch(GAS,{
+      method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'lineNotifyV2',token,userId,message:'\n【倉治整骨院 管理システム】\n✅ LINE通知のテスト送信です\n設定が正常に完了しました！\n'+new Date().toLocaleString('ja-JP')}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await r.text());
+    if(d.ok){res.className='result result-ok';res.textContent='✅ 送信成功！LINEを確認してください。届いていれば設定完了です。';}
+    else{res.className='result result-ng';res.textContent='❌ 送信失敗：'+( d.error||'不明なエラー')+'　→ トークンとユーザーIDを確認してください';}
+  }catch(e){res.className='result result-ng';res.textContent='❌ エラー：'+e.message;}
+}
+
+function saveSettings(){
+  const token=document.getElementById('token-input').value.trim();
+  const userId=document.getElementById('userid-input').value.trim();
+  if(!token||!userId){alert('トークンとユーザーIDを入力してください');return;}
+  localStorage.setItem('kj_line_token2',token);
+  localStorage.setItem('kj_line_userid',userId);
+  alert('✅ 保存完了！管理システムに戻ってください。\n\n次回から：\n・患者が21日来院なし → 自動でLINEに通知\n・キャンセル発生時 → 即座にLINEに通知');
+  location.href='kanri.html';
+}
+</script>
+</body>
+</html>
