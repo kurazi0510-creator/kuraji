@@ -979,6 +979,14 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="mpane" id="mp-pay">
+      <!-- 交通事故：支払いなしトグル -->
+      <div id="jiko-pay-toggle" style="display:none;margin-bottom:10px;background:#fef3c7;border-radius:8px;padding:10px 12px;border:1.5px solid #fcd34d">
+        <div style="font-size:0.78rem;font-weight:bold;color:#92400e;margin-bottom:8px">🚗 交通事故の支払い設定</div>
+        <div style="display:flex;gap:8px">
+          <button class="pay-btn on" id="jiko-nopay-btn" onclick="setJikoPay(false)" style="flex:1;background:#fef3c7;color:#92400e;border-color:#fcd34d">保険対応（支払いなし）</button>
+          <button class="pay-btn" id="jiko-pay-btn" onclick="setJikoPay(true)" style="flex:1">患者支払いあり</button>
+        </div>
+      </div>
       <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">支払方法を選択（複数可）</div>
       <div class="pay-grid" id="m-pay-btns">
         <button class="pay-btn" data-v="現金" onclick="toggleMPay(this)">💴 現金</button>
@@ -1704,7 +1712,37 @@ function toggleKubun(btn){
   updateKubunFeeArea();
 }
 
+function setJikoPay(hasPay){
+  // 交通事故の支払い設定
+  const payArea=document.getElementById('m-pay-btns');
+  const amountEl=document.getElementById('m-pay-amount');
+  const nopayBtn=document.getElementById('jiko-nopay-btn');
+  const payBtn=document.getElementById('jiko-pay-btn');
+  if(hasPay){
+    // 支払いあり：通常表示
+    if(payArea)payArea.style.opacity='1';
+    if(amountEl)amountEl.disabled=false;
+    if(nopayBtn){nopayBtn.classList.remove('on');nopayBtn.style.background='';nopayBtn.style.color='';nopayBtn.style.borderColor='';}
+    if(payBtn){payBtn.classList.add('on');}
+  } else {
+    // 支払いなし：支払方法・金額をリセット・非活性
+    mPaySel=[];
+    document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+    if(amountEl){amountEl.value='0';amountEl.disabled=true;}
+    if(payArea)payArea.style.opacity='0.4';
+    if(nopayBtn){nopayBtn.classList.add('on');nopayBtn.style.background='#fef3c7';nopayBtn.style.color='#92400e';nopayBtn.style.borderColor='#fcd34d';}
+    if(payBtn)payBtn.classList.remove('on');
+  }
+}
 function updateKubunDisplay(){
+  // 交通事故選択時はトグル表示
+  const jikoToggle=document.getElementById('jiko-pay-toggle');
+  if(jikoToggle){
+    const isJiko=mKubunSel.includes('交通事故');
+    const wasShown=jikoToggle.style.display!=='none';
+    jikoToggle.style.display=isJiko?'block':'none';
+    if(isJiko&&!wasShown)setJikoPay(false);// 初回のみデフォルト支払いなし
+  }
   const disp=document.getElementById('kubun-display');
   if(!mKubunSel.length){disp.style.display='none';return;}
   disp.style.display='block';
@@ -1878,7 +1916,7 @@ function renderSched(){
         <td style="font-size:0.72rem">${bk.visitCount||''}</td>
         <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=20?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:2px 5px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':"color:var(--accent2)"}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=20?' ⚠️初診料':''}</td>
         <td>${buiHtml?buiHtml+'<br>':''} ${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td>
-        <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':'<br><span style="font-size:0.68rem;color:#f97316">💴 未会計</span>'}</td>
+        <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':'<br><span style="font-size:0.68rem;color:'+((() => {const list=bk.kubunList||[bk.kubun||''];return list.includes('交通事故')&&!list.includes('自費')&&!list.includes('保険');})() ?'#94a3b8">🚗 保険対応':'#f97316">💴 未会計')+'</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn bc bsm" onclick="editBk('${date}','${s}')">編集</button>
           <button class="btn bcancel bsm" onclick="openCancelModal('${date}','${s}')" style="margin-top:2px">ｷｬﾝｾﾙ</button>
@@ -2063,6 +2101,13 @@ function openModal(date,slot){
   ['m-id','m-nm','m-sym','m-opt','m-menu','m-menu-price','m-opt-price','m-psearch'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['m-menu-sel','m-opt-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   mSlotCount=1;setSlotCount(1);updateMenuTotal();
+  // 交通事故トグルリセット
+  const jikoT=document.getElementById('jiko-pay-toggle');
+  if(jikoT)jikoT.style.display='none';
+  const amtEl=document.getElementById('m-pay-amount');
+  if(amtEl)amtEl.disabled=false;
+  const payArea=document.getElementById('m-pay-btns');
+  if(payArea)payArea.style.opacity='1';
   // 自費メニュープルダウンを処置マスターから動的生成
   const menuSel=document.getElementById('m-menu-sel');
   if(menuSel){
