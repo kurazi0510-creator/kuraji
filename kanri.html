@@ -670,6 +670,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="card">
         <div class="ctitle">💎 LTV分析（顧客生涯価値）</div>
         <div class="ltv-grid" id="ltv-main-kpi"></div>
+        <div class="ltv-grid" id="ltv-next-rate" style="margin-top:6px"></div>
       </div>
       <div class="card" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-color:#bae6fd">
         <div class="ctitle" style="border-color:#0284c7;color:#0c4a6e">💡 プロからのアドバイス</div>
@@ -759,6 +760,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <button class="btn bp bsm" onclick="renderLtvMonth()">表示</button>
         </div>
         <div class="usum" id="ltv-month-kpi"></div>
+        <!-- 月別来院数グラフ -->
+        <div style="background:white;border-radius:10px;padding:12px;margin-bottom:10px">
+          <div style="font-size:0.78rem;font-weight:bold;color:#374151;margin-bottom:8px">📊 月別来院数グラフ</div>
+          <canvas id="ltv-month-chart" height="160"></canvas>
+        </div>
         <div class="scroll"><table class="utbl"><thead><tr><th>月</th><th>予約数</th><th>保険</th><th>自費</th><th>交通事故</th><th>新規</th><th>稼働率</th></tr></thead><tbody id="ltv-month-body"></tbody></table></div>
       </div>
     </div>
@@ -788,6 +794,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div id="ltv-alert-sec" style="display:none">
       <div class="card"><div class="ctitle">⚠ 経過日数アラート（30日以上未来院）</div>
         <div class="scroll"><table class="tbl"><thead><tr><th>券No</th><th>患者名</th><th>前回通院</th><th>経過日数</th><th>電話</th></tr></thead><tbody id="ltv-alert"></tbody></table></div>
+        <div style="font-size:0.78rem;font-weight:bold;color:#f97316;margin-top:14px;margin-bottom:6px">🛍 物販提案タイミング（3・6・9…回来院）</div>
+        <div class="scroll"><table class="tbl"><thead><tr><th>券No</th><th>患者名</th><th>来院回数</th><th>電話</th></tr></thead><tbody id="ltv-bussan-target"><tr><td colspan="4" class="empty">-</td></tr></tbody></table></div>
       </div>
     </div>
   </div>
@@ -2666,7 +2674,10 @@ function renderPatients(){
       <td style="font-size:0.7rem">${p.job||'−'}</td>
       <td>${srcBadge}</td>
       <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'('+elDays+'日前)':'')+(elDays>=20?' 🚨初診料注意':elDays>=14?' ⚠️まもなく初診料':'')  +'</span>':''}</td>
-      <td><button class="btn be bsm" onclick="openPEdit('${p.id}')">編集</button></td>
+      <td>
+        <button class="btn be bsm" onclick="openPEdit('${p.id}')">編集</button>
+        ${p.count&&parseInt(p.count)>0&&parseInt(p.count)%3===0?'<br><span style="font-size:0.62rem;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:4px;display:inline-block;margin-top:2px">🛍 物販提案タイミング</span>':''}
+      </td>
     </tr>`;
   }).join('');
 }
@@ -3202,8 +3213,23 @@ function renderLtvMain(){
     `<div class="ltv-box"><div class="n">${bsUnitPrice?bsUnitPrice.toLocaleString()+'円':'-'}</div><div class="l">物販単価<br><span style="font-size:0.6rem">（1点あたり）</span></div></div>`+
     `<div class="ltv-box"><div class="n">${avgPayPerVisit?avgPayPerVisit.toLocaleString()+'円':'-'}</div><div class="l">施術単価<br><span style="font-size:0.6rem">（1来院あたり）</span></div></div>`;
 
+  // 次回予約率をKPIに追加表示
+  document.getElementById('ltv-next-rate').innerHTML='';//後で計算
+
   // アドバイス
+  // 次回予約率（routeが「次回予約」の割合）
+  let nextBookingCnt=0,totalBkCnt=0;
+  Object.values(bookings).forEach(dayBk=>Object.values(dayBk).forEach(bk=>{
+    if(!bk||bk.cont||bk.cancelled)return;
+    totalBkCnt++;
+    if(bk.route==='次回予約')nextBookingCnt++;
+  }));
+  const nextRate=totalBkCnt?Math.round(nextBookingCnt/totalBkCnt*100):0;
+  document.getElementById('ltv-next-rate').innerHTML=
+    `<div class="ltv-box"><div class="n" style="color:${nextRate>=60?'#22c55e':nextRate>=40?'#f97316':'#dc2626'}">${nextRate}%</div><div class="l">次回予約率<br><span style="font-size:0.6rem">（目標60%以上）</span></div></div>`;
+
   const advices=[];
+  if(nextRate<60)advices.push('📅 <strong>次回予約率が'+nextRate+'%です（目標60%以上）。</strong> 施術終了時に必ず「次回はいつ来られますか？」と声かけし、その場で予約を取りましょう。次回予約率が上がるだけでキャンセル率も下がります。');
   if(repeatRate<60)advices.push('🔄 <strong>新患リピート率が'+repeatRate+'%です。</strong> 業界平均は65〜75%。初回来院後に「施術計画表」を渡すと次回予約率が大幅に向上します。');
   if(lineRate<70)advices.push('📱 <strong>LINE登録率が'+lineRate+'%です。</strong> 80%以上を目標に。LINEで予約リマインド・健康情報配信すると来院頻度が1.3倍になります。');
   if(retention<50)advices.push('💪 <strong>継続率（3回以上）が'+retention+'%です。</strong> 3回来院で習慣化する方が多いため、「3回コース」のパッケージ提案が有効です。');
@@ -3395,6 +3421,52 @@ function renderLtvMonth(){
   const validMonths=Object.entries(months).filter(([,v])=>v.total>0);
   const grandTotal=validMonths.reduce((a,[,v])=>a+v.total,0);
   const avgMonth=validMonths.length?Math.round(grandTotal/validMonths.length):0;
+  // 月別グラフ描画
+  const chartCanvas=document.getElementById('ltv-month-chart');
+  if(chartCanvas){
+    const ctx=chartCanvas.getContext('2d');
+    chartCanvas.width=chartCanvas.parentElement.clientWidth-24;
+    const W=chartCanvas.width,H=160;
+    chartCanvas.height=H;
+    ctx.clearRect(0,0,W,H);
+    const allMonths=Object.entries(months);
+    const maxVal=Math.max(...allMonths.map(([,v])=>v.total),1);
+    const barW=Math.floor((W-40)/12)-4;
+    const colors={ho:'#3b82f6',ji:'#f97316',ko:'#dc2626',sh:'#22c55e'};
+    allMonths.forEach(([m,v],i)=>{
+      const x=40+i*(barW+4);
+      const bh=Math.round((v.total/maxVal)*(H-40));
+      // 積み上げ棒グラフ
+      let y=H-20;
+      [['ho',colors.ho],['ji',colors.ji],['ko',colors.ko],['sh',colors.sh]].forEach(([k,c])=>{
+        if(!v[k])return;
+        const h=Math.round((v[k]/maxVal)*(H-40));
+        ctx.fillStyle=c;ctx.fillRect(x,y-h,barW,h);
+        y-=h;
+      });
+      // 月ラベル
+      ctx.fillStyle='#6b7280';ctx.font='9px sans-serif';ctx.textAlign='center';
+      ctx.fillText(m+'月',x+barW/2,H-6);
+      // 数値
+      if(v.total>0){ctx.fillStyle='#374151';ctx.font='bold 9px sans-serif';ctx.fillText(v.total,x+barW/2,H-22-bh);}
+    });
+    // Y軸ラベル
+    ctx.fillStyle='#9ca3af';ctx.font='9px sans-serif';ctx.textAlign='right';
+    [0,Math.round(maxVal/2),maxVal].forEach(v=>{
+      const y=H-20-Math.round((v/maxVal)*(H-40));
+      ctx.fillText(v,36,y+3);
+      ctx.strokeStyle='#f1f5f9';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(38,y);ctx.lineTo(W,y);ctx.stroke();
+    });
+    // 凡例
+    const legends=[['保険',colors.ho],['自費',colors.ji],['交通事故',colors.ko],['新規',colors.sh]];
+    let lx=42;
+    legends.forEach(([name,c])=>{
+      ctx.fillStyle=c;ctx.fillRect(lx,4,10,8);
+      ctx.fillStyle='#374151';ctx.font='9px sans-serif';ctx.textAlign='left';
+      ctx.fillText(name,lx+13,12);
+      lx+=name.length*6+22;
+    });
+  }
   document.getElementById('ltv-month-kpi').innerHTML=
     `<div class="ubox big"><div class="n">${grandTotal}</div><div class="l">${yr}年 年間来院数</div></div>`+
     `<div class="ubox"><div class="n">${avgMonth}</div><div class="l">月平均来院数</div></div>`;
@@ -3443,6 +3515,12 @@ function renderBussanHist(){
 
 function renderLtvAlert(){
   const alerts=patients.filter(p=>p.last&&elapsed(p.last)>=30).sort((a,b)=>elapsed(b.last)-elapsed(a.last));
+  // 3回来院ごとの物販提案対象患者
+  const bussanTargets=patients.filter(p=>p.count&&parseInt(p.count)>0&&parseInt(p.count)%3===0&&p.last&&elapsed(p.last)<=30);
+  document.getElementById('ltv-bussan-target').innerHTML=bussanTargets.length
+    ?bussanTargets.map(p=>`<tr><td><strong>${p.id}</strong></td><td>${p.name}</td><td style="color:#f97316;font-weight:bold">${p.count}回</td><td>${p.tel||'-'}</td></tr>`).join('')
+    :'<tr><td colspan="4" class="empty">対象患者なし</td></tr>';
+
   document.getElementById('ltv-alert').innerHTML=alerts.length?alerts.map(p=>`<tr><td><strong>${p.id}</strong></td><td>${p.name}</td><td>${p.last}</td><td><strong style="color:var(--accent2)">${elapsed(p.last)}日</strong></td><td style="font-size:0.72rem">${p.tel||'-'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">30日以上未来院の患者はいません</td></tr>';
 }
 
