@@ -438,7 +438,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="utab" onclick="switchU('month')">🗓 月別</div>
       <div class="utab" onclick="switchU('year')">📊 年別</div>
       <div class="utab" onclick="switchU('pay')">💳 支払別</div>
-      <button class="btn bsm" onclick="forcePushU()" style="margin-left:8px;padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">📤 GAS保存</button>
+      <button class="btn bsm" onclick="syncUriageFromBookings()" style="margin-left:8px;padding:6px 12px;background:#22c55e;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">🔄 予約から集計</button>
+      <button class="btn bsm" onclick="forcePushU()" style="margin-left:4px;padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">📤 GAS保存</button>
     </div>
     <div id="u-day">
       <div class="card">
@@ -2813,6 +2814,51 @@ function saveU(){
   pushU().then(()=>{}).catch(e=>console.error('pushU error:',e));
   ['u-ho','u-ji','u-ko','u-bu','u-ot'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('u-memo').value='';uPaySel=[];document.querySelectorAll('#u-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+}
+// 予約データから売上を自動集計してuriageに反映
+function calcUriageFromBookings(){
+  const calc={};
+  Object.entries(bookings).forEach(([date,slots])=>{
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cont||bk.cancelled)return;
+      const d=date; // YYYY-MM-DD
+      if(!calc[d])calc[d]={hoken:0,jhi:0,jiko:0,bussan:0,other:0,pay:[],memo:''};
+      const amount=parseInt(bk.payAmount||0);
+      if(!amount)return;
+      const kubunList=bk.kubunList||[bk.kubun||''];
+      if(kubunList.includes('保険'))calc[d].hoken+=amount;
+      else if(kubunList.includes('自費'))calc[d].jhi+=amount;
+      else if(kubunList.includes('交通事故'))calc[d].jiko+=amount;
+      else if(kubunList.includes('新規'))calc[d].jhi+=amount;
+      // 物販
+      const bussanArr=bk.bussan||[];
+      bussanArr.forEach(b=>{calc[d].bussan+=b.price*(b.qty||1);});
+      // 支払方法
+      (bk.pay||[]).forEach(p=>{if(!calc[d].pay.includes(p))calc[d].pay.push(p);});
+    });
+  });
+  return calc;
+}
+async function syncUriageFromBookings(){
+  const calc=calcUriageFromBookings();
+  const dates=Object.keys(calc);
+  if(!dates.length){alert('予約データに支払金額が入っているデータがありません。');return;}
+  // 既存のuriageとマージ（予約データを優先）
+  let updated=0;
+  dates.forEach(d=>{
+    const c=calc[d];
+    if(c.hoken||c.jhi||c.jiko||c.bussan){
+      if(!uriage[d])uriage[d]={hoken:0,jhi:0,jiko:0,bussan:0,other:0,pay:[],memo:''};
+      if(c.hoken)uriage[d].hoken=c.hoken;
+      if(c.jhi)uriage[d].jhi=c.jhi;
+      if(c.jiko)uriage[d].jiko=c.jiko;
+      if(c.bussan)uriage[d].bussan+=c.bussan;
+      if(c.pay.length)uriage[d].pay=[...new Set([...uriage[d].pay,...c.pay])];
+      updated++;
+    }
+  });
+  save();renderDayU();
+  alert('✅ 予約データから'+updated+'日分の売上を自動集計しました。\n内容を確認してからGAS保存してください。');
 }
 async function forcePushU(){
   if(!Object.keys(uriage).length){
