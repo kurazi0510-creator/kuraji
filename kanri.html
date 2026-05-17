@@ -2825,17 +2825,23 @@ function calcUriageFromBookings(){
       if(!calc[d])calc[d]={hoken:0,jhi:0,jiko:0,bussan:0,other:0,pay:[],memo:''};
       const totalAmount=parseInt(bk.payAmount||0);
       if(!totalAmount)return;
-      // 物販合計を先に計算
+      // 物販合計を計算
       const bussanArr=bk.bussan||[];
       const bussanTotal=bussanArr.reduce((s,b)=>s+b.price*(b.qty||1),0);
-      calc[d].bussan+=bussanTotal;
-      // 施術料 = 合計 - 物販
-      const seturyoAmount=totalAmount-bussanTotal;
+      // 施術料 = 合計 - 物販（マイナスにならないよう）
+      const seturyoAmount=Math.max(0,totalAmount-bussanTotal);
+      // 物販: bussanTotalと実際の支払いの小さい方（物販が施術料を超えないように）
+      const actualBussan=Math.min(bussanTotal,totalAmount);
+      calc[d].bussan+=actualBussan;
       if(seturyoAmount>0){
         const kubunList=bk.kubunList||[bk.kubun||''];
         if(kubunList.includes('保険'))calc[d].hoken+=seturyoAmount;
         else if(kubunList.includes('交通事故'))calc[d].jiko+=seturyoAmount;
-        else calc[d].jhi+=seturyoAmount;// 自費・新規
+        else calc[d].jhi+=seturyoAmount;
+      }
+      // 物販のみの場合（施術料0）でtotalAmountがある場合はbussanに全額
+      if(seturyoAmount===0&&bussanTotal===0&&totalAmount>0){
+        calc[d].bussan+=totalAmount;
       }
       // 支払方法
       (bk.pay||[]).forEach(p=>{if(!calc[d].pay.includes(p))calc[d].pay.push(p);});
@@ -2852,12 +2858,8 @@ async function syncUriageFromBookings(){
   dates.forEach(d=>{
     const c=calc[d];
     if(c.hoken||c.jhi||c.jiko||c.bussan){
-      if(!uriage[d])uriage[d]={hoken:0,jhi:0,jiko:0,bussan:0,other:0,pay:[],memo:''};
-      if(c.hoken)uriage[d].hoken=c.hoken;
-      if(c.jhi)uriage[d].jhi=c.jhi;
-      if(c.jiko)uriage[d].jiko=c.jiko;
-      if(c.bussan)uriage[d].bussan+=c.bussan;
-      if(c.pay.length)uriage[d].pay=[...new Set([...uriage[d].pay,...c.pay])];
+      // 既存データを上書き（重複防止）
+      uriage[d]={hoken:c.hoken,jhi:c.jhi,jiko:c.jiko,bussan:c.bussan,other:uriage[d]?.other||0,pay:c.pay,memo:uriage[d]?.memo||''};
       updated++;
     }
   });
