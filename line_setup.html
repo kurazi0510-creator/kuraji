@@ -141,15 +141,30 @@ async function testSend(){
   if(!token||!userId){res.className='result result-ng';res.style.display='block';res.textContent='❌ トークンとユーザーIDを両方入力してください';return;}
   res.className='result';res.style.display='block';res.textContent='📤 送信中...';
   try{
-    const r=await fetch(GAS,{
-      method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'lineNotifyV2',token,userId,message:'\n【倉治整骨院 管理システム】\n✅ LINE通知のテスト送信です\n設定が正常に完了しました！\n'+new Date().toLocaleString('ja-JP')}),
-      redirect:'follow'
+    // GASを経由せず直接LINE Messaging APIに送信
+    const r=await fetch('https://api.line.me/v2/bot/message/push',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+token
+      },
+      body:JSON.stringify({
+        to:userId,
+        messages:[{type:'text',text:'【倉治整骨院 管理システム】\n✅ LINE通知のテスト送信成功！\n設定が正常に完了しました！\n'+new Date().toLocaleString('ja-JP')}]
+      })
     });
-    const d=JSON.parse(await r.text());
-    if(d.ok){res.className='result result-ok';res.textContent='✅ 送信成功！LINEを確認してください。届いていれば設定完了です。';}
-    else{res.className='result result-ng';res.textContent='❌ 送信失敗：'+( d.error||'不明なエラー')+'　→ トークンとユーザーIDを確認してください';}
-  }catch(e){res.className='result result-ng';res.textContent='❌ エラー：'+e.message;}
+    if(r.ok){
+      res.className='result result-ok';
+      res.textContent='✅ 送信成功！LINEを確認してください。届いていれば設定完了です。';
+    }else{
+      const err=await r.json();
+      res.className='result result-ng';
+      res.textContent='❌ 送信失敗（'+r.status+'）：'+(err.message||'トークンまたはユーザーIDを確認してください');
+    }
+  }catch(e){
+    res.className='result result-ng';
+    res.textContent='❌ エラー：'+e.message;
+  }
 }
 
 function saveSettings(){
