@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LINEメッセージ雛形 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;padding:12px;}
+.header{background:#1e293b;color:white;padding:10px 14px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+.header h1{font-size:0.85rem;font-weight:bold;}
+.back{background:#f97316;color:white;padding:6px 12px;border:none;border-radius:6px;font-size:0.75rem;font-weight:bold;cursor:pointer;}
+.section{background:white;border-radius:10px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.section-title{font-size:0.85rem;font-weight:bold;color:#1e293b;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #f0f4f8;}
+.tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.7rem;font-weight:bold;margin-right:4px;margin-bottom:4px;cursor:pointer;}
+.tag-blue{background:#dbeafe;color:#1e40af;}
+.tag-green{background:#dcfce7;color:#166534;}
+.tag-orange{background:#fef3c7;color:#92400e;}
+.tag-red{background:#fee2e2;color:#991b1b;}
+.template-card{background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid #f97316;}
+.template-title{font-size:0.75rem;font-weight:bold;color:#374151;margin-bottom:6px;}
+.template-body{font-size:0.8rem;color:#374151;line-height:1.8;white-space:pre-wrap;background:white;border-radius:6px;padding:10px;border:1px solid #e2e8f0;}
+.btn{padding:8px 14px;border:none;border-radius:7px;font-size:0.78rem;font-weight:bold;cursor:pointer;margin-top:6px;}
+.btn-copy{background:#22c55e;color:white;}
+.btn-edit{background:#e2e8f0;color:#374151;}
+.edit-area{width:100%;min-height:120px;border:1.5px solid #e2e8f0;border-radius:6px;padding:10px;font-size:0.8rem;line-height:1.8;resize:vertical;margin-top:6px;display:none;}
+.copied{background:#dcfce7;color:#166534;padding:6px 10px;border-radius:6px;font-size:0.74rem;margin-top:6px;display:none;}
+.name-input{border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:0.82rem;width:100%;margin-bottom:8px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>💬 LINEメッセージ雛形集</h1>
+  <button class="back" onclick="location.href='kanri.html'">← 戻る</button>
+</div>
+
+<!-- 患者名入力 -->
+<div class="section">
+  <div class="section-title">👤 患者名（入力すると自動で差し込み）</div>
+  <input type="text" class="name-input" id="patient-name" placeholder="例：山田 太郎" oninput="updateAllTemplates()">
+</div>
+
+<!-- カテゴリタブ -->
+<div class="section" style="padding:10px">
+  <span class="tag tag-blue" onclick="showCat('shinki')">🆕 初診後フォロー</span>
+  <span class="tag tag-green" onclick="showCat('reminder')">🔔 来院促進</span>
+  <span class="tag tag-orange" onclick="showCat('health')">💪 健康アドバイス</span>
+  <span class="tag tag-red" onclick="showCat('cancel')">❌ キャンセル後</span>
+  <span class="tag tag-blue" onclick="showCat('bussan')">🛍 物販提案</span>
+</div>
+
+<!-- 初診後フォロー -->
+<div id="cat-shinki" class="cat-section">
+  <div class="section">
+    <div class="section-title">🆕 初診後フォロー（施術当日〜翌日）</div>
+    
+    <div class="template-card">
+      <div class="template-title">① 施術当日夜（調子確認）</div>
+      <div class="template-body" id="t01"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t01')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t01')">✏️ 編集</button>
+      <textarea class="edit-area" id="t01-edit" onblur="saveEdit('t01')"></textarea>
+      <div class="copied" id="t01-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">② 翌日フォロー（好転反応の説明）</div>
+      <div class="template-body" id="t02"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t02')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t02')">✏️ 編集</button>
+      <textarea class="edit-area" id="t02-edit" onblur="saveEdit('t02')"></textarea>
+      <div class="copied" id="t02-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">③ 3日後フォロー（次回予約の促進）</div>
+      <div class="template-body" id="t03"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t03')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t03')">✏️ 編集</button>
+      <textarea class="edit-area" id="t03-edit" onblur="saveEdit('t03')"></textarea>
+      <div class="copied" id="t03-copied">✅ コピーしました！</div>
+    </div>
+  </div>
+</div>
+
+<!-- 来院促進 -->
+<div id="cat-reminder" class="cat-section" style="display:none">
+  <div class="section">
+    <div class="section-title">🔔 来院促進メッセージ</div>
+
+    <div class="template-card">
+      <div class="template-title">④ 2週間ぶり（来院促進）</div>
+      <div class="template-body" id="t04"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t04')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t04')">✏️ 編集</button>
+      <textarea class="edit-area" id="t04-edit" onblur="saveEdit('t04')"></textarea>
+      <div class="copied" id="t04-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">⑤ 20日未来院（初診料前日アラート）</div>
+      <div class="template-body" id="t05"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t05')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t05')">✏️ 編集</button>
+      <textarea class="edit-area" id="t05-edit" onblur="saveEdit('t05')"></textarea>
+      <div class="copied" id="t05-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">⑥ 次回予約リマインド（前日）</div>
+      <div class="template-body" id="t06"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t06')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t06')">✏️ 編集</button>
+      <textarea class="edit-area" id="t06-edit" onblur="saveEdit('t06')"></textarea>
+      <div class="copied" id="t06-copied">✅ コピーしました！</div>
+    </div>
+  </div>
+</div>
+
+<!-- 健康アドバイス -->
+<div id="cat-health" class="cat-section" style="display:none">
+  <div class="section">
+    <div class="section-title">💪 家でできる体操・生活アドバイス</div>
+
+    <div class="template-card">
+      <div class="template-title">⑦ 腰痛向け生活アドバイス</div>
+      <div class="template-body" id="t07"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t07')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t07')">✏️ 編集</button>
+      <textarea class="edit-area" id="t07-edit" onblur="saveEdit('t07')"></textarea>
+      <div class="copied" id="t07-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">⑧ 肩こり向け生活アドバイス</div>
+      <div class="template-body" id="t08"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t08')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t08')">✏️ 編集</button>
+      <textarea class="edit-area" id="t08-edit" onblur="saveEdit('t08')"></textarea>
+      <div class="copied" id="t08-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">⑨ 食事・生活習慣アドバイス（全般）</div>
+      <div class="template-body" id="t09"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t09')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t09')">✏️ 編集</button>
+      <textarea class="edit-area" id="t09-edit" onblur="saveEdit('t09')"></textarea>
+      <div class="copied" id="t09-copied">✅ コピーしました！</div>
+    </div>
+  </div>
+</div>
+
+<!-- キャンセル後 -->
+<div id="cat-cancel" class="cat-section" style="display:none">
+  <div class="section">
+    <div class="section-title">❌ キャンセル後フォロー</div>
+
+    <div class="template-card">
+      <div class="template-title">⑩ キャンセル受付（体調不良）</div>
+      <div class="template-body" id="t10"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t10')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t10')">✏️ 編集</button>
+      <textarea class="edit-area" id="t10-edit" onblur="saveEdit('t10')"></textarea>
+      <div class="copied" id="t10-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">⑪ キャンセル後再予約の促進</div>
+      <div class="template-body" id="t11"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t11')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t11')">✏️ 編集</button>
+      <textarea class="edit-area" id="t11-edit" onblur="saveEdit('t11')"></textarea>
+      <div class="copied" id="t11-copied">✅ コピーしました！</div>
+    </div>
+  </div>
+</div>
+
+<!-- 物販提案 -->
+<div id="cat-bussan" class="cat-section" style="display:none">
+  <div class="section">
+    <div class="section-title">🛍 物販提案メッセージ</div>
+
+    <div class="template-card">
+      <div class="template-title">⑫ シリカ水（シエラ）提案</div>
+      <div class="template-body" id="t12"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t12')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t12')">✏️ 編集</button>
+      <textarea class="edit-area" id="t12-edit" onblur="saveEdit('t12')"></textarea>
+      <div class="copied" id="t12-copied">✅ コピーしました！</div>
+    </div>
+
+    <div class="template-card">
+      <div class="template-title">⑬ 整体10回券提案</div>
+      <div class="template-body" id="t13"></div>
+      <button class="btn btn-copy" onclick="copyTemplate('t13')">📋 コピー</button>
+      <button class="btn btn-edit" onclick="toggleEdit('t13')">✏️ 編集</button>
+      <textarea class="edit-area" id="t13-edit" onblur="saveEdit('t13')"></textarea>
+      <div class="copied" id="t13-copied">✅ コピーしました！</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TEMPLATES = {
+  t01: `{name}さん、本日はご来院ありがとうございました😊
+
+施術後のお体の調子はいかがでしょうか？
+
+もし気になることや、違和感などございましたら遠慮なくご連絡ください。
+
+次回のご予約もお待ちしております。
+倉治整骨院 院長`,
+
+  t02: `{name}さん、おはようございます☀️
+
+昨日はご来院いただきありがとうございました。
+
+施術後に一時的に体がだるくなったり、少し痛みが増したように感じる方がいらっしゃいます。これは「好転反応」といって、体が良くなっていくサインですので、ご心配なさらないでください。
+
+水分をしっかり摂って、ゆっくり休んでいただけると回復が早まります💧
+
+何かご不明な点がございましたらいつでもご連絡ください。
+倉治整骨院 院長`,
+
+  t03: `{name}さん、こんにちは！
+
+先日のお体の調子はいかがですか？😊
+
+症状を根本から改善するには、間隔を空けすぎずに継続して施術を受けていただくのが大切です。
+
+良かったら近いうちにまたお越しください。
+ご予約はLINEでもお気軽にどうぞ！
+
+倉治整骨院 院長`,
+
+  t04: `{name}さん、こんにちは☺️
+
+最近お体の調子はいかがですか？
+
+しばらくご来院がないので気になってご連絡しました。
+以前の症状はいかがでしょうか？
+
+施術を継続することで、再発予防にもなりますので、
+良かったらまたいつでもご予約ください😊
+
+ご予約はこちらのLINEから↓
+倉治整骨院 院長`,
+
+  t05: `{name}さん、こんにちは。
+
+倉治整骨院からお知らせです。
+
+前回のご来院から間もなく21日が経ちます。
+21日を超えますと次回より初診料が発生してしまいます💦
+
+ぜひ明日か明後日にでもお越しいただけますと、
+これまでの施術をそのまま継続できます！
+
+ご予約はLINEでどうぞ。お待ちしております😊
+倉治整骨院 院長`,
+
+  t06: `{name}さん、こんにちは！
+
+明日のご予約のリマインドです😊
+
+━━━━━━━━━━
+📅 明日 ○月○日（○）
+🕐 ○○:○○〜
+📍 倉治整骨院
+━━━━━━━━━━
+
+ご来院お待ちしております！
+キャンセル・変更は前日までにご連絡ください。
+
+倉治整骨院 院長`,
+
+  t07: `{name}さん、こんにちは！
+
+腰痛改善のためにご自宅でできることをご紹介します😊
+
+【腰痛改善のポイント】
+✅ 長時間同じ姿勢を避ける（1時間に1回は動く）
+✅ 座るときは深く腰掛け、背もたれを使う
+✅ 寝るときは横向きで膝を軽く曲げる
+✅ お風呂はシャワーより湯船に浸かる（血流促進）
+
+【避けていただきたいこと】
+❌ 腰を急に曲げたり、ひねったりする動作
+❌ 長時間の前かがみ姿勢
+❌ 冷たいものの摂り過ぎ（血行が悪くなります）
+❌ お酒・タバコ・甘いものの摂り過ぎ（炎症を悪化させます）
+
+何かご不明な点はいつでもご相談ください🙏
+倉治整骨院 院長`,
+
+  t08: `{name}さん、こんにちは！
+
+肩こり改善のためにご自宅でできることをご紹介します😊
+
+【かんたん肩ほぐし体操】
+① 肩を耳に向かってゆっくり上げて、スッと力を抜く（10回）
+② 両腕を大きく後ろにゆっくり回す（10回）
+③ 首をゆっくり左右に倒してキープ（各20秒）
+
+【生活習慣のポイント】
+✅ スマホは目の高さで見る
+✅ デスクワークは1時間ごとに立ち上がる
+✅ 枕の高さを自分の肩幅に合わせる
+✅ 水分をこまめに摂る
+
+❌ お酒・タバコは血行を悪くして肩こりを悪化させます
+❌ 甘いものの摂り過ぎは炎症を招きます
+
+倉治整骨院 院長`,
+
+  t09: `{name}さん、こんにちは！
+
+体の回復を早めるための食事・生活習慣のコツをお伝えします😊
+
+【回復を助ける食べ物】
+🥦 野菜・魚・発酵食品（炎症を抑える）
+💧 水分は1日1.5〜2L（老廃物の排出）
+🌙 睡眠7〜8時間（修復ホルモンが分泌されます）
+
+【控えていただきたいもの】
+🍺 お酒（炎症を悪化させます）
+🚬 タバコ（血流を悪くして回復が遅れます）
+🍰 甘いもの・揚げ物（体の炎症につながります）
+
+小さな生活習慣の積み重ねが、施術効果を2倍にします！
+一緒に良くしていきましょう😊
+
+倉治整骨院 院長`,
+
+  t10: `{name}さん、ご連絡ありがとうございます。
+
+体調不良とのこと、無理をなさらないでください🙏
+
+キャンセルの件、承りました。
+お体が回復されましたら、またいつでもご予約ください。
+
+お大事になさってください。
+倉治整骨院 院長`,
+
+  t11: `{name}さん、こんにちは。
+
+先日はキャンセルのご連絡をいただきありがとうございました。
+
+その後お体の調子はいかがですか？
+
+症状が長引くと回復に時間がかかりますので、
+良くなってきましたらぜひまたご来院ください😊
+
+ご予約はこちらのLINEからいつでもどうぞ！
+倉治整骨院 院長`,
+
+  t12: `{name}さん、こんにちは！
+
+当院でご好評いただいている「シリカ水（シエラ）」のご紹介です😊
+
+💧 シリカ水は骨・軟骨・コラーゲンの材料となるミネラルが豊富で、
+施術と合わせて飲み続けることで関節や筋肉の回復をサポートします。
+
+540円/本でご購入いただけます。
+次回ご来院の際にお気軽にお声がけください！
+
+倉治整骨院 院長`,
+
+  t13: `{name}さん、こんにちは！
+
+継続的にご来院いただいているご褒美として
+「整体10回券（55,000円）」をご提案させてください😊
+
+通常1回あたりの施術を継続的に受けていただくことで
+より高い効果が期待できます。
+
+10回分をまとめてご購入いただくことで、
+計画的に施術を進めることができます。
+
+詳しくは次回ご来院の際にお声がけください！
+倉治整骨院 院長`
+};
+
+// localStorage から保存済み編集を読み込む
+const saved = JSON.parse(localStorage.getItem('kj_line_templates') || '{}');
+Object.keys(saved).forEach(id => { TEMPLATES[id] = saved[id]; });
+
+function getName() {
+  return document.getElementById('patient-name').value.trim() || '○○';
+}
+
+function applyName(text) {
+  return text.replace(/\{name\}/g, getName() + 'さん').replace(/\{name\}さん/g, getName() + 'さん');
+}
+
+function updateAllTemplates() {
+  Object.keys(TEMPLATES).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = TEMPLATES[id].replace(/\{name\}/g, getName());
+  });
+}
+
+function copyTemplate(id) {
+  const text = TEMPLATES[id].replace(/\{name\}/g, getName());
+  navigator.clipboard.writeText(text).then(() => {
+    const c = document.getElementById(id + '-copied');
+    if (c) { c.style.display = 'block'; setTimeout(() => c.style.display = 'none', 2000); }
+  });
+}
+
+function toggleEdit(id) {
+  const area = document.getElementById(id + '-edit');
+  if (!area) return;
+  if (area.style.display === 'none' || !area.style.display) {
+    area.value = TEMPLATES[id];
+    area.style.display = 'block';
+    area.focus();
+  } else {
+    area.style.display = 'none';
+  }
+}
+
+function saveEdit(id) {
+  const area = document.getElementById(id + '-edit');
+  if (!area) return;
+  TEMPLATES[id] = area.value;
+  const saved = JSON.parse(localStorage.getItem('kj_line_templates') || '{}');
+  saved[id] = area.value;
+  localStorage.setItem('kj_line_templates', JSON.stringify(saved));
+  updateAllTemplates();
+  area.style.display = 'none';
+}
+
+function showCat(cat) {
+  document.querySelectorAll('.cat-section').forEach(el => el.style.display = 'none');
+  const target = document.getElementById('cat-' + cat);
+  if (target) target.style.display = 'block';
+}
+
+// 初期表示
+updateAllTemplates();
+</script>
+</body>
+</html>

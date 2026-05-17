@@ -201,6 +201,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
   <div class="nav-t" onclick="goPage('master')">⚙️ マスター</div>
   <div class="nav-t" onclick="goPage('lottery')">🎉 抽選</div>
   <div class="nav-t" onclick="location.href='symptom.html'">🩺 症状図</div>
+  <div class="nav-t" onclick="location.href='line_template.html'">💬 LINE雛形</div>
 </div>
 
 <!-- 予約管理 -->
@@ -1174,6 +1175,7 @@ const DEFAULT_BUSSAN_MASTER=[
   {id:'bs026',name:'THE MATTRESS シングル(100cm)',price:135300,unit:'枚',stockId:'st026'},
   {id:'bs027',name:'THE MATTRESS セミダブル(120cm)',price:157300,unit:'枚',stockId:'st027'},
   {id:'bs028',name:'THE MATTRESS ダブル(140cm)',price:177100,unit:'枚',stockId:'st028'},
+  {id:'bs029',name:'整体10回券',price:55000,unit:'枚',stockId:''},
 ];
 const DEFAULT_SHOCHI_MASTER=[
   {id:'sh001',name:'クラウドテープS',price:300,unit:'枚',stockId:'st001'},
@@ -1261,7 +1263,10 @@ function load(){
     uriage=JSON.parse(localStorage.getItem('kj_u')||'{}');
     bussanLog=JSON.parse(localStorage.getItem('kj_bl')||'[]');
     const bm=JSON.parse(localStorage.getItem('kj_bm')||'null');
-    bussanMaster=bm||DEFAULT_BUSSAN_MASTER;
+    // 整体10回券(bs029)がなければリセット
+    const hasNewBussan=bm&&bm.some(b=>b.id==='bs029');
+    bussanMaster=hasNewBussan?bm:DEFAULT_BUSSAN_MASTER;
+    if(!hasNewBussan&&bm)localStorage.setItem('kj_bm',JSON.stringify(DEFAULT_BUSSAN_MASTER));
     const sm=JSON.parse(localStorage.getItem('kj_sm')||'null');
     // バージョンチェック：新メニュー(sh008〜sh011)がなければリセット
     const hasNewMenus=sm&&sm.some(s=>['sh008','sh009','sh010','sh011'].includes(s.id));
@@ -3207,7 +3212,7 @@ function renderLtvMain(){
     `<div class="ltv-box"><div class="n">${totalP}</div><div class="l">総患者数</div></div>`+
     `<div class="ltv-box"><div class="n" style="color:var(--gold)">${avgLTV.toLocaleString()}円</div><div class="l">推定平均LTV</div></div>`+
     `<div class="ltv-box"><div class="n">${avgVisit}回</div><div class="l">平均来院回数</div></div>`+
-    `<div class="ltv-box"><div class="n" style="color:var(--accent)">${repeatRate}%</div><div class="l">新患リピート率<br><span style="font-size:0.6rem">（2回以上来院）</span></div></div>`+
+    `<div class="ltv-box" style="border:2px solid #f97316;background:#fff7ed"><div class="n" style="color:#f97316;font-size:1.6rem">${repeatRate}%</div><div class="l" style="color:#c2410c;font-weight:bold">新患リピート率<br><span style="font-size:0.6rem">目標65%以上</span></div></div>`+
     `<div class="ltv-box"><div class="n" style="color:var(--gold)">${retention}%</div><div class="l">継続率<br><span style="font-size:0.6rem">（3回以上）</span></div></div>`+
     `<div class="ltv-box"><div class="n">${lineRate}%</div><div class="l">LINE登録率</div></div>`+
     `<div class="ltv-box"><div class="n">${bsUnitPrice?bsUnitPrice.toLocaleString()+'円':'-'}</div><div class="l">物販単価<br><span style="font-size:0.6rem">（1点あたり）</span></div></div>`+
