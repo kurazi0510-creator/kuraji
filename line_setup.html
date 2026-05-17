@@ -115,6 +115,7 @@ h1{color:#1e293b;font-size:1rem;text-align:center;margin-bottom:4px;}
     <label style="font-size:0.76rem;font-weight:bold;color:#374151;display:block;margin-bottom:4px;margin-top:8px">あなたのユーザーID（Uで始まる）</label>
     <input class="inp" type="text" id="userid-input" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
     <button class="btn btn-green" onclick="testSend()">🧪 テスト送信してLINEに届くか確認</button>
+    <button class="btn" id="auth-btn" onclick="openAuthPage()" style="display:none;background:#7c3aed;color:white;margin-top:6px">🔑 権限承認ページを開く（エラー時）</button>
     <div class="result" id="test-result"></div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:10px">💾 管理システムに保存して完了</button>
   </div>
@@ -139,27 +140,30 @@ async function testSend(){
   const userId=document.getElementById('userid-input').value.trim();
   const res=document.getElementById('test-result');
   if(!token||!userId){res.className='result result-ng';res.style.display='block';res.textContent='❌ トークンとユーザーIDを両方入力してください';return;}
-  res.className='result';res.style.display='block';res.textContent='📤 送信中...';
+  res.className='result';res.style.display='block';res.textContent='📤 GAS経由で送信中...';
+  const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
   try{
-    // GASを経由せず直接LINE Messaging APIに送信
-    const r=await fetch('https://api.line.me/v2/bot/message/push',{
+    const r=await fetch(GAS,{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':'Bearer '+token
-      },
+      headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({
-        to:userId,
-        messages:[{type:'text',text:'【倉治整骨院 管理システム】\n✅ LINE通知のテスト送信成功！\n設定が正常に完了しました！\n'+new Date().toLocaleString('ja-JP')}]
-      })
+        action:'lineNotifyV2',
+        token:token,
+        userId:userId,
+        message:'【倉治整骨院 管理システム】\n✅ LINE通知テスト成功！\n'+new Date().toLocaleString('ja-JP')
+      }),
+      redirect:'follow'
     });
-    if(r.ok){
+    const txt=await r.text();
+    let d;
+    try{d=JSON.parse(txt);}catch(e){d={ok:false,error:txt};}
+    if(d.ok){
       res.className='result result-ok';
-      res.textContent='✅ 送信成功！LINEを確認してください。届いていれば設定完了です。';
+      res.textContent='✅ 送信成功！LINEを確認してください。';
     }else{
-      const err=await r.json();
       res.className='result result-ng';
-      res.textContent='❌ 送信失敗（'+r.status+'）：'+(err.message||'トークンまたはユーザーIDを確認してください');
+      res.textContent='❌ 失敗：'+(d.error||JSON.stringify(d))+'　→ Apps Scriptで権限承認が必要です。下のボタンを押してください。';
+      document.getElementById('auth-btn').style.display='block';
     }
   }catch(e){
     res.className='result result-ng';
@@ -167,6 +171,11 @@ async function testSend(){
   }
 }
 
+function openAuthPage(){
+  // GASの権限承認ページを直接開く
+  window.open('https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec?action=auth','_blank');
+  alert('新しいタブでGASページが開きます。\n「このアプリを信頼する」や「許可」が表示されたら承認してください。\n承認後、もう一度テスト送信してください。');
+}
 function saveSettings(){
   const token=document.getElementById('token-input').value.trim();
   const userId=document.getElementById('userid-input').value.trim();

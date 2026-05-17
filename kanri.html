@@ -1741,13 +1741,14 @@ async function sendLineNotify(msg){
   const userId=localStorage.getItem('kj_line_userid')||'';
   if(!token||!userId)return false;
   try{
-    // GASを経由せず直接LINE Messaging APIに送信
-    const res=await fetch('https://api.line.me/v2/bot/message/push',{
+    const res=await fetch(GAS,{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({to:userId,messages:[{type:'text',text:msg}]})
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'lineNotifyV2',token,userId,message:msg}),
+      redirect:'follow'
     });
-    return res.ok;
+    const d=JSON.parse(await res.text());
+    return d.ok;
   }catch(e){console.error('LINE error:',e);return false;}
 }
 async function testLineNotify2(){
