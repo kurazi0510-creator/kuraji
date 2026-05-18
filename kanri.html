@@ -1232,6 +1232,7 @@ const DEFAULT_STOCK=[
 
 let patients=[], bookings={}, uriage={}, bussanLog=[], lp=[];
 let bussanMaster=[], shochiMaster=[], stockData=[];
+let mBussanDisc={}; // 物販個別割引 {id: 割引額}
 let editDate=null, editSlot=null;
 let mKubunSel=[], mBuiSel=[], mShochiSel={}, mBussanQty={}, mPaySel=[];
 let bsPaySel=[], uPaySel=[];
@@ -2020,6 +2021,7 @@ function switchMTab(tab){
 
 function renderMShochiBtns(){
   const area=document.getElementById('m-shochi-btns');area.innerHTML='';
+  if(!window.mShochiDisc)window.mShochiDisc={};
   shochiMaster.forEach(sh=>{
     const needQty=sh.unit==='枚'||sh.unit==='本';
     const qty=mShochiSel[sh.id]||0;
@@ -2078,21 +2080,51 @@ function renderMBussanItems(){
   const area=document.getElementById('m-bussan-items');area.innerHTML='';
   bussanMaster.forEach(bs=>{
     const qty=mBussanQty[bs.id]||0;
+    const disc=mBussanDisc[bs.id]||0;
+    const netPrice=Math.max(0,bs.price-disc);
     const div=document.createElement('div');div.className='bussan-item';
-    div.innerHTML=`<span style="flex:1;font-size:0.8rem;font-weight:600">${bs.name}</span><span style="font-size:0.7rem;color:var(--muted);margin-right:6px">${yen(bs.price)}/${bs.unit}</span>`;
+    // 名前・定価・数量入力
+    div.innerHTML=`<span style="flex:1;font-size:0.8rem;font-weight:600">${bs.name}</span>
+      <span style="font-size:0.7rem;color:var(--muted);margin-right:4px">${yen(bs.price)}/${bs.unit}</span>`;
     const inp=document.createElement('input');inp.type='number';inp.min='0';inp.value=qty||0;inp.className='bussan-qty';
-    inp.oninput=function(){mBussanQty[bs.id]=parseInt(this.value)||0;calcMBussanTotal();};
-    div.appendChild(inp);area.appendChild(div);
+    inp.oninput=function(){mBussanQty[bs.id]=parseInt(this.value)||0;renderMBussanItems();calcMBussanTotal();};
+    div.appendChild(inp);
+    // 割引入力欄（数量>0の時だけ表示）
+    if(qty>0){
+      const discWrap=document.createElement('div');
+      discWrap.style.cssText='display:flex;align-items:center;gap:4px;margin-top:4px;width:100%';
+      discWrap.innerHTML=`<span style="font-size:0.7rem;color:#92400e;white-space:nowrap">割引(円):</span>
+        <input type="number" class="inp" style="width:90px;padding:3px 8px;font-size:0.78rem" 
+          placeholder="0" value="${disc}" min="0" 
+          oninput="mBussanDisc['${bs.id}']=parseInt(this.value)||0;calcMBussanTotal()">
+        <span style="font-size:0.72rem;color:#16a34a;white-space:nowrap">→ 実質${yen(netPrice)}</span>`;
+      div.appendChild(discWrap);
+      if(disc>0){
+        const tag=document.createElement('div');
+        tag.style.cssText='font-size:0.68rem;color:#dc2626;margin-top:2px';
+        tag.textContent='割引適用: -'+yen(disc)+'（小計'+yen(netPrice*qty)+'円）';
+        div.appendChild(tag);
+      }
+    }
+    area.appendChild(div);
   });
 }
 function calcMBussanTotal(){
-  let total=0;bussanMaster.forEach(bs=>{const q=mBussanQty[bs.id]||0;total+=bs.price*q;});
+  let total=0;
+  bussanMaster.forEach(bs=>{
+    const q=mBussanQty[bs.id]||0;
+    const disc=mBussanDisc[bs.id]||0;
+    total+=Math.max(0,bs.price-disc)*q;
+  });
   document.getElementById('m-bussan-total').textContent=yen(total);updateMTotal();
 }
 function updateMTotal(){
   let sh=0,bs=0;
   shochiMaster.forEach(s=>{sh+=s.price*(mShochiSel[s.id]||0);});
-  bussanMaster.forEach(b=>{bs+=b.price*(mBussanQty[b.id]||0);});
+  bussanMaster.forEach(b=>{
+    const disc=mBussanDisc[b.id]||0;
+    bs+=Math.max(0,b.price-disc)*(mBussanQty[b.id]||0);
+  });
   const el=document.getElementById('m-total-sum');if(el)el.textContent=yen(sh+bs);
 }
 function toggleMPay(btn){btn.classList.toggle('on');const v=btn.getAttribute('data-v');if(btn.classList.contains('on')){if(!mPaySel.includes(v))mPaySel.push(v);}else{mPaySel=mPaySel.filter(x=>x!==v);}}
@@ -2117,7 +2149,7 @@ function openModal(date,slot){
   document.getElementById('mtitle').textContent='予約入力 '+slot;
   ['m-id','m-nm','m-sym','m-opt','m-menu','m-menu-price','m-opt-price','m-psearch','m-next-memo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['m-menu-sel','m-opt-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  mSlotCount=1;setSlotCount(1);updateMenuTotal();
+  mSlotCount=1;setSlotCount(1);updateMenuTotal();mBussanDisc={};
   ['m-shochi-discount','m-bussan-discount'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['m-shochi-net','m-bussan-net'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
   // 交通事故トグルリセット
@@ -2315,7 +2347,7 @@ async function saveBk(){
   }
   if(!name){alert('患者名を入力してください');return;}
   const shochiArr=shochiMaster.filter(s=>mShochiSel[s.id]>0).map(s=>({id:s.id,name:s.name,price:s.price,qty:mShochiSel[s.id]||1}));
-  const bussanArr=bussanMaster.filter(b=>mBussanQty[b.id]>0).map(b=>({id:b.id,name:b.name,price:b.price,qty:mBussanQty[b.id]}));
+  const bussanArr=bussanMaster.filter(b=>mBussanQty[b.id]>0).map(b=>({id:b.id,name:b.name,price:b.price,actualPrice:Math.max(0,b.price-(mBussanDisc[b.id]||0)),discount:mBussanDisc[b.id]||0,qty:mBussanQty[b.id]}));
   if(!bookings[date])bookings[date]={};
   const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
   const p=patients.find(p=>p.id===cardId);
