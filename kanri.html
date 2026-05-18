@@ -1027,7 +1027,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <button class="pay-btn" data-v="au Pay" onclick="toggleMPay(this)">🟡 au Pay</button>
         <button class="pay-btn" data-v="その他" onclick="toggleMPay(this)">🔘 その他</button>
       </div>
-      <div class="fg" style="margin-top:8px"><label>支払金額（円）</label><input class="inp" id="m-pay-amount" type="number" placeholder="0" inputmode="numeric" tabindex="0" style="font-size:1rem;padding:10px"></div>
+      <div class="fg" style="margin-top:8px"><label>支払金額（円）</label><input class="inp" id="m-pay-amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" tabindex="0" style="font-size:1.1rem;padding:10px;border:2px solid #3b82f6" onclick="this.select()" autocomplete="off"></div>
       <div style="margin-top:8px;padding:8px;background:#f8f6f1;border-radius:8px;font-size:0.78rem;color:var(--muted)">
         処置+物販合計：<strong id="m-total-sum" style="color:var(--primary)">0円</strong>
       </div>
@@ -1944,7 +1944,24 @@ function renderSched(){
         <td>${kubunHtml}</td>
         <td><strong style="font-size:0.8rem">${bk.name}</strong>${bk.menu?'<br><span style="font-size:0.65rem;color:var(--accent)">'+bk.menu+'</span>':''}</td>
         <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td>
-        <td><span class="rt ${rc}">${bk.route||''}</span></td>
+        <td><span class="rt ${rc}">${bk.route||''}</span>${(()=>{
+  if(bk.route!=='次回予約')return '';
+  const allD=Object.keys(bookings).sort();
+  for(const nd of allD){
+    if(nd<date)continue;
+    for(const ns of Object.keys(bookings[nd]).sort()){
+      const nb=bookings[nd][ns];
+      if(!nb||nb.cont||nb.cancelled)continue;
+      if(nd===date&&ns<=s)continue;
+      if(nb.name===bk.name||(bk.cardId&&nb.cardId===bk.cardId)){
+        const w=['日','月','火','水','木','金','土'];
+        const dt=new Date(nd);
+        return '<br><span style="color:#1e40af;font-size:0.68rem;font-weight:bold">📅'+nd.slice(5).replace('-','/')+'('+w[dt.getDay()]+') '+ns+'</span>';
+      }
+    }
+  }
+  return '<br><span style="color:#dc2626;font-size:0.65rem">未入力</span>';
+})()}</td>
         <td style="font-size:0.72rem">${bk.visitCount||''}</td>
         <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=20?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:2px 5px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':"color:var(--accent2)"}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=20?' ⚠️初診料':''}</td>
         <td>${buiHtml?buiHtml+'<br>':''} ${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td>
@@ -2222,6 +2239,8 @@ function editBk(date,slot){
   document.getElementById('m-nm').value=bk.name||'';
   document.getElementById('m-rt').value=bk.route||'LINE';
   document.getElementById('m-sym').value=bk.symptom||'';
+  const nne=document.getElementById('m-next-note')||document.getElementById('m-next-memo');
+  if(nne)nne.value=bk.nextNote||'';
   const nmEl=document.getElementById('m-next-memo');if(nmEl)nmEl.value=bk.nextMemo||'';
   document.getElementById('m-opt').value=bk.option||'';
   document.getElementById('m-menu').value=bk.menu||'';
@@ -2358,6 +2377,7 @@ async function saveBk(){
   const cardId=document.getElementById('m-id').value.trim();
   const route=document.getElementById('m-rt').value;
   const symptom=document.getElementById('m-sym').value.trim();
+  const nextNote=document.getElementById('m-next-note')?.value.trim()||document.getElementById('m-next-memo')?.value.trim()||'';
   const nextMemo=document.getElementById('m-next-memo')?.value.trim()||'';
   const option=document.getElementById('m-opt').value.trim();
   const menu=document.getElementById('m-menu').value.trim();
@@ -2394,7 +2414,7 @@ async function saveBk(){
   const wasCancel=prevBk&&prevBk.cancelled;
   const menuPrice=parseInt(document.getElementById('m-menu-price')?.value)||0;
   const optPrice=parseInt(document.getElementById('m-opt-price')?.value)||0;
-  bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,elapsed:el,visitCount:vc};
+  bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,nextNote:nextNote||nextMemo,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,elapsed:el,visitCount:vc};
   // 継続枠（安全版：空枠か自分のcont枠のみ設定。他の患者の予約は絶対に上書きしない）
   for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){const existing=bookings[date][sl[ni]];if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
     if(!existing||(existing.cont&&existing.cardId===cardId)){bookings[date][sl[ni]]={cont:true,name,cardId};}
@@ -2494,7 +2514,8 @@ function onRouteChange(){
     const dt=new Date(found.date);
     const wd=w[dt.getDay()];
     info.style.display='block';
-    info.innerHTML='📅 次回予約済み：'+found.date.replace(/-/g,'/')+'（'+wd+'） '+found.slot+'〜';
+    info.style.background='#dcfce7';info.style.border='2px solid #22c55e';info.style.color='#166534';
+    info.innerHTML='✅ 次回予約済み：<strong>'+found.date.replace(/-/g,'/')+'（'+wd+'） '+found.slot+'〜</strong>'+(found.bk.sym?'<br>症状：'+found.bk.sym:'');
     if(form)form.style.display='none';// 既に予約あればフォーム非表示
   }else{
     info.style.display='block';
