@@ -97,34 +97,48 @@ function dailyLineAlert(){
   var props=PropertiesService.getScriptProperties();
   var token=props.getProperty('LINE_TOKEN');
   var userId=props.getProperty('LINE_USER_ID');
-  if(!token||!userId){Logger.log('トークン未設定');return;}
+  if(!token||!userId){Logger.log('トークン未設定 - saveLineSettings()を実行してください');return;}
 
   var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var sheet=ss.getSheetByName('予約表');
-  if(!sheet){Logger.log('予約表シートなし');return;}
-
-  var data=sheet.getDataRange().getValues();
-  if(data.length<2)return;
-
   var today=new Date();
+  today.setHours(0,0,0,0);
   var alerts=[];
 
-  // 患者データから最終来院日を取得して20日チェック
-  var cSheet=ss.getSheetByName('患者');
-  if(cSheet){
-    var cData=cSheet.getDataRange().getValues();
-    var cHdr=cData[0];
-    var nameIdx=cHdr.indexOf('患者名');
-    var lastIdx=cHdr.indexOf('前回通院日');
-    var idIdx=cHdr.indexOf('診察券No');
-    if(nameIdx>-1&&lastIdx>-1){
-      cData.slice(1).forEach(function(row){
-        var lastStr=String(row[lastIdx]||'').trim();
-        if(!lastStr||lastStr.startsWith('1899'))return;
-        var lastDate=new Date(lastStr);
-        var diff=Math.floor((today-lastDate)/(1000*60*60*24));
+  // 予約表から各患者の最終来院日を計算
+  var bSheet=ss.getSheetByName('予約表');
+  if(bSheet){
+    var bData=bSheet.getDataRange().getValues();
+    var bHdr=bData[0];
+    var dateIdx=bHdr.indexOf('日付');
+    var nameIdx=bHdr.indexOf('患者名');
+    var idIdx=bHdr.indexOf('診察券No');
+    var kubunIdx=bHdr.indexOf('区分');
+    if(dateIdx>-1&&nameIdx>-1){
+      // 患者ごとの最終来院日を集計
+      var lastVisit={};
+      bData.slice(1).forEach(function(row){
+        var kubun=String(row[kubunIdx]||'');
+        if(kubun.indexOf('継続')>-1||kubun.indexOf('キャンセル')>-1)return;
+        var dateVal=row[dateIdx];
+        if(!dateVal)return;
+        var d;
+        if(dateVal instanceof Date){d=new Date(dateVal);}
+        else{d=new Date(String(dateVal));}
+        if(isNaN(d.getTime()))return;
+        d.setHours(0,0,0,0);
+        // 未来の予約は除外
+        if(d>today)return;
+        var key=String(row[idIdx]||'')||String(row[nameIdx]||'');
+        if(!lastVisit[key]||d>lastVisit[key].date){
+          lastVisit[key]={date:d,name:String(row[nameIdx]||''),id:String(row[idIdx]||'')};
+        }
+      });
+      // 20日チェック
+      Object.values(lastVisit).forEach(function(v){
+        var diff=Math.floor((today-v.date)/(1000*60*60*24));
         if(diff>=20&&diff<=21){
-          alerts.push('・'+String(row[nameIdx]||'')+'（'+String(row[idIdx]||'')+'号）前回:'+lastStr+' '+diff+'日経過');
+          var dateStr=Utilities.formatDate(v.date,'Asia/Tokyo','M/d');
+          alerts.push('・'+v.name+'（'+v.id+'号）前回:'+dateStr+' '+diff+'日経過');
         }
       });
     }
@@ -135,7 +149,7 @@ function dailyLineAlert(){
     sendLineMessagingAPI(token,userId,msg);
     Logger.log('アラート送信：'+alerts.length+'件');
   }else{
-    Logger.log('20日アラート対象なし');
+    Logger.log('20日アラート対象なし（本日 '+Utilities.formatDate(today,'Asia/Tokyo','M/d')+')');
   }
 }
 
