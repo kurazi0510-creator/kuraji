@@ -2509,27 +2509,37 @@ function onRouteChange(){
     }
     if(found)break;
   }
+  // 常にフォームを表示
+  info.style.display='block';
+  if(form)form.style.display='block';
+  window._foundNextAppt=found||null;
+
   if(found){
     const w=['日','月','火','水','木','金','土'];
     const dt=new Date(found.date);
-    const wd=w[dt.getDay()];
-    info.style.display='block';
-    info.style.background='#dcfce7';info.style.border='2px solid #22c55e';info.style.color='#166534';
-    info.innerHTML='✅ 次回予約済み：<strong>'+found.date.replace(/-/g,'/')+'（'+wd+'） '+found.slot+'〜</strong>'+(found.bk.sym?'<br>症状：'+found.bk.sym:'');
-    if(form)form.style.display='none';// 既に予約あればフォーム非表示
+    info.style.background='#dcfce7';info.style.color='#166534';info.style.border='1.5px solid #86efac';
+    info.innerHTML='✅ 次回予約済み：<strong>'+found.date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+found.slot+'〜</strong><br><span style="font-size:0.72rem">↓ 日時を変更できます</span>';
+    // 既存の予約日時をフォームにセット
+    const nd=document.getElementById('nb-date');
+    const nt=document.getElementById('nb-time');
+    if(nd)nd.value=found.date;
+    if(nt)nt.value=found.slot;
+    const btn=document.querySelector('#next-book-form button');
+    if(btn){btn.textContent='✏️ 次回予約の日時を変更する';btn.style.background='#f97316';}
   }else{
-    info.style.display='block';
-    info.innerHTML='📅 次回予約：まだ入っていません → 下で今すぐ予約できます';
-    if(form){
-      form.style.display='block';
-      // 日付のデフォルトを今日から7日後にセット
-      const next=new Date(curDate||today());
-      next.setDate(next.getDate()+7);
-      const nd=document.getElementById('nb-date');
-      if(nd)nd.value=next.toISOString().split('T')[0];
-      updateNbPreview();
-    }
+    info.style.background='#eff6ff';info.style.color='#1e40af';info.style.border='1.5px solid #93c5fd';
+    info.innerHTML='📅 次回予約：まだ入っていません';
+    // デフォルトを7日後にセット
+    const next=new Date(curDate||today());
+    next.setDate(next.getDate()+7);
+    const nd=document.getElementById('nb-date');
+    const nt=document.getElementById('nb-time');
+    if(nd)nd.value=next.toISOString().split('T')[0];
+    if(nt)nt.value='';
+    const btn=document.querySelector('#next-book-form button');
+    if(btn){btn.textContent='✅ 次回予約を入れる';btn.style.background='#22c55e';}
   }
+  updateNbPreview();
 }
 function updateNbPreview(){
   const d=document.getElementById('nb-date')?.value;
@@ -2555,41 +2565,59 @@ function bookNextAppt(){
   const d=document.getElementById('nb-date')?.value;
   const t=document.getElementById('nb-time')?.value;
   if(!d||!t){alert('日付と時間を選択してください');return;}
-  // 現在の患者情報を取得
   const name=document.getElementById('m-nm')?.value.trim()||'';
   const cardId=document.getElementById('m-id')?.value.trim()||'';
   const kubun=getKubunPrimary()||'保険';
-  const kubunList=mKubunSel.slice();
+  const kubunList=mKubunSel.length?mKubunSel.slice():[kubun];
   if(!name){alert('患者名を入力してください');return;}
-  // 対象スロットが空いているか確認
-  if(bookings[d]&&bookings[d][t]&&!bookings[d][t].cancelled){
-    const w=['日','月','火','水','木','金','土'];
-    const dt=new Date(d);
-    alert('❌ '+d.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+t+' はすでに予約が入っています。\n別の時間を選んでください。');
-    return;
-  }
-  // 次回予約をセット（ルートは「次回予約」）
-  if(!bookings[d])bookings[d]={};
-  // 来院回数を+1（予測）
-  const p=patients.find(x=>x.id===cardId||x.name===name);
-  const vc=parseInt(p?.count||0)+1;
-  bookings[d][t]={
-    kubun,kubunList,kubunFee:'',
-    name,cardId:cardId||'',
-    route:'次回予約',
-    symptom:'',nextMemo:'',
-    option:'',menu:'',
-    bui:[],shochi:[],shochiMemo:'',
-    bussan:[],pay:[],payAmount:'',
-    elapsed:'',visitCount:vc
-  };
-  save();
   const w=['日','月','火','水','木','金','土'];
   const dt=new Date(d);
-  const msg=d.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+t+'〜 に次回予約を追加しました！';
-  document.getElementById('next-appt-info').innerHTML='📅 次回予約済み：'+msg;
-  document.getElementById('next-book-form').style.display='none';
-  alert('✅ '+msg);
+  const dayStr=d.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+t+'〜';
+
+  // 既存予約がある場合は古いスロットを削除して新しいスロットに移動
+  const prev=window._foundNextAppt;
+  if(prev&&(prev.date!==d||prev.slot!==t)){
+    // 日時が変わった場合：古い予約を削除
+    if(bookings[prev.date]&&bookings[prev.date][prev.slot]){
+      delete bookings[prev.date][prev.slot];
+    }
+  }
+
+  // 新しいスロットに既存の別患者の予約があるか確認
+  if(bookings[d]&&bookings[d][t]&&!bookings[d][t].cancelled){
+    const existing=bookings[d][t];
+    if(existing.name!==name&&existing.cardId!==cardId){
+      alert('❌ '+dayStr+' はすでに別の患者の予約が入っています。\n別の時間を選んでください。');
+      // 削除した予約を元に戻す
+      if(prev)bookings[prev.date][prev.slot]=prev.bk;
+      save();return;
+    }
+  }
+
+  // 予約をセット
+  if(!bookings[d])bookings[d]={};
+  const p=patients.find(x=>x.id===cardId||x.name===name);
+  const vc=parseInt(p?.count||0)+1;
+  // 既存予約のデータを引き継ぐ
+  const existingBk=prev?prev.bk:{};
+  bookings[d][t]={
+    ...existingBk,
+    kubun,kubunList,
+    name,cardId:cardId||'',
+    route:'次回予約',
+    visitCount:vc
+  };
+  save();renderSched();
+
+  const info=document.getElementById('next-appt-info');
+  if(info){
+    info.style.background='#dcfce7';info.style.color='#166534';info.style.border='1.5px solid #86efac';
+    info.innerHTML='✅ 次回予約済み：<strong>'+dayStr+'</strong>';
+  }
+  window._foundNextAppt={date:d,slot:t,bk:bookings[d][t]};
+  const btn=document.querySelector('#next-book-form button');
+  if(btn){btn.textContent='✏️ 次回予約の日時を変更する';btn.style.background='#f97316';}
+  alert('✅ '+dayStr+' に次回予約を'+(prev?'変更':'追加')+'しました！');
 }
 function setSlotCount(n){
   mSlotCount=n;
