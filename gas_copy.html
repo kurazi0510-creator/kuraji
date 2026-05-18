@@ -154,17 +154,14 @@ function setupDailyTrigger(){
     .atHour(8)
     .create();
   Logger.log('✅ 毎朝8時の自動アラートトリガーを設定しました！');
-  Browser.msgBox('✅ 完了！毎朝8時に自動でLINEにアラートが届くようになりました。');
 }
 function saveLineSettings(){
-  // ★ここにトークンとユーザーIDが設定されています★
   var token='RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
   var userId='U9f7333eed2d51ceba13641059e8bd341';
   var props=PropertiesService.getScriptProperties();
   props.setProperty('LINE_TOKEN',token);
   props.setProperty('LINE_USER_ID',userId);
-  Logger.log('✅ LINE設定を保存しました');
-  Browser.msgBox('✅ LINE設定を保存しました！\n毎朝8時に自動アラートが届きます。');
+  Logger.log('✅ LINE設定を保存しました！毎朝8時に自動アラートが届きます。');
 }
 
 function sendLineMessagingAPI(token,userId,message){
