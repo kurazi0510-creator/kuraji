@@ -1897,10 +1897,11 @@ function loadBui(arr){
 function showQR(date,slot,name){
   const w=['日','月','火','水','木','金','土'];
   const dt=new Date(date);
-  const info=date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+slot+'〜　'+name+'様';
+  const info=date.replace(/-/g,'/')+'('+w[dt.getDay()]+') '+slot+' '+name;
   document.getElementById('qr-title').textContent='予約確認 QRコード';
-  document.getElementById('qr-info').textContent=info;
-  const text=encodeURIComponent('【倉治整骨院】ご予約\n日時：'+info+'\n〒576-0054 大阪府交野市倉治3丁目\nTEL：0728-91-1234');
+  document.getElementById('qr-info').textContent=date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+slot+'〜　'+(name||'')+'様';
+  // QRコードの内容はシンプルなテキストのみ（住所・電話番号を除外）
+  const text=encodeURIComponent('倉治整骨院 予約確認 '+info);
   document.getElementById('qr-img').src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+text;
   const modal=document.getElementById('qrModal');
   modal.style.display='flex';

@@ -131,14 +131,7 @@ function dailyLineAlert(){
   }
 
   if(alerts.length>0){
-    var msg='【倉治整骨院】
-⚠️ 明日で初診料発生アラート
-'+Utilities.formatDate(today,'Asia/Tokyo','M月d日(E)')+'
-
-'+alerts.join('
-')+'
-
-→ 来院を促してください！';
+    var msg='【倉治整骨院】\n⚠️ 明日で初診料発生アラート\n'+Utilities.formatDate(today,'Asia/Tokyo','M月d日(E)')+'\n\n'+alerts.join('\n')+'\n\n→ 来院を促してください！';
     sendLineMessagingAPI(token,userId,msg);
     Logger.log('アラート送信：'+alerts.length+'件');
   }else{
