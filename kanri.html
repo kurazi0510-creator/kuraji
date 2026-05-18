@@ -895,6 +895,36 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div class="fg"><label>予約ルート</label>
           <select class="sel" id="m-rt" onchange="onRouteChange()"><option value="LINE">LINE</option><option value="次回予約">次回予約</option><option value="電話">電話</option><option value="飛び込み">飛び込み</option><option value="当日LINE予約">当日LINE予約</option><option value="当日電話予約">当日電話予約</option></select>
           <div id="next-appt-info" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border-radius:8px;font-size:0.78rem;color:#1e40af;font-weight:bold"></div>
+          <!-- 次回予約入力フォーム -->
+          <div id="next-book-form" style="display:none;margin-top:8px;background:#f0fdf4;border-radius:10px;padding:12px;border:1.5px solid #86efac">
+            <div style="font-size:0.78rem;font-weight:bold;color:#166534;margin-bottom:8px">📅 次回予約を今すぐ入れる</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+              <div>
+                <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">日付</label>
+                <input type="date" class="inp" id="nb-date" style="font-size:0.82rem">
+              </div>
+              <div>
+                <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">時間</label>
+                <select class="sel" id="nb-time" style="font-size:0.82rem">
+                  <option value="">選択</option>
+                  <option>08:30</option><option>08:50</option><option>09:10</option>
+                  <option>09:30</option><option>09:50</option><option>10:10</option>
+                  <option>10:30</option><option>10:50</option><option>11:10</option>
+                  <option>11:30</option><option>11:50</option><option>12:10</option>
+                  <option>12:30</option><option>15:00</option><option>15:20</option>
+                  <option>15:40</option><option>16:00</option><option>16:20</option>
+                  <option>16:40</option><option>17:00</option><option>17:20</option>
+                  <option>17:40</option><option>18:00</option><option>18:20</option>
+                  <option>18:40</option><option>19:00</option><option>19:20</option>
+                  <option>19:40</option>
+                </select>
+              </div>
+            </div>
+            <div style="font-size:0.72rem;color:#6b7280;margin-bottom:6px" id="nb-preview"></div>
+            <button class="btn bp bsm" onclick="bookNextAppt()" style="width:100%;background:#22c55e;color:white;border-color:#22c55e;font-size:0.82rem">
+              ✅ この予約登録後に次回も予約する
+            </button>
+          </div>
         </div>
         <div class="fg" style="grid-column:1/-1">
           <label>予約枠数</label>
@@ -2433,9 +2463,14 @@ let mSlotCount=1;
 function onRouteChange(){
   const rt=document.getElementById('m-rt').value;
   const info=document.getElementById('next-appt-info');
+  const form=document.getElementById('next-book-form');
   if(!info)return;
-  if(rt!=='次回予約'){info.style.display='none';return;}
-  // 次回予約の場合：editDate・editSlotの次の予約を探す
+  if(rt!=='次回予約'){
+    info.style.display='none';
+    if(form)form.style.display='none';
+    return;
+  }
+  // 次回予約の場合：その患者の次の予約を探す
   const curDate=editDate;
   const allDates=Object.keys(bookings).sort();
   let found=null;
@@ -2459,11 +2494,81 @@ function onRouteChange(){
     const dt=new Date(found.date);
     const wd=w[dt.getDay()];
     info.style.display='block';
-    info.innerHTML='📅 次回予約：'+found.date.replace(/-/g,'/')+'（'+wd+'） '+found.slot+'〜';
+    info.innerHTML='📅 次回予約済み：'+found.date.replace(/-/g,'/')+'（'+wd+'） '+found.slot+'〜';
+    if(form)form.style.display='none';// 既に予約あればフォーム非表示
   }else{
     info.style.display='block';
-    info.innerHTML='📅 次回予約：まだ入っていません';
+    info.innerHTML='📅 次回予約：まだ入っていません → 下で今すぐ予約できます';
+    if(form){
+      form.style.display='block';
+      // 日付のデフォルトを今日から7日後にセット
+      const next=new Date(curDate||today());
+      next.setDate(next.getDate()+7);
+      const nd=document.getElementById('nb-date');
+      if(nd)nd.value=next.toISOString().split('T')[0];
+      updateNbPreview();
+    }
   }
+}
+function updateNbPreview(){
+  const d=document.getElementById('nb-date')?.value;
+  const t=document.getElementById('nb-time')?.value;
+  const prev=document.getElementById('nb-preview');
+  if(!prev)return;
+  if(d&&t){
+    const w=['日','月','火','水','木','金','土'];
+    const dt=new Date(d);
+    prev.textContent='→ '+d.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+t+'〜 で予約します';
+    prev.style.color='#166534';
+  }else{
+    prev.textContent='日付と時間を選択してください';
+    prev.style.color='#6b7280';
+  }
+}
+// nb-date・nb-timeが変わったらpreview更新
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('nb-date')?.addEventListener('change',updateNbPreview);
+  document.getElementById('nb-time')?.addEventListener('change',updateNbPreview);
+});
+function bookNextAppt(){
+  const d=document.getElementById('nb-date')?.value;
+  const t=document.getElementById('nb-time')?.value;
+  if(!d||!t){alert('日付と時間を選択してください');return;}
+  // 現在の患者情報を取得
+  const name=document.getElementById('m-nm')?.value.trim()||'';
+  const cardId=document.getElementById('m-id')?.value.trim()||'';
+  const kubun=getKubunPrimary()||'保険';
+  const kubunList=mKubunSel.slice();
+  if(!name){alert('患者名を入力してください');return;}
+  // 対象スロットが空いているか確認
+  if(bookings[d]&&bookings[d][t]&&!bookings[d][t].cancelled){
+    const w=['日','月','火','水','木','金','土'];
+    const dt=new Date(d);
+    alert('❌ '+d.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+t+' はすでに予約が入っています。\n別の時間を選んでください。');
+    return;
+  }
+  // 次回予約をセット（ルートは「次回予約」）
+  if(!bookings[d])bookings[d]={};
+  // 来院回数を+1（予測）
+  const p=patients.find(x=>x.id===cardId||x.name===name);
+  const vc=parseInt(p?.count||0)+1;
+  bookings[d][t]={
+    kubun,kubunList,kubunFee:'',
+    name,cardId:cardId||'',
+    route:'次回予約',
+    symptom:'',nextMemo:'',
+    option:'',menu:'',
+    bui:[],shochi:[],shochiMemo:'',
+    bussan:[],pay:[],payAmount:'',
+    elapsed:'',visitCount:vc
+  };
+  save();
+  const w=['日','月','火','水','木','金','土'];
+  const dt=new Date(d);
+  const msg=d.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+t+'〜 に次回予約を追加しました！';
+  document.getElementById('next-appt-info').innerHTML='📅 次回予約済み：'+msg;
+  document.getElementById('next-book-form').style.display='none';
+  alert('✅ '+msg);
 }
 function setSlotCount(n){
   mSlotCount=n;
