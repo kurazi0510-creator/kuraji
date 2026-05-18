@@ -214,6 +214,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div id="daybadge" class="day-b" style="margin-top:16px"></div>
       </div>
       <button class="btn bp bsm" onclick="syncAll()" style="margin-top:16px">🔄 最新データ取得</button>
+      <button class="btn bp bsm" onclick="showFutureBookings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
       <button class="btn bp bsm" onclick="toggleDayMemo()" style="margin-top:16px;background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
     </div>
@@ -897,15 +898,15 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <div id="next-appt-info" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border-radius:8px;font-size:0.78rem;color:#1e40af;font-weight:bold"></div>
           <!-- 次回予約入力フォーム -->
           <div id="next-book-form" style="display:none;margin-top:8px;background:#f0fdf4;border-radius:10px;padding:12px;border:1.5px solid #86efac">
-            <div style="font-size:0.78rem;font-weight:bold;color:#166534;margin-bottom:8px">📅 次回予約を今すぐ入れる</div>
+            <div style="font-size:0.78rem;font-weight:bold;color:#166534;margin-bottom:8px">📅 次回予約の詳細</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
               <div>
                 <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">日付</label>
-                <input type="date" class="inp" id="nb-date" style="font-size:0.82rem">
+                <input type="date" class="inp" id="nb-date" style="font-size:0.82rem" onchange="updateNbPreview()">
               </div>
               <div>
                 <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">時間</label>
-                <select class="sel" id="nb-time" style="font-size:0.82rem">
+                <select class="sel" id="nb-time" style="font-size:0.82rem" onchange="updateNbPreview()">
                   <option value="">選択</option>
                   <option>08:30</option><option>08:50</option><option>09:10</option>
                   <option>09:30</option><option>09:50</option><option>10:10</option>
@@ -920,9 +921,38 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
                 </select>
               </div>
             </div>
-            <div style="font-size:0.72rem;color:#6b7280;margin-bottom:6px" id="nb-preview"></div>
-            <button class="btn bp bsm" onclick="bookNextAppt()" style="width:100%;background:#22c55e;color:white;border-color:#22c55e;font-size:0.82rem">
-              ✅ この予約登録後に次回も予約する
+            <!-- 区分選択 -->
+            <div style="margin-bottom:8px">
+              <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">区分</label>
+              <div style="display:flex;gap:6px;flex-wrap:wrap" id="nb-kubun-btns">
+                <button class="pay-btn on" data-v="保険" onclick="toggleNbKubun(this)">保険</button>
+                <button class="pay-btn" data-v="自費" onclick="toggleNbKubun(this)">自費</button>
+                <button class="pay-btn" data-v="交通事故" onclick="toggleNbKubun(this)">交通事故</button>
+                <button class="pay-btn" data-v="新規" onclick="toggleNbKubun(this)">新規</button>
+              </div>
+            </div>
+            <!-- 枠数 -->
+            <div style="margin-bottom:8px">
+              <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">枠数</label>
+              <div style="display:flex;gap:6px">
+                <button class="pay-btn on" id="nb-slot-1" onclick="setNbSlot(1)">1枠</button>
+                <button class="pay-btn" id="nb-slot-2" onclick="setNbSlot(2)">2枠</button>
+                <button class="pay-btn" id="nb-slot-3" onclick="setNbSlot(3)">3枠</button>
+              </div>
+            </div>
+            <!-- 症状（次回） -->
+            <div style="margin-bottom:8px">
+              <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">次回の予定症状・施術内容</label>
+              <input class="inp" id="nb-symptom" placeholder="継続施術・腰痛など" style="font-size:0.82rem">
+            </div>
+            <!-- 前回引継ぎメモ（今日の注意事項を自動引継ぎ） -->
+            <div style="margin-bottom:8px">
+              <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">📋 前回引継ぎメモ（今日の注意事項から自動引継ぎ）</label>
+              <textarea class="inp" id="nb-prev-memo" placeholder="前回からの引継ぎ事項" style="height:60px;resize:none;font-size:0.78rem"></textarea>
+            </div>
+            <div style="font-size:0.72rem;color:#166534;font-weight:bold;margin-bottom:6px" id="nb-preview"></div>
+            <button class="btn bp bsm" onclick="bookNextAppt()" style="width:100%;background:#22c55e;color:white;border-color:#22c55e;font-size:0.85rem;padding:10px">
+              ✅ 次回予約を入れる
             </button>
           </div>
         </div>
@@ -1040,6 +1070,16 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
   </div>
 </div>
 
+<!-- 未来予約一覧モーダル -->
+<div class="modal-overlay" id="futureModal" style="display:none;z-index:2000">
+  <div class="modal" style="max-width:600px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <strong style="font-size:0.9rem">📋 未来の予約一覧</strong>
+      <button onclick="document.getElementById('futureModal').style.display='none'" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+    </div>
+    <div id="future-list"></div>
+  </div>
+</div>
 <!-- キャンセルモーダル -->
 <div class="modal-ov" id="cancelModal">
   <div class="modal" style="max-width:380px">
@@ -2362,6 +2402,7 @@ function openHistModal(){
         </div>
         ${bk.symptom?`<div style="font-size:0.72rem;color:var(--muted);margin-top:3px">症状: ${bk.symptom}</div>`:''}
         ${bk.nextMemo?`<div style="font-size:0.7rem;color:#7c3aed;margin-top:3px">📋 ${bk.nextMemo.slice(0,30)}${bk.nextMemo.length>30?'…':''}</div>`:''}
+        ${(()=>{const nx=getNextAppt(bk.name,bk.cardId,date,slot);return nx?`<div style="font-size:0.7rem;color:#0369a1;margin-top:3px">📅 次回: ${nx}</div>`:''})()}
         ${buiHtml}${shHtml}${bsHtml}${payHtml}
       </div>`;
     }).join('');
@@ -2519,13 +2560,23 @@ function onRouteChange(){
     const dt=new Date(found.date);
     info.style.background='#dcfce7';info.style.color='#166534';info.style.border='1.5px solid #86efac';
     info.innerHTML='✅ 次回予約済み：<strong>'+found.date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+found.slot+'〜</strong><br><span style="font-size:0.72rem">↓ 日時を変更できます</span>';
-    // 既存の予約日時をフォームにセット
+    // 既存の予約日時・詳細をフォームにセット
     const nd=document.getElementById('nb-date');
     const nt=document.getElementById('nb-time');
     if(nd)nd.value=found.date;
     if(nt)nt.value=found.slot;
+    // 区分ボタンを反映
+    const foundKubunList=found.bk.kubunList||[found.bk.kubun||'保険'];
+    document.querySelectorAll('#nb-kubun-btns .pay-btn').forEach(b=>{
+      b.classList.toggle('on',foundKubunList.includes(b.getAttribute('data-v')));
+    });
+    // 症状・引継ぎメモを反映
+    const nbSym=document.getElementById('nb-symptom');
+    const nbMemo=document.getElementById('nb-prev-memo');
+    if(nbSym)nbSym.value=found.bk.symptom||'';
+    if(nbMemo)nbMemo.value=found.bk.nextMemo||'';
     const btn=document.querySelector('#next-book-form button');
-    if(btn){btn.textContent='✏️ 次回予約の日時を変更する';btn.style.background='#f97316';}
+    if(btn){btn.textContent='✏️ 次回予約を更新する';btn.style.background='#f97316';}
   }else{
     info.style.background='#eff6ff';info.style.color='#1e40af';info.style.border='1.5px solid #93c5fd';
     info.innerHTML='📅 次回予約：まだ入っていません';
@@ -2538,8 +2589,79 @@ function onRouteChange(){
     if(nt)nt.value='';
     const btn=document.querySelector('#next-book-form button');
     if(btn){btn.textContent='✅ 次回予約を入れる';btn.style.background='#22c55e';}
+    // 今日の注意事項を前回引継ぎメモに自動セット
+    const todayMemo=document.getElementById('m-next-memo')?.value.trim()||'';
+    const prevMemoEl=document.getElementById('nb-prev-memo');
+    if(prevMemoEl&&todayMemo)prevMemoEl.value=todayMemo;
   }
   updateNbPreview();
+}
+// 未来予約一覧を表示
+function showFutureBookings(){
+  const w=['日','月','火','水','木','金','土'];
+  const td=today();
+  const rows=[];
+  Object.keys(bookings).sort().forEach(d=>{
+    if(d<td)return;
+    Object.keys(bookings[d]).sort().forEach(s=>{
+      const bk=bookings[d][s];
+      if(!bk||bk.cont||bk.cancelled)return;
+      const dt=new Date(d);
+      rows.push({date:d,slot:s,bk,dow:w[dt.getDay()]});
+    });
+  });
+  const el=document.getElementById('future-list');
+  if(!rows.length){
+    el.innerHTML='<div style="text-align:center;color:#94a3b8;padding:20px">未来の予約はありません</div>';
+  }else{
+    // 日付ごとにグループ化
+    const byDate={};
+    rows.forEach(r=>{if(!byDate[r.date])byDate[r.date]=[];byDate[r.date].push(r);});
+    el.innerHTML=Object.entries(byDate).map(([d,rs])=>`
+      <div style="margin-bottom:12px">
+        <div style="background:#1e293b;color:white;padding:6px 10px;border-radius:6px;font-size:0.8rem;font-weight:bold;margin-bottom:4px">
+          📅 ${d.replace(/-/g,'/')}（${rs[0].dow}）　${rs.length}件
+        </div>
+        ${rs.map(r=>`
+        <div style="background:#f8fafc;border-radius:6px;padding:8px 10px;margin-bottom:4px;border-left:3px solid ${r.bk.kubun==='自費'?'#f97316':r.bk.kubun==='交通事故'?'#dc2626':'#3b82f6'}">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.82rem;font-weight:bold">${r.slot}　${r.bk.name}</span>
+            <span style="font-size:0.72rem;background:${r.bk.kubun==='自費'?'#fef3c7':r.bk.kubun==='交通事故'?'#fee2e2':'#dbeafe'};padding:2px 7px;border-radius:10px">${r.bk.kubun||'-'}</span>
+          </div>
+          ${r.bk.symptom?`<div style="font-size:0.72rem;color:#64748b;margin-top:3px">症状: ${r.bk.symptom}</div>`:''}
+          ${r.bk.nextMemo?`<div style="font-size:0.7rem;color:#7c3aed;margin-top:2px">📋 ${r.bk.nextMemo.slice(0,30)}</div>`:''}
+        </div>`).join('')}
+      </div>`).join('');
+  }
+  document.getElementById('futureModal').style.display='flex';
+}
+// 患者の次回予約日時を返す
+function getNextAppt(name,cardId,curDate,curSlot){
+  const w=['日','月','火','水','木','金','土'];
+  const allDates=Object.keys(bookings).sort();
+  for(const d of allDates){
+    if(d<curDate)continue;
+    const slots=Object.keys(bookings[d]).sort();
+    for(const s of slots){
+      const bk=bookings[d][s];
+      if(!bk||bk.cont||bk.cancelled)continue;
+      if(d===curDate&&s<=curSlot)continue;
+      if(bk.name===name||(cardId&&bk.cardId===cardId)){
+        const dt=new Date(d);
+        return d.replace(/-/g,'/')+'('+w[dt.getDay()]+') '+s;
+      }
+    }
+  }
+  return null;
+}
+function toggleNbKubun(btn){
+  btn.classList.toggle('on');
+}
+function setNbSlot(n){
+  [1,2,3].forEach(i=>{
+    const b=document.getElementById('nb-slot-'+i);
+    if(b)b.classList.toggle('on',i===n);
+  });
 }
 function updateNbPreview(){
   const d=document.getElementById('nb-date')?.value;
@@ -2594,19 +2716,38 @@ function bookNextAppt(){
     }
   }
 
+  // フォームから詳細取得
+  const nbKubunList=[...document.querySelectorAll('#nb-kubun-btns .pay-btn.on')].map(b=>b.getAttribute('data-v'));
+  const nbKubun=nbKubunList[0]||kubun;
+  const nbSymptom=document.getElementById('nb-symptom')?.value.trim()||'';
+  const nbPrevMemo=document.getElementById('nb-prev-memo')?.value.trim()||'';
+  const nbSlot=parseInt([...document.querySelectorAll('[id^=nb-slot-]')].find(b=>b.classList.contains('on'))?.id.replace('nb-slot-','')||'1');
   // 予約をセット
   if(!bookings[d])bookings[d]={};
   const p=patients.find(x=>x.id===cardId||x.name===name);
   const vc=parseInt(p?.count||0)+1;
-  // 既存予約のデータを引き継ぐ
   const existingBk=prev?prev.bk:{};
   bookings[d][t]={
     ...existingBk,
-    kubun,kubunList,
+    kubun:nbKubun,kubunList:nbKubunList.length?nbKubunList:[nbKubun],
     name,cardId:cardId||'',
     route:'次回予約',
-    visitCount:vc
+    symptom:nbSymptom,
+    nextMemo:nbPrevMemo,// 引継ぎメモを保存
+    visitCount:vc,
+    slots:nbSlot
   };
+  // 複数枠の場合は続き枠も確保
+  if(nbSlot>1){
+    const allSlots=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10','12:30','15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+    const idx=allSlots.indexOf(t);
+    for(let i=1;i<nbSlot&&idx+i<allSlots.length;i++){
+      const ns=allSlots[idx+i];
+      if(!bookings[d][ns]||bookings[d][ns].cancelled){
+        bookings[d][ns]={...bookings[d][t],cont:true};
+      }
+    }
+  }
   save();renderSched();
 
   const info=document.getElementById('next-appt-info');
