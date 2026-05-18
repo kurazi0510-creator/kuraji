@@ -55,20 +55,16 @@ h1{color:#1e293b;font-size:0.9rem;text-align:center;margin-bottom:4px;}
 
   <div class="step">
     <div class="step-num">STEP 3</div>
-    <div class="step-title">⏰ トリガーを設定する（毎朝8時）</div>
+    <div class="step-title">⏰ トリガーを自動設定する（1回実行するだけ）</div>
     <div class="step-desc">
       Apps Scriptで：<br>
-      ① 左メニューの <strong>⏰時計アイコン</strong>（トリガー）をクリック<br>
-      ② 右下の <strong>「トリガーを追加」</strong> をクリック<br>
-      ③ 実行する関数：<strong>「dailyLineAlert」</strong> を選択<br>
-      ④ イベントのソース：<strong>「時間主導型」</strong> を選択<br>
-      ⑤ 時間ベースのトリガーのタイプ：<strong>「日付ベースのタイマー」</strong><br>
-      ⑥ 時刻：<strong>「午前8時〜9時」</strong> を選択<br>
-      ⑦ <strong>「保存」</strong> をクリック
+      ① 関数のドロップダウンを <strong>「setupDailyTrigger」</strong> に変更<br>
+      ② <strong>「▶ 実行」</strong> を押す<br>
+      ③ 「✅ 完了！毎朝8時に...」というメッセージが出たら設定完了！
     </div>
     <div class="tip">
-      ✅ 設定完了後、毎朝8時に自動でLINEに20日アラートが届きます。<br>
-      🧪 テストするには関数を「dailyLineAlert」に変えて「▶ 実行」を押してください。
+      ✅ これだけで毎朝8時に自動でLINEに20日アラートが届くようになります。<br>
+      ⚠️ 実行は1回だけでOKです。複数回実行すると重複してしまいます。
     </div>
   </div>
 

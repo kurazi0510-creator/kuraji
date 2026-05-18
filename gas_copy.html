@@ -140,6 +140,22 @@ function dailyLineAlert(){
 }
 
 // LINEトークン・ユーザーIDをスクリプトプロパティに保存
+// ===== 自動トリガー設定（この関数を1回実行するだけでOK）=====
+function setupDailyTrigger(){
+  // 既存のdailyLineAlertトリガーを削除
+  var triggers=ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t){
+    if(t.getHandlerFunction()==='dailyLineAlert'){ScriptApp.deleteTrigger(t);}
+  });
+  // 毎朝8時のトリガーを作成
+  ScriptApp.newTrigger('dailyLineAlert')
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+  Logger.log('✅ 毎朝8時の自動アラートトリガーを設定しました！');
+  Browser.msgBox('✅ 完了！毎朝8時に自動でLINEにアラートが届くようになりました。');
+}
 function saveLineSettings(token,userId){
   var props=PropertiesService.getScriptProperties();
   props.setProperty('LINE_TOKEN',token);
