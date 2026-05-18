@@ -439,6 +439,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="utab" onclick="switchU('month')">🗓 月別</div>
       <div class="utab" onclick="switchU('year')">📊 年別</div>
       <div class="utab" onclick="switchU('pay')">💳 支払別</div>
+      <div class="utab" onclick="switchU('paydetail')">🧾 支払明細</div>
       <button class="btn bsm" onclick="syncUriageFromBookings()" style="margin-left:8px;padding:6px 12px;background:#22c55e;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">🔄 予約から集計</button>
       <button class="btn bsm" onclick="forcePushU()" style="margin-left:4px;padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">📤 GAS保存</button>
     </div>
@@ -489,6 +490,26 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div></div>
     <div id="u-year" style="display:none"><div class="card"><div class="ctitle">年別集計</div>
       <div class="scroll"><table class="utbl"><thead><tr><th>年</th><th>保険</th><th>自費</th><th>交通事故</th><th>物販</th><th>その他</th><th>合計</th></tr></thead><tbody id="u-ybody"></tbody></table></div>
+    </div></div>
+    <div id="u-paydetail" style="display:none"><div class="card">
+      <div class="ctitle">🧾 支払明細（誰が・何を・いくら払ったか）</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <select class="sel" id="pd-yr" style="width:90px"></select>
+        <select class="sel" id="pd-mo" style="width:80px">
+          <option value="0">全月</option>
+        </select>
+        <select class="sel" id="pd-pay" style="width:110px">
+          <option value="">全支払方法</option>
+          <option>現金</option><option>クレジット</option><option>PayPay</option>
+          <option>d払い</option><option>au Pay</option>
+        </select>
+        <button class="btn bp bsm" onclick="renderPayDetail()">表示</button>
+      </div>
+      <div id="pd-summary" style="margin-bottom:8px"></div>
+      <div class="scroll"><table class="tbl" id="pd-table">
+        <thead><tr><th>日付</th><th>患者名</th><th>区分</th><th>処置・物販</th><th>支払方法</th><th>金額</th></tr></thead>
+        <tbody id="pd-body"></tbody>
+      </table></div>
     </div></div>
     <div id="u-pay" style="display:none"><div class="card"><div class="ctitle">支払別集計</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
@@ -868,7 +889,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div class="kubun-btn" data-v="新規" onclick="toggleKubun(this)">🆕 新規<br><span style="font-size:0.65rem;font-weight:400">3枠60分</span></div>
       </div>
       <!-- 区分別料金入力 -->
-      <div id="kubun-fee-area" style="display:none;margin-top:8px;background:#f8f6f1;border-radius:8px;padding:10px;gap:8px">
+      <div id="kubun-fee-area" style="display:block;margin-top:8px;background:#f8f6f1;border-radius:8px;padding:10px;gap:8px">
         <div style="font-size:0.72rem;color:var(--muted);font-weight:600;margin-bottom:6px">💰 区分別料金（円）</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px" id="kubun-fee-inputs"></div>
       </div>
@@ -2222,7 +2243,8 @@ function resetKubun(){
   mKubunSel=[];
   document.querySelectorAll('.kubun-btn').forEach(b=>b.classList.remove('on'));
   document.getElementById('kubun-display').style.display='none';
-  document.getElementById('kubun-fee-area').style.display='none';
+  // 区分別料金エリアは常に表示
+  // document.getElementById('kubun-fee-area').style.display='none';
 }
 function loadKubun(kubunList){
   resetKubun();
@@ -2281,7 +2303,7 @@ function editBk(date,slot){
   document.getElementById('m-sym').value=bk.symptom||'';
   const nne=document.getElementById('m-next-note')||document.getElementById('m-next-memo');
   if(nne)nne.value=bk.nextNote||'';
-  const nmEl=document.getElementById('m-next-memo');if(nmEl)nmEl.value=bk.nextMemo||'';
+  const nmEl=document.getElementById('m-next-memo');if(nmEl)nmEl.value=bk.nextMemo||bk.nextNote||'';
   document.getElementById('m-opt').value=bk.option||'';
   document.getElementById('m-menu').value=bk.menu||'';
   document.getElementById('m-psearch').value='';
@@ -2401,7 +2423,7 @@ function openHistModal(){
           ${bk.route?`<span class="rt ${bk.route==='LINE'?'r-li':bk.route==='次回予約'?'r-ji':'r-to'}">${bk.route}</span>`:''}
         </div>
         ${bk.symptom?`<div style="font-size:0.72rem;color:var(--muted);margin-top:3px">症状: ${bk.symptom}</div>`:''}
-        ${bk.nextMemo?`<div style="font-size:0.7rem;color:#7c3aed;margin-top:3px">📋 ${bk.nextMemo.slice(0,30)}${bk.nextMemo.length>30?'…':''}</div>`:''}
+        ${(bk.nextMemo||bk.nextNote)?`<div style="font-size:0.7rem;color:#7c3aed;margin-top:3px">📋 ${(bk.nextMemo||bk.nextNote||'').slice(0,30)}${(bk.nextMemo||bk.nextNote||'').length>30?'…':''}</div>`:''}
         ${(()=>{const nx=getNextAppt(bk.name,bk.cardId,date,slot);return nx?`<div style="font-size:0.7rem;color:#0369a1;margin-top:3px">📅 次回: ${nx}</div>`:''})()}
         ${buiHtml}${shHtml}${bsHtml}${payHtml}
       </div>`;
@@ -2443,7 +2465,9 @@ async function saveBk(){
   const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
   const p=patients.find(p=>p.id===cardId);
   const el=p&&p.last?elapsed(p.last):'';
-  const vc=p?(parseInt(p.count)||0)+1:'';
+  // 既存予約の編集時は来院回数を増やさない（新規登録時のみ+1）
+  const isNewBk=!bookings[date]?.[slot]||bookings[date]?.[slot]?.cancelled;
+  const vc=p?(isNewBk?(parseInt(p.count)||0)+1:parseInt(p.count)||0):'';
   const kubun=getKubunPrimary();
   const kubunList=mKubunSel.slice();
   const extra=mSlotCount-1;
@@ -2462,7 +2486,7 @@ async function saveBk(){
     // 他の患者が入っている場合は触らない（上書きしない）
   }else{// 継続枠が不要な範囲：自分のcont枠のみ削除（他の患者は触らない）
     if(existing&&existing.cont&&existing.cardId===cardId)delete bookings[date][sl[ni]];}}}
-  if(p){p.last=date;p.count=vc;}
+  if(p&&isNewBk){p.last=date;p.count=vc;}else if(p&&!isNewBk){p.count=vc;}
   shochiArr.forEach(s=>{if(s.id){const sm=shochiMaster.find(m=>m.id===s.id);if(sm?.stockId){const st=stockData.find(x=>x.id===sm.stockId);if(st)st.qty=Math.max(0,st.qty-s.qty);}}});
   bussanArr.forEach(b=>{const master=bussanMaster.find(m=>m.id===b.id);if(master?.stockId){const st=stockData.find(x=>x.id===master.stockId);if(st)st.qty=Math.max(0,st.qty-b.qty);}});
   const btn=document.getElementById('sbtn');btn.textContent='保存中...';btn.disabled=true;
@@ -2629,7 +2653,7 @@ function showFutureBookings(){
             <span style="font-size:0.72rem;background:${r.bk.kubun==='自費'?'#fef3c7':r.bk.kubun==='交通事故'?'#fee2e2':'#dbeafe'};padding:2px 7px;border-radius:10px">${r.bk.kubun||'-'}</span>
           </div>
           ${r.bk.symptom?`<div style="font-size:0.72rem;color:#64748b;margin-top:3px">症状: ${r.bk.symptom}</div>`:''}
-          ${r.bk.nextMemo?`<div style="font-size:0.7rem;color:#7c3aed;margin-top:2px">📋 ${r.bk.nextMemo.slice(0,30)}</div>`:''}
+          ${(r.bk.nextMemo||r.bk.nextNote)?`<div style="font-size:0.7rem;color:#7c3aed;margin-top:2px">📋 ${(r.bk.nextMemo||r.bk.nextNote||'').slice(0,30)}</div>`:''}
         </div>`).join('')}
       </div>`).join('');
   }
@@ -3199,7 +3223,7 @@ function switchU(t){
   document.querySelectorAll('#uTabsArea .utab').forEach((el,i)=>el.classList.toggle('on',tabs[i]===t));
   ['u-day','u-week','u-month','u-year','u-pay'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   const target=document.getElementById('u-'+t);if(target)target.style.display='';
-  if(t==='day')renderDayU();if(t==='week')renderWeekU();if(t==='month')renderMonthU();if(t==='year')renderYearU();if(t==='pay')renderPayU();
+  if(t==='day')renderDayU();if(t==='week')renderWeekU();if(t==='month')renderMonthU();if(t==='year')renderYearU();if(t==='pay')renderPayU();if(t==='paydetail')renderPayDetail();
 }
 function saveU(){
   const date=document.getElementById('u-date').value;if(!date){alert('日付を入力してください');return;}
@@ -3433,6 +3457,56 @@ function renderYearU(){
   const tbody=document.getElementById('u-ybody');
   if(!Object.keys(years).length){tbody.innerHTML='<tr><td colspan="7" class="empty">データがありません</td></tr>';return;}
   tbody.innerHTML=Object.entries(years).sort((a,b)=>b[0].localeCompare(a[0])).map(([yr,u])=>{const tot=Object.values(u).reduce((a,b)=>a+b,0);return`<tr><td>${yr}年</td><td>${u.hoken?yen(u.hoken):'-'}</td><td>${u.jhi?yen(u.jhi):'-'}</td><td>${u.jiko?yen(u.jiko):'-'}</td><td>${u.bussan?yen(u.bussan):'-'}</td><td>${u.other?yen(u.other):'-'}</td><td><strong>${yen(tot)}</strong></td></tr>`;}).join('');
+}
+function renderPayDetail(){
+  const yr=parseInt(document.getElementById('pd-yr').value)||new Date().getFullYear();
+  const mo=parseInt(document.getElementById('pd-mo').value)||0;
+  const payFilter=document.getElementById('pd-pay').value||'';
+  const rows=[];
+  let totalByPay={};
+
+  Object.entries(bookings).sort().forEach(([date,slots])=>{
+    const dt=new Date(date+'T00:00:00');
+    if(dt.getFullYear()!==yr)return;
+    if(mo>0&&dt.getMonth()+1!==mo)return;
+    Object.entries(slots).forEach(([slot,bk])=>{
+      if(!bk||bk.cont||bk.cancelled)return;
+      const amount=parseInt(bk.payAmount||0);
+      if(!amount)return;
+      const pays=bk.pay||[];
+      if(payFilter&&!pays.includes(payFilter))return;
+
+      // 処置・物販の内容
+      const shochiNames=(bk.shochi||[]).map(s=>s.name+'×'+s.qty).join('、');
+      const bussanNames=(bk.bussan||[]).map(b=>b.name+'×'+b.qty).join('、');
+      const items=[shochiNames,bussanNames].filter(Boolean).join(' / ')||'施術';
+
+      const payStr=pays.join('・')||'-';
+      rows.push({date,slot,name:bk.name||'-',kubun:bk.kubun||'-',items,pay:payStr,amount});
+      // 支払別集計
+      pays.forEach(p=>{if(!totalByPay[p])totalByPay[p]=0;totalByPay[p]+=amount;});
+      if(!pays.length){if(!totalByPay['不明'])totalByPay['不明']=0;totalByPay['不明']+=amount;}
+    });
+  });
+
+  // サマリー
+  const sumEl=document.getElementById('pd-summary');
+  sumEl.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    Object.entries(totalByPay).map(([p,v])=>`<div style="background:#f8fafc;border-radius:8px;padding:6px 12px;font-size:0.78rem"><span style="color:#64748b">${p}</span><br><strong style="color:#1e293b">${v.toLocaleString()}円</strong></div>`).join('')+
+    '</div>';
+
+  // 一覧
+  const tbody=document.getElementById('pd-body');
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="6" class="empty">データがありません</td></tr>';return;}
+  tbody.innerHTML=rows.map(r=>`
+    <tr>
+      <td style="font-size:0.72rem">${r.date.replace(/-/g,'/')}</td>
+      <td style="font-weight:bold">${r.name}</td>
+      <td><span style="font-size:0.7rem;padding:2px 6px;border-radius:10px;background:#dbeafe;color:#1e40af">${r.kubun}</span></td>
+      <td style="font-size:0.7rem;max-width:120px">${r.items}</td>
+      <td style="font-size:0.72rem">${r.pay}</td>
+      <td style="font-weight:bold;color:#16a34a;text-align:right">${r.amount.toLocaleString()}円</td>
+    </tr>`).join('');
 }
 function renderPayU(){
   const yr=parseInt(document.getElementById('pay-yr').value);
