@@ -1092,13 +1092,16 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 </div>
 
 <!-- 未来予約一覧モーダル -->
-<div class="modal-overlay" id="futureModal" style="display:none;z-index:2000">
-  <div class="modal" style="max-width:600px;max-height:80vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <strong style="font-size:0.9rem">📋 未来の予約一覧</strong>
-      <button onclick="document.getElementById('futureModal').style.display='none'" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+<div id="futureModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(0,0,0,0.5);overflow-y:auto">
+  <div style="background:white;max-width:640px;margin:20px auto;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.3);overflow:hidden">
+    <div style="background:#1e293b;color:white;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0">
+      <div>
+        <div style="font-size:0.95rem;font-weight:bold">📋 未来の予約一覧</div>
+        <div style="font-size:0.72rem;color:#94a3b8;margin-top:2px" id="future-count"></div>
+      </div>
+      <button onclick="document.getElementById('futureModal').style.display='none'" style="background:#374151;border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
-    <div id="future-list"></div>
+    <div style="padding:14px" id="future-list"></div>
   </div>
 </div>
 <!-- キャンセルモーダル -->
@@ -2026,7 +2029,14 @@ function renderSched(){
         <td style="font-size:0.72rem">${bk.visitCount||''}</td>
         <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=20?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:2px 5px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':"color:var(--accent2)"}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=20?' ⚠️初診料':''}</td>
         <td>${buiHtml?buiHtml+'<br>':''} ${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td>
-        <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':'<br><span style="font-size:0.68rem;color:'+((() => {const list=bk.kubunList||[bk.kubun||''];return list.includes('交通事故')&&!list.includes('自費')&&!list.includes('保険');})() ?'#94a3b8">🚗 保険対応':'#f97316">💴 未会計')+'</span>'}</td>
+        <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':(()=>{
+  const list=bk.kubunList||[bk.kubun||''];
+  const isJiko=list.includes('交通事故')&&!list.includes('自費')&&!list.includes('保険');
+  const hasPay=bk.payAmount&&parseInt(bk.payAmount)>0;
+  if(isJiko)return '';// 交通事故は未会計表示しない
+  if(hasPay)return '<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>';
+  return '<br><span style="font-size:0.68rem;color:#f97316">💴 未会計</span>';
+})()}</td>
         <td style="white-space:nowrap">
           <button class="btn bc bsm" onclick="editBk('${date}','${s}')">編集</button>
           <button class="btn bcancel bsm" onclick="openCancelModal('${date}','${s}')" style="margin-top:2px">ｷｬﾝｾﾙ</button>
@@ -2065,7 +2075,12 @@ function updateStats(date,sl){
   document.getElementById('s4').textContent=statOverride[4]!==undefined?statOverride[4]:sh;
   document.getElementById('s5').textContent=(sl.length?Math.round(used/sl.length*100):0)+'%';
   // 未会計件数
-  const uncounted=e.filter(b=>!(b.payAmount&&parseInt(b.payAmount)>0)).length;
+  const uncounted=e.filter(b=>{
+    const kl=b.kubunList||[b.kubun||''];
+    const isJiko=kl.includes('交通事故')&&!kl.includes('自費')&&!kl.includes('保険');
+    if(isJiko)return false;// 交通事故（患者支払いなし）は未会計から除外
+    return !(b.payAmount&&parseInt(b.payAmount)>0);
+  }).length;
   const s6=document.getElementById('s6');
   if(s6){s6.textContent=uncounted;s6.closest('.sbox').style.background=uncounted>0?'rgba(249,115,22,0.15)':'';s6.style.color=uncounted>0?'#f97316':'inherit';}
 }
@@ -2657,7 +2672,9 @@ function showFutureBookings(){
         </div>`).join('')}
       </div>`).join('');
   }
-  document.getElementById('futureModal').style.display='flex';
+  const countEl=document.getElementById('future-count');
+  if(countEl)countEl.textContent='今日以降 '+rows.length+'件の予約';
+  document.getElementById('futureModal').style.display='block';
 }
 // 患者の次回予約日時を返す
 function getNextAppt(name,cardId,curDate,curSlot){
@@ -3502,7 +3519,7 @@ function renderPayDetail(){
     <tr>
       <td style="font-size:0.72rem">${r.date.replace(/-/g,'/')}</td>
       <td style="font-weight:bold">${r.name}</td>
-      <td><span style="font-size:0.7rem;padding:2px 6px;border-radius:10px;background:#dbeafe;color:#1e40af">${r.kubun}</span></td>
+      <td><span style="font-size:0.7rem;padding:2px 6px;border-radius:10px;font-weight:bold;background:${r.kubun==='自費'?'#fff7ed':r.kubun==='交通事故'?'#fee2e2':r.kubun==='新規'?'#f0fdf4':'#dbeafe'};color:${r.kubun==='自費'?'#c2410c':r.kubun==='交通事故'?'#dc2626':r.kubun==='新規'?'#166534':'#1e40af'}">${r.kubun}</span></td>
       <td style="font-size:0.7rem;max-width:120px">${r.items}</td>
       <td style="font-size:0.72rem">${r.pay}</td>
       <td style="font-weight:bold;color:#16a34a;text-align:right">${r.amount.toLocaleString()}円</td>
