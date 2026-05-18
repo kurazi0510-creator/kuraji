@@ -692,6 +692,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 
     <!-- LTV分析メイン -->
     <div id="ltv-main-sec">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn bp bsm" onclick="generateMonthlyReport()" style="background:#1e293b;color:white;border-color:#1e293b">📊 月次レポート生成（PDF）</button>
+        <button class="btn bp bsm" onclick="generateCarePlan()" style="background:#7c3aed;color:white;border-color:#7c3aed">📋 施術計画書作成</button>
+        <button class="btn bp bsm" onclick="location.href='gas_trigger_setup.html'" style="background:#f97316;color:white;border-color:#f97316">⏰ 自動通知設定</button>
+      </div>
       <div class="card">
         <div class="ctitle">💎 LTV分析（顧客生涯価値）</div>
         <div class="ltv-grid" id="ltv-main-kpi"></div>
@@ -1102,6 +1107,19 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button onclick="document.getElementById('futureModal').style.display='none'" style="background:#374151;border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="padding:14px" id="future-list"></div>
+  </div>
+</div>
+<!-- QRコードモーダル -->
+<div id="qrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center">
+  <div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+    <div style="font-size:0.9rem;font-weight:bold;color:#1e293b;margin-bottom:4px" id="qr-title">予約確認QRコード</div>
+    <div style="font-size:0.78rem;color:#64748b;margin-bottom:12px" id="qr-info"></div>
+    <img id="qr-img" style="width:200px;height:200px;border:1px solid #e2e8f0;border-radius:8px" src="">
+    <div style="font-size:0.72rem;color:#94a3b8;margin-top:8px">このQRコードをiPhoneで読み取ると<br>予約内容のメモが確認できます</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="document.getElementById('qrModal').style.display='none'" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;background:white;cursor:pointer;font-weight:bold">閉じる</button>
+      <button onclick="downloadQR()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#1e293b;color:white;cursor:pointer;font-weight:bold">📥 保存</button>
+    </div>
   </div>
 </div>
 <!-- キャンセルモーダル -->
@@ -1875,6 +1893,189 @@ function loadBui(arr){
 }
 
 // ===== SCHEDULE =====
+// ===== QRコード =====
+function showQR(date,slot,name){
+  const w=['日','月','火','水','木','金','土'];
+  const dt=new Date(date);
+  const info=date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+slot+'〜　'+name+'様';
+  document.getElementById('qr-title').textContent='予約確認 QRコード';
+  document.getElementById('qr-info').textContent=info;
+  const text=encodeURIComponent('【倉治整骨院】ご予約
+日時：'+info+'
+〒576-0054 大阪府交野市倉治3丁目
+TEL：0728-91-1234');
+  document.getElementById('qr-img').src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+text;
+  const modal=document.getElementById('qrModal');
+  modal.style.display='flex';
+}
+function downloadQR(){
+  const img=document.getElementById('qr-img');
+  const a=document.createElement('a');a.href=img.src;a.download='予約QR.png';a.click();
+}
+
+// ===== 月次レポート生成（PDF印刷） =====
+function generateMonthlyReport(){
+  const now=new Date();
+  const yr=now.getFullYear();
+  const mo=now.getMonth()+1;
+  // 月の売上集計
+  let hoken=0,jhi=0,jiko=0,bussan=0,other=0,total=0;
+  let days=0;
+  const payCount={};
+  Object.entries(uriage).forEach(([d,u])=>{
+    const dt=new Date(d+'T00:00:00');
+    if(dt.getFullYear()!==yr||dt.getMonth()+1!==mo)return;
+    hoken+=u.hoken||0;jhi+=u.jhi||0;jiko+=u.jiko||0;bussan+=u.bussan||0;other+=u.other||0;
+    total+=(u.hoken||0)+(u.jhi||0)+(u.jiko||0)+(u.bussan||0)+(u.other||0);
+    days++;
+    (u.pay||[]).forEach(p=>{payCount[p]=(payCount[p]||0)+1;});
+  });
+  // 来院数集計
+  let visitTotal=0,visitHoken=0,visitJhi=0,visitJiko=0,visitNew=0;
+  Object.entries(bookings).forEach(([d,slots])=>{
+    const dt=new Date(d+'T00:00:00');
+    if(dt.getFullYear()!==yr||dt.getMonth()+1!==mo)return;
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cont||bk.cancelled)return;
+      visitTotal++;
+      const kl=bk.kubunList||[bk.kubun||''];
+      if(kl.includes('保険'))visitHoken++;
+      if(kl.includes('自費'))visitJhi++;
+      if(kl.includes('交通事故'))visitJiko++;
+      if(kl.includes('新規'))visitNew++;
+    });
+  });
+  const avgPay=visitTotal?Math.round(total/visitTotal):0;
+  // PDF印刷用ウィンドウ
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+  <title>${yr}年${mo}月 月次レポート - 倉治整骨院</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Hiragino Sans',sans-serif;padding:20px;color:#1e293b;font-size:12px;}
+    h1{font-size:18px;font-weight:bold;text-align:center;margin-bottom:4px;}
+    .sub{text-align:center;color:#64748b;font-size:11px;margin-bottom:20px;}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+    .kpi{border:1.5px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center;}
+    .kpi .n{font-size:20px;font-weight:bold;color:#1e293b;}
+    .kpi .l{font-size:10px;color:#64748b;margin-top:2px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+    th{background:#1e293b;color:white;padding:7px 10px;text-align:left;font-size:11px;}
+    td{border-bottom:1px solid #e2e8f0;padding:6px 10px;font-size:11px;}
+    .total{font-weight:bold;background:#f8fafc;}
+    h2{font-size:13px;font-weight:bold;margin-bottom:8px;color:#374151;border-left:4px solid #f97316;padding-left:8px;}
+    @media print{body{padding:10px;}}
+  </style></head><body>
+  <h1>倉治整骨院 月次レポート</h1>
+  <div class="sub">${yr}年${mo}月 ／ 作成日：${now.toLocaleDateString('ja-JP')}</div>
+  <div class="grid">
+    <div class="kpi"><div class="n">${total.toLocaleString()}円</div><div class="l">月間総売上</div></div>
+    <div class="kpi"><div class="n">${visitTotal}名</div><div class="l">月間来院数</div></div>
+    <div class="kpi"><div class="n">${visitNew}名</div><div class="l">新患数</div></div>
+    <div class="kpi"><div class="n">${avgPay.toLocaleString()}円</div><div class="l">1来院平均単価</div></div>
+  </div>
+  <h2>売上内訳</h2>
+  <table><tr><th>区分</th><th>金額</th><th>割合</th></tr>
+  <tr><td>保険</td><td>${hoken.toLocaleString()}円</td><td>${total?Math.round(hoken/total*100):0}%</td></tr>
+  <tr><td>自費</td><td>${jhi.toLocaleString()}円</td><td>${total?Math.round(jhi/total*100):0}%</td></tr>
+  <tr><td>交通事故</td><td>${jiko.toLocaleString()}円</td><td>${total?Math.round(jiko/total*100):0}%</td></tr>
+  <tr><td>物販</td><td>${bussan.toLocaleString()}円</td><td>${total?Math.round(bussan/total*100):0}%</td></tr>
+  <tr><td>その他</td><td>${other.toLocaleString()}円</td><td>${total?Math.round(other/total*100):0}%</td></tr>
+  <tr class="total"><td>合計</td><td>${total.toLocaleString()}円</td><td>100%</td></tr>
+  </table>
+  <h2>来院数内訳</h2>
+  <table><tr><th>区分</th><th>人数</th></tr>
+  <tr><td>保険</td><td>${visitHoken}名</td></tr>
+  <tr><td>自費</td><td>${visitJhi}名</td></tr>
+  <tr><td>交通事故</td><td>${visitJiko}名</td></tr>
+  <tr><td>新患</td><td>${visitNew}名</td></tr>
+  <tr class="total"><td>合計</td><td>${visitTotal}名</td></tr>
+  </table>
+  <h2>支払方法別</h2>
+  <table><tr><th>支払方法</th><th>件数</th></tr>
+  ${Object.entries(payCount).map(([p,c])=>'<tr><td>'+p+'</td><td>'+c+'件</td></tr>').join('')}
+  </table>
+  <div style="margin-top:20px;padding:12px;background:#f8fafc;border-radius:8px;font-size:11px;color:#64748b;text-align:center;">
+    このレポートは倉治整骨院管理システムから自動生成されました
+  </div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// ===== 施術計画書作成 =====
+function generateCarePlan(){
+  // 患者選択ダイアログ
+  const names=patients.map(p=>p.id+'：'+p.name).join('\n');
+  const input=prompt('施術計画書を作成する患者の診察券Noを入力してください：\n\n'+names.slice(0,300));
+  if(!input)return;
+  const p=patients.find(x=>x.id===input.trim()||x.name===input.trim());
+  if(!p){alert('患者が見つかりません');return;}
+  // 来院履歴取得
+  const history=[];
+  Object.entries(bookings).sort().forEach(([d,slots])=>{
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cont||bk.cancelled)return;
+      if(bk.name===p.name||bk.cardId===p.id){
+        history.push({date:d,kubun:bk.kubun,symptom:bk.symptom,memo:bk.nextMemo||bk.nextNote});
+      }
+    });
+  });
+  const latest=history[history.length-1]||{};
+  const w=window.open('','_blank');
+  const today=new Date().toLocaleDateString('ja-JP');
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+  <title>施術計画書 - ${p.name}様</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Hiragino Sans',sans-serif;padding:24px;color:#1e293b;font-size:12px;max-width:700px;}
+    h1{font-size:16px;font-weight:bold;text-align:center;margin-bottom:16px;border-bottom:2px solid #1e293b;padding-bottom:8px;}
+    .clinic{text-align:center;font-size:11px;color:#64748b;margin-bottom:16px;}
+    .section{margin-bottom:16px;}
+    .section-title{font-size:12px;font-weight:bold;background:#1e293b;color:white;padding:5px 10px;border-radius:4px;margin-bottom:8px;}
+    .row{display:flex;border-bottom:1px solid #e2e8f0;padding:5px 0;}
+    .label{width:120px;font-size:11px;color:#64748b;flex-shrink:0;}
+    .value{flex:1;font-size:11px;}
+    .plan-box{border:1.5px solid #e2e8f0;border-radius:6px;padding:10px;min-height:60px;font-size:11px;color:#94a3b8;}
+    .sign{display:flex;gap:20px;margin-top:20px;}
+    .sign-box{flex:1;border-top:1.5px solid #1e293b;padding-top:8px;text-align:center;font-size:10px;color:#64748b;}
+    @media print{body{padding:10px;}}
+  </style></head><body>
+  <div class="clinic">倉治整骨院　大阪府交野市倉治3丁目　Tel: 0728-91-1234</div>
+  <h1>施術計画書</h1>
+  <div class="section">
+    <div class="section-title">患者情報</div>
+    <div class="row"><div class="label">診察券No</div><div class="value">${p.id}</div></div>
+    <div class="row"><div class="label">氏名</div><div class="value">${p.name}　様</div></div>
+    <div class="row"><div class="label">生年月日</div><div class="value">${p.dob||'未記入'}</div></div>
+    <div class="row"><div class="label">住所</div><div class="value">${p.city||'未記入'}</div></div>
+    <div class="row"><div class="label">電話番号</div><div class="value">${p.tel||'未記入'}</div></div>
+    <div class="row"><div class="label">初診日</div><div class="value">${history[0]?.date||'未記入'}</div></div>
+    <div class="row"><div class="label">来院回数</div><div class="value">${p.count||0}回</div></div>
+    <div class="row"><div class="label">最終来院</div><div class="value">${p.last||'未記入'}</div></div>
+  </div>
+  <div class="section">
+    <div class="section-title">症状・訴え</div>
+    <div class="plan-box">${p.symptom||latest.symptom||'　'}</div>
+  </div>
+  <div class="section">
+    <div class="section-title">施術方針・計画</div>
+    <div class="plan-box">・週　　回のペースで施術を行います<br>・目標期間：　　ヶ月<br>・主な施術：<br>・注意事項：${latest.memo||''}</div>
+  </div>
+  <div class="section">
+    <div class="section-title">来院履歴（直近10回）</div>
+    ${history.slice(-10).map(h=>'<div class="row"><div class="label">'+h.date+'</div><div class="value">'+h.kubun+(h.symptom?' / '+h.symptom:'')+'</div></div>').join('')}
+  </div>
+  <div class="row"><div class="label">作成日</div><div class="value">${today}</div></div>
+  <div class="sign">
+    <div class="sign-box">患者署名<br><br><br>（自署）</div>
+    <div class="sign-box">施術者<br><br><br>倉治整骨院 院長</div>
+  </div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
 // ===== LINE Notify =====
 function saveLineToken(){
   const token=document.getElementById('line-notify-token').value.trim();
@@ -2039,6 +2240,7 @@ function renderSched(){
 })()}</td>
         <td style="white-space:nowrap">
           <button class="btn bc bsm" onclick="editBk('${date}','${s}')">編集</button>
+          <button class="btn bp bsm" onclick="showQR('${date}','${s}','${bk.name||&quot;&quot;}')" style="background:#7c3aed;border-color:#7c3aed;color:white;margin-top:2px">QR</button>
           <button class="btn bcancel bsm" onclick="openCancelModal('${date}','${s}')" style="margin-top:2px">ｷｬﾝｾﾙ</button>
           <button class="btn bd bsm" onclick="delBk('${date}','${s}')" style="margin-top:2px">削除</button>
         </td>`;

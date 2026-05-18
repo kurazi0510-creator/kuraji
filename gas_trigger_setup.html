@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GASトリガー設定 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;padding:14px;}
+.card{background:white;border-radius:12px;padding:16px;max-width:600px;margin:0 auto 12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+h1{color:#1e293b;font-size:0.9rem;text-align:center;margin-bottom:4px;}
+.step{background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #f97316;}
+.step-num{color:#f97316;font-size:0.72rem;font-weight:bold;margin-bottom:4px;}
+.step-title{color:#1e293b;font-size:0.88rem;font-weight:bold;margin-bottom:8px;}
+.step-desc{color:#374151;font-size:0.78rem;line-height:1.9;}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:0.88rem;font-weight:bold;cursor:pointer;margin-top:8px;}
+.btn-primary{background:#f97316;color:white;}
+.btn-green{background:#22c55e;color:white;}
+.btn-back{background:#1e3a5f;color:#7dd3fc;}
+.tip{background:#eff6ff;border-radius:8px;padding:10px;font-size:0.76rem;color:#1e40af;margin-top:8px;line-height:1.7;}
+.inp{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px 12px;font-size:0.82rem;margin-bottom:8px;}
+.result{border-radius:8px;padding:10px;margin-top:8px;display:none;font-size:0.78rem;}
+.result-ok{background:#dcfce7;color:#166534;}
+.result-ng{background:#fee2e2;color:#dc2626;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⏰ GAS自動トリガー設定ガイド</h1>
+  <p style="text-align:center;font-size:0.74rem;color:#64748b;margin-bottom:14px">毎朝8時に20日未来院患者を自動でLINEに通知</p>
+
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <div class="step-title">📋 最新GASコードに更新する</div>
+    <div class="step-desc">
+      まず下のページを開いてGASコードを更新してください。<br>
+      新しいコードに<code>dailyLineAlert</code>関数が含まれています。
+    </div>
+    <button class="btn btn-primary" onclick="window.open('gas_copy.html')">📋 GASコードをコピーする</button>
+    <div class="tip">コピー後：Apps Script → Ctrl+A → Delete → 貼り付け → Ctrl+S → デプロイ</div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <div class="step-title">🔑 LINEトークンをGASに保存する</div>
+    <div class="step-desc">
+      Apps Scriptで<code>saveLineSettings</code>関数を実行して、LINEトークンをGASのプロパティに保存します。
+    </div>
+    <input class="inp" type="password" id="setup-token" placeholder="チャネルアクセストークン（長期）">
+    <input class="inp" type="text" id="setup-userid" placeholder="あなたのユーザーID（Uで始まる）">
+    <button class="btn btn-green" onclick="saveToGAS()">💾 GASにLINE設定を保存する</button>
+    <div class="result" id="save-result"></div>
+    <div class="tip">保存した設定はGASのスクリプトプロパティに安全に保存されます。</div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">STEP 3</div>
+    <div class="step-title">⏰ トリガーを設定する（毎朝8時）</div>
+    <div class="step-desc">
+      Apps Scriptで：<br>
+      ① 左メニューの <strong>⏰時計アイコン</strong>（トリガー）をクリック<br>
+      ② 右下の <strong>「トリガーを追加」</strong> をクリック<br>
+      ③ 実行する関数：<strong>「dailyLineAlert」</strong> を選択<br>
+      ④ イベントのソース：<strong>「時間主導型」</strong> を選択<br>
+      ⑤ 時間ベースのトリガーのタイプ：<strong>「日付ベースのタイマー」</strong><br>
+      ⑥ 時刻：<strong>「午前8時〜9時」</strong> を選択<br>
+      ⑦ <strong>「保存」</strong> をクリック
+    </div>
+    <div class="tip">
+      ✅ 設定完了後、毎朝8時に自動でLINEに20日アラートが届きます。<br>
+      🧪 テストするには関数を「dailyLineAlert」に変えて「▶ 実行」を押してください。
+    </div>
+  </div>
+
+  <button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムに戻る</button>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+
+// localStorageからトークンを自動入力
+window.addEventListener('load',()=>{
+  const t=localStorage.getItem('kj_line_token2')||'';
+  const u=localStorage.getItem('kj_line_userid')||'';
+  if(t)document.getElementById('setup-token').value=t;
+  if(u)document.getElementById('setup-userid').value=u;
+});
+
+async function saveToGAS(){
+  const token=document.getElementById('setup-token').value.trim();
+  const userId=document.getElementById('setup-userid').value.trim();
+  const res=document.getElementById('save-result');
+  if(!token||!userId){res.className='result result-ng';res.style.display='block';res.textContent='❌ トークンとユーザーIDを入力してください';return;}
+  res.className='result';res.style.display='block';res.textContent='📤 GASに保存中...';
+  try{
+    const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveLineSettings',token,userId}),redirect:'follow'});
+    const d=JSON.parse(await r.text());
+    if(d.ok){res.className='result result-ok';res.textContent='✅ GASにLINE設定を保存しました！STEP 3のトリガー設定に進んでください。';}
+    else{res.className='result result-ng';res.textContent='❌ 失敗：'+JSON.stringify(d);}
+  }catch(e){res.className='result result-ng';res.textContent='❌ エラー：'+e.message;}
+}
+</script>
+</body>
+</html>

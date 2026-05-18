@@ -56,6 +56,7 @@ function doPost(e){
     else if(action==='resetBookings'){resetBookings();result={ok:true};}
     else if(action==='lineNotify'){result=sendLineNotify(body.token,body.message);}
     else if(action==='lineNotifyV2'){result=sendLineMessagingAPI(body.token,body.userId,body.message);}
+    else if(action==='saveLineSettings'){saveLineSettings(body.token,body.userId);result={ok:true};}
     else{result={ok:false,error:'unknown action'};}
   }catch(err){result={ok:false,error:err.message};}
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
@@ -90,6 +91,69 @@ function resetBookings(){
   s.clearContents();
   s.getRange(1,1,1,20).setValues([['\u65e5\u4ed8','\u6642\u9593','\u533a\u5206','\u60a3\u8005\u540d','\u8a3a\u5bdf\u5238No','\u4e88\u7d04\u30eb\u30fc\u30c8','\u6765\u9662\u56de\u6570','\u7d4c\u904e\u65e5\u6570','\u75c7\u72b6','\u30aa\u30d7\u30b7\u30e7\u30f3','\u81ea\u8cbb\u30e1\u30cb\u30e5\u30fc','\u51e6\u7f6e(JSON)','\u51e6\u7f6e\u30e1\u30e2','\u7269\u8ca9(JSON)','\u652f\u6255\u65b9\u6cd5','\u652f\u6255\u91d1\u984d','\u533a\u5206\u30ea\u30b9\u30c8','\u518d\u4e88\u7d04\u60c5\u5831','\u30ad\u30e3\u30f3\u30bb\u30eb\u7406\u7531','\u65bd\u8853\u90e8\u4f4d']]);
 }
+// ===== 毎朝8時自動アラート（GASトリガーで実行）=====
+// Apps Scriptで：時計アイコン→トリガー追加→dailyLineAlert→時間ベース→午前8時
+function dailyLineAlert(){
+  var props=PropertiesService.getScriptProperties();
+  var token=props.getProperty('LINE_TOKEN');
+  var userId=props.getProperty('LINE_USER_ID');
+  if(!token||!userId){Logger.log('トークン未設定');return;}
+
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var sheet=ss.getSheetByName('予約表');
+  if(!sheet){Logger.log('予約表シートなし');return;}
+
+  var data=sheet.getDataRange().getValues();
+  if(data.length<2)return;
+
+  var today=new Date();
+  var alerts=[];
+
+  // 患者データから最終来院日を取得して20日チェック
+  var cSheet=ss.getSheetByName('患者');
+  if(cSheet){
+    var cData=cSheet.getDataRange().getValues();
+    var cHdr=cData[0];
+    var nameIdx=cHdr.indexOf('患者名');
+    var lastIdx=cHdr.indexOf('前回通院日');
+    var idIdx=cHdr.indexOf('診察券No');
+    if(nameIdx>-1&&lastIdx>-1){
+      cData.slice(1).forEach(function(row){
+        var lastStr=String(row[lastIdx]||'').trim();
+        if(!lastStr||lastStr.startsWith('1899'))return;
+        var lastDate=new Date(lastStr);
+        var diff=Math.floor((today-lastDate)/(1000*60*60*24));
+        if(diff>=20&&diff<=21){
+          alerts.push('・'+String(row[nameIdx]||'')+'（'+String(row[idIdx]||'')+'号）前回:'+lastStr+' '+diff+'日経過');
+        }
+      });
+    }
+  }
+
+  if(alerts.length>0){
+    var msg='【倉治整骨院】
+⚠️ 明日で初診料発生アラート
+'+Utilities.formatDate(today,'Asia/Tokyo','M月d日(E)')+'
+
+'+alerts.join('
+')+'
+
+→ 来院を促してください！';
+    sendLineMessagingAPI(token,userId,msg);
+    Logger.log('アラート送信：'+alerts.length+'件');
+  }else{
+    Logger.log('20日アラート対象なし');
+  }
+}
+
+// LINEトークン・ユーザーIDをスクリプトプロパティに保存
+function saveLineSettings(token,userId){
+  var props=PropertiesService.getScriptProperties();
+  props.setProperty('LINE_TOKEN',token);
+  props.setProperty('LINE_USER_ID',userId);
+  Logger.log('LINE設定を保存しました');
+}
+
 function sendLineMessagingAPI(token,userId,message){
   if(!token||!userId||!message)return{ok:false,error:'missing params'};
   try{
