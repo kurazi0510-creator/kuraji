@@ -993,7 +993,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div class="fg" style="grid-column:1/-1"><label>本日の症状</label><input class="inp" id="m-sym" placeholder="腰痛・肩こりなど"></div>
         <div class="fg" style="grid-column:1/-1">
           <label>📋 次回の注意事項・施術メモ</label>
-          <textarea class="inp" id="m-next-memo" placeholder="次回来院時の注意点・やること・患者への伝達事項など" style="height:80px;resize:none;font-size:0.82rem;line-height:1.6"></textarea>
+          <textarea class="inp" id="m-next-memo" placeholder="次回来院時の注意点・やること・患者への伝達事項など" style="height:80px;resize:none;font-size:0.82rem;line-height:1.6" oninput="syncMemoToNextForm()"></textarea>
         </div>
         <!-- 自費メニュー・オプション（非表示で値保持） -->
         <input type="hidden" id="m-menu" value="">
@@ -2953,6 +2953,15 @@ function setNbSlot(n){
     const b=document.getElementById('nb-slot-'+i);
     if(b)b.classList.toggle('on',i===n);
   });
+}
+// m-next-memoの入力をリアルタイムでnb-prev-memoに反映
+function syncMemoToNextForm(){
+  const val=document.getElementById('m-next-memo')?.value||'';
+  const el=document.getElementById('nb-prev-memo');
+  if(el){
+    el.value=val;
+    el.style.background=val?'#f0fdf4':'';
+  }
 }
 function reloadInheritMemo(){
   const todayMemo=document.getElementById('m-next-memo')?.value.trim()||'';
