@@ -1527,7 +1527,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 </div>
 
 <script>
-const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+const GAS='https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
 
 const DEFAULT_BUSSAN_MASTER=[
   {id:'bs001',name:'クラウドテープS',price:300,unit:'枚',stockId:'st001'},
@@ -2416,7 +2416,7 @@ async function testPatientLine(){
   if(!token){alert('まずマスター設定でLINEトークンを設定してください');return;}
   const msg='【倉治整骨院】\n'+name+'様\nLINE連携のテスト送信です✅\n正常に届いていれば設定完了です。';
   try{
-    const res=await fetch('https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec',{
+    const res=await fetch('https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec',{
       method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'lineNotifyV2',token,userId:uid,message:msg}),
       redirect:'follow'

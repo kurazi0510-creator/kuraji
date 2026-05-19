@@ -125,7 +125,7 @@ h1{color:#1e293b;font-size:1rem;text-align:center;margin-bottom:4px;}
 
 <script>
 // GAS URL
-const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+const GAS='https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
 
 // 保存済みの値を読み込む
 window.addEventListener('load',()=>{
@@ -141,7 +141,7 @@ async function testSend(){
   const res=document.getElementById('test-result');
   if(!token||!userId){res.className='result result-ng';res.style.display='block';res.textContent='❌ トークンとユーザーIDを両方入力してください';return;}
   res.className='result';res.style.display='block';res.textContent='📤 GAS経由で送信中...';
-  const GAS='https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec';
+  const GAS='https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
   try{
     const r=await fetch(GAS,{
       method:'POST',
@@ -173,7 +173,7 @@ async function testSend(){
 
 function openAuthPage(){
   // GASの権限承認ページを直接開く
-  window.open('https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec?action=auth','_blank');
+  window.open('https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec?action=auth','_blank');
   alert('新しいタブでGASページが開きます。\n「このアプリを信頼する」や「許可」が表示されたら承認してください。\n承認後、もう一度テスト送信してください。');
 }
 function saveSettings(){
