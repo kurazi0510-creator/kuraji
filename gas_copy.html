@@ -12,270 +12,53 @@ h1{color:#f97316;font-size:1rem;text-align:center;margin-bottom:8px;}
 .step{background:#1e3a5f;border-radius:8px;padding:12px 14px;margin:10px 0;font-size:0.8rem;color:#7dd3fc;line-height:2;}
 .btn{display:block;width:100%;padding:16px;border:none;border-radius:10px;font-size:1rem;font-weight:bold;cursor:pointer;margin-bottom:10px;}
 .btn-copy{background:#f97316;color:white;}
-.btn-dl{background:#22c55e;color:white;}
 .btn-back{background:#374151;color:#94a3b8;}
-#status{padding:10px;border-radius:8px;text-align:center;font-size:0.82rem;display:none;margin-bottom:10px;}
-.ok{background:#dcfce7;color:#166534;}
+#status{padding:12px;border-radius:8px;text-align:center;font-size:0.82rem;display:none;margin-bottom:10px;background:#dcfce7;color:#166534;}
 </style>
 </head>
 <body>
 <div class="card">
   <h1>⚙️ GASコード更新</h1>
-  
   <div class="step">
     <strong>【手順】</strong><br>
-    ① 「📋 クリップボードにコピー」を押す<br>
+    ① 「📋 コピー」ボタンを押す<br>
     ② <a href="https://script.google.com" target="_blank" style="color:#60a5fa">script.google.com</a> を開く<br>
-    ③ 「無題のプロジェクト」→「コード.gs」をクリック<br>
-    ④ <kbd>Ctrl+A</kbd> → <kbd>Delete</kbd> → <kbd>Ctrl+V</kbd> → <kbd>Ctrl+S</kbd><br>
-    ⑤ 関数を「setupAllTriggers」に変更 → 「▶ 実行」<br>
-    ⑥ デプロイ → デプロイを管理 → 鉛筆 → 新しいバージョン → デプロイ
+    ③ コード.gs → <kbd>Ctrl+A</kbd> → <kbd>Delete</kbd> → <kbd>Ctrl+V</kbd> → <kbd>Ctrl+S</kbd><br>
+    ④ 関数を「setupAllTriggers」に変更 → 「▶ 実行」<br>
+    ⑤ デプロイ → デプロイを管理 → 鉛筆 → 新しいバージョン → デプロイ
   </div>
-  
   <div id="status"></div>
-  <button class="btn btn-copy" onclick="copyGAS()">📋 クリップボードにコピー</button>
-  <button class="btn btn-dl" onclick="downloadGAS()">💾 .gsファイルとしてダウンロード</button>
+  <button class="btn btn-copy" id="copybtn" onclick="copyGAS()">📋 クリップボードにコピー</button>
   <button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムに戻る</button>
 </div>
-
 <script>
-function getGASCode(){
-  return [
-'function myTest(){',
-'  var token="RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=";',
-'  var userId="U9f7333eed2d51ceba13641059e8bd341";',
-'  var result=sendLineMessagingAPI(token,userId,"【倉治整骨院】LINEテスト");',
-'  Logger.log(JSON.stringify(result));',
-'}',
-'function doGet(e){',
-'  var action=(e&&e.parameter&&e.parameter.action)||"getAll";',
-'  var callback=(e&&e.parameter&&e.parameter.callback)||"";',
-'  var result;',
-'  try{if(action==="getAll"){result=getAllData();}else{result={ok:true};}}',
-'  catch(err){result={ok:false,error:err.message};}',
-'  var json=JSON.stringify(result);',
-'  if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);',
-'  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);',
-'}',
-'function doPost(e){',
-'  var body={};',
-'  try{body=JSON.parse(e.postData.contents);}catch(err){}',
-'  if(body.events&&body.events.length>0){',
-'    body.events.forEach(function(ev){',
-'      if(ev.type==="message"&&ev.source&&ev.source.userId){',
-'        var uid=ev.source.userId,dname="";',
-'        try{',
-'          var tok=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");',
-'          if(tok){',
-'            var r=UrlFetchApp.fetch("https://api.line.me/v2/bot/profile/"+uid,{',
-'              headers:{"Authorization":"Bearer "+tok},muteHttpExceptions:true});',
-'            if(r.getResponseCode()===200)dname=JSON.parse(r.getContentText()).displayName||"";',
-'          }',
-'        }catch(err){}',
-'        saveLineUserId(uid,dname,ev.message?ev.message.text:"");',
-'      }',
-'    });',
-'    return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);',
-'  }',
-'  var action=body.action||"",result;',
-'  try{',
-'    if(action==="getAll")result=getAllData();',
-'    else if(action==="saveBookings"){saveSheet("予約表",JSON.parse(body.rows));result={ok:true};}',
-'    else if(action==="saveCustomers"){saveSheet("患者",JSON.parse(body.rows));result={ok:true};}',
-'    else if(action==="saveUriage"){saveSheet("売上",JSON.parse(body.rows));result={ok:true};}',
-'    else if(action==="resetBookings"){resetBookings();result={ok:true};}',
-'    else if(action==="lineNotifyV2")result=sendLineMessagingAPI(body.token,body.userId,body.message);',
-'    else if(action==="saveLineSettings"){saveLineSettings();result={ok:true};}',
-'    else if(action==="getLineUsers")result=getLineUsers();',
-'    else result={ok:false,error:"unknown action"};',
-'  }catch(err){result={ok:false,error:err.message};}',
-'  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);',
-'}',
-'function saveLineUserId(userId,displayName,message){',
-'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
-'  var s=ss.getSheetByName("LINE_IDs");',
-'  if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,4).setValues([["userId","表示名","最終MSG","更新日"]]);}',
-'  var data=s.getDataRange().getValues();',
-'  var now=new Date();',
-'  for(var i=1;i<data.length;i++){',
-'    if(data[i][0]===userId){s.getRange(i+1,2,1,3).setValues([[displayName||data[i][1],message,now]]);return;}',
-'  }',
-'  s.appendRow([userId,displayName,message,now]);',
-'}',
-'function getLineUsers(){',
-'  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");',
-'  if(!s)return{ok:true,users:[]};',
-'  var users=s.getDataRange().getValues().slice(1).map(function(r){return{userId:r[0],name:String(r[1]),lastMsg:String(r[2])};});',
-'  return{ok:true,users:users};',
-'}',
-'function getAllData(){',
-'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
-'  var b=ss.getSheetByName("予約表"),c=ss.getSheetByName("患者"),u=ss.getSheetByName("売上");',
-'  return{ok:true,',
-'    bookings:b?b.getDataRange().getValues():[[]],',
-'    customers:c?c.getDataRange().getValues():[[]],',
-'    uriage:u?u.getDataRange().getValues():[[]]};',
-'}',
-'function saveSheet(name,rows){',
-'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
-'  var s=ss.getSheetByName(name)||ss.insertSheet(name);',
-'  s.clearContents();',
-'  if(!rows||!rows.length)return;',
-'  var san=rows.map(function(row){return row.map(function(c){',
-'    if(c===null||c===undefined)return"";',
-'    if(c instanceof Date){',
-'      var y=c.getFullYear(),m=String(c.getMonth()+1).padStart(2,"0"),d=String(c.getDate()).padStart(2,"0");',
-'      return y+"-"+m+"-"+d;',
-'    }',
-'    return String(c);',
-'  });});',
-'  var rng=s.getRange(1,1,san.length,san[0].length);',
-'  rng.setNumberFormats(san.map(function(r){return r.map(function(){return"@";});}));',
-'  rng.setValues(san);',
-'}',
-'function resetBookings(){',
-'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
-'  var s=ss.getSheetByName("予約表")||ss.insertSheet("予約表");',
-'  s.clearContents();',
-'  s.getRange(1,1,1,20).setValues([["日付","時間","区分","患者名","診察券No","予約ルート","来院回数","経過日数","症状","オプション","自費メニュー","処置(JSON)","処置メモ","物販(JSON)","支払方法","支払金額","区分リスト","再予約情報","キャンセル理由","施術部位"]]);',
-'}',
-'function saveLineSettings(){',
-'  var p=PropertiesService.getScriptProperties();',
-'  p.setProperty("LINE_TOKEN","RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=");',
-'  p.setProperty("LINE_USER_ID","U9f7333eed2d51ceba13641059e8bd341");',
-'  Logger.log("LINE設定保存完了");',
-'}',
-'function dailyLineAlert(){',
-'  var p=PropertiesService.getScriptProperties();',
-'  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");',
-'  if(!token||!ownerId){Logger.log("トークン未設定");return;}',
-'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
-'  var today=new Date();today.setHours(0,0,0,0);',
-'  var alerts=[];',
-'  var bs=ss.getSheetByName("予約表");',
-'  if(bs){',
-'    var bd=bs.getDataRange().getValues(),bh=bd[0];',
-'    var di=bh.indexOf("日付"),ni=bh.indexOf("患者名"),ii=bh.indexOf("診察券No"),ki=bh.indexOf("区分");',
-'    if(di>-1){',
-'      var lv={};',
-'      bd.slice(1).forEach(function(r){',
-'        var k=String(r[ki]||"");',
-'        if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1)return;',
-'        var dv=r[di];if(!dv)return;',
-'        var d=dv instanceof Date?new Date(dv):new Date(String(dv));',
-'        if(isNaN(d.getTime()))return;',
-'        d.setHours(0,0,0,0);if(d>today)return;',
-'        var key=String(r[ii]||"")||String(r[ni]||"");',
-'        if(!lv[key]||d>lv[key].date)lv[key]={date:d,name:String(r[ni]||""),id:String(r[ii]||"")};',
-'      });',
-'      Object.values(lv).forEach(function(v){',
-'        var diff=Math.floor((today-v.date)/(1000*60*60*24));',
-'        if(diff>=20&&diff<=21)alerts.push("・"+v.name+"（"+v.id+"号）前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+" "+diff+"日経過");',
-'      });',
-'    }',
-'  }',
-'  if(alerts.length){',
-'    sendLineMessagingAPI(token,ownerId,"【倉治整骨院】\n⚠️ 初診料発生アラート\n"+Utilities.formatDate(today,"Asia/Tokyo","M月d日(E)")+"\n\n"+alerts.join("\n")+"\n\n→ 来院を促してください！");',
-'    Logger.log("アラート送信:"+alerts.length+"件");',
-'  }else{',
-'    Logger.log("対象なし（本日 "+Utilities.formatDate(today,"Asia/Tokyo","M/d")+")");',
-'  }',
-'}',
-'function sendDayBeforeReminders(){',
-'  var p=PropertiesService.getScriptProperties();',
-'  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");',
-'  if(!token){Logger.log("トークン未設定");return;}',
-'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
-'  var today=new Date();today.setHours(0,0,0,0);',
-'  var tmr=new Date(today);tmr.setDate(tmr.getDate()+1);',
-'  var tmrStr=Utilities.formatDate(tmr,"Asia/Tokyo","yyyy-MM-dd");',
-'  var tmrDisp=Utilities.formatDate(tmr,"Asia/Tokyo","M月d日(E)");',
-'  var lu={};',
-'  var ls=ss.getSheetByName("LINE_IDs");',
-'  if(ls)ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});',
-'  var bs=ss.getSheetByName("予約表");',
-'  if(!bs){Logger.log("予約表なし");return;}',
-'  var bd=bs.getDataRange().getValues(),bh=bd[0];',
-'  var di=bh.indexOf("日付"),ti=bh.indexOf("時間"),ni=bh.indexOf("患者名"),ki=bh.indexOf("区分");',
-'  if(di<0){Logger.log("ヘッダー未発見");return;}',
-'  var bp={},seen={};',
-'  bd.slice(1).forEach(function(r){',
-'    var dv=String(r[di]||"").trim(),k=String(r[ki]||"");',
-'    if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1||dv!==tmrStr)return;',
-'    var n=String(r[ni]||"").trim(),t=String(r[ti]||"").trim();',
-'    if(!n||!t||seen[n+"_"+t])return;',
-'    seen[n+"_"+t]=true;',
-'    if(!bp[n])bp[n]=[];',
-'    bp[n].push(t);',
-'  });',
-'  if(!Object.keys(bp).length){Logger.log("明日の予約なし");return;}',
-'  var sent=0,skip=[];',
-'  Object.keys(bp).forEach(function(name){',
-'    var tid=lu[name];',
-'    if(!tid){',
-'      var ln=name.split(/[　 ]/)[0];',
-'      var fk=Object.keys(lu).find(function(k){return k.replace(/[　 ]/g,"").indexOf(ln)===0;});',
-'      if(fk)tid=lu[fk];',
-'    }',
-'    if(!tid){skip.push(name);return;}',
-'    var msg="【倉治整骨院】\n"+tmrDisp+"のご予約リマインドです\n\n⏰ "+bp[name].join(" / ")+"\n\nお気をつけてお越しください。\n※自動送信のため返信不要です。";',
-'    if(sendLineMessagingAPI(token,tid,msg).ok)sent++;else skip.push(name+"(エラー)");',
-'  });',
-'  Logger.log("リマインド完了 送信:"+sent+"件 未登録:"+skip.length+"件");',
-'  if(ownerId){',
-'    var s="【倉治整骨院】\n前日リマインド完了\n"+tmrDisp+"\n送信:"+sent+"件";',
-'    if(skip.length)s+="\nLINE未登録:\n・"+skip.join("\n・");',
-'    sendLineMessagingAPI(token,ownerId,s);',
-'  }',
-'}',
-'function setupAllTriggers(){',
-'  ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});',
-'  ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(8).create();',
-'  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(18).create();',
-'  Logger.log("トリガー設定完了：毎朝8時+毎日18時");',
-'}',
-'function sendLineMessagingAPI(token,userId,message){',
-'  if(!token||!userId||!message)return{ok:false,error:"missing"};',
-'  try{',
-'    var res=UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push",{',
-'      method:"post",',
-'      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},',
-'      payload:JSON.stringify({to:userId,messages:[{type:"text",text:message}]})',
-'    });',
-'    return{ok:res.getResponseCode()===200};',
-'  }catch(e){return{ok:false,error:e.message};}',
-'}'
-  ].join('\n');
+var B64="ZnVuY3Rpb24gbXlUZXN0KCl7CiAgdmFyIHRva2VuPSJSb21uVDdvbS95dFlqejFkaWNIZ01iYXhIWnZuY2NDZUJQNkMzRlgxczFUdGlDVzFNRTNYM2ZLMDk4d2FjQmZEdHRWZ25NTTRqWlBSTjZHK1JXUm1ZcmtaVVcrcWtFamx1Z201RlZOYWdqNVdPZndJTlY2TnFFb05DSDlPVmJJN3FWaVA2WHpGM0dFWWRqV0dIUXZJc2dkQjA0dDg5LzFPL3cxY0RueWlsRlU9IjsKICB2YXIgdXNlcklkPSJVOWY3MzMzZWVkMmQ1MWNlYmExMzY0MTA1OWU4YmQzNDEiOwogIHZhciByZXN1bHQ9c2VuZExpbmVNZXNzYWdpbmdBUEkodG9rZW4sdXNlcklkLCLjg4bjgrnjg4giKTsKICBMb2dnZXIubG9nKEpTT04uc3RyaW5naWZ5KHJlc3VsdCkpOwp9CmZ1bmN0aW9uIGRvR2V0KGUpewogIHZhciBhY3Rpb249KGUmJmUucGFyYW1ldGVyJiZlLnBhcmFtZXRlci5hY3Rpb24pfHwiZ2V0QWxsIjsKICB2YXIgY2FsbGJhY2s9KGUmJmUucGFyYW1ldGVyJiZlLnBhcmFtZXRlci5jYWxsYmFjayl8fCIiOwogIHZhciByZXN1bHQ7CiAgdHJ5e2lmKGFjdGlvbj09PSJnZXRBbGwiKXtyZXN1bHQ9Z2V0QWxsRGF0YSgpO31lbHNle3Jlc3VsdD17b2s6dHJ1ZX07fX0KICBjYXRjaChlcnIpe3Jlc3VsdD17b2s6ZmFsc2UsZXJyb3I6ZXJyLm1lc3NhZ2V9O30KICB2YXIganNvbj1KU09OLnN0cmluZ2lmeShyZXN1bHQpOwogIGlmKGNhbGxiYWNrKXJldHVybiBDb250ZW50U2VydmljZS5jcmVhdGVUZXh0T3V0cHV0KGNhbGxiYWNrKyIoIitqc29uKyIpIikuc2V0TWltZVR5cGUoQ29udGVudFNlcnZpY2UuTWltZVR5cGUuSkFWQVNDUklQVCk7CiAgcmV0dXJuIENvbnRlbnRTZXJ2aWNlLmNyZWF0ZVRleHRPdXRwdXQoanNvbikuc2V0TWltZVR5cGUoQ29udGVudFNlcnZpY2UuTWltZVR5cGUuSlNPTik7Cn0KZnVuY3Rpb24gZG9Qb3N0KGUpewogIHZhciBib2R5PXt9OwogIHRyeXtib2R5PUpTT04ucGFyc2UoZS5wb3N0RGF0YS5jb250ZW50cyk7fWNhdGNoKGVycil7fQogIGlmKGJvZHkuZXZlbnRzJiZib2R5LmV2ZW50cy5sZW5ndGg+MCl7CiAgICBib2R5LmV2ZW50cy5mb3JFYWNoKGZ1bmN0aW9uKGV2KXsKICAgICAgaWYoZXYudHlwZT09PSJtZXNzYWdlIiYmZXYuc291cmNlJiZldi5zb3VyY2UudXNlcklkKXsKICAgICAgICB2YXIgdWlkPWV2LnNvdXJjZS51c2VySWQsZG5hbWU9IiI7CiAgICAgICAgdHJ5ewogICAgICAgICAgdmFyIHRvaz1Qcm9wZXJ0aWVzU2VydmljZS5nZXRTY3JpcHRQcm9wZXJ0aWVzKCkuZ2V0UHJvcGVydHkoIkxJTkVfVE9LRU4iKTsKICAgICAgICAgIGlmKHRvayl7CiAgICAgICAgICAgIHZhciByPVVybEZldGNoQXBwLmZldGNoKCJodHRwczovL2FwaS5saW5lLm1lL3YyL2JvdC9wcm9maWxlLyIrdWlkLHtoZWFkZXJzOnsiQXV0aG9yaXphdGlvbiI6IkJlYXJlciAiK3Rva30sbXV0ZUh0dHBFeGNlcHRpb25zOnRydWV9KTsKICAgICAgICAgICAgaWYoci5nZXRSZXNwb25zZUNvZGUoKT09PTIwMClkbmFtZT1KU09OLnBhcnNlKHIuZ2V0Q29udGVudFRleHQoKSkuZGlzcGxheU5hbWV8fCIiOwogICAgICAgICAgfQogICAgICAgIH1jYXRjaChlcnIpe30KICAgICAgICBzYXZlTGluZVVzZXJJZCh1aWQsZG5hbWUsZXYubWVzc2FnZT9ldi5tZXNzYWdlLnRleHQ6IiIpOwogICAgICB9CiAgICB9KTsKICAgIHJldHVybiBDb250ZW50U2VydmljZS5jcmVhdGVUZXh0T3V0cHV0KEpTT04uc3RyaW5naWZ5KHtvazp0cnVlfSkpLnNldE1pbWVUeXBlKENvbnRlbnRTZXJ2aWNlLk1pbWVUeXBlLkpTT04pOwogIH0KICB2YXIgYWN0aW9uPWJvZHkuYWN0aW9ufHwiIixyZXN1bHQ7CiAgdHJ5ewogICAgaWYoYWN0aW9uPT09ImdldEFsbCIpcmVzdWx0PWdldEFsbERhdGEoKTsKICAgIGVsc2UgaWYoYWN0aW9uPT09InNhdmVCb29raW5ncyIpe3NhdmVTaGVldCgi5LqI57SE6KGoIixKU09OLnBhcnNlKGJvZHkucm93cykpO3Jlc3VsdD17b2s6dHJ1ZX07fQogICAgZWxzZSBpZihhY3Rpb249PT0ic2F2ZUN1c3RvbWVycyIpe3NhdmVTaGVldCgi5oKj6ICFIixKU09OLnBhcnNlKGJvZHkucm93cykpO3Jlc3VsdD17b2s6dHJ1ZX07fQogICAgZWxzZSBpZihhY3Rpb249PT0ic2F2ZVVyaWFnZSIpe3NhdmVTaGVldCgi5aOy5LiKIixKU09OLnBhcnNlKGJvZHkucm93cykpO3Jlc3VsdD17b2s6dHJ1ZX07fQogICAgZWxzZSBpZihhY3Rpb249PT0icmVzZXRCb29raW5ncyIpe3Jlc2V0Qm9va2luZ3MoKTtyZXN1bHQ9e29rOnRydWV9O30KICAgIGVsc2UgaWYoYWN0aW9uPT09ImxpbmVOb3RpZnlWMiIpcmVzdWx0PXNlbmRMaW5lTWVzc2FnaW5nQVBJKGJvZHkudG9rZW4sYm9keS51c2VySWQsYm9keS5tZXNzYWdlKTsKICAgIGVsc2UgaWYoYWN0aW9uPT09InNhdmVMaW5lU2V0dGluZ3MiKXtzYXZlTGluZVNldHRpbmdzKCk7cmVzdWx0PXtvazp0cnVlfTt9CiAgICBlbHNlIGlmKGFjdGlvbj09PSJnZXRMaW5lVXNlcnMiKXJlc3VsdD1nZXRMaW5lVXNlcnMoKTsKICAgIGVsc2UgcmVzdWx0PXtvazpmYWxzZSxlcnJvcjoidW5rbm93biBhY3Rpb24ifTsKICB9Y2F0Y2goZXJyKXtyZXN1bHQ9e29rOmZhbHNlLGVycm9yOmVyci5tZXNzYWdlfTt9CiAgcmV0dXJuIENvbnRlbnRTZXJ2aWNlLmNyZWF0ZVRleHRPdXRwdXQoSlNPTi5zdHJpbmdpZnkocmVzdWx0KSkuc2V0TWltZVR5cGUoQ29udGVudFNlcnZpY2UuTWltZVR5cGUuSlNPTik7Cn0KZnVuY3Rpb24gc2F2ZUxpbmVVc2VySWQodXNlcklkLGRpc3BsYXlOYW1lLG1lc3NhZ2UpewogIHZhciBzcz1TcHJlYWRzaGVldEFwcC5nZXRBY3RpdmVTcHJlYWRzaGVldCgpOwogIHZhciBzPXNzLmdldFNoZWV0QnlOYW1lKCJMSU5FX0lEcyIpOwogIGlmKCFzKXtzPXNzLmluc2VydFNoZWV0KCJMSU5FX0lEcyIpO3MuZ2V0UmFuZ2UoMSwxLDEsNCkuc2V0VmFsdWVzKFtbInVzZXJJZCIsIuihqOekuuWQjSIsIuacgOe1gk1TRyIsIuabtOaWsOaXpSJdXSk7fQogIHZhciBkYXRhPXMuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCk7CiAgdmFyIG5vdz1uZXcgRGF0ZSgpOwogIGZvcih2YXIgaT0xO2k8ZGF0YS5sZW5ndGg7aSsrKXsKICAgIGlmKGRhdGFbaV1bMF09PT11c2VySWQpe3MuZ2V0UmFuZ2UoaSsxLDIsMSwzKS5zZXRWYWx1ZXMoW1tkaXNwbGF5TmFtZXx8ZGF0YVtpXVsxXSxtZXNzYWdlLG5vd11dKTtyZXR1cm47fQogIH0KICBzLmFwcGVuZFJvdyhbdXNlcklkLGRpc3BsYXlOYW1lLG1lc3NhZ2Usbm93XSk7Cn0KZnVuY3Rpb24gZ2V0TGluZVVzZXJzKCl7CiAgdmFyIHM9U3ByZWFkc2hlZXRBcHAuZ2V0QWN0aXZlU3ByZWFkc2hlZXQoKS5nZXRTaGVldEJ5TmFtZSgiTElORV9JRHMiKTsKICBpZighcylyZXR1cm57b2s6dHJ1ZSx1c2VyczpbXX07CiAgdmFyIHVzZXJzPXMuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCkuc2xpY2UoMSkubWFwKGZ1bmN0aW9uKHIpe3JldHVybnt1c2VySWQ6clswXSxuYW1lOlN0cmluZyhyWzFdKSxsYXN0TXNnOlN0cmluZyhyWzJdKX07fSk7CiAgcmV0dXJue29rOnRydWUsdXNlcnM6dXNlcnN9Owp9CmZ1bmN0aW9uIGdldEFsbERhdGEoKXsKICB2YXIgc3M9U3ByZWFkc2hlZXRBcHAuZ2V0QWN0aXZlU3ByZWFkc2hlZXQoKTsKICB2YXIgYj1zcy5nZXRTaGVldEJ5TmFtZSgi5LqI57SE6KGoIiksYz1zcy5nZXRTaGVldEJ5TmFtZSgi5oKj6ICFIiksdT1zcy5nZXRTaGVldEJ5TmFtZSgi5aOy5LiKIik7CiAgcmV0dXJue29rOnRydWUsYm9va2luZ3M6Yj9iLmdldERhdGFSYW5nZSgpLmdldFZhbHVlcygpOltbXV0sY3VzdG9tZXJzOmM/Yy5nZXREYXRhUmFuZ2UoKS5nZXRWYWx1ZXMoKTpbW11dLHVyaWFnZTp1P3UuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCk6W1tdXX07Cn0KZnVuY3Rpb24gc2F2ZVNoZWV0KG5hbWUscm93cyl7CiAgdmFyIHNzPVNwcmVhZHNoZWV0QXBwLmdldEFjdGl2ZVNwcmVhZHNoZWV0KCk7CiAgdmFyIHM9c3MuZ2V0U2hlZXRCeU5hbWUobmFtZSl8fHNzLmluc2VydFNoZWV0KG5hbWUpOwogIHMuY2xlYXJDb250ZW50cygpOwogIGlmKCFyb3dzfHwhcm93cy5sZW5ndGgpcmV0dXJuOwogIHZhciBzYW49cm93cy5tYXAoZnVuY3Rpb24ocm93KXtyZXR1cm4gcm93Lm1hcChmdW5jdGlvbihjKXsKICAgIGlmKGM9PT1udWxsfHxjPT09dW5kZWZpbmVkKXJldHVybiIiOwogICAgaWYoYyBpbnN0YW5jZW9mIERhdGUpe3ZhciB5PWMuZ2V0RnVsbFllYXIoKSxtPVN0cmluZyhjLmdldE1vbnRoKCkrMSkucGFkU3RhcnQoMiwiMCIpLGQ9U3RyaW5nKGMuZ2V0RGF0ZSgpKS5wYWRTdGFydCgyLCIwIik7cmV0dXJuIHkrIi0iK20rIi0iK2Q7fQogICAgcmV0dXJuIFN0cmluZyhjKTsKICB9KTt9KTsKICB2YXIgcm5nPXMuZ2V0UmFuZ2UoMSwxLHNhbi5sZW5ndGgsc2FuWzBdLmxlbmd0aCk7CiAgcm5nLnNldE51bWJlckZvcm1hdHMoc2FuLm1hcChmdW5jdGlvbihyKXtyZXR1cm4gci5tYXAoZnVuY3Rpb24oKXtyZXR1cm4iQCI7fSk7fSkpOwogIHJuZy5zZXRWYWx1ZXMoc2FuKTsKfQpmdW5jdGlvbiByZXNldEJvb2tpbmdzKCl7CiAgdmFyIHNzPVNwcmVhZHNoZWV0QXBwLmdldEFjdGl2ZVNwcmVhZHNoZWV0KCk7CiAgdmFyIHM9c3MuZ2V0U2hlZXRCeU5hbWUoIuS6iOe0hOihqCIpfHxzcy5pbnNlcnRTaGVldCgi5LqI57SE6KGoIik7CiAgcy5jbGVhckNvbnRlbnRzKCk7CiAgcy5nZXRSYW5nZSgxLDEsMSwyMCkuc2V0VmFsdWVzKFtbIuaXpeS7mCIsIuaZgumWkyIsIuWMuuWIhiIsIuaCo+iAheWQjSIsIuiouuWvn+WIuE5vIiwi5LqI57SE44Or44O844OIIiwi5p2l6Zmi5Zue5pWwIiwi57WM6YGO5pel5pWwIiwi55eH54q2Iiwi44Kq44OX44K344On44OzIiwi6Ieq6LK744Oh44OL44Ol44O8Iiwi5Yem572uKEpTT04pIiwi5Yem572u44Oh44OiIiwi54mp6LKpKEpTT04pIiwi5pSv5omV5pa55rOVIiwi5pSv5omV6YeR6aGNIiwi5Yy65YiG44Oq44K544OIIiwi5YaN5LqI57SE5oOF5aCxIiwi44Kt44Oj44Oz44K744Or55CG55SxIiwi5pa96KGT6YOo5L2NIl1dKTsKfQpmdW5jdGlvbiBzYXZlTGluZVNldHRpbmdzKCl7CiAgdmFyIHA9UHJvcGVydGllc1NlcnZpY2UuZ2V0U2NyaXB0UHJvcGVydGllcygpOwogIHAuc2V0UHJvcGVydHkoIkxJTkVfVE9LRU4iLCJSb21uVDdvbS95dFlqejFkaWNIZ01iYXhIWnZuY2NDZUJQNkMzRlgxczFUdGlDVzFNRTNYM2ZLMDk4d2FjQmZEdHRWZ25NTTRqWlBSTjZHK1JXUm1ZcmtaVVcrcWtFamx1Z201RlZOYWdqNVdPZndJTlY2TnFFb05DSDlPVmJJN3FWaVA2WHpGM0dFWWRqV0dIUXZJc2dkQjA0dDg5LzFPL3cxY0RueWlsRlU9Iik7CiAgcC5zZXRQcm9wZXJ0eSgiTElORV9VU0VSX0lEIiwiVTlmNzMzM2VlZDJkNTFjZWJhMTM2NDEwNTllOGJkMzQxIik7CiAgTG9nZ2VyLmxvZygiTElOReioreWumuS/neWtmOWujOS6hiIpOwp9CmZ1bmN0aW9uIGRhaWx5TGluZUFsZXJ0KCl7CiAgdmFyIHA9UHJvcGVydGllc1NlcnZpY2UuZ2V0U2NyaXB0UHJvcGVydGllcygpOwogIHZhciB0b2tlbj1wLmdldFByb3BlcnR5KCJMSU5FX1RPS0VOIiksb3duZXJJZD1wLmdldFByb3BlcnR5KCJMSU5FX1VTRVJfSUQiKTsKICBpZighdG9rZW58fCFvd25lcklkKXtMb2dnZXIubG9nKCLjg4jjg7zjgq/jg7PmnKroqK3lrpoiKTtyZXR1cm47fQogIHZhciBzcz1TcHJlYWRzaGVldEFwcC5nZXRBY3RpdmVTcHJlYWRzaGVldCgpOwogIHZhciB0b2RheT1uZXcgRGF0ZSgpO3RvZGF5LnNldEhvdXJzKDAsMCwwLDApOwogIHZhciBhbGVydHM9W107CiAgdmFyIGJzPXNzLmdldFNoZWV0QnlOYW1lKCLkuojntITooagiKTsKICBpZihicyl7CiAgICB2YXIgYmQ9YnMuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCksYmg9YmRbMF07CiAgICB2YXIgZGk9YmguaW5kZXhPZigi5pel5LuYIiksbmk9YmguaW5kZXhPZigi5oKj6ICF5ZCNIiksaWk9YmguaW5kZXhPZigi6Ki65a+f5Yi4Tm8iKSxraT1iaC5pbmRleE9mKCLljLrliIYiKTsKICAgIGlmKGRpPi0xKXsKICAgICAgdmFyIGx2PXt9OwogICAgICBiZC5zbGljZSgxKS5mb3JFYWNoKGZ1bmN0aW9uKHIpewogICAgICAgIHZhciBrPVN0cmluZyhyW2tpXXx8IiIpOwogICAgICAgIGlmKGsuaW5kZXhPZigi57aZ57aaIik+LTF8fGsuaW5kZXhPZigi44Kt44Oj44Oz44K744OrIik+LTEpcmV0dXJuOwogICAgICAgIHZhciBkdj1yW2RpXTtpZighZHYpcmV0dXJuOwogICAgICAgIHZhciBkPWR2IGluc3RhbmNlb2YgRGF0ZT9uZXcgRGF0ZShkdik6bmV3IERhdGUoU3RyaW5nKGR2KSk7CiAgICAgICAgaWYoaXNOYU4oZC5nZXRUaW1lKCkpKXJldHVybjsKICAgICAgICBkLnNldEhvdXJzKDAsMCwwLDApO2lmKGQ+dG9kYXkpcmV0dXJuOwogICAgICAgIHZhciBrZXk9U3RyaW5nKHJbaWldfHwiIil8fFN0cmluZyhyW25pXXx8IiIpOwogICAgICAgIGlmKCFsdltrZXldfHxkPmx2W2tleV0uZGF0ZSlsdltrZXldPXtkYXRlOmQsbmFtZTpTdHJpbmcocltuaV18fCIiKSxpZDpTdHJpbmcocltpaV18fCIiKX07CiAgICAgIH0pOwogICAgICBPYmplY3QudmFsdWVzKGx2KS5mb3JFYWNoKGZ1bmN0aW9uKHYpewogICAgICAgIHZhciBkaWZmPU1hdGguZmxvb3IoKHRvZGF5LXYuZGF0ZSkvKDEwMDAqNjAqNjAqMjQpKTsKICAgICAgICBpZihkaWZmPj0yMCYmZGlmZjw9MjEpYWxlcnRzLnB1c2goIuODuyIrdi5uYW1lKyLvvIgiK3YuaWQrIuWPt++8ieWJjeWbnjoiK1V0aWxpdGllcy5mb3JtYXREYXRlKHYuZGF0ZSwiQXNpYS9Ub2t5byIsIk0vZCIpKyIgIitkaWZmKyLml6XntYzpgY4iKTsKICAgICAgfSk7CiAgICB9CiAgfQogIHZhciBubD1TdHJpbmcuZnJvbUNoYXJDb2RlKDEwKTsKICBpZihhbGVydHMubGVuZ3RoKXsKICAgIHNlbmRMaW5lTWVzc2FnaW5nQVBJKHRva2VuLG93bmVySWQsIuOAkOWAieayu+aVtOmqqOmZouOAkSIrbmwrIuKaoO+4jyDliJ3oqLrmlpnnmbrnlJ/jgqLjg6njg7zjg4giK25sK1V0aWxpdGllcy5mb3JtYXREYXRlKHRvZGF5LCJBc2lhL1Rva3lvIiwiTeaciGTml6UoRSkiKStubCtubCthbGVydHMuam9pbihubCkrbmwrbmwrIuKGkiDmnaXpmaLjgpLkv4PjgZfjgabjgY/jgaDjgZXjgYTvvIEiKTsKICAgIExvZ2dlci5sb2coIuOCouODqeODvOODiOmAgeS/oToiK2FsZXJ0cy5sZW5ndGgrIuS7tiIpOwogIH1lbHNlewogICAgTG9nZ2VyLmxvZygi5a++6LGh44Gq44GX77yI5pys5pelICIrVXRpbGl0aWVzLmZvcm1hdERhdGUodG9kYXksIkFzaWEvVG9reW8iLCJNL2QiKSsiKSIpOwogIH0KfQpmdW5jdGlvbiBzZW5kRGF5QmVmb3JlUmVtaW5kZXJzKCl7CiAgdmFyIHA9UHJvcGVydGllc1NlcnZpY2UuZ2V0U2NyaXB0UHJvcGVydGllcygpOwogIHZhciB0b2tlbj1wLmdldFByb3BlcnR5KCJMSU5FX1RPS0VOIiksb3duZXJJZD1wLmdldFByb3BlcnR5KCJMSU5FX1VTRVJfSUQiKTsKICBpZighdG9rZW4pe0xvZ2dlci5sb2coIuODiOODvOOCr+ODs+acquioreWumiIpO3JldHVybjt9CiAgdmFyIHNzPVNwcmVhZHNoZWV0QXBwLmdldEFjdGl2ZVNwcmVhZHNoZWV0KCk7CiAgdmFyIHRvZGF5PW5ldyBEYXRlKCk7dG9kYXkuc2V0SG91cnMoMCwwLDAsMCk7CiAgdmFyIHRtcj1uZXcgRGF0ZSh0b2RheSk7dG1yLnNldERhdGUodG1yLmdldERhdGUoKSsxKTsKICB2YXIgdG1yU3RyPVV0aWxpdGllcy5mb3JtYXREYXRlKHRtciwiQXNpYS9Ub2t5byIsInl5eXktTU0tZGQiKTsKICB2YXIgdG1yRGlzcD1VdGlsaXRpZXMuZm9ybWF0RGF0ZSh0bXIsIkFzaWEvVG9reW8iLCJN5pyIZOaXpShFKSIpOwogIHZhciBsdT17fTsKICB2YXIgbHM9c3MuZ2V0U2hlZXRCeU5hbWUoIkxJTkVfSURzIik7CiAgaWYobHMpbHMuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCkuc2xpY2UoMSkuZm9yRWFjaChmdW5jdGlvbihyKXtpZihyWzBdJiZyWzFdKWx1W1N0cmluZyhyWzFdKS50cmltKCldPVN0cmluZyhyWzBdKTt9KTsKICB2YXIgYnM9c3MuZ2V0U2hlZXRCeU5hbWUoIuS6iOe0hOihqCIpOwogIGlmKCFicyl7TG9nZ2VyLmxvZygi5LqI57SE6KGo44Gq44GXIik7cmV0dXJuO30KICB2YXIgYmQ9YnMuZ2V0RGF0YVJhbmdlKCkuZ2V0VmFsdWVzKCksYmg9YmRbMF07CiAgdmFyIGRpPWJoLmluZGV4T2YoIuaXpeS7mCIpLHRpPWJoLmluZGV4T2YoIuaZgumWkyIpLG5pPWJoLmluZGV4T2YoIuaCo+iAheWQjSIpLGtpPWJoLmluZGV4T2YoIuWMuuWIhiIpOwogIGlmKGRpPDApe0xvZ2dlci5sb2coIuODmOODg+ODgOODvOacqueZuuimiyIpO3JldHVybjt9CiAgdmFyIGJwPXt9LHNlZW49e307CiAgYmQuc2xpY2UoMSkuZm9yRWFjaChmdW5jdGlvbihyKXsKICAgIHZhciBkdj1TdHJpbmcocltkaV18fCIiKS50cmltKCksaz1TdHJpbmcocltraV18fCIiKTsKICAgIGlmKGsuaW5kZXhPZigi57aZ57aaIik+LTF8fGsuaW5kZXhPZigi44Kt44Oj44Oz44K744OrIik+LTF8fGR2IT09dG1yU3RyKXJldHVybjsKICAgIHZhciBuPVN0cmluZyhyW25pXXx8IiIpLnRyaW0oKSx0PVN0cmluZyhyW3RpXXx8IiIpLnRyaW0oKTsKICAgIGlmKCFufHwhdHx8c2VlbltuKyJfIit0XSlyZXR1cm47CiAgICBzZWVuW24rIl8iK3RdPXRydWU7CiAgICBpZighYnBbbl0pYnBbbl09W107CiAgICBicFtuXS5wdXNoKHQpOwogIH0pOwogIGlmKCFPYmplY3Qua2V5cyhicCkubGVuZ3RoKXtMb2dnZXIubG9nKCLmmI7ml6Xjga7kuojntITjgarjgZciKTtyZXR1cm47fQogIHZhciBubD1TdHJpbmcuZnJvbUNoYXJDb2RlKDEwKTsKICB2YXIgc2VudD0wLHNraXA9W107CiAgT2JqZWN0LmtleXMoYnApLmZvckVhY2goZnVuY3Rpb24obmFtZSl7CiAgICB2YXIgdGlkPWx1W25hbWVdOwogICAgaWYoIXRpZCl7CiAgICAgIHZhciBsbj1uYW1lLnNwbGl0KC9b44CAIF0vKVswXTsKICAgICAgdmFyIGZrPU9iamVjdC5rZXlzKGx1KS5maW5kKGZ1bmN0aW9uKGspe3JldHVybiBrLnJlcGxhY2UoL1vjgIAgXS9nLCIiKS5pbmRleE9mKGxuKT09PTA7fSk7CiAgICAgIGlmKGZrKXRpZD1sdVtma107CiAgICB9CiAgICBpZighdGlkKXtza2lwLnB1c2gobmFtZSk7cmV0dXJuO30KICAgIHZhciBtc2c9IuOAkOWAieayu+aVtOmqqOmZouOAkSIrbmwrdG1yRGlzcCsi44Gu44GU5LqI57SE44Oq44Oe44Kk44Oz44OJ44Gn44GZIitubCtubCsi4o+wICIrYnBbbmFtZV0uam9pbigiIC8gIikrbmwrbmwrIuOBiuawl+OCkuOBpOOBkeOBpuOBiui2iuOBl+OBj+OBoOOBleOBhOOAgiIrbmwrIuKAu+iHquWLlemAgeS/oeOBruOBn+OCgei/lOS/oeS4jeimgeOBp+OBmeOAgiI7CiAgICBpZihzZW5kTGluZU1lc3NhZ2luZ0FQSSh0b2tlbix0aWQsbXNnKS5vaylzZW50Kys7ZWxzZSBza2lwLnB1c2gobmFtZSsiKOOCqOODqeODvCkiKTsKICB9KTsKICBMb2dnZXIubG9nKCLjg6rjg57jgqTjg7Pjg4nlrozkuoYg6YCB5L+hOiIrc2VudCsi5Lu2IOacqueZu+mMsjoiK3NraXAubGVuZ3RoKyLku7YiKTsKICBpZihvd25lcklkKXsKICAgIHZhciBzPSLjgJDlgInmsrvmlbTpqqjpmaLjgJEiK25sKyLliY3ml6Xjg6rjg57jgqTjg7Pjg4nlrozkuoYiK25sK3RtckRpc3ArbmwrIumAgeS/oToiK3NlbnQrIuS7tiI7CiAgICBpZihza2lwLmxlbmd0aClzKz1ubCsiTElOReacqueZu+mMsjoiK25sKyLjg7siK3NraXAuam9pbihubCsi44O7Iik7CiAgICBzZW5kTGluZU1lc3NhZ2luZ0FQSSh0b2tlbixvd25lcklkLHMpOwogIH0KfQpmdW5jdGlvbiBzZXR1cEFsbFRyaWdnZXJzKCl7CiAgU2NyaXB0QXBwLmdldFByb2plY3RUcmlnZ2VycygpLmZvckVhY2goZnVuY3Rpb24odCl7U2NyaXB0QXBwLmRlbGV0ZVRyaWdnZXIodCk7fSk7CiAgU2NyaXB0QXBwLm5ld1RyaWdnZXIoImRhaWx5TGluZUFsZXJ0IikudGltZUJhc2VkKCkuZXZlcnlEYXlzKDEpLmF0SG91cig4KS5jcmVhdGUoKTsKICBTY3JpcHRBcHAubmV3VHJpZ2dlcigic2VuZERheUJlZm9yZVJlbWluZGVycyIpLnRpbWVCYXNlZCgpLmV2ZXJ5RGF5cygxKS5hdEhvdXIoMTgpLmNyZWF0ZSgpOwogIExvZ2dlci5sb2coIuODiOODquOCrOODvOioreWumuWujOS6hiIpOwp9CmZ1bmN0aW9uIHNlbmRMaW5lTWVzc2FnaW5nQVBJKHRva2VuLHVzZXJJZCxtZXNzYWdlKXsKICBpZighdG9rZW58fCF1c2VySWR8fCFtZXNzYWdlKXJldHVybntvazpmYWxzZSxlcnJvcjoibWlzc2luZyJ9OwogIHRyeXsKICAgIHZhciByZXM9VXJsRmV0Y2hBcHAuZmV0Y2goImh0dHBzOi8vYXBpLmxpbmUubWUvdjIvYm90L21lc3NhZ2UvcHVzaCIsewogICAgICBtZXRob2Q6InBvc3QiLAogICAgICBoZWFkZXJzOnsiQ29udGVudC1UeXBlIjoiYXBwbGljYXRpb24vanNvbiIsIkF1dGhvcml6YXRpb24iOiJCZWFyZXIgIit0b2tlbn0sCiAgICAgIHBheWxvYWQ6SlNPTi5zdHJpbmdpZnkoe3RvOnVzZXJJZCxtZXNzYWdlczpbe3R5cGU6InRleHQiLHRleHQ6bWVzc2FnZX1dfSkKICAgIH0pOwogICAgcmV0dXJue29rOnJlcy5nZXRSZXNwb25zZUNvZGUoKT09PTIwMH07CiAgfWNhdGNoKGUpe3JldHVybntvazpmYWxzZSxlcnJvcjplLm1lc3NhZ2V9O30KfQ==";
+function getCode(){
+  var bin=atob(B64);
+  var bytes=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(bytes);
 }
-
 function copyGAS(){
-  const code = getGASCode();
-  navigator.clipboard.writeText(code).then(()=>{
-    const st=document.getElementById('status');
-    st.className='ok';st.style.display='block';
-    st.textContent='✅ コピーしました！Apps Scriptに貼り付けてください。';
-    document.querySelector('.btn-copy').textContent='✅ コピー済み！';
-    document.querySelector('.btn-copy').style.background='#22c55e';
-  }).catch(()=>{
-    // fallback
-    const ta=document.createElement('textarea');
-    ta.value=getGASCode();document.body.appendChild(ta);ta.select();
-    document.execCommand('copy');document.body.removeChild(ta);
-    document.getElementById('status').className='ok';
-    document.getElementById('status').style.display='block';
-    document.getElementById('status').textContent='✅ コピーしました！';
+  var code=getCode();
+  var st=document.getElementById("status");
+  var btn=document.getElementById("copybtn");
+  navigator.clipboard.writeText(code).then(function(){
+    st.style.display="block";
+    st.textContent="✅ コピーしました！Apps Scriptに貼り付けてください。";
+    btn.textContent="✅ コピー済み！";
+    btn.style.background="#22c55e";
+  }).catch(function(){
+    var ta=document.createElement("textarea");
+    ta.value=code;ta.style.position="fixed";ta.style.opacity="0";
+    document.body.appendChild(ta);ta.focus();ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    st.style.display="block";
+    st.textContent="✅ コピーしました！";
+    btn.textContent="✅ コピー済み！";
+    btn.style.background="#22c55e";
   });
-}
-
-function downloadGAS(){
-  const blob=new Blob([getGASCode()],{type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='kuraji_gas.gs';
-  a.click();
-  document.getElementById('status').className='ok';
-  document.getElementById('status').style.display='block';
-  document.getElementById('status').textContent='✅ ダウンロードしました！Apps Scriptに内容を貼り付けてください。';
 }
 </script>
 </body>
