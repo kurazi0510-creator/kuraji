@@ -1180,6 +1180,15 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <div class="modal-ov" id="peditModal">
   <div class="pedit-modal">
     <div class="mtitle">患者情報を編集</div>
+    <!-- タブ -->
+    <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid #e2e8f0;padding-bottom:0">
+      <button class="pay-btn on" id="pe-tab-basic" onclick="switchPeTab('basic')" style="border-radius:6px 6px 0 0;padding:6px 14px;font-size:0.75rem">📋 基本情報</button>
+      <button class="pay-btn" id="pe-tab-life" onclick="switchPeTab('life')" style="border-radius:6px 6px 0 0;padding:6px 14px;font-size:0.75rem">🏠 生活習慣</button>
+      <button class="pay-btn" id="pe-tab-med" onclick="switchPeTab('med')" style="border-radius:6px 6px 0 0;padding:6px 14px;font-size:0.75rem">🏥 既往歴・医療</button>
+      <button class="pay-btn" id="pe-tab-line" onclick="switchPeTab('line')" style="border-radius:6px 6px 0 0;padding:6px 14px;font-size:0.75rem">📱 LINE設定</button>
+    </div>
+    <!-- 基本情報タブ -->
+    <div id="pe-pane-basic">
     <div class="fgrid">
       <div class="fg"><label>診察券No</label><input class="inp" id="pe-id" readonly style="background:#f4f1eb"></div>
       <div class="fg"><label>患者名</label><input class="inp" id="pe-nm"></div>
@@ -1220,6 +1229,230 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="fg"><label>症状</label><input class="inp" id="pe-sym"></div>
       <div class="fg" style="grid-column:1/-1"><label>備考</label><input class="inp" id="pe-note"></div>
     </div>
+    </div><!-- /pe-pane-basic -->
+
+    <!-- 生活習慣タブ -->
+    <div id="pe-pane-life" style="display:none">
+      <div class="fgrid">
+        <!-- 家族構成 -->
+        <div class="fg" style="grid-column:1/-1">
+          <label>家族構成</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" id="pe-family-btns">
+            <button class="pay-btn" data-v="独身" onclick="togglePeFamily(this)">独身</button>
+            <button class="pay-btn" data-v="既婚" onclick="togglePeFamily(this)">既婚</button>
+            <button class="pay-btn" data-v="バツイチ" onclick="togglePeFamily(this)">バツイチ</button>
+          </div>
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>同居家族（チェックして年齢入力）</label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:4px">
+            <div style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="pe-fam-spouse"><label style="font-size:0.78rem">配偶者</label><input class="inp" id="pe-fam-spouse-age" placeholder="年齢" style="width:50px;font-size:0.76rem"></div>
+            <div style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="pe-fam-child1"><label style="font-size:0.78rem">子①</label><input class="inp" id="pe-fam-child1-info" placeholder="性別・年齢" style="width:80px;font-size:0.76rem"></div>
+            <div style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="pe-fam-child2"><label style="font-size:0.78rem">子②</label><input class="inp" id="pe-fam-child2-info" placeholder="性別・年齢" style="width:80px;font-size:0.76rem"></div>
+            <div style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="pe-fam-parent"><label style="font-size:0.78rem">親</label><input class="inp" id="pe-fam-parent-info" placeholder="性別・年齢" style="width:80px;font-size:0.76rem"></div>
+            <div style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="pe-fam-grand"><label style="font-size:0.78rem">孫</label><input class="inp" id="pe-fam-grand-info" placeholder="性別・年齢" style="width:80px;font-size:0.76rem"></div>
+          </div>
+        </div>
+        <!-- お酒 -->
+        <div class="fg">
+          <label>お酒</label>
+          <select class="sel" id="pe-alcohol">
+            <option value="">-</option>
+            <option value="飲まない">飲まない</option>
+            <option value="たまに飲む">たまに飲む（月数回）</option>
+            <option value="週2〜3回">週2〜3回</option>
+            <option value="毎日少量">毎日（少量）</option>
+            <option value="毎日多量">毎日（多量）</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>飲酒量の詳細</label>
+          <input class="inp" id="pe-alcohol-detail" placeholder="ビール1缶、焼酎2杯など">
+        </div>
+        <!-- タバコ -->
+        <div class="fg">
+          <label>タバコ</label>
+          <select class="sel" id="pe-smoke">
+            <option value="">-</option>
+            <option value="吸わない">吸わない</option>
+            <option value="過去に吸っていた">過去に吸っていた</option>
+            <option value="吸う（少量）">吸う（少量・10本未満/日）</option>
+            <option value="吸う（多量）">吸う（多量・10本以上/日）</option>
+          </select>
+        </div>
+        <!-- 甘いもの -->
+        <div class="fg">
+          <label>甘いもの</label>
+          <select class="sel" id="pe-sweet">
+            <option value="">-</option>
+            <option value="ほとんど食べない">ほとんど食べない</option>
+            <option value="たまに食べる">たまに食べる</option>
+            <option value="よく食べる">よく食べる（毎日）</option>
+          </select>
+        </div>
+        <!-- 外食 -->
+        <div class="fg">
+          <label>外食頻度</label>
+          <select class="sel" id="pe-eat-out">
+            <option value="">-</option>
+            <option value="ほとんどしない">ほとんどしない</option>
+            <option value="週1〜2回">週1〜2回</option>
+            <option value="週3〜4回">週3〜4回</option>
+            <option value="ほぼ毎日">ほぼ毎日</option>
+          </select>
+        </div>
+        <!-- 運動 -->
+        <div class="fg">
+          <label>運動習慣</label>
+          <select class="sel" id="pe-exercise">
+            <option value="">-</option>
+            <option value="ほとんどしない">ほとんどしない</option>
+            <option value="たまにする">たまにする</option>
+            <option value="週2〜3回">週2〜3回</option>
+            <option value="ほぼ毎日">ほぼ毎日</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>運動の内容</label>
+          <input class="inp" id="pe-exercise-detail" placeholder="ウォーキング・ゴルフなど">
+        </div>
+        <!-- 睡眠 -->
+        <div class="fg">
+          <label>睡眠時間（平均）</label>
+          <select class="sel" id="pe-sleep">
+            <option value="">-</option>
+            <option value="5時間未満">5時間未満</option>
+            <option value="5〜6時間">5〜6時間</option>
+            <option value="6〜7時間">6〜7時間</option>
+            <option value="7〜8時間">7〜8時間</option>
+            <option value="8時間以上">8時間以上</option>
+          </select>
+        </div>
+        <!-- 仕事内容 -->
+        <div class="fg">
+          <label>仕事の種類</label>
+          <select class="sel" id="pe-work-type">
+            <option value="">-</option>
+            <option value="デスクワーク">デスクワーク（座り仕事）</option>
+            <option value="立ち仕事">立ち仕事</option>
+            <option value="肉体労働">肉体労働</option>
+            <option value="運転">運転（長時間）</option>
+            <option value="主婦・主夫">主婦・主夫</option>
+            <option value="無職・退職">無職・退職</option>
+            <option value="学生">学生</option>
+          </select>
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>生活習慣メモ</label>
+          <textarea class="inp" id="pe-life-memo" placeholder="その他気になる生活習慣など" style="height:60px;resize:none"></textarea>
+        </div>
+      </div>
+    </div><!-- /pe-pane-life -->
+
+    <!-- 既往歴・医療タブ -->
+    <div id="pe-pane-med" style="display:none">
+      <div class="fgrid">
+        <!-- 服薬 -->
+        <div class="fg" style="grid-column:1/-1">
+          <label>服用中の薬</label>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <button class="pay-btn" id="pe-med-none" onclick="setMedStatus('none')" style="font-size:0.75rem">飲んでいない</button>
+            <button class="pay-btn" id="pe-med-yes" onclick="setMedStatus('yes')" style="font-size:0.75rem">飲んでいる</button>
+          </div>
+          <textarea class="inp" id="pe-medicine" placeholder="薬の名前・用量（例：アムロジピン5mg、メトホルミン500mg）" style="height:70px;resize:none"></textarea>
+        </div>
+        <!-- 既往歴 -->
+        <div class="fg" style="grid-column:1/-1">
+          <label>既往歴（過去の病気・手術）</label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0">
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-hbp"> 高血圧</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-dm"> 糖尿病</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-heart"> 心疾患</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-stroke"> 脳卒中</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-cancer"> がん</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-kidney"> 腎臓病</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-liver"> 肝臓病</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-osteo"> 骨粗鬆症</label>
+            <label style="font-size:0.74rem;display:flex;align-items:center;gap:3px"><input type="checkbox" id="pe-hx-allergy"> アレルギー</label>
+          </div>
+          <textarea class="inp" id="pe-hx-other" placeholder="その他の既往歴・詳細" style="height:50px;resize:none"></textarea>
+        </div>
+        <!-- 骨折・外傷歴 -->
+        <div class="fg" style="grid-column:1/-1">
+          <label>骨折・外傷・手術歴</label>
+          <textarea class="inp" id="pe-fracture" placeholder="例：右足首骨折（2010年）、腰椎ヘルニア手術（2015年）" style="height:60px;resize:none"></textarea>
+        </div>
+        <!-- 現在の痛み -->
+        <div class="fg" style="grid-column:1/-1">
+          <label>現在の主な症状・痛みの部位</label>
+          <textarea class="inp" id="pe-current-pain" placeholder="例：腰痛（慢性）、右肩こり、膝の痛み" style="height:50px;resize:none"></textarea>
+        </div>
+        <!-- 妊娠・出産歴（女性のみ） -->
+        <div class="fg" style="grid-column:1/-1">
+          <label>妊娠・出産歴（女性の場合）</label>
+          <input class="inp" id="pe-birth-hx" placeholder="例：2回出産、帝王切開あり">
+        </div>
+        <!-- 血液型 -->
+        <div class="fg">
+          <label>血液型</label>
+          <select class="sel" id="pe-blood">
+            <option value="">不明</option>
+            <option value="A">A型</option>
+            <option value="B">B型</option>
+            <option value="O">O型</option>
+            <option value="AB">AB型</option>
+          </select>
+        </div>
+        <!-- かかりつけ医 -->
+        <div class="fg">
+          <label>かかりつけ医・通院中の病院</label>
+          <input class="inp" id="pe-doctor" placeholder="例：○○クリニック（内科）">
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>医療・治療に関するメモ</label>
+          <textarea class="inp" id="pe-med-memo" placeholder="治療上知っておくべき情報など" style="height:60px;resize:none"></textarea>
+        </div>
+      </div>
+    </div><!-- /pe-pane-med -->
+
+    <!-- LINE設定タブ -->
+    <div id="pe-pane-line" style="display:none">
+      <div class="fgrid">
+        <div class="fg" style="grid-column:1/-1">
+          <label>📱 LINEユーザーID（Uで始まる）</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="inp" id="pe-line-uid2" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxx" style="flex:1;font-size:0.78rem">
+            <button class="btn bp bsm" onclick="testPatientLine2()" style="white-space:nowrap">🧪 テスト</button>
+          </div>
+          <div style="font-size:0.72rem;color:#64748b;margin-top:4px">患者さんが公式LINEにメッセージを送ると自動で登録されます</div>
+        </div>
+        <!-- 自動LINE送信の設定 -->
+        <div class="fg" style="grid-column:1/-1">
+          <label style="font-size:0.82rem;font-weight:bold;color:#1e293b;display:block;margin-bottom:8px">🔔 自動LINE通知の設定</label>
+          <div style="background:#f8fafc;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="pe-notify-20day" style="width:18px;height:18px;accent-color:#f97316">
+              <div>
+                <div style="font-size:0.8rem;font-weight:bold">20日未来院アラート</div>
+                <div style="font-size:0.7rem;color:#64748b">最終来院から17日目に初診料の案内を自動送信</div>
+              </div>
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="pe-notify-reminder" style="width:18px;height:18px;accent-color:#f97316">
+              <div>
+                <div style="font-size:0.8rem;font-weight:bold">前日リマインド</div>
+                <div style="font-size:0.7rem;color:#64748b">予約前日の18時に自動でリマインドを送信</div>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label>LINEメモ</label>
+          <textarea class="inp" id="pe-line-memo" placeholder="LINE対応に関する備考" style="height:50px;resize:none"></textarea>
+        </div>
+      </div>
+    </div><!-- /pe-pane-line -->
+
     <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
       <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
       <button class="btn bc" onclick="closePEdit()">キャンセル</button>
@@ -3290,6 +3523,30 @@ async function addPatient(){
 
 }
 
+// タブ切替
+function switchPeTab(tab){
+  ['basic','life','med','line'].forEach(t=>{
+    document.getElementById('pe-pane-'+t).style.display=t===tab?'block':'none';
+    const btn=document.getElementById('pe-tab-'+t);
+    if(btn)btn.classList.toggle('on',t===tab);
+  });
+}
+function togglePeFamily(btn){
+  document.querySelectorAll('#pe-family-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+}
+function setMedStatus(s){
+  document.getElementById('pe-med-none').classList.toggle('on',s==='none');
+  document.getElementById('pe-med-yes').classList.toggle('on',s==='yes');
+}
+function testPatientLine2(){
+  const uid=document.getElementById('pe-line-uid2').value.trim()||document.getElementById('pe-line-uid').value.trim();
+  if(!uid){alert('LINEユーザーIDを入力してください');return;}
+  const token=localStorage.getItem('kj_line_token2')||'';
+  if(!token){alert('LINE設定が未完了です');return;}
+  sendLineNotify('【倉治整骨院】テスト送信です');
+  alert('テスト送信しました');
+}
 function openPEdit(id){
   const p=patients.find(x=>x.id===id);if(!p)return;
   editPatientId=id;
@@ -3311,6 +3568,39 @@ function openPEdit(id){
   document.getElementById('pe-cnt').value=p.count||0;
   document.getElementById('pe-sym').value=p.symptom||'';
   document.getElementById('pe-note').value=p.note||'';
+  // 詳細情報読込
+  const pd=p.detail||{};
+  // 家族構成
+  document.querySelectorAll('#pe-family-btns .pay-btn').forEach(b=>{b.classList.toggle('on',b.getAttribute('data-v')===(pd.family||''));});
+  ['spouse','child1','child2','parent','grand'].forEach(k=>{
+    const cb=document.getElementById('pe-fam-'+k);const inf=document.getElementById('pe-fam-'+k+'-info')||document.getElementById('pe-fam-'+k+'-age');
+    if(cb)cb.checked=!!(pd['fam_'+k]);if(inf)inf.value=pd['fam_'+k]||'';
+  });
+  // 生活習慣
+  ['alcohol','smoke','sweet','eat-out','exercise','sleep','work-type'].forEach(k=>{
+    const el=document.getElementById('pe-'+k);if(el)el.value=pd[k.replace('-','_')]||'';
+  });
+  ['alcohol-detail','exercise-detail','life-memo'].forEach(k=>{
+    const el=document.getElementById('pe-'+k);if(el)el.value=pd[k.replace('-','_')]||'';
+  });
+  // 既往歴
+  ['hbp','dm','heart','stroke','cancer','kidney','liver','osteo','allergy'].forEach(k=>{
+    const el=document.getElementById('pe-hx-'+k);if(el)el.checked=!!(pd['hx_'+k]);
+  });
+  ['hx-other','fracture','current-pain','birth-hx','med-memo'].forEach(k=>{
+    const el=document.getElementById('pe-'+k);if(el)el.value=pd[k.replace('-','_')]||'';
+  });
+  const bloodEl=document.getElementById('pe-blood');if(bloodEl)bloodEl.value=pd.blood||'';
+  const doctorEl=document.getElementById('pe-doctor');if(doctorEl)doctorEl.value=pd.doctor||'';
+  const medicineEl=document.getElementById('pe-medicine');if(medicineEl)medicineEl.value=pd.medicine||'';
+  if(pd.med_status)setMedStatus(pd.med_status);
+  // LINE設定
+  const uid2El=document.getElementById('pe-line-uid2');if(uid2El)uid2El.value=p.lineUid||pd.lineUid||'';
+  const n20=document.getElementById('pe-notify-20day');if(n20)n20.checked=pd.notify20day!==false;
+  const nRem=document.getElementById('pe-notify-reminder');if(nRem)nRem.checked=pd.notifyReminder!==false;
+  const lmEl=document.getElementById('pe-line-memo');if(lmEl)lmEl.value=pd.line_memo||'';
+  // タブリセット
+  switchPeTab('basic');
   document.getElementById('peditModal').classList.add('on');
 }
 function closePEdit(){document.getElementById('peditModal').classList.remove('on');editPatientId=null;}
@@ -3330,6 +3620,49 @@ async function savePEdit(){
   p.count=parseInt(document.getElementById('pe-cnt').value)||0;
   p.symptom=document.getElementById('pe-sym').value.trim();
   p.note=document.getElementById('pe-note').value.trim();
+  // 詳細情報保存
+  const familyBtn=document.querySelector('#pe-family-btns .pay-btn.on');
+  p.detail={
+    family:familyBtn?familyBtn.getAttribute('data-v'):'',
+    fam_spouse:document.getElementById('pe-fam-spouse')?.checked?document.getElementById('pe-fam-spouse-age')?.value:'',
+    fam_child1:document.getElementById('pe-fam-child1')?.checked?document.getElementById('pe-fam-child1-info')?.value:'',
+    fam_child2:document.getElementById('pe-fam-child2')?.checked?document.getElementById('pe-fam-child2-info')?.value:'',
+    fam_parent:document.getElementById('pe-fam-parent')?.checked?document.getElementById('pe-fam-parent-info')?.value:'',
+    fam_grand:document.getElementById('pe-fam-grand')?.checked?document.getElementById('pe-fam-grand-info')?.value:'',
+    alcohol:document.getElementById('pe-alcohol')?.value||'',
+    alcohol_detail:document.getElementById('pe-alcohol-detail')?.value||'',
+    smoke:document.getElementById('pe-smoke')?.value||'',
+    sweet:document.getElementById('pe-sweet')?.value||'',
+    eat_out:document.getElementById('pe-eat-out')?.value||'',
+    exercise:document.getElementById('pe-exercise')?.value||'',
+    exercise_detail:document.getElementById('pe-exercise-detail')?.value||'',
+    sleep:document.getElementById('pe-sleep')?.value||'',
+    work_type:document.getElementById('pe-work-type')?.value||'',
+    life_memo:document.getElementById('pe-life-memo')?.value||'',
+    hx_hbp:document.getElementById('pe-hx-hbp')?.checked||false,
+    hx_dm:document.getElementById('pe-hx-dm')?.checked||false,
+    hx_heart:document.getElementById('pe-hx-heart')?.checked||false,
+    hx_stroke:document.getElementById('pe-hx-stroke')?.checked||false,
+    hx_cancer:document.getElementById('pe-hx-cancer')?.checked||false,
+    hx_kidney:document.getElementById('pe-hx-kidney')?.checked||false,
+    hx_liver:document.getElementById('pe-hx-liver')?.checked||false,
+    hx_osteo:document.getElementById('pe-hx-osteo')?.checked||false,
+    hx_allergy:document.getElementById('pe-hx-allergy')?.checked||false,
+    hx_other:document.getElementById('pe-hx-other')?.value||'',
+    fracture:document.getElementById('pe-fracture')?.value||'',
+    current_pain:document.getElementById('pe-current-pain')?.value||'',
+    birth_hx:document.getElementById('pe-birth-hx')?.value||'',
+    blood:document.getElementById('pe-blood')?.value||'',
+    doctor:document.getElementById('pe-doctor')?.value||'',
+    medicine:document.getElementById('pe-medicine')?.value||'',
+    med_status:document.getElementById('pe-med-yes')?.classList.contains('on')?'yes':'none',
+    med_memo:document.getElementById('pe-med-memo')?.value||'',
+    lineUid:document.getElementById('pe-line-uid2')?.value.trim()||p.lineUid||'',
+    notify20day:document.getElementById('pe-notify-20day')?.checked!==false,
+    notifyReminder:document.getElementById('pe-notify-reminder')?.checked!==false,
+    line_memo:document.getElementById('pe-line-memo')?.value||'',
+  };
+  if(p.detail.lineUid)p.lineUid=p.detail.lineUid;
   save();renderPatients();closePEdit();await pushP();
 }
 async function deletePatientFromModal(){
