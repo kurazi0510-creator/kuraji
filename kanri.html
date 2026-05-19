@@ -2558,6 +2558,8 @@ function editBk(date,slot){
   document.getElementById('m-id').value=bk.cardId||'';
   document.getElementById('m-nm').value=bk.name||'';
   document.getElementById('m-rt').value=bk.route||'LINE';
+  // 次回予約の場合は自動でフォームを表示
+  if((bk.route||'LINE')==='次回予約')setTimeout(onRouteChange,100);
   document.getElementById('m-sym').value=bk.symptom||'';
   const nmEl=document.getElementById('m-next-memo');if(nmEl)nmEl.value=bk.nextMemo||bk.nextNote||'';
   document.getElementById('m-opt').value=bk.option||'';
