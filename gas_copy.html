@@ -46,7 +46,37 @@ function doGet(e){
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 function doPost(e){
-  var body={};try{body=JSON.parse(e.postData.contents);}catch(err){}
+  var body={};
+  try{body=JSON.parse(e.postData.contents);}catch(err){}
+  
+  // LINE Webhookイベント（患者さんからのメッセージ）を処理
+  if(body.events&&body.events.length>0){
+    body.events.forEach(function(event){
+      if(event.type==='message'&&event.source&&event.source.userId){
+        var userId=event.source.userId;
+        var displayName='';
+        // プロフィール取得を試みる
+        try{
+          var props=PropertiesService.getScriptProperties();
+          var token=props.getProperty('LINE_TOKEN');
+          if(token){
+            var res=UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/'+userId,{
+              headers:{'Authorization':'Bearer '+token},
+              muteHttpExceptions:true
+            });
+            if(res.getResponseCode()===200){
+              var profile=JSON.parse(res.getContentText());
+              displayName=profile.displayName||'';
+            }
+          }
+        }catch(err){}
+        // LINE IDシートに保存
+        saveLineUserId(userId,displayName,event.message?event.message.text:'');
+      }
+    });
+    return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
+  }
+  
   var action=body.action||'',result;
   try{
     if(action==='getAll'){result=getAllData();}
@@ -57,9 +87,45 @@ function doPost(e){
     else if(action==='lineNotify'){result=sendLineNotify(body.token,body.message);}
     else if(action==='lineNotifyV2'){result=sendLineMessagingAPI(body.token,body.userId,body.message);}
     else if(action==='saveLineSettings'){saveLineSettings();result={ok:true};}
+    else if(action==='getLineUsers'){result=getLineUsers();}
     else{result={ok:false,error:'unknown action'};}
   }catch(err){result={ok:false,error:err.message};}
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// LINE IDをスプレッドシートに保存
+function saveLineUserId(userId,displayName,message){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var sheet=ss.getSheetByName('LINE_IDs');
+  if(!sheet){
+    sheet=ss.insertSheet('LINE_IDs');
+    sheet.getRange(1,1,1,4).setValues([['LINE_userId','表示名','最終メッセージ','更新日時']]);
+  }
+  var data=sheet.getDataRange().getValues();
+  var now=new Date();
+  // 既存IDを更新
+  for(var i=1;i<data.length;i++){
+    if(data[i][0]===userId){
+      sheet.getRange(i+1,2,1,3).setValues([[displayName||data[i][1],message,now]]);
+      Logger.log('LINE ID更新: '+displayName+'('+userId+')');
+      return;
+    }
+  }
+  // 新規追加
+  sheet.appendRow([userId,displayName,message,now]);
+  Logger.log('LINE ID新規保存: '+displayName+'('+userId+')');
+}
+
+// LINE IDリストを取得
+function getLineUsers(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var sheet=ss.getSheetByName('LINE_IDs');
+  if(!sheet)return{ok:true,users:[]};
+  var data=sheet.getDataRange().getValues();
+  var users=data.slice(1).map(function(row){
+    return{userId:row[0],name:row[1],lastMsg:row[2],updated:String(row[3])};
+  });
+  return{ok:true,users:users};
 }
 function getAllData(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -159,84 +225,89 @@ function dailyLineAlert(){
 function sendDayBeforeReminders(){
   var props=PropertiesService.getScriptProperties();
   var token=props.getProperty('LINE_TOKEN');
-  var myUserId=props.getProperty('LINE_USER_ID');
   if(!token){Logger.log('トークン未設定');return;}
 
   var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var bSheet=ss.getSheetByName('予約表');
+  if(!bSheet){Logger.log('予約表シートなし');return;}
+
   var today=new Date();today.setHours(0,0,0,0);
   var tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
   var tomorrowStr=Utilities.formatDate(tomorrow,'Asia/Tokyo','yyyy-MM-dd');
   var tomorrowDisp=Utilities.formatDate(tomorrow,'Asia/Tokyo','M月d日(E)');
 
-  // 予約表を取得
-  var bSheet=ss.getSheetByName('予約表');
-  if(!bSheet){Logger.log('予約表シートなし');return;}
-  var bData=bSheet.getDataRange().getValues();
-  var bHdr=bData[0];
-  var dateIdx=bHdr.indexOf('日付'),timeIdx=bHdr.indexOf('時間');
-  var nameIdx=bHdr.indexOf('患者名'),idIdx=bHdr.indexOf('診察券No'),kubunIdx=bHdr.indexOf('区分');
+  // LINE IDシートから {表示名→userId} マップを作成
+  var lineUsers={};
+  var lSheet=ss.getSheetByName('LINE_IDs');
+  if(lSheet){
+    var lData=lSheet.getDataRange().getValues();
+    lData.slice(1).forEach(function(row){
+      if(row[0]&&row[1])lineUsers[String(row[1]).trim()]=String(row[0]);
+    });
+  }
 
-  // 患者シートからLINEユーザーIDを取得
-  var lineUids={};
+  // 患者シートの患者名→LINE表示名マップ
+  var patientLineMap={};
   var pSheet=ss.getSheetByName('患者');
   if(pSheet){
     var pData=pSheet.getDataRange().getValues();
     var pHdr=pData[0];
-    var pIdIdx=pHdr.indexOf('診察券No'),pLineUidIdx=pHdr.indexOf('LINEユーザーID');
-    if(pIdIdx>-1&&pLineUidIdx>-1){
+    var pNameIdx=pHdr.indexOf('患者名');
+    var pLineIdx=pHdr.indexOf('LINE');
+    if(pNameIdx>-1&&pLineIdx>-1){
       pData.slice(1).forEach(function(row){
-        var pid=String(row[pIdIdx]||'').trim();
-        var uid=String(row[pLineUidIdx]||'').trim();
-        if(pid&&uid&&uid.startsWith('U'))lineUids[pid]=uid;
+        var pName=String(row[pNameIdx]||'').trim();
+        var lineVal=String(row[pLineIdx]||'').trim();
+        if(pName&&lineVal&&lineVal!=='なし')patientLineMap[pName]=lineVal;
       });
     }
   }
 
-  // 明日の予約を収集
-  var appointments=[];var seen={};
-  bData.slice(1).forEach(function(row){
+  // 明日の予約を患者ごとに収集
+  var data=bSheet.getDataRange().getValues();
+  var hdr=data[0];
+  var dateIdx=hdr.indexOf('日付'),timeIdx=hdr.indexOf('時間');
+  var nameIdx=hdr.indexOf('患者名'),kubunIdx=hdr.indexOf('区分');
+  if(dateIdx<0){Logger.log('ヘッダー未発見');return;}
+
+  var byPatient={},seen={};
+  data.slice(1).forEach(function(row){
     var dateVal=String(row[dateIdx]||'').trim();
     var kubun=String(row[kubunIdx]||'');
     if(kubun.indexOf('継続')>-1||kubun.indexOf('キャンセル')>-1)return;
     if(dateVal!==tomorrowStr)return;
     var name=String(row[nameIdx]||'').trim();
     var time=String(row[timeIdx]||'').trim();
-    var pid=String(row[idIdx]||'').trim();
-    if(!name||!time)return;
-    var key=name+'_'+time;
-    if(seen[key])return;seen[key]=true;
-    appointments.push({name:name,time:time,pid:pid});
+    if(!name||!time||seen[name+'_'+time])return;
+    seen[name+'_'+time]=true;
+    if(!byPatient[name])byPatient[name]=[];
+    byPatient[name].push(time);
   });
 
-  if(!appointments.length){Logger.log('明日の予約なし');return;}
+  if(!Object.keys(byPatient).length){Logger.log('明日('+tomorrowStr+')の予約なし');return;}
 
-  var sentCount=0,ownCount=0;
-  // 患者個別に送信
-  appointments.forEach(function(a){
-    var uid=lineUids[a.pid]||'';
-    if(uid){
-      var msg='【倉治整骨院】\n'+a.name+'様\n明日('+tomorrowDisp+') '+a.time+'〜のご予約を\nお待ちしております😊\n\n気をつけてお越しください🙏\n※自動送信のため返信不要です。';
-      var result=sendLineMessagingAPI(token,uid,msg);
-      if(result.ok)sentCount++;
-      else Logger.log('送信失敗: '+a.name+' '+JSON.stringify(result));
-    }else{
-      ownCount++;
-    }
+  var sent=0,skipped=[];
+  Object.keys(byPatient).forEach(function(name){
+    var times=byPatient[name];
+    // LINE IDを患者名 or LINE表示名で検索
+    var targetId=lineUsers[name]||lineUsers[patientLineMap[name]||'']||null;
+    if(!targetId){skipped.push(name);return;}
+    var msg='【倉治整骨院】\n'+tomorrowDisp+'のご予約リマインドです😊\n\n'+
+      '⏰ '+times.join(' / ')+'\n\nお気をつけてお越しください。\n※自動送信のため返信不要です。';
+    var result=sendLineMessagingAPI(token,targetId,msg);
+    if(result.ok){sent++;}else{skipped.push(name+'(送信エラー)');}
   });
+  Logger.log('リマインド完了 送信:'+sent+'件 未登録:'+skipped.length+'件');
 
-  // LINEユーザーID未登録の患者はまとめて自分のLINEに通知
-  if(ownCount>0&&myUserId){
-    var unregistered=appointments.filter(function(a){return !lineUids[a.pid];});
-    var msg2='【倉治整骨院】\n📅 明日('+tomorrowDisp+')のLINE未登録患者\n\n';
-    unregistered.forEach(function(a){msg2+='・'+a.time+' '+a.name+'様\n';});
-    msg2+='\n→ LINEユーザーIDを登録すると自動でリマインドが届きます';
-    sendLineMessagingAPI(token,myUserId,msg2);
+  // 院長への集計通知
+  var ownerUserId=props.getProperty('LINE_USER_ID');
+  if(ownerUserId){
+    var summary='【倉治整骨院】\n📊 前日リマインド完了\n'+tomorrowDisp+'\n送信:'+sent+'件';
+    if(skipped.length>0)summary+='\nLINE未登録:\n・'+skipped.join('\n・');
+    sendLineMessagingAPI(token,ownerUserId,summary);
   }
-
-  Logger.log('患者個別送信:'+sentCount+'件 / 未登録:'+ownCount+'件');
 }
 
-// 両方のトリガーをまとめて設定
 function setupAllTriggers(){
   // 既存トリガーを全削除
   ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});

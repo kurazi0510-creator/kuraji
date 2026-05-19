@@ -1752,6 +1752,8 @@ async function syncAll(){
       }
       save();
       setStat('s-ok','✅ 同期済み');
+      // LINE IDを自動取得して患者と照合
+      setTimeout(syncLineIds,3000);
       // 21日未来院アラートチェック（バックグラウンドで実行）
       const curDate=document.getElementById('yoyaku-date')?.value||today();
       setTimeout(()=>checkElapsedAlert(curDate),2000);
@@ -1912,6 +1914,29 @@ function loadBui(arr){
 }
 
 // ===== SCHEDULE =====
+// ===== LINE ID照合 =====
+let lineIdMap={};// LINE表示名→userId
+async function syncLineIds(){
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLineUsers'}),redirect:'follow'});
+    const d=JSON.parse(await res.text());
+    if(d.ok&&d.users){
+      lineIdMap={};
+      d.users.forEach(u=>{if(u.userId&&u.name)lineIdMap[u.name.trim()]=u.userId;});
+      console.log('LINE ID取得完了:',Object.keys(lineIdMap).length,'件');
+    }
+  }catch(e){console.error('LINE ID取得エラー:',e);}
+}
+// 患者名からLINE IDを検索
+function getPatientLineId(patientName){
+  // 患者名で直接検索
+  if(lineIdMap[patientName])return lineIdMap[patientName];
+  // 姓のみで検索
+  const lastName=patientName.split(/[　 ]/)[0];
+  const found=Object.keys(lineIdMap).find(k=>k.startsWith(lastName));
+  return found?lineIdMap[found]:null;
+}
+
 // ===== 印刷プレビューモーダル =====
 function showPrintModal(title, htmlContent){
   document.getElementById('print-modal-title').textContent=title;
