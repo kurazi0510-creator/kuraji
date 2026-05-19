@@ -1451,6 +1451,16 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <textarea class="inp" id="pe-line-memo" placeholder="LINE対応に関する備考" style="height:50px;resize:none"></textarea>
         </div>
       </div>
+        <!-- 20日アラートLINE送信設定 -->
+        <div class="fg" style="grid-column:1/-1;background:#fef3c7;border-radius:10px;padding:12px;border:1.5px solid #fcd34d">
+          <label style="color:#92400e;font-weight:bold">⚠️ 20日アラートLINE自動送信</label>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="pay-btn on" id="pe-alert-on" onclick="setAlertSend(true)" style="flex:1;background:#fef3c7;color:#92400e;border-color:#fcd34d">送る（デフォルト）</button>
+            <button class="pay-btn" id="pe-alert-off" onclick="setAlertSend(false)" style="flex:1">送らない</button>
+          </div>
+          <div style="font-size:0.72rem;color:#92400e;margin-top:6px">「送らない」にすると院長への通知リストには表示されますが、患者さんへの自動LINEは送信されません。</div>
+        </div>
+      </div>
     </div><!-- /pe-pane-line -->
 
     <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
@@ -3561,6 +3571,7 @@ function openPEdit(id){
   document.getElementById('pe-tel').value=p.tel||'';
   document.getElementById('pe-line').value=p.line||'あり';
   const luid=document.getElementById('pe-line-uid');if(luid)luid.value=p.lineUid||'';
+  setAlertSend(p.alertSend!==false);// デフォルトtrue=送る
   document.getElementById('pe-city').value=p.city||'';
   document.getElementById('pe-job').value=p.job||'';
   document.getElementById('pe-src').value=p.src||'-';
@@ -3604,7 +3615,13 @@ function openPEdit(id){
   document.getElementById('peditModal').classList.add('on');
 }
 function closePEdit(){document.getElementById('peditModal').classList.remove('on');editPatientId=null;}
-async function savePEdit(){
+async function setAlertSend(val){
+  const on=document.getElementById('pe-alert-on');
+  const off=document.getElementById('pe-alert-off');
+  if(on)on.classList.toggle('on',val);
+  if(off)off.classList.toggle('on',!val);
+}
+function savePEdit(){
   const p=patients.find(x=>x.id===editPatientId);if(!p)return;
   p.name=document.getElementById('pe-nm').value.trim();
   p.kana=document.getElementById('pe-kana').value.trim();
