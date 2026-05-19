@@ -3621,7 +3621,7 @@ async function setAlertSend(val){
   if(on)on.classList.toggle('on',val);
   if(off)off.classList.toggle('on',!val);
 }
-function savePEdit(){
+async function savePEdit(){
   const p=patients.find(x=>x.id===editPatientId);if(!p)return;
   p.name=document.getElementById('pe-nm').value.trim();
   p.kana=document.getElementById('pe-kana').value.trim();
