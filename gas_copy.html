@@ -3,284 +3,279 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GASコード コピー用</title>
+<title>GASコード - 倉治整骨院</title>
 <style>
-body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:16px;}
-.card{background:#1e293b;border-radius:12px;padding:16px;max-width:800px;margin:0 auto;}
-h1{color:#f97316;font-size:0.9rem;text-align:center;margin-bottom:4px;}
-p{color:#94a3b8;font-size:0.75rem;text-align:center;margin-bottom:12px;}
-.btn{display:block;width:100%;padding:14px;background:#f97316;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:bold;cursor:pointer;margin-bottom:8px;}
-.step{background:#1e3a5f;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.78rem;color:#7dd3fc;line-height:1.9;}
-pre{background:#000;color:#22c55e;padding:14px;border-radius:8px;font-size:0.68rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;user-select:all;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;}
+.card{background:#1e293b;border-radius:12px;padding:20px;max-width:600px;margin:0 auto;}
+h1{color:#f97316;font-size:1rem;text-align:center;margin-bottom:8px;}
+.step{background:#1e3a5f;border-radius:8px;padding:12px 14px;margin:10px 0;font-size:0.8rem;color:#7dd3fc;line-height:2;}
+.btn{display:block;width:100%;padding:16px;border:none;border-radius:10px;font-size:1rem;font-weight:bold;cursor:pointer;margin-bottom:10px;}
+.btn-copy{background:#f97316;color:white;}
+.btn-dl{background:#22c55e;color:white;}
+.btn-back{background:#374151;color:#94a3b8;}
+#status{padding:10px;border-radius:8px;text-align:center;font-size:0.82rem;display:none;margin-bottom:10px;}
+.ok{background:#dcfce7;color:#166534;}
 </style>
 </head>
 <body>
 <div class="card">
-<h1>GASコード コピー用（最新版）</h1>
-<p>① コピー → ② Apps Scriptに全貼り付け → ③ setupAllTriggersを実行 → ④ デプロイ</p>
-<div class="step">
-⚠️ <strong>手順</strong><br>
-1. 下の「📋 コピー」ボタンを押す<br>
-2. Apps Script（script.google.com）を開く → コード.gs<br>
-3. Ctrl+A（全選択）→ Delete（全削除）→ Ctrl+V（貼り付け）→ Ctrl+S（保存）<br>
-4. 関数を「setupAllTriggers」に変更 → ▶ 実行<br>
-5. デプロイ → デプロイを管理 → 鉛筆 → 新しいバージョン → デプロイ
+  <h1>⚙️ GASコード更新</h1>
+  
+  <div class="step">
+    <strong>【手順】</strong><br>
+    ① 「📋 クリップボードにコピー」を押す<br>
+    ② <a href="https://script.google.com" target="_blank" style="color:#60a5fa">script.google.com</a> を開く<br>
+    ③ 「無題のプロジェクト」→「コード.gs」をクリック<br>
+    ④ <kbd>Ctrl+A</kbd> → <kbd>Delete</kbd> → <kbd>Ctrl+V</kbd> → <kbd>Ctrl+S</kbd><br>
+    ⑤ 関数を「setupAllTriggers」に変更 → 「▶ 実行」<br>
+    ⑥ デプロイ → デプロイを管理 → 鉛筆 → 新しいバージョン → デプロイ
+  </div>
+  
+  <div id="status"></div>
+  <button class="btn btn-copy" onclick="copyGAS()">📋 クリップボードにコピー</button>
+  <button class="btn btn-dl" onclick="downloadGAS()">💾 .gsファイルとしてダウンロード</button>
+  <button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムに戻る</button>
 </div>
-<button class="btn" onclick="copyCode()">📋 全選択してコピー</button>
-<pre id="code">function myTest(){
-  var token='RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
-  var userId='U9f7333eed2d51ceba13641059e8bd341';
-  var result=sendLineMessagingAPI(token,userId,'\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\u30e9\u30a4\u30f3\u901a\u77e5\u30c6\u30b9\u30c8\u2705\n\u6a29\u9650\u627f\u8a8d\u304c\u5b8c\u4e86\u3057\u307e\u3057\u305f\uff01');
-  Logger.log(JSON.stringify(result));
-}
-function doGet(e){
-  var action=(e&amp;&amp;e.parameter&amp;&amp;e.parameter.action)||'getAll';
-  var callback=(e&amp;&amp;e.parameter&amp;&amp;e.parameter.callback)||'';
-  var result;
-  try{if(action==='getAll'){result=getAllData();}else{result={ok:true,msg:'ok'};}}
-  catch(err){result={ok:false,error:err.message};}
-  var json=JSON.stringify(result);
-  if(callback)return ContentService.createTextOutput(callback+'('+json+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
-  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
-}
-function doPost(e){
-  var body={};
-  try{body=JSON.parse(e.postData.contents);}catch(err){}
-  if(body.events&amp;&amp;body.events.length&gt;0){
-    body.events.forEach(function(event){
-      if(event.type==='message'&amp;&amp;event.source&amp;&amp;event.source.userId){
-        var uid=event.source.userId;
-        var dname='';
-        try{
-          var props=PropertiesService.getScriptProperties();
-          var tok=props.getProperty('LINE_TOKEN');
-          if(tok){
-            var r=UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/'+uid,{headers:{'Authorization':'Bearer '+tok},muteHttpExceptions:true});
-            if(r.getResponseCode()===200){var pr=JSON.parse(r.getContentText());dname=pr.displayName||'';}
-          }
-        }catch(err){}
-        saveLineUserId(uid,dname,event.message?event.message.text:'');
-      }
-    });
-    return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
-  }
-  var action=body.action||'',result;
-  try{
-    if(action==='getAll'){result=getAllData();}
-    else if(action==='saveBookings'){saveSheet('\u4e88\u7d04\u8868',JSON.parse(body.rows));result={ok:true};}
-    else if(action==='saveCustomers'){saveSheet('\u60a3\u8005',JSON.parse(body.rows));result={ok:true};}
-    else if(action==='saveUriage'){saveSheet('\u58f2\u4e0a',JSON.parse(body.rows));result={ok:true};}
-    else if(action==='resetBookings'){resetBookings();result={ok:true};}
-    else if(action==='lineNotify'){result=sendLineNotify(body.token,body.message);}
-    else if(action==='lineNotifyV2'){result=sendLineMessagingAPI(body.token,body.userId,body.message);}
-    else if(action==='saveLineSettings'){saveLineSettings();result={ok:true};}
-    else if(action==='getLineUsers'){result=getLineUsers();}
-    else{result={ok:false,error:'unknown action'};}
-  }catch(err){result={ok:false,error:err.message};}
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-}
-function saveLineUserId(userId,displayName,message){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var sheet=ss.getSheetByName('LINE_IDs');
-  if(!sheet){
-    sheet=ss.insertSheet('LINE_IDs');
-    sheet.getRange(1,1,1,4).setValues([['LINE_userId','\u8868\u793a\u540d','\u6700\u7d42\u30e1\u30c3\u30bb\u30fc\u30b8','\u66f4\u65b0\u65e5\u6642']]);
-  }
-  var data=sheet.getDataRange().getValues();
-  var now=new Date();
-  for(var i=1;i&lt;data.length;i++){
-    if(data[i][0]===userId){
-      sheet.getRange(i+1,2,1,3).setValues([[displayName||data[i][1],message,now]]);
-      return;
-    }
-  }
-  sheet.appendRow([userId,displayName,message,now]);
-}
-function getLineUsers(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var sheet=ss.getSheetByName('LINE_IDs');
-  if(!sheet)return{ok:true,users:[]};
-  var data=sheet.getDataRange().getValues();
-  var users=data.slice(1).map(function(row){return{userId:row[0],name:String(row[1]),lastMsg:String(row[2])};});
-  return{ok:true,users:users};
-}
-function getAllData(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var b=ss.getSheetByName('\u4e88\u7d04\u8868');
-  var c=ss.getSheetByName('\u60a3\u8005');
-  var u=ss.getSheetByName('\u58f2\u4e0a');
-  return{ok:true,bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
-}
-function saveSheet(name,rows){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var s=ss.getSheetByName(name);
-  if(!s)s=ss.insertSheet(name);
-  s.clearContents();
-  if(!rows||rows.length===0)return;
-  var san=rows.map(function(row){return row.map(function(cell){
-    if(cell===null||cell===undefined)return'';
-    if(cell instanceof Date){var y=cell.getFullYear(),mo=String(cell.getMonth()+1).padStart(2,'0'),d=String(cell.getDate()).padStart(2,'0');return y+'-'+mo+'-'+d;}
-    return String(cell);
-  });});
-  var range=s.getRange(1,1,san.length,san[0].length);
-  var fmt=san.map(function(r){return r.map(function(){return'@';});});
-  range.setNumberFormats(fmt);
-  range.setValues(san);
-}
-function resetBookings(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var s=ss.getSheetByName('\u4e88\u7d04\u8868');
-  if(!s)s=ss.insertSheet('\u4e88\u7d04\u8868');
-  s.clearContents();
-  s.getRange(1,1,1,20).setValues([['\u65e5\u4ed8','\u6642\u9593','\u533a\u5206','\u60a3\u8005\u540d','\u8a3a\u5bdf\u5238No','\u4e88\u7d04\u30eb\u30fc\u30c8','\u6765\u9662\u56de\u6570','\u7d4c\u904e\u65e5\u6570','\u75c7\u72b6','\u30aa\u30d7\u30b7\u30e7\u30f3','\u81ea\u8cbb\u30e1\u30cb\u30e5\u30fc','\u51e6\u7f6e(JSON)','\u51e6\u7f6e\u30e1\u30e2','\u7269\u8ca9(JSON)','\u652f\u6255\u65b9\u6cd5','\u652f\u6255\u91d1\u984d','\u533a\u5206\u30ea\u30b9\u30c8','\u518d\u4e88\u7d04\u60c5\u5831','\u30ad\u30e3\u30f3\u30bb\u30eb\u7406\u7531','\u65bd\u8853\u90e8\u4f4d']]);
-}
-function saveLineSettings(){
-  var token='RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
-  var userId='U9f7333eed2d51ceba13641059e8bd341';
-  var props=PropertiesService.getScriptProperties();
-  props.setProperty('LINE_TOKEN',token);
-  props.setProperty('LINE_USER_ID',userId);
-  Logger.log('LINE\u8a2d\u5b9a\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f');
-}
-function dailyLineAlert(){
-  var props=PropertiesService.getScriptProperties();
-  var token=props.getProperty('LINE_TOKEN');
-  var userId=props.getProperty('LINE_USER_ID');
-  if(!token||!userId){Logger.log('\u30c8\u30fc\u30af\u30f3\u672a\u8a2d\u5b9a');return;}
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var today=new Date();today.setHours(0,0,0,0);
-  var alerts=[];
-  var bSheet=ss.getSheetByName('\u4e88\u7d04\u8868');
-  if(bSheet){
-    var bData=bSheet.getDataRange().getValues();
-    var bHdr=bData[0];
-    var dateIdx=bHdr.indexOf('\u65e5\u4ed8'),nameIdx=bHdr.indexOf('\u60a3\u8005\u540d'),idIdx=bHdr.indexOf('\u8a3a\u5bdf\u5238No'),kubunIdx=bHdr.indexOf('\u533a\u5206');
-    if(dateIdx&gt;-1&amp;&amp;nameIdx&gt;-1){
-      var lastVisit={};
-      bData.slice(1).forEach(function(row){
-        var kubun=String(row[kubunIdx]||'');
-        if(kubun.indexOf('\u7d99\u7d9a')&gt;-1||kubun.indexOf('\u30ad\u30e3\u30f3\u30bb\u30eb')&gt;-1)return;
-        var dateVal=row[dateIdx];
-        if(!dateVal)return;
-        var d=dateVal instanceof Date?new Date(dateVal):new Date(String(dateVal));
-        if(isNaN(d.getTime()))return;
-        d.setHours(0,0,0,0);
-        if(d&gt;today)return;
-        var key=String(row[idIdx]||'')||String(row[nameIdx]||'');
-        if(!lastVisit[key]||d&gt;lastVisit[key].date)lastVisit[key]={date:d,name:String(row[nameIdx]||''),id:String(row[idIdx]||'')};
-      });
-      Object.values(lastVisit).forEach(function(v){
-        var diff=Math.floor((today-v.date)/(1000*60*60*24));
-        if(diff&gt;=20&amp;&amp;diff&lt;=21){
-          var ds=Utilities.formatDate(v.date,'Asia/Tokyo','M/d');
-          alerts.push('\u30fb'+v.name+'\uff08'+v.id+'\u53f7\uff09\u524d\u56de:'+ds+' '+diff+'\u65e5\u7d4c\u904e');
-        }
-      });
-    }
-  }
-  if(alerts.length&gt;0){
-    var msg='\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\n\u26a0\ufe0f \u660e\u65e5\u3067\u521d\u8a3a\u6599\u767a\u751f\u30a2\u30e9\u30fc\u30c8\n'+Utilities.formatDate(today,'Asia/Tokyo','M\u6708d\u65e5(E)')+'\n\n'+alerts.join('\n')+'\n\n\u2192 \u6765\u9662\u3092\u4fc3\u3057\u3066\u304f\u3060\u3055\u3044\uff01';
-    sendLineMessagingAPI(token,userId,msg);
-  }else{
-    Logger.log('20\u65e5\u30a2\u30e9\u30fc\u30c8\u5bfe\u8c61\u306a\u3057\uff08\u672c\u65e5 '+Utilities.formatDate(today,'Asia/Tokyo','M/d')+')');
-  }
-}
-function sendDayBeforeReminders(){
-  var props=PropertiesService.getScriptProperties();
-  var token=props.getProperty('LINE_TOKEN');
-  if(!token){Logger.log('\u30c8\u30fc\u30af\u30f3\u672a\u8a2d\u5b9a');return;}
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var bSheet=ss.getSheetByName('\u4e88\u7d04\u8868');
-  if(!bSheet){Logger.log('\u4e88\u7d04\u8868\u30b7\u30fc\u30c8\u306a\u3057');return;}
-  var today=new Date();today.setHours(0,0,0,0);
-  var tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
-  var tomorrowStr=Utilities.formatDate(tomorrow,'Asia/Tokyo','yyyy-MM-dd');
-  var tomorrowDisp=Utilities.formatDate(tomorrow,'Asia/Tokyo','M\u6708d\u65e5(E)');
-  var lineUsers={};
-  var lSheet=ss.getSheetByName('LINE_IDs');
-  if(lSheet){
-    var lData=lSheet.getDataRange().getValues();
-    lData.slice(1).forEach(function(row){if(row[0]&amp;&amp;row[1])lineUsers[String(row[1]).trim()]=String(row[0]);});
-  }
-  var data=bSheet.getDataRange().getValues();
-  var hdr=data[0];
-  var dateIdx=hdr.indexOf('\u65e5\u4ed8'),timeIdx=hdr.indexOf('\u6642\u9593');
-  var nameIdx=hdr.indexOf('\u60a3\u8005\u540d'),kubunIdx=hdr.indexOf('\u533a\u5206');
-  if(dateIdx&lt;0){Logger.log('\u30d8\u30c3\u30c0\u30fc\u672a\u767a\u898b');return;}
-  var byPatient={},seen={};
-  data.slice(1).forEach(function(row){
-    var dateVal=String(row[dateIdx]||'').trim();
-    var kubun=String(row[kubunIdx]||'');
-    if(kubun.indexOf('\u7d99\u7d9a')&gt;-1||kubun.indexOf('\u30ad\u30e3\u30f3\u30bb\u30eb')&gt;-1)return;
-    if(dateVal!==tomorrowStr)return;
-    var name=String(row[nameIdx]||'').trim();
-    var time=String(row[timeIdx]||'').trim();
-    if(!name||!time||seen[name+'_'+time])return;
-    seen[name+'_'+time]=true;
-    if(!byPatient[name])byPatient[name]=[];
-    byPatient[name].push(time);
-  });
-  if(!Object.keys(byPatient).length){Logger.log('\u660e\u65e5('+tomorrowStr+')\u306e\u4e88\u7d04\u306a\u3057');return;}
-  var sent=0,skipped=[];
-  Object.keys(byPatient).forEach(function(name){
-    var times=byPatient[name];
-    var targetId=lineUsers[name]||null;
-    if(!targetId){
-      var lastName=name.split(/[\u3000 ]/)[0];
-      var found=Object.keys(lineUsers).find(function(k){return k.replace(/[\u3000 ]/,'').indexOf(lastName)===0;});
-      if(found)targetId=lineUsers[found];
-    }
-    if(!targetId){skipped.push(name);return;}
-    var msg='\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\n'+tomorrowDisp+'\u306e\u3054\u4e88\u7d04\u30ea\u30de\u30a4\u30f3\u30c9\u3067\u3059\ud83d\ude0a\n\n\u23f0 '+times.join(' / ')+'\n\n\u304a\u6c17\u3092\u3064\u3051\u3066\u304a\u8d8a\u3057\u304f\u3060\u3055\u3044\u3002\n\u203b\u81ea\u52d5\u9001\u4fe1\u306e\u305f\u3081\u8fd4\u4fe1\u4e0d\u8981\u3067\u3059\u3002';
-    var result=sendLineMessagingAPI(token,targetId,msg);
-    if(result.ok){sent++;}else{skipped.push(name+'(\u9001\u4fe1\u30a8\u30e9\u30fc)');}
-  });
-  Logger.log('\u30ea\u30de\u30a4\u30f3\u30c9\u5b8c\u4e86 \u9001\u4fe1:'+sent+'\u4ef6 \u672a\u767b\u9332:'+skipped.length+'\u4ef6');
-  var ownerUserId=props.getProperty('LINE_USER_ID');
-  if(ownerUserId){
-    var summary='\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\n\ud83d\udcca \u524d\u65e5\u30ea\u30de\u30a4\u30f3\u30c9\u5b8c\u4e86\n'+tomorrowDisp+'\n\u9001\u4fe1:'+sent+'\u4ef6';
-    if(skipped.length&gt;0)summary+='\nLINE\u672a\u767b\u9332:\n\u30fb'+skipped.join('\n\u30fb');
-    sendLineMessagingAPI(token,ownerUserId,summary);
-  }
-}
-function setupDailyTrigger(){
-  ScriptApp.getProjectTriggers().forEach(function(t){if(t.getHandlerFunction()==='dailyLineAlert')ScriptApp.deleteTrigger(t);});
-  ScriptApp.newTrigger('dailyLineAlert').timeBased().everyDays(1).atHour(8).create();
-  Logger.log('\u6bcf\u671d8\u6642\u306e\u81ea\u52d5\u30a2\u30e9\u30fc\u30c8\u30c8\u30ea\u30ac\u30fc\u3092\u8a2d\u5b9a\u3057\u307e\u3057\u305f\uff01');
-}
-function setupAllTriggers(){
-  ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
-  ScriptApp.newTrigger('dailyLineAlert').timeBased().everyDays(1).atHour(8).create();
-  ScriptApp.newTrigger('sendDayBeforeReminders').timeBased().everyDays(1).atHour(18).create();
-  Logger.log('\u30c8\u30ea\u30ac\u30fc\u8a2d\u5b9a\u5b8c\u4e86\uff1a\u6bcf\u671d8\u6642(20\u65e5\u30a2\u30e9\u30fc\u30c8) + \u6bce\u65e518\u6642(\u524d\u65e5\u30ea\u30de\u30a4\u30f3\u30c9)');
-}
-function sendLineMessagingAPI(token,userId,message){
-  if(!token||!userId||!message)return{ok:false,error:'missing params'};
-  try{
-    var payload=JSON.stringify({to:userId,messages:[{type:'text',text:message}]});
-    var res=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{
-      method:'post',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      payload:payload
-    });
-    return{ok:res.getResponseCode()===200,status:res.getResponseCode()};
-  }catch(err){return{ok:false,error:err.message};}
-}
-function sendLineNotify(token,message){
-  if(!token||!message)return{ok:false,error:'missing'};
-  try{
-    var res=UrlFetchApp.fetch('https://notify-api.line.me/api/notify',{method:'post',headers:{'Authorization':'Bearer '+token},payload:{message:message}});
-    return{ok:res.getResponseCode()===200};
-  }catch(err){return{ok:false,error:err.message};}
-}</pre>
-</div>
+
 <script>
-function copyCode(){
-  const code=document.getElementById('code').innerText;
+function getGASCode(){
+  return [
+'function myTest(){',
+'  var token="RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=";',
+'  var userId="U9f7333eed2d51ceba13641059e8bd341";',
+'  var result=sendLineMessagingAPI(token,userId,"【倉治整骨院】LINEテスト");',
+'  Logger.log(JSON.stringify(result));',
+'}',
+'function doGet(e){',
+'  var action=(e&&e.parameter&&e.parameter.action)||"getAll";',
+'  var callback=(e&&e.parameter&&e.parameter.callback)||"";',
+'  var result;',
+'  try{if(action==="getAll"){result=getAllData();}else{result={ok:true};}}',
+'  catch(err){result={ok:false,error:err.message};}',
+'  var json=JSON.stringify(result);',
+'  if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);',
+'  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);',
+'}',
+'function doPost(e){',
+'  var body={};',
+'  try{body=JSON.parse(e.postData.contents);}catch(err){}',
+'  if(body.events&&body.events.length>0){',
+'    body.events.forEach(function(ev){',
+'      if(ev.type==="message"&&ev.source&&ev.source.userId){',
+'        var uid=ev.source.userId,dname="";',
+'        try{',
+'          var tok=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");',
+'          if(tok){',
+'            var r=UrlFetchApp.fetch("https://api.line.me/v2/bot/profile/"+uid,{',
+'              headers:{"Authorization":"Bearer "+tok},muteHttpExceptions:true});',
+'            if(r.getResponseCode()===200)dname=JSON.parse(r.getContentText()).displayName||"";',
+'          }',
+'        }catch(err){}',
+'        saveLineUserId(uid,dname,ev.message?ev.message.text:"");',
+'      }',
+'    });',
+'    return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);',
+'  }',
+'  var action=body.action||"",result;',
+'  try{',
+'    if(action==="getAll")result=getAllData();',
+'    else if(action==="saveBookings"){saveSheet("予約表",JSON.parse(body.rows));result={ok:true};}',
+'    else if(action==="saveCustomers"){saveSheet("患者",JSON.parse(body.rows));result={ok:true};}',
+'    else if(action==="saveUriage"){saveSheet("売上",JSON.parse(body.rows));result={ok:true};}',
+'    else if(action==="resetBookings"){resetBookings();result={ok:true};}',
+'    else if(action==="lineNotifyV2")result=sendLineMessagingAPI(body.token,body.userId,body.message);',
+'    else if(action==="saveLineSettings"){saveLineSettings();result={ok:true};}',
+'    else if(action==="getLineUsers")result=getLineUsers();',
+'    else result={ok:false,error:"unknown action"};',
+'  }catch(err){result={ok:false,error:err.message};}',
+'  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);',
+'}',
+'function saveLineUserId(userId,displayName,message){',
+'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
+'  var s=ss.getSheetByName("LINE_IDs");',
+'  if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,4).setValues([["userId","表示名","最終MSG","更新日"]]);}',
+'  var data=s.getDataRange().getValues();',
+'  var now=new Date();',
+'  for(var i=1;i<data.length;i++){',
+'    if(data[i][0]===userId){s.getRange(i+1,2,1,3).setValues([[displayName||data[i][1],message,now]]);return;}',
+'  }',
+'  s.appendRow([userId,displayName,message,now]);',
+'}',
+'function getLineUsers(){',
+'  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");',
+'  if(!s)return{ok:true,users:[]};',
+'  var users=s.getDataRange().getValues().slice(1).map(function(r){return{userId:r[0],name:String(r[1]),lastMsg:String(r[2])};});',
+'  return{ok:true,users:users};',
+'}',
+'function getAllData(){',
+'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
+'  var b=ss.getSheetByName("予約表"),c=ss.getSheetByName("患者"),u=ss.getSheetByName("売上");',
+'  return{ok:true,',
+'    bookings:b?b.getDataRange().getValues():[[]],',
+'    customers:c?c.getDataRange().getValues():[[]],',
+'    uriage:u?u.getDataRange().getValues():[[]]};',
+'}',
+'function saveSheet(name,rows){',
+'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
+'  var s=ss.getSheetByName(name)||ss.insertSheet(name);',
+'  s.clearContents();',
+'  if(!rows||!rows.length)return;',
+'  var san=rows.map(function(row){return row.map(function(c){',
+'    if(c===null||c===undefined)return"";',
+'    if(c instanceof Date){',
+'      var y=c.getFullYear(),m=String(c.getMonth()+1).padStart(2,"0"),d=String(c.getDate()).padStart(2,"0");',
+'      return y+"-"+m+"-"+d;',
+'    }',
+'    return String(c);',
+'  });});',
+'  var rng=s.getRange(1,1,san.length,san[0].length);',
+'  rng.setNumberFormats(san.map(function(r){return r.map(function(){return"@";});}));',
+'  rng.setValues(san);',
+'}',
+'function resetBookings(){',
+'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
+'  var s=ss.getSheetByName("予約表")||ss.insertSheet("予約表");',
+'  s.clearContents();',
+'  s.getRange(1,1,1,20).setValues([["日付","時間","区分","患者名","診察券No","予約ルート","来院回数","経過日数","症状","オプション","自費メニュー","処置(JSON)","処置メモ","物販(JSON)","支払方法","支払金額","区分リスト","再予約情報","キャンセル理由","施術部位"]]);',
+'}',
+'function saveLineSettings(){',
+'  var p=PropertiesService.getScriptProperties();',
+'  p.setProperty("LINE_TOKEN","RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=");',
+'  p.setProperty("LINE_USER_ID","U9f7333eed2d51ceba13641059e8bd341");',
+'  Logger.log("LINE設定保存完了");',
+'}',
+'function dailyLineAlert(){',
+'  var p=PropertiesService.getScriptProperties();',
+'  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");',
+'  if(!token||!ownerId){Logger.log("トークン未設定");return;}',
+'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
+'  var today=new Date();today.setHours(0,0,0,0);',
+'  var alerts=[];',
+'  var bs=ss.getSheetByName("予約表");',
+'  if(bs){',
+'    var bd=bs.getDataRange().getValues(),bh=bd[0];',
+'    var di=bh.indexOf("日付"),ni=bh.indexOf("患者名"),ii=bh.indexOf("診察券No"),ki=bh.indexOf("区分");',
+'    if(di>-1){',
+'      var lv={};',
+'      bd.slice(1).forEach(function(r){',
+'        var k=String(r[ki]||"");',
+'        if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1)return;',
+'        var dv=r[di];if(!dv)return;',
+'        var d=dv instanceof Date?new Date(dv):new Date(String(dv));',
+'        if(isNaN(d.getTime()))return;',
+'        d.setHours(0,0,0,0);if(d>today)return;',
+'        var key=String(r[ii]||"")||String(r[ni]||"");',
+'        if(!lv[key]||d>lv[key].date)lv[key]={date:d,name:String(r[ni]||""),id:String(r[ii]||"")};',
+'      });',
+'      Object.values(lv).forEach(function(v){',
+'        var diff=Math.floor((today-v.date)/(1000*60*60*24));',
+'        if(diff>=20&&diff<=21)alerts.push("・"+v.name+"（"+v.id+"号）前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+" "+diff+"日経過");',
+'      });',
+'    }',
+'  }',
+'  if(alerts.length){',
+'    sendLineMessagingAPI(token,ownerId,"【倉治整骨院】\n⚠️ 初診料発生アラート\n"+Utilities.formatDate(today,"Asia/Tokyo","M月d日(E)")+"\n\n"+alerts.join("\n")+"\n\n→ 来院を促してください！");',
+'    Logger.log("アラート送信:"+alerts.length+"件");',
+'  }else{',
+'    Logger.log("対象なし（本日 "+Utilities.formatDate(today,"Asia/Tokyo","M/d")+")");',
+'  }',
+'}',
+'function sendDayBeforeReminders(){',
+'  var p=PropertiesService.getScriptProperties();',
+'  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");',
+'  if(!token){Logger.log("トークン未設定");return;}',
+'  var ss=SpreadsheetApp.getActiveSpreadsheet();',
+'  var today=new Date();today.setHours(0,0,0,0);',
+'  var tmr=new Date(today);tmr.setDate(tmr.getDate()+1);',
+'  var tmrStr=Utilities.formatDate(tmr,"Asia/Tokyo","yyyy-MM-dd");',
+'  var tmrDisp=Utilities.formatDate(tmr,"Asia/Tokyo","M月d日(E)");',
+'  var lu={};',
+'  var ls=ss.getSheetByName("LINE_IDs");',
+'  if(ls)ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});',
+'  var bs=ss.getSheetByName("予約表");',
+'  if(!bs){Logger.log("予約表なし");return;}',
+'  var bd=bs.getDataRange().getValues(),bh=bd[0];',
+'  var di=bh.indexOf("日付"),ti=bh.indexOf("時間"),ni=bh.indexOf("患者名"),ki=bh.indexOf("区分");',
+'  if(di<0){Logger.log("ヘッダー未発見");return;}',
+'  var bp={},seen={};',
+'  bd.slice(1).forEach(function(r){',
+'    var dv=String(r[di]||"").trim(),k=String(r[ki]||"");',
+'    if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1||dv!==tmrStr)return;',
+'    var n=String(r[ni]||"").trim(),t=String(r[ti]||"").trim();',
+'    if(!n||!t||seen[n+"_"+t])return;',
+'    seen[n+"_"+t]=true;',
+'    if(!bp[n])bp[n]=[];',
+'    bp[n].push(t);',
+'  });',
+'  if(!Object.keys(bp).length){Logger.log("明日の予約なし");return;}',
+'  var sent=0,skip=[];',
+'  Object.keys(bp).forEach(function(name){',
+'    var tid=lu[name];',
+'    if(!tid){',
+'      var ln=name.split(/[　 ]/)[0];',
+'      var fk=Object.keys(lu).find(function(k){return k.replace(/[　 ]/g,"").indexOf(ln)===0;});',
+'      if(fk)tid=lu[fk];',
+'    }',
+'    if(!tid){skip.push(name);return;}',
+'    var msg="【倉治整骨院】\n"+tmrDisp+"のご予約リマインドです\n\n⏰ "+bp[name].join(" / ")+"\n\nお気をつけてお越しください。\n※自動送信のため返信不要です。";',
+'    if(sendLineMessagingAPI(token,tid,msg).ok)sent++;else skip.push(name+"(エラー)");',
+'  });',
+'  Logger.log("リマインド完了 送信:"+sent+"件 未登録:"+skip.length+"件");',
+'  if(ownerId){',
+'    var s="【倉治整骨院】\n前日リマインド完了\n"+tmrDisp+"\n送信:"+sent+"件";',
+'    if(skip.length)s+="\nLINE未登録:\n・"+skip.join("\n・");',
+'    sendLineMessagingAPI(token,ownerId,s);',
+'  }',
+'}',
+'function setupAllTriggers(){',
+'  ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});',
+'  ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(8).create();',
+'  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(18).create();',
+'  Logger.log("トリガー設定完了：毎朝8時+毎日18時");',
+'}',
+'function sendLineMessagingAPI(token,userId,message){',
+'  if(!token||!userId||!message)return{ok:false,error:"missing"};',
+'  try{',
+'    var res=UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push",{',
+'      method:"post",',
+'      headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},',
+'      payload:JSON.stringify({to:userId,messages:[{type:"text",text:message}]})',
+'    });',
+'    return{ok:res.getResponseCode()===200};',
+'  }catch(e){return{ok:false,error:e.message};}',
+'}'
+  ].join('\n');
+}
+
+function copyGAS(){
+  const code = getGASCode();
   navigator.clipboard.writeText(code).then(()=>{
-    document.querySelector('.btn').textContent='✅ コピーしました！Apps Scriptに貼り付けてください';
-    document.querySelector('.btn').style.background='#22c55e';
+    const st=document.getElementById('status');
+    st.className='ok';st.style.display='block';
+    st.textContent='✅ コピーしました！Apps Scriptに貼り付けてください。';
+    document.querySelector('.btn-copy').textContent='✅ コピー済み！';
+    document.querySelector('.btn-copy').style.background='#22c55e';
+  }).catch(()=>{
+    // fallback
+    const ta=document.createElement('textarea');
+    ta.value=getGASCode();document.body.appendChild(ta);ta.select();
+    document.execCommand('copy');document.body.removeChild(ta);
+    document.getElementById('status').className='ok';
+    document.getElementById('status').style.display='block';
+    document.getElementById('status').textContent='✅ コピーしました！';
   });
+}
+
+function downloadGAS(){
+  const blob=new Blob([getGASCode()],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='kuraji_gas.gs';
+  a.click();
+  document.getElementById('status').className='ok';
+  document.getElementById('status').style.display='block';
+  document.getElementById('status').textContent='✅ ダウンロードしました！Apps Scriptに内容を貼り付けてください。';
 }
 </script>
 </body>
