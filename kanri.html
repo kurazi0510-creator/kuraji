@@ -1946,7 +1946,8 @@ function showQR(date,slot,name){
   document.getElementById('qr-title').textContent='予約確認 QRコード';
   document.getElementById('qr-info').textContent=date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+slot+'〜　'+(name||'')+'様';
   // QRコードの内容はシンプルなテキストのみ（住所・電話番号を除外）
-  const text=encodeURIComponent('倉治整骨院 予約確認 '+info);
+  // 院名を含めるとGoogleマイビジネスが開くため、予約情報のみのテキストにする
+  const text=encodeURIComponent('予約: '+info+' (倉治整骨院)');
   document.getElementById('qr-img').src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+text;
   const modal=document.getElementById('qrModal');
   modal.style.display='flex';

@@ -155,6 +155,82 @@ function dailyLineAlert(){
 
 // LINEトークン・ユーザーIDをスクリプトプロパティに保存
 // ===== 自動トリガー設定（この関数を1回実行するだけでOK）=====
+// ===== 前日リマインド送信（毎夕方18時に実行）=====
+function sendDayBeforeReminders(){
+  var props=PropertiesService.getScriptProperties();
+  var token=props.getProperty('LINE_TOKEN');
+  var userId=props.getProperty('LINE_USER_ID');
+  if(!token||!userId){Logger.log('トークン未設定');return;}
+
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var sheet=ss.getSheetByName('予約表');
+  if(!sheet){Logger.log('予約表シートなし');return;}
+
+  var today=new Date();
+  today.setHours(0,0,0,0);
+  var tomorrow=new Date(today);
+  tomorrow.setDate(tomorrow.getDate()+1);
+  var tomorrowStr=Utilities.formatDate(tomorrow,'Asia/Tokyo','yyyy-MM-dd');
+  var tomorrowDisp=Utilities.formatDate(tomorrow,'Asia/Tokyo','M月d日(E)');
+
+  var data=sheet.getDataRange().getValues();
+  var hdr=data[0];
+  var dateIdx=hdr.indexOf('日付');
+  var timeIdx=hdr.indexOf('時間');
+  var nameIdx=hdr.indexOf('患者名');
+  var kubunIdx=hdr.indexOf('区分');
+
+  if(dateIdx<0||timeIdx<0){Logger.log('ヘッダー未発見');return;}
+
+  // 明日の予約を収集（継続・キャンセル除外）
+  var appointments=[];
+  var seen={};
+  data.slice(1).forEach(function(row){
+    var dateVal=String(row[dateIdx]||'').trim();
+    var kubun=String(row[kubunIdx]||'');
+    if(kubun.indexOf('継続')>-1||kubun.indexOf('キャンセル')>-1)return;
+    if(dateVal!==tomorrowStr)return;
+    var name=String(row[nameIdx]||'').trim();
+    var time=String(row[timeIdx]||'').trim();
+    if(!name||!time)return;
+    var key=name+'_'+time;
+    if(seen[key])return;
+    seen[key]=true;
+    appointments.push({name:name,time:time});
+  });
+
+  if(!appointments.length){
+    Logger.log('明日('+tomorrowStr+')の予約なし');
+    return;
+  }
+
+  // まとめてリマインドメッセージを送信
+  var msg='【倉治整骨院】
+📅 明日('+tomorrowDisp+')の予約リマインド
+
+';
+  appointments.forEach(function(a){
+    msg+='・'+a.time+' '+a.name+'様
+';
+  });
+  msg+='
+※このメッセージは自動送信です。返信不要です。';
+
+  sendLineMessagingAPI(token,userId,msg);
+  Logger.log('リマインド送信完了：'+appointments.length+'件');
+}
+
+// 両方のトリガーをまとめて設定
+function setupAllTriggers(){
+  // 既存トリガーを全削除
+  ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
+  // 毎朝8時：20日アラート
+  ScriptApp.newTrigger('dailyLineAlert').timeBased().everyDays(1).atHour(8).create();
+  // 毎日18時：前日リマインド
+  ScriptApp.newTrigger('sendDayBeforeReminders').timeBased().everyDays(1).atHour(18).create();
+  Logger.log('✅ トリガー設定完了：毎朝8時(20日アラート) + 毎日18時(前日リマインド)');
+}
+
 function setupDailyTrigger(){
   // 既存のdailyLineAlertトリガーを削除
   var triggers=ScriptApp.getProjectTriggers();
