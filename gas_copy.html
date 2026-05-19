@@ -10,34 +10,32 @@ body{font-family:monospace;background:#0f172a;color:#e2e8f0;padding:16px;}
 h1{color:#f97316;font-size:0.9rem;text-align:center;margin-bottom:4px;}
 p{color:#94a3b8;font-size:0.75rem;text-align:center;margin-bottom:12px;}
 .btn{display:block;width:100%;padding:14px;background:#f97316;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:bold;cursor:pointer;margin-bottom:8px;}
-.btn2{display:block;width:100%;padding:14px;background:#22c55e;color:white;border:none;border-radius:8px;font-size:0.9rem;font-weight:bold;cursor:pointer;margin-bottom:12px;}
+.step{background:#1e3a5f;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.78rem;color:#7dd3fc;line-height:1.9;}
 pre{background:#000;color:#22c55e;padding:14px;border-radius:8px;font-size:0.68rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;user-select:all;}
-.step{background:#1e3a5f;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.78rem;color:#7dd3fc;line-height:1.8;}
 </style>
 </head>
 <body>
 <div class="card">
 <h1>GASコード コピー用（最新版）</h1>
-<p>① コピー → ② Apps Scriptに貼り付け → ③ myTestを実行して権限承認 → ④ デプロイ</p>
-
+<p>① コピー → ② Apps Scriptに全貼り付け → ③ setupAllTriggersを実行 → ④ デプロイ</p>
 <div class="step">
-⚠️ <strong>重要：今回のコードにはmyTest関数が含まれています</strong><br>
-貼り付け後、関数名を「myTest」に変えて「▶ 実行」を押してください。<br>
-「承認が必要です」→「権限を確認」→「詳細」→「安全ではないページに移動」→「許可」<br>
-承認後にデプロイしてください。
+⚠️ <strong>手順</strong><br>
+1. 下の「📋 コピー」ボタンを押す<br>
+2. Apps Script（script.google.com）を開く → コード.gs<br>
+3. Ctrl+A（全選択）→ Delete（全削除）→ Ctrl+V（貼り付け）→ Ctrl+S（保存）<br>
+4. 関数を「setupAllTriggers」に変更 → ▶ 実行<br>
+5. デプロイ → デプロイを管理 → 鉛筆 → 新しいバージョン → デプロイ
 </div>
-
 <button class="btn" onclick="copyCode()">📋 全選択してコピー</button>
 <pre id="code">function myTest(){
-  // ★権限承認用テスト関数★ 貼り付け後にこの関数を実行して「許可」を押してください
   var token='RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
   var userId='U9f7333eed2d51ceba13641059e8bd341';
   var result=sendLineMessagingAPI(token,userId,'\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\u30e9\u30a4\u30f3\u901a\u77e5\u30c6\u30b9\u30c8\u2705\n\u6a29\u9650\u627f\u8a8d\u304c\u5b8c\u4e86\u3057\u307e\u3057\u305f\uff01');
   Logger.log(JSON.stringify(result));
 }
 function doGet(e){
-  var action=(e&&e.parameter&&e.parameter.action)||'getAll';
-  var callback=(e&&e.parameter&&e.parameter.callback)||'';
+  var action=(e&amp;&amp;e.parameter&amp;&amp;e.parameter.action)||'getAll';
+  var callback=(e&amp;&amp;e.parameter&amp;&amp;e.parameter.callback)||'';
   var result;
   try{if(action==='getAll'){result=getAllData();}else{result={ok:true,msg:'ok'};}}
   catch(err){result={ok:false,error:err.message};}
@@ -48,35 +46,24 @@ function doGet(e){
 function doPost(e){
   var body={};
   try{body=JSON.parse(e.postData.contents);}catch(err){}
-  
-  // LINE Webhookイベント（患者さんからのメッセージ）を処理
-  if(body.events&&body.events.length>0){
+  if(body.events&amp;&amp;body.events.length&gt;0){
     body.events.forEach(function(event){
-      if(event.type==='message'&&event.source&&event.source.userId){
-        var userId=event.source.userId;
-        var displayName='';
-        // プロフィール取得を試みる
+      if(event.type==='message'&amp;&amp;event.source&amp;&amp;event.source.userId){
+        var uid=event.source.userId;
+        var dname='';
         try{
           var props=PropertiesService.getScriptProperties();
-          var token=props.getProperty('LINE_TOKEN');
-          if(token){
-            var res=UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/'+userId,{
-              headers:{'Authorization':'Bearer '+token},
-              muteHttpExceptions:true
-            });
-            if(res.getResponseCode()===200){
-              var profile=JSON.parse(res.getContentText());
-              displayName=profile.displayName||'';
-            }
+          var tok=props.getProperty('LINE_TOKEN');
+          if(tok){
+            var r=UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/'+uid,{headers:{'Authorization':'Bearer '+tok},muteHttpExceptions:true});
+            if(r.getResponseCode()===200){var pr=JSON.parse(r.getContentText());dname=pr.displayName||'';}
           }
         }catch(err){}
-        // LINE IDシートに保存
-        saveLineUserId(userId,displayName,event.message?event.message.text:'');
+        saveLineUserId(uid,dname,event.message?event.message.text:'');
       }
     });
     return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
   }
-  
   var action=body.action||'',result;
   try{
     if(action==='getAll'){result=getAllData();}
@@ -92,39 +79,29 @@ function doPost(e){
   }catch(err){result={ok:false,error:err.message};}
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
 }
-
-// LINE IDをスプレッドシートに保存
 function saveLineUserId(userId,displayName,message){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var sheet=ss.getSheetByName('LINE_IDs');
   if(!sheet){
     sheet=ss.insertSheet('LINE_IDs');
-    sheet.getRange(1,1,1,4).setValues([['LINE_userId','表示名','最終メッセージ','更新日時']]);
+    sheet.getRange(1,1,1,4).setValues([['LINE_userId','\u8868\u793a\u540d','\u6700\u7d42\u30e1\u30c3\u30bb\u30fc\u30b8','\u66f4\u65b0\u65e5\u6642']]);
   }
   var data=sheet.getDataRange().getValues();
   var now=new Date();
-  // 既存IDを更新
-  for(var i=1;i<data.length;i++){
+  for(var i=1;i&lt;data.length;i++){
     if(data[i][0]===userId){
       sheet.getRange(i+1,2,1,3).setValues([[displayName||data[i][1],message,now]]);
-      Logger.log('LINE ID更新: '+displayName+'('+userId+')');
       return;
     }
   }
-  // 新規追加
   sheet.appendRow([userId,displayName,message,now]);
-  Logger.log('LINE ID新規保存: '+displayName+'('+userId+')');
 }
-
-// LINE IDリストを取得
 function getLineUsers(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var sheet=ss.getSheetByName('LINE_IDs');
   if(!sheet)return{ok:true,users:[]};
   var data=sheet.getDataRange().getValues();
-  var users=data.slice(1).map(function(row){
-    return{userId:row[0],name:row[1],lastMsg:row[2],updated:String(row[3])};
-  });
+  var users=data.slice(1).map(function(row){return{userId:row[0],name:String(row[1]),lastMsg:String(row[2])};});
   return{ok:true,users:users};
 }
 function getAllData(){
@@ -157,124 +134,84 @@ function resetBookings(){
   s.clearContents();
   s.getRange(1,1,1,20).setValues([['\u65e5\u4ed8','\u6642\u9593','\u533a\u5206','\u60a3\u8005\u540d','\u8a3a\u5bdf\u5238No','\u4e88\u7d04\u30eb\u30fc\u30c8','\u6765\u9662\u56de\u6570','\u7d4c\u904e\u65e5\u6570','\u75c7\u72b6','\u30aa\u30d7\u30b7\u30e7\u30f3','\u81ea\u8cbb\u30e1\u30cb\u30e5\u30fc','\u51e6\u7f6e(JSON)','\u51e6\u7f6e\u30e1\u30e2','\u7269\u8ca9(JSON)','\u652f\u6255\u65b9\u6cd5','\u652f\u6255\u91d1\u984d','\u533a\u5206\u30ea\u30b9\u30c8','\u518d\u4e88\u7d04\u60c5\u5831','\u30ad\u30e3\u30f3\u30bb\u30eb\u7406\u7531','\u65bd\u8853\u90e8\u4f4d']]);
 }
-// ===== 毎朝8時自動アラート（GASトリガーで実行）=====
-// Apps Scriptで：時計アイコン→トリガー追加→dailyLineAlert→時間ベース→午前8時
+function saveLineSettings(){
+  var token='RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
+  var userId='U9f7333eed2d51ceba13641059e8bd341';
+  var props=PropertiesService.getScriptProperties();
+  props.setProperty('LINE_TOKEN',token);
+  props.setProperty('LINE_USER_ID',userId);
+  Logger.log('LINE\u8a2d\u5b9a\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f');
+}
 function dailyLineAlert(){
   var props=PropertiesService.getScriptProperties();
   var token=props.getProperty('LINE_TOKEN');
   var userId=props.getProperty('LINE_USER_ID');
-  if(!token||!userId){Logger.log('トークン未設定 - saveLineSettings()を実行してください');return;}
-
+  if(!token||!userId){Logger.log('\u30c8\u30fc\u30af\u30f3\u672a\u8a2d\u5b9a');return;}
   var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var today=new Date();
-  today.setHours(0,0,0,0);
+  var today=new Date();today.setHours(0,0,0,0);
   var alerts=[];
-
-  // 予約表から各患者の最終来院日を計算
-  var bSheet=ss.getSheetByName('予約表');
+  var bSheet=ss.getSheetByName('\u4e88\u7d04\u8868');
   if(bSheet){
     var bData=bSheet.getDataRange().getValues();
     var bHdr=bData[0];
-    var dateIdx=bHdr.indexOf('日付');
-    var nameIdx=bHdr.indexOf('患者名');
-    var idIdx=bHdr.indexOf('診察券No');
-    var kubunIdx=bHdr.indexOf('区分');
-    if(dateIdx>-1&&nameIdx>-1){
-      // 患者ごとの最終来院日を集計
+    var dateIdx=bHdr.indexOf('\u65e5\u4ed8'),nameIdx=bHdr.indexOf('\u60a3\u8005\u540d'),idIdx=bHdr.indexOf('\u8a3a\u5bdf\u5238No'),kubunIdx=bHdr.indexOf('\u533a\u5206');
+    if(dateIdx&gt;-1&amp;&amp;nameIdx&gt;-1){
       var lastVisit={};
       bData.slice(1).forEach(function(row){
         var kubun=String(row[kubunIdx]||'');
-        if(kubun.indexOf('継続')>-1||kubun.indexOf('キャンセル')>-1)return;
+        if(kubun.indexOf('\u7d99\u7d9a')&gt;-1||kubun.indexOf('\u30ad\u30e3\u30f3\u30bb\u30eb')&gt;-1)return;
         var dateVal=row[dateIdx];
         if(!dateVal)return;
-        var d;
-        if(dateVal instanceof Date){d=new Date(dateVal);}
-        else{d=new Date(String(dateVal));}
+        var d=dateVal instanceof Date?new Date(dateVal):new Date(String(dateVal));
         if(isNaN(d.getTime()))return;
         d.setHours(0,0,0,0);
-        // 未来の予約は除外
-        if(d>today)return;
+        if(d&gt;today)return;
         var key=String(row[idIdx]||'')||String(row[nameIdx]||'');
-        if(!lastVisit[key]||d>lastVisit[key].date){
-          lastVisit[key]={date:d,name:String(row[nameIdx]||''),id:String(row[idIdx]||'')};
-        }
+        if(!lastVisit[key]||d&gt;lastVisit[key].date)lastVisit[key]={date:d,name:String(row[nameIdx]||''),id:String(row[idIdx]||'')};
       });
-      // 20日チェック
       Object.values(lastVisit).forEach(function(v){
         var diff=Math.floor((today-v.date)/(1000*60*60*24));
-        if(diff>=20&&diff<=21){
-          var dateStr=Utilities.formatDate(v.date,'Asia/Tokyo','M/d');
-          alerts.push('・'+v.name+'（'+v.id+'号）前回:'+dateStr+' '+diff+'日経過');
+        if(diff&gt;=20&amp;&amp;diff&lt;=21){
+          var ds=Utilities.formatDate(v.date,'Asia/Tokyo','M/d');
+          alerts.push('\u30fb'+v.name+'\uff08'+v.id+'\u53f7\uff09\u524d\u56de:'+ds+' '+diff+'\u65e5\u7d4c\u904e');
         }
       });
     }
   }
-
-  if(alerts.length>0){
-    var msg='【倉治整骨院】\n⚠️ 明日で初診料発生アラート\n'+Utilities.formatDate(today,'Asia/Tokyo','M月d日(E)')+'\n\n'+alerts.join('\n')+'\n\n→ 来院を促してください！';
+  if(alerts.length&gt;0){
+    var msg='\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\n\u26a0\ufe0f \u660e\u65e5\u3067\u521d\u8a3a\u6599\u767a\u751f\u30a2\u30e9\u30fc\u30c8\n'+Utilities.formatDate(today,'Asia/Tokyo','M\u6708d\u65e5(E)')+'\n\n'+alerts.join('\n')+'\n\n\u2192 \u6765\u9662\u3092\u4fc3\u3057\u3066\u304f\u3060\u3055\u3044\uff01';
     sendLineMessagingAPI(token,userId,msg);
-    Logger.log('アラート送信：'+alerts.length+'件');
   }else{
-    Logger.log('20日アラート対象なし（本日 '+Utilities.formatDate(today,'Asia/Tokyo','M/d')+')');
+    Logger.log('20\u65e5\u30a2\u30e9\u30fc\u30c8\u5bfe\u8c61\u306a\u3057\uff08\u672c\u65e5 '+Utilities.formatDate(today,'Asia/Tokyo','M/d')+')');
   }
 }
-
-// LINEトークン・ユーザーIDをスクリプトプロパティに保存
-// ===== 自動トリガー設定（この関数を1回実行するだけでOK）=====
-// ===== 前日リマインド送信（毎夕方18時に実行）=====
 function sendDayBeforeReminders(){
   var props=PropertiesService.getScriptProperties();
   var token=props.getProperty('LINE_TOKEN');
-  if(!token){Logger.log('トークン未設定');return;}
-
+  if(!token){Logger.log('\u30c8\u30fc\u30af\u30f3\u672a\u8a2d\u5b9a');return;}
   var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var bSheet=ss.getSheetByName('予約表');
-  if(!bSheet){Logger.log('予約表シートなし');return;}
-
+  var bSheet=ss.getSheetByName('\u4e88\u7d04\u8868');
+  if(!bSheet){Logger.log('\u4e88\u7d04\u8868\u30b7\u30fc\u30c8\u306a\u3057');return;}
   var today=new Date();today.setHours(0,0,0,0);
   var tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
   var tomorrowStr=Utilities.formatDate(tomorrow,'Asia/Tokyo','yyyy-MM-dd');
-  var tomorrowDisp=Utilities.formatDate(tomorrow,'Asia/Tokyo','M月d日(E)');
-
-  // LINE IDシートから {表示名→userId} マップを作成
+  var tomorrowDisp=Utilities.formatDate(tomorrow,'Asia/Tokyo','M\u6708d\u65e5(E)');
   var lineUsers={};
   var lSheet=ss.getSheetByName('LINE_IDs');
   if(lSheet){
     var lData=lSheet.getDataRange().getValues();
-    lData.slice(1).forEach(function(row){
-      if(row[0]&&row[1])lineUsers[String(row[1]).trim()]=String(row[0]);
-    });
+    lData.slice(1).forEach(function(row){if(row[0]&amp;&amp;row[1])lineUsers[String(row[1]).trim()]=String(row[0]);});
   }
-
-  // 患者シートの患者名→LINE表示名マップ
-  var patientLineMap={};
-  var pSheet=ss.getSheetByName('患者');
-  if(pSheet){
-    var pData=pSheet.getDataRange().getValues();
-    var pHdr=pData[0];
-    var pNameIdx=pHdr.indexOf('患者名');
-    var pLineIdx=pHdr.indexOf('LINE');
-    if(pNameIdx>-1&&pLineIdx>-1){
-      pData.slice(1).forEach(function(row){
-        var pName=String(row[pNameIdx]||'').trim();
-        var lineVal=String(row[pLineIdx]||'').trim();
-        if(pName&&lineVal&&lineVal!=='なし')patientLineMap[pName]=lineVal;
-      });
-    }
-  }
-
-  // 明日の予約を患者ごとに収集
   var data=bSheet.getDataRange().getValues();
   var hdr=data[0];
-  var dateIdx=hdr.indexOf('日付'),timeIdx=hdr.indexOf('時間');
-  var nameIdx=hdr.indexOf('患者名'),kubunIdx=hdr.indexOf('区分');
-  if(dateIdx<0){Logger.log('ヘッダー未発見');return;}
-
+  var dateIdx=hdr.indexOf('\u65e5\u4ed8'),timeIdx=hdr.indexOf('\u6642\u9593');
+  var nameIdx=hdr.indexOf('\u60a3\u8005\u540d'),kubunIdx=hdr.indexOf('\u533a\u5206');
+  if(dateIdx&lt;0){Logger.log('\u30d8\u30c3\u30c0\u30fc\u672a\u767a\u898b');return;}
   var byPatient={},seen={};
   data.slice(1).forEach(function(row){
     var dateVal=String(row[dateIdx]||'').trim();
     var kubun=String(row[kubunIdx]||'');
-    if(kubun.indexOf('継続')>-1||kubun.indexOf('キャンセル')>-1)return;
+    if(kubun.indexOf('\u7d99\u7d9a')&gt;-1||kubun.indexOf('\u30ad\u30e3\u30f3\u30bb\u30eb')&gt;-1)return;
     if(dateVal!==tomorrowStr)return;
     var name=String(row[nameIdx]||'').trim();
     var time=String(row[timeIdx]||'').trim();
@@ -283,64 +220,40 @@ function sendDayBeforeReminders(){
     if(!byPatient[name])byPatient[name]=[];
     byPatient[name].push(time);
   });
-
-  if(!Object.keys(byPatient).length){Logger.log('明日('+tomorrowStr+')の予約なし');return;}
-
+  if(!Object.keys(byPatient).length){Logger.log('\u660e\u65e5('+tomorrowStr+')\u306e\u4e88\u7d04\u306a\u3057');return;}
   var sent=0,skipped=[];
   Object.keys(byPatient).forEach(function(name){
     var times=byPatient[name];
-    // LINE IDを患者名 or LINE表示名で検索
-    var targetId=lineUsers[name]||lineUsers[patientLineMap[name]||'']||null;
+    var targetId=lineUsers[name]||null;
+    if(!targetId){
+      var lastName=name.split(/[\u3000 ]/)[0];
+      var found=Object.keys(lineUsers).find(function(k){return k.replace(/[\u3000 ]/,'').indexOf(lastName)===0;});
+      if(found)targetId=lineUsers[found];
+    }
     if(!targetId){skipped.push(name);return;}
-    var msg='【倉治整骨院】\n'+tomorrowDisp+'のご予約リマインドです😊\n\n'+
-      '⏰ '+times.join(' / ')+'\n\nお気をつけてお越しください。\n※自動送信のため返信不要です。';
+    var msg='\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\n'+tomorrowDisp+'\u306e\u3054\u4e88\u7d04\u30ea\u30de\u30a4\u30f3\u30c9\u3067\u3059\ud83d\ude0a\n\n\u23f0 '+times.join(' / ')+'\n\n\u304a\u6c17\u3092\u3064\u3051\u3066\u304a\u8d8a\u3057\u304f\u3060\u3055\u3044\u3002\n\u203b\u81ea\u52d5\u9001\u4fe1\u306e\u305f\u3081\u8fd4\u4fe1\u4e0d\u8981\u3067\u3059\u3002';
     var result=sendLineMessagingAPI(token,targetId,msg);
-    if(result.ok){sent++;}else{skipped.push(name+'(送信エラー)');}
+    if(result.ok){sent++;}else{skipped.push(name+'(\u9001\u4fe1\u30a8\u30e9\u30fc)');}
   });
-  Logger.log('リマインド完了 送信:'+sent+'件 未登録:'+skipped.length+'件');
-
-  // 院長への集計通知
+  Logger.log('\u30ea\u30de\u30a4\u30f3\u30c9\u5b8c\u4e86 \u9001\u4fe1:'+sent+'\u4ef6 \u672a\u767b\u9332:'+skipped.length+'\u4ef6');
   var ownerUserId=props.getProperty('LINE_USER_ID');
   if(ownerUserId){
-    var summary='【倉治整骨院】\n📊 前日リマインド完了\n'+tomorrowDisp+'\n送信:'+sent+'件';
-    if(skipped.length>0)summary+='\nLINE未登録:\n・'+skipped.join('\n・');
+    var summary='\u300c\u5009\u6cbb\u6574\u9aa8\u9662\u300d\n\ud83d\udcca \u524d\u65e5\u30ea\u30de\u30a4\u30f3\u30c9\u5b8c\u4e86\n'+tomorrowDisp+'\n\u9001\u4fe1:'+sent+'\u4ef6';
+    if(skipped.length&gt;0)summary+='\nLINE\u672a\u767b\u9332:\n\u30fb'+skipped.join('\n\u30fb');
     sendLineMessagingAPI(token,ownerUserId,summary);
   }
 }
-
-function setupAllTriggers(){
-  // 既存トリガーを全削除
-  ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
-  // 毎朝8時：20日アラート
-  ScriptApp.newTrigger('dailyLineAlert').timeBased().everyDays(1).atHour(8).create();
-  // 毎日18時：前日リマインド
-  ScriptApp.newTrigger('sendDayBeforeReminders').timeBased().everyDays(1).atHour(18).create();
-  Logger.log('✅ トリガー設定完了：毎朝8時(20日アラート) + 毎日18時(前日リマインド)');
-}
-
 function setupDailyTrigger(){
-  // 既存のdailyLineAlertトリガーを削除
-  var triggers=ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t){
-    if(t.getHandlerFunction()==='dailyLineAlert'){ScriptApp.deleteTrigger(t);}
-  });
-  // 毎朝8時のトリガーを作成
-  ScriptApp.newTrigger('dailyLineAlert')
-    .timeBased()
-    .everyDays(1)
-    .atHour(8)
-    .create();
-  Logger.log('✅ 毎朝8時の自動アラートトリガーを設定しました！');
+  ScriptApp.getProjectTriggers().forEach(function(t){if(t.getHandlerFunction()==='dailyLineAlert')ScriptApp.deleteTrigger(t);});
+  ScriptApp.newTrigger('dailyLineAlert').timeBased().everyDays(1).atHour(8).create();
+  Logger.log('\u6bcf\u671d8\u6642\u306e\u81ea\u52d5\u30a2\u30e9\u30fc\u30c8\u30c8\u30ea\u30ac\u30fc\u3092\u8a2d\u5b9a\u3057\u307e\u3057\u305f\uff01');
 }
-function saveLineSettings(){
-  var token='RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
-  var userId='U9f7333eed2d51ceba13641059e8bd341';
-  var props=PropertiesService.getScriptProperties();
-  props.setProperty('LINE_TOKEN',token);
-  props.setProperty('LINE_USER_ID',userId);
-  Logger.log('✅ LINE設定を保存しました！毎朝8時に自動アラートが届きます。');
+function setupAllTriggers(){
+  ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
+  ScriptApp.newTrigger('dailyLineAlert').timeBased().everyDays(1).atHour(8).create();
+  ScriptApp.newTrigger('sendDayBeforeReminders').timeBased().everyDays(1).atHour(18).create();
+  Logger.log('\u30c8\u30ea\u30ac\u30fc\u8a2d\u5b9a\u5b8c\u4e86\uff1a\u6bcf\u671d8\u6642(20\u65e5\u30a2\u30e9\u30fc\u30c8) + \u6bce\u65e518\u6642(\u524d\u65e5\u30ea\u30de\u30a4\u30f3\u30c9)');
 }
-
 function sendLineMessagingAPI(token,userId,message){
   if(!token||!userId||!message)return{ok:false,error:'missing params'};
   try{
@@ -350,24 +263,15 @@ function sendLineMessagingAPI(token,userId,message){
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
       payload:payload
     });
-    var code=res.getResponseCode();
-    return{ok:code===200,status:code};
-  }catch(err){
-    return{ok:false,error:err.message};
-  }
+    return{ok:res.getResponseCode()===200,status:res.getResponseCode()};
+  }catch(err){return{ok:false,error:err.message};}
 }
 function sendLineNotify(token,message){
-  if(!token||!message)return{ok:false,error:'token or message missing'};
+  if(!token||!message)return{ok:false,error:'missing'};
   try{
-    var res=UrlFetchApp.fetch('https://notify-api.line.me/api/notify',{
-      method:'post',
-      headers:{'Authorization':'Bearer '+token},
-      payload:{message:message}
-    });
+    var res=UrlFetchApp.fetch('https://notify-api.line.me/api/notify',{method:'post',headers:{'Authorization':'Bearer '+token},payload:{message:message}});
     return{ok:res.getResponseCode()===200};
-  }catch(err){
-    return{ok:false,error:err.message};
-  }
+  }catch(err){return{ok:false,error:err.message};}
 }</pre>
 </div>
 <script>
