@@ -973,7 +973,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
             </div>
             <!-- 前回引継ぎメモ（今日の注意事項を自動引継ぎ） -->
             <div style="margin-bottom:8px">
-              <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">📋 前回引継ぎメモ（今日の注意事項から自動引継ぎ）</label>
+              <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">📋 前回引継ぎメモ <button onclick="reloadInheritMemo()" style="font-size:0.65rem;padding:1px 6px;background:#22c55e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:4px">再取得</button></label>
               <textarea class="inp" id="nb-prev-memo" placeholder="前回からの引継ぎ事項" style="height:60px;resize:none;font-size:0.78rem"></textarea>
             </div>
             <div style="font-size:0.72rem;color:#166534;font-weight:bold;margin-bottom:6px" id="nb-preview"></div>
@@ -2870,11 +2870,16 @@ function onRouteChange(){
     const btn=document.querySelector('#next-book-form button');
     if(btn){btn.textContent='✅ 次回予約を入れる';btn.style.background='#22c55e';}
     // 今日の注意事項を前回引継ぎメモに自動セット
+    // 複数の場所から取得を試みる
     const todayMemo=document.getElementById('m-next-memo')?.value.trim()||'';
-    const curBk=bookings[editDate]?.[editSlot];
-    const prevMemo=todayMemo||curBk?.nextMemo||curBk?.nextNote||'';
+    const curBk=(editDate&&editSlot)?bookings[editDate]?.[editSlot]:null;
+    const savedMemo=curBk?.nextMemo||curBk?.nextNote||'';
+    const prevMemo=todayMemo||savedMemo;
     const prevMemoEl=document.getElementById('nb-prev-memo');
-    if(prevMemoEl)prevMemoEl.value=prevMemo;
+    if(prevMemoEl){
+      prevMemoEl.value=prevMemo;
+      if(prevMemo)prevMemoEl.style.background='#f0fdf4';
+    }
   }
   updateNbPreview();
 }
@@ -2946,6 +2951,18 @@ function setNbSlot(n){
     const b=document.getElementById('nb-slot-'+i);
     if(b)b.classList.toggle('on',i===n);
   });
+}
+function reloadInheritMemo(){
+  const todayMemo=document.getElementById('m-next-memo')?.value.trim()||'';
+  const curBk=(editDate&&editSlot)?bookings[editDate]?.[editSlot]:null;
+  const savedMemo=curBk?.nextMemo||curBk?.nextNote||'';
+  const prevMemo=todayMemo||savedMemo;
+  const el=document.getElementById('nb-prev-memo');
+  if(el){
+    el.value=prevMemo;
+    el.style.background=prevMemo?'#f0fdf4':'';
+    if(!prevMemo)el.placeholder='今日の注意事項・施術メモを入力してから再取得してください';
+  }
 }
 function updateNbPreview(){
   const d=document.getElementById('nb-date')?.value;
