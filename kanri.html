@@ -1205,6 +1205,12 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div class="fgrid">
       <div class="fg"><label>電話番号</label><input class="inp" id="pe-tel" inputmode="numeric"></div>
       <div class="fg"><label>LINE</label><select class="sel" id="pe-line"><option value="あり">あり</option><option value="なし">なし</option><option value="-">-</option></select></div>
+      <div class="fg"><label>📱 LINEユーザーID <span style="font-size:0.68rem;color:#94a3b8">（Uで始まる・前日リマインド送信用）</span></label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input class="inp" id="pe-line-uid" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxx" style="flex:1;font-size:0.78rem">
+          <button class="btn bp bsm" onclick="testPatientLine()" style="white-space:nowrap">🧪 送信テスト</button>
+        </div>
+      </div>
       <div class="fg"><label>郵便番号 → 住所自動</label><input class="inp" id="pe-postal" placeholder="576-0054" inputmode="numeric" oninput="autoPostal('pe')"></div>
       <div class="fg"><label>住所（町名・丁目まで）</label><input class="inp" id="pe-city"></div>
       <div class="fg"><label>職業</label><input class="inp" id="pe-job"></div>
@@ -1815,8 +1821,8 @@ async function pushB(){
 }
 
 async function pushP(){
-  const hdr=['診察券No','患者名','ふりがな','性別','電話番号','LINE','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考'];
-  const rows=[hdr,...patients.map(p=>[p.id,p.name,p.kana||'',p.sex||'',normTel(p.tel||''),p.line||'',p.city||'',p.job||'',p.src||'',p.symptom||'',p.last||'',p.count||0,p.dob||'',p.note||''])];
+  const hdr=['診察券No','患者名','ふりがな','性別','電話番号','LINE','LINEユーザーID','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考'];
+  const rows=[hdr,...patients.map(p=>[p.id,p.name,p.kana||'',p.sex||'',normTel(p.tel||''),p.line||'',p.lineUid||'',p.city||'',p.job||'',p.src||'',p.symptom||'',p.last||'',p.count||0,p.dob||'',p.note||''])];
   try{const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveCustomers',rows:JSON.stringify(rows)}),redirect:'follow'});const d=JSON.parse(await res.text());setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');}catch(e){setStat('s-err','⚠ 保存エラー');}
 }
 
@@ -2132,6 +2138,24 @@ async function checkElapsedAlert(date){
     alerts.map(p=>'・'+p.name+'（'+p.id+'号）前回:'+p.last+' '+elapsed(p.last)+'日経過\n　→ 明日来院なければ次回初診料').join('\n')+
     '\n⚠️ 明日が21日目です。来院を促してください！';
   await sendLineNotify(msg);
+}
+// 患者個別LINEテスト送信
+async function testPatientLine(){
+  const uid=document.getElementById('pe-line-uid')?.value.trim();
+  const name=document.getElementById('pe-nm')?.value.trim()||'患者様';
+  if(!uid){alert('LINEユーザーIDを入力してください');return;}
+  const token=localStorage.getItem('kj_line_token2')||'';
+  if(!token){alert('まずマスター設定でLINEトークンを設定してください');return;}
+  const msg='【倉治整骨院】\n'+name+'様\nLINE連携のテスト送信です✅\n正常に届いていれば設定完了です。';
+  try{
+    const res=await fetch('https://script.google.com/macros/s/AKfycbyJt0p0pSFsmmtdTDHRJBlaXebrvNuSKAzcYF2VlVLAsBDuKp2X68hEe6qUv_I6PwlJrg/exec',{
+      method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'lineNotifyV2',token,userId:uid,message:msg}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res.text());
+    alert(d.ok?'✅ 送信成功！'+name+'様のLINEを確認してください':'❌ 送信失敗：'+JSON.stringify(d));
+  }catch(e){alert('❌ エラー：'+e.message);}
 }
 function toggleDayMemo(){
   const area=document.getElementById('day-memo-area');
@@ -3225,6 +3249,7 @@ function openPEdit(id){
   if(p.dob){dobBoth.style.display='block';dobBoth.textContent=p.dob+' ／ '+toWareki(p.dob)+(calcAge(p.dob)?' （'+calcAge(p.dob)+'歳）':'');}else{dobBoth.style.display='none';}
   document.getElementById('pe-tel').value=p.tel||'';
   document.getElementById('pe-line').value=p.line||'あり';
+  const luid=document.getElementById('pe-line-uid');if(luid)luid.value=p.lineUid||'';
   document.getElementById('pe-city').value=p.city||'';
   document.getElementById('pe-job').value=p.job||'';
   document.getElementById('pe-src').value=p.src||'-';
@@ -3243,6 +3268,7 @@ async function savePEdit(){
   p.dob=document.getElementById('pe-dob').value;
   p.tel=normTel(document.getElementById('pe-tel').value.trim());
   p.line=document.getElementById('pe-line').value;
+  p.lineUid=document.getElementById('pe-line-uid')?.value.trim()||'';
   p.city=document.getElementById('pe-city').value.trim();
   p.job=document.getElementById('pe-job').value.trim();
   p.src=document.getElementById('pe-src').value;

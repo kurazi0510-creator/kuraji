@@ -159,65 +159,81 @@ function dailyLineAlert(){
 function sendDayBeforeReminders(){
   var props=PropertiesService.getScriptProperties();
   var token=props.getProperty('LINE_TOKEN');
-  var userId=props.getProperty('LINE_USER_ID');
-  if(!token||!userId){Logger.log('トークン未設定');return;}
+  var myUserId=props.getProperty('LINE_USER_ID');
+  if(!token){Logger.log('トークン未設定');return;}
 
   var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var sheet=ss.getSheetByName('予約表');
-  if(!sheet){Logger.log('予約表シートなし');return;}
-
-  var today=new Date();
-  today.setHours(0,0,0,0);
-  var tomorrow=new Date(today);
-  tomorrow.setDate(tomorrow.getDate()+1);
+  var today=new Date();today.setHours(0,0,0,0);
+  var tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
   var tomorrowStr=Utilities.formatDate(tomorrow,'Asia/Tokyo','yyyy-MM-dd');
   var tomorrowDisp=Utilities.formatDate(tomorrow,'Asia/Tokyo','M月d日(E)');
 
-  var data=sheet.getDataRange().getValues();
-  var hdr=data[0];
-  var dateIdx=hdr.indexOf('日付');
-  var timeIdx=hdr.indexOf('時間');
-  var nameIdx=hdr.indexOf('患者名');
-  var kubunIdx=hdr.indexOf('区分');
+  // 予約表を取得
+  var bSheet=ss.getSheetByName('予約表');
+  if(!bSheet){Logger.log('予約表シートなし');return;}
+  var bData=bSheet.getDataRange().getValues();
+  var bHdr=bData[0];
+  var dateIdx=bHdr.indexOf('日付'),timeIdx=bHdr.indexOf('時間');
+  var nameIdx=bHdr.indexOf('患者名'),idIdx=bHdr.indexOf('診察券No'),kubunIdx=bHdr.indexOf('区分');
 
-  if(dateIdx<0||timeIdx<0){Logger.log('ヘッダー未発見');return;}
+  // 患者シートからLINEユーザーIDを取得
+  var lineUids={};
+  var pSheet=ss.getSheetByName('患者');
+  if(pSheet){
+    var pData=pSheet.getDataRange().getValues();
+    var pHdr=pData[0];
+    var pIdIdx=pHdr.indexOf('診察券No'),pLineUidIdx=pHdr.indexOf('LINEユーザーID');
+    if(pIdIdx>-1&&pLineUidIdx>-1){
+      pData.slice(1).forEach(function(row){
+        var pid=String(row[pIdIdx]||'').trim();
+        var uid=String(row[pLineUidIdx]||'').trim();
+        if(pid&&uid&&uid.startsWith('U'))lineUids[pid]=uid;
+      });
+    }
+  }
 
-  // 明日の予約を収集（継続・キャンセル除外）
-  var appointments=[];
-  var seen={};
-  data.slice(1).forEach(function(row){
+  // 明日の予約を収集
+  var appointments=[];var seen={};
+  bData.slice(1).forEach(function(row){
     var dateVal=String(row[dateIdx]||'').trim();
     var kubun=String(row[kubunIdx]||'');
     if(kubun.indexOf('継続')>-1||kubun.indexOf('キャンセル')>-1)return;
     if(dateVal!==tomorrowStr)return;
     var name=String(row[nameIdx]||'').trim();
     var time=String(row[timeIdx]||'').trim();
+    var pid=String(row[idIdx]||'').trim();
     if(!name||!time)return;
     var key=name+'_'+time;
-    if(seen[key])return;
-    seen[key]=true;
-    appointments.push({name:name,time:time});
+    if(seen[key])return;seen[key]=true;
+    appointments.push({name:name,time:time,pid:pid});
   });
 
-  if(!appointments.length){
-    Logger.log('明日('+tomorrowStr+')の予約なし');
-    return;
+  if(!appointments.length){Logger.log('明日の予約なし');return;}
+
+  var sentCount=0,ownCount=0;
+  // 患者個別に送信
+  appointments.forEach(function(a){
+    var uid=lineUids[a.pid]||'';
+    if(uid){
+      var msg='【倉治整骨院】\n'+a.name+'様\n明日('+tomorrowDisp+') '+a.time+'〜のご予約を\nお待ちしております😊\n\n気をつけてお越しください🙏\n※自動送信のため返信不要です。';
+      var result=sendLineMessagingAPI(token,uid,msg);
+      if(result.ok)sentCount++;
+      else Logger.log('送信失敗: '+a.name+' '+JSON.stringify(result));
+    }else{
+      ownCount++;
+    }
+  });
+
+  // LINEユーザーID未登録の患者はまとめて自分のLINEに通知
+  if(ownCount>0&&myUserId){
+    var unregistered=appointments.filter(function(a){return !lineUids[a.pid];});
+    var msg2='【倉治整骨院】\n📅 明日('+tomorrowDisp+')のLINE未登録患者\n\n';
+    unregistered.forEach(function(a){msg2+='・'+a.time+' '+a.name+'様\n';});
+    msg2+='\n→ LINEユーザーIDを登録すると自動でリマインドが届きます';
+    sendLineMessagingAPI(token,myUserId,msg2);
   }
 
-  // まとめてリマインドメッセージを送信
-  var msg='【倉治整骨院】
-📅 明日('+tomorrowDisp+')の予約リマインド
-
-';
-  appointments.forEach(function(a){
-    msg+='・'+a.time+' '+a.name+'様
-';
-  });
-  msg+='
-※このメッセージは自動送信です。返信不要です。';
-
-  sendLineMessagingAPI(token,userId,msg);
-  Logger.log('リマインド送信完了：'+appointments.length+'件');
+  Logger.log('患者個別送信:'+sentCount+'件 / 未登録:'+ownCount+'件');
 }
 
 // 両方のトリガーをまとめて設定
