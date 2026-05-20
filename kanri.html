@@ -3608,16 +3608,23 @@ async function addPatient(){
 
 // タブ切替
 function addFamRow(type){
-  const container=document.getElementById('pe-fam-'+type+'s');
+  var container=document.getElementById('pe-fam-'+type+'s');
   if(!container)return;
-  const idx=container.children.length+1;
-  const labels={child:'子'+idx,grand:'孫'+idx,parent:'親'+idx};
-  const div=document.createElement('div');
+  var n=container.children.length+1;
+  var lbl={child:'子',grand:'孫',parent:'親'}[type]||type;
+  var div=document.createElement('div');
   div.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:end';
-  div.innerHTML='<div><label style="font-size:0.7rem;color:#64748b">'+labels[type]+' 性別</label><select class="sel" style="font-size:0.78rem"><option value="">-</option><option>男性</option><option>女性</option></select></div>'+
-    '<div><label style="font-size:0.7rem;color:#64748b">年齢</label><input class="inp" placeholder="例: 25" style="font-size:0.78rem"></div>'+
-    '<div><label style="font-size:0.7rem;color:#64748b">メモ</label><input class="inp" placeholder="大学生など" style="font-size:0.78rem"></div>'+
-    '<button onclick="this.closest('div[style]').remove()" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 8px;font-size:0.75rem;cursor:pointer">✕</button>';
+  var sex=document.createElement('div');
+  sex.innerHTML='<label style="font-size:0.7rem;color:#64748b">'+lbl+n+' 性別</label><select class="sel" style="font-size:0.78rem"><option value="">-</option><option>男性</option><option>女性</option></select>';
+  var age=document.createElement('div');
+  age.innerHTML='<label style="font-size:0.7rem;color:#64748b">年齢</label><input class="inp" placeholder="例: 25" style="font-size:0.78rem">';
+  var memo=document.createElement('div');
+  memo.innerHTML='<label style="font-size:0.7rem;color:#64748b">メモ</label><input class="inp" placeholder="大学生など" style="font-size:0.78rem">';
+  var rm=document.createElement('button');
+  rm.textContent='✕';
+  rm.style.cssText='background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 8px;font-size:0.75rem;cursor:pointer;height:36px;margin-top:14px';
+  rm.onclick=function(){var p=this.parentElement;if(p&&p.parentElement)p.parentElement.removeChild(p);};
+  div.appendChild(sex);div.appendChild(age);div.appendChild(memo);div.appendChild(rm);
   container.appendChild(div);
 }
 function togglePePet(btn){
