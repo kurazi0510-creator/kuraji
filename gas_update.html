@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GAS更新手順</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;padding:16px;}
+.card{background:#1e293b;border-radius:12px;padding:20px;max-width:600px;margin:0 auto 12px;}
+h1{color:#f97316;font-size:1rem;text-align:center;margin-bottom:16px;}
+.step{background:#0f172a;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #f97316;}
+.num{color:#f97316;font-size:0.72rem;font-weight:bold;margin-bottom:6px;}
+.title{color:white;font-size:0.9rem;font-weight:bold;margin-bottom:8px;}
+.desc{color:#94a3b8;font-size:0.8rem;line-height:1.9;}
+.url{background:#000;color:#22c55e;padding:10px;border-radius:6px;font-size:0.72rem;word-break:break-all;margin:8px 0;cursor:pointer;}
+.key{background:#374151;color:#f9fafb;padding:3px 8px;border-radius:4px;font-size:0.78rem;font-family:monospace;}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:0.95rem;font-weight:bold;cursor:pointer;margin-bottom:10px;text-align:center;}
+.btn-orange{background:#f97316;color:white;}
+.btn-green{background:#22c55e;color:white;}
+.btn-blue{background:#3b82f6;color:white;}
+.btn-back{background:#374151;color:#94a3b8;}
+.done{background:#dcfce7;color:#166534;padding:10px;border-radius:8px;font-size:0.8rem;text-align:center;display:none;margin-bottom:10px;}
+.arrow{color:#f97316;font-size:1.2rem;text-align:center;margin:4px 0;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⚙️ GASコード更新手順</h1>
+
+  <div class="step">
+    <div class="num">STEP 1</div>
+    <div class="title">📋 コードをコピーする</div>
+    <div class="desc">下のボタンを押すだけでコピー完了。</div>
+    <br>
+    <button class="btn btn-orange" id="copybtn" onclick="copyGAS()">📋 GASコードをコピーする</button>
+    <div class="done" id="copy-done">✅ コピーしました！STEP 2に進んでください。</div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">STEP 2</div>
+    <div class="title">🌐 Apps Scriptを開く</div>
+    <div class="desc">下のボタンを押してApps Scriptを開いてください。<br>（新しいタブで開きます）</div>
+    <br>
+    <button class="btn btn-blue" onclick="window.open('https://script.google.com','_blank')">🌐 Apps Scriptを開く</button>
+    <div class="desc" style="margin-top:8px">開いたら「無題のプロジェクト」→「コード.gs」をクリック</div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">STEP 3</div>
+    <div class="title">📝 貼り付けて保存する</div>
+    <div class="desc">
+      コード.gsの画面で：<br><br>
+      <span class="key">Ctrl</span> + <span class="key">A</span>　→　全選択<br><br>
+      <span class="key">Delete</span>　→　全削除<br><br>
+      <span class="key">Ctrl</span> + <span class="key">V</span>　→　貼り付け<br><br>
+      <span class="key">Ctrl</span> + <span class="key">S</span>　→　保存
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">STEP 4</div>
+    <div class="title">▶ 関数を選んで実行する</div>
+    <div class="desc">
+      上部のドロップダウン（関数名が書いてある部分）を変更して「▶ 実行」を押す。<br><br>
+      <strong style="color:white">通常は「setupAllTriggers」を選んで実行</strong><br>
+      （トリガー設定・初回のみ）<br><br>
+      <strong style="color:white">フォロワーIDを取得したい時は「getFollowers」</strong>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">STEP 5</div>
+    <div class="title">🚀 デプロイする</div>
+    <div class="desc">
+      右上「デプロイ」→「デプロイを管理」→ ✏️鉛筆アイコン<br>
+      →「新しいバージョン」→「デプロイ」
+    </div>
+  </div>
+
+  <br>
+  <button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムに戻る</button>
+</div>
+
+<script>
+var B64 = "";
+
+fetch('gas_copy.html')
+  .then(r => r.text())
+  .then(html => {
+    var m = html.match(/var B64="([^"]+)"/);
+    if(m) B64 = m[1];
+  });
+
+function getCode(){
+  var bin = atob(B64);
+  var bytes = new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function copyGAS(){
+  var code = getCode();
+  var btn = document.getElementById('copybtn');
+  var done = document.getElementById('copy-done');
+  navigator.clipboard.writeText(code).then(function(){
+    btn.textContent = '✅ コピー済み！';
+    btn.style.background = '#22c55e';
+    done.style.display = 'block';
+  }).catch(function(){
+    var ta = document.createElement('textarea');
+    ta.value = code;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✅ コピー済み！';
+    btn.style.background = '#22c55e';
+    done.style.display = 'block';
+  });
+}
+</script>
+</body>
+</html>
