@@ -209,10 +209,23 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <div class="page on" id="page-yoyaku">
   <div class="card" style="margin-top:14px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <div><label style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:3px">日付</label>
-        <input type="date" class="date-inp" id="selDate" onchange="renderSched()"></div>
-        <div id="daybadge" class="day-b" style="margin-top:16px"></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <!-- 日付クイック移動 -->
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button onclick="moveDate(-7)" style="background:#f1f5f9;color:#374151;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.72rem;padding:5px 8px;cursor:pointer;font-weight:bold">◀◀先週</button>
+          <button onclick="moveDate(-1)" style="background:#f1f5f9;color:#374151;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.72rem;padding:5px 10px;cursor:pointer;font-weight:bold">◀ 前日</button>
+          <button onclick="moveDate(0)" style="background:#1e293b;color:white;border:none;border-radius:7px;font-size:0.72rem;padding:5px 10px;cursor:pointer;font-weight:bold">今日</button>
+          <button onclick="moveDate(1)" style="background:#f1f5f9;color:#374151;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.72rem;padding:5px 10px;cursor:pointer;font-weight:bold">翌日 ▶</button>
+          <button onclick="moveDate(7)" style="background:#f1f5f9;color:#374151;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.72rem;padding:5px 8px;cursor:pointer;font-weight:bold">来週▶▶</button>
+        </div>
+        <!-- 今週の曜日タブ -->
+        <div id="week-day-tabs" style="display:flex;gap:3px;flex-wrap:wrap"></div>
+        <!-- 日付入力 -->
+        <div style="display:flex;align-items:center;gap:8px">
+          <div><label style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:3px">日付</label>
+          <input type="date" class="date-inp" id="selDate" onchange="renderSched();renderWeekDayTabs()"></div>
+          <div id="daybadge" class="day-b" style="margin-top:16px"></div>
+        </div>
       </div>
       <button class="btn bp bsm" onclick="syncAll()" style="margin-top:16px">🔄 最新データ取得</button>
       <button class="btn bp bsm" onclick="showFutureBookings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
@@ -4940,6 +4953,42 @@ let ltimer=null;
 function doLottery(){if(!lp.length){alert('参加者を追加してください');return;}const drum=document.getElementById('drum'),dtext=document.getElementById('dtext');document.getElementById('winner').classList.remove('on');drum.classList.add('spin');let c=0,total=25+Math.floor(Math.random()*15);if(ltimer)clearInterval(ltimer);ltimer=setInterval(()=>{dtext.innerHTML=`<span style="font-size:0.82rem">${lp[Math.floor(Math.random()*lp.length)]}</span>`;if(++c>=total){clearInterval(ltimer);drum.classList.remove('spin');const w=lp[Math.floor(Math.random()*lp.length)];dtext.innerHTML=`🎉<br><span style="font-size:0.78rem;color:var(--gold)">${w}</span>`;document.getElementById('wname').textContent=w+' 様';document.getElementById('winner').classList.add('on');}},80);}
 
 // ===== NAV =====
+function moveDate(days){
+  const el=document.getElementById('selDate');
+  if(!el)return;
+  if(days===0){el.value=today();}
+  else{
+    const base=el.value?new Date(el.value+'T00:00:00'):new Date();
+    base.setDate(base.getDate()+days);
+    el.value=base.toISOString().split('T')[0];
+  }
+  renderSched();renderWeekDayTabs();
+}
+function selectDate(dateStr){
+  const el=document.getElementById('selDate');
+  if(el){el.value=dateStr;renderSched();renderWeekDayTabs();}
+}
+function renderWeekDayTabs(){
+  const container=document.getElementById('week-day-tabs');
+  if(!container)return;
+  const curVal=document.getElementById('selDate')?.value||today();
+  const cur=new Date(curVal+'T00:00:00');
+  const dow=cur.getDay();
+  const monOffset=dow===0?-6:1-dow;
+  const monday=new Date(cur);monday.setDate(cur.getDate()+monOffset);
+  const dn=['日','月','火','水','木','金','土'];
+  const dc=['#e5e7eb','#f5a623','#a8c639','#7ac6ee','#f7f3c0','#f9c0cc','#f5d6d6'];
+  container.innerHTML=[0,1,2,3,4,5,6].map(i=>{
+    const d=new Date(monday);d.setDate(monday.getDate()+i);
+    const ds=d.toISOString().split('T')[0];
+    const isCur=ds===curVal,isToday=ds===today();
+    const di=d.getDay();
+    const bg=isCur?'#1e293b':dc[di];
+    const tc=isCur?'white':di===0?'#dc2626':di===6?'#1d4ed8':'#374151';
+    const bdr=isToday&&!isCur?'2px solid #f97316':'2px solid transparent';
+    return `<button onclick="selectDate('${ds}')" style="background:${bg};color:${tc};border:${bdr};border-radius:8px;padding:5px 7px;cursor:pointer;font-size:0.72rem;font-weight:bold;min-width:40px;line-height:1.3;text-align:center"><div>${dn[di]}</div><div style="font-size:0.68rem">${d.getDate()}</div></button>`;
+  }).join('');
+}
 function goPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav-t').forEach(t=>t.classList.remove('on'));
@@ -4967,7 +5016,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('bs-date').value=today();
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // まずlocalStorageから即表示（データは消えない）
-  load();renderSched();renderPatients();
+  load();renderSched();renderWeekDayTabs();renderPatients();
   // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
   // ふりがな入力IME対策初期化
