@@ -934,30 +934,43 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div class="fg"><label>診察券No</label><input class="inp" id="m-id" type="number" placeholder="入力で自動入力" oninput="autoFill()"></div>
         <div class="fg"><label>患者名</label><input class="inp" id="m-nm" placeholder="患者名"></div>
         <div class="fg"><label>予約ルート</label>
-          <select class="sel" id="m-rt" onchange="onRouteChange()"><option value="LINE">LINE</option><option value="次回予約">次回予約</option><option value="電話">電話</option><option value="飛び込み">飛び込み</option><option value="当日LINE予約">当日LINE予約</option><option value="当日電話予約">当日電話予約</option></select>
+          <select class="sel" id="m-rt" onchange="onRouteChange()">
+  <optgroup label="── 今回の来院ルート ──">
+    <option value="次回予約">次回予約（前回予約済み）</option>
+    <option value="LINE">LINE予約</option>
+    <option value="電話">電話予約</option>
+    <option value="当日LINE予約">当日LINE予約</option>
+    <option value="当日電話予約">当日電話予約</option>
+    <option value="飛び込み">飛び込み</option>
+  </optgroup>
+</select>
           <div id="next-appt-info" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border-radius:8px;font-size:0.78rem;color:#1e40af;font-weight:bold"></div>
           <!-- 次回予約入力フォーム -->
           <div id="next-book-form" style="display:none;margin-top:8px;background:#f0fdf4;border-radius:10px;padding:12px;border:1.5px solid #86efac">
             <div style="font-size:0.78rem;font-weight:bold;color:#166534;margin-bottom:8px">📅 次回予約の詳細</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;min-width:0">
               <div>
                 <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">日付</label>
                 <input type="date" class="inp" id="nb-date" style="font-size:0.82rem" onchange="updateNbPreview()">
               </div>
               <div>
                 <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">時間</label>
-                <select class="sel" id="nb-time" style="font-size:0.82rem" onchange="updateNbPreview()">
-                  <option value="">選択</option>
+                <select class="sel" id="nb-time" style="font-size:0.82rem;width:100%" onchange="updateNbPreview()">
+                  <option value="">-- 選択 --</option>
+                  <optgroup label="午前">
                   <option>08:30</option><option>08:50</option><option>09:10</option>
                   <option>09:30</option><option>09:50</option><option>10:10</option>
                   <option>10:30</option><option>10:50</option><option>11:10</option>
                   <option>11:30</option><option>11:50</option><option>12:10</option>
-                  <option>12:30</option><option>15:00</option><option>15:20</option>
-                  <option>15:40</option><option>16:00</option><option>16:20</option>
-                  <option>16:40</option><option>17:00</option><option>17:20</option>
-                  <option>17:40</option><option>18:00</option><option>18:20</option>
-                  <option>18:40</option><option>19:00</option><option>19:20</option>
-                  <option>19:40</option>
+                  <option>12:30</option>
+                  </optgroup>
+                  <optgroup label="午後">
+                  <option>15:00</option><option>15:20</option><option>15:40</option>
+                  <option>16:00</option><option>16:20</option><option>16:40</option>
+                  <option>17:00</option><option>17:20</option><option>17:40</option>
+                  <option>18:00</option><option>18:20</option><option>18:40</option>
+                  <option>19:00</option><option>19:20</option><option>19:40</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -3010,7 +3023,7 @@ function openHistModal(){
           ${bk.route?`<span class="rt ${bk.route==='LINE'?'r-li':bk.route==='次回予約'?'r-ji':'r-to'}">${bk.route}</span>`:''}
         </div>
         ${bk.symptom?`<div style="font-size:0.72rem;color:var(--muted);margin-top:3px">症状: ${bk.symptom}</div>`:''}
-        ${(bk.nextMemo||bk.nextNote)?`<div style="font-size:0.7rem;color:#7c3aed;margin-top:3px">📋 ${(bk.nextMemo||bk.nextNote||'').slice(0,30)}${(bk.nextMemo||bk.nextNote||'').length>30?'…':''}</div>`:''}
+        ${(()=>{const m=bk.nextMemo||bk.nextNote||'';return m?`<div style="font-size:0.7rem;background:#f3e8ff;color:#6d28d9;padding:3px 6px;border-radius:5px;margin-top:3px;border-left:3px solid #7c3aed">📋 ${m.slice(0,40)}${m.length>40?'…':''}</div>`:''})()}
         ${(()=>{const nx=getNextAppt(bk.name,bk.cardId,date,slot);return nx?`<div style="font-size:0.7rem;color:#0369a1;margin-top:3px">📅 次回: ${nx}</div>`:''})()}
         ${buiHtml}${shHtml}${bsHtml}${payHtml}
       </div>`;
