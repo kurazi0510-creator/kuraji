@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>倉治整骨院｜予約空き状況ジェネレーター</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Hiragino Sans',sans-serif;background:#1a1a2e;min-height:100vh;padding:12px;}
+h1{color:white;font-size:0.85rem;text-align:center;margin-bottom:2px;letter-spacing:1px;}
+.sub{color:#888;font-size:0.68rem;text-align:center;margin-bottom:10px;}
+.card{background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 4px 16px rgba(0,0,0,0.3);}
+.section-title{font-size:0.75rem;font-weight:bold;color:#1e293b;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+
+/* 日数選択タブ */
+.days-tabs{display:flex;gap:6px;margin-bottom:10px;}
+.days-tab{flex:1;padding:10px 4px;border:2px solid #e2e8f0;border-radius:8px;background:white;font-size:0.8rem;font-weight:bold;cursor:pointer;text-align:center;color:#64748b;}
+.days-tab.active{border-color:#f97316;background:#f97316;color:white;}
+
+/* 日付ブロック */
+.day-block{background:#f8fafc;border-radius:10px;padding:10px;margin-bottom:8px;border:1.5px solid #e2e8f0;}
+.day-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.day-label{font-size:0.8rem;font-weight:bold;color:#1e293b;}
+.day-badge{padding:3px 10px;border-radius:20px;font-size:0.72rem;font-weight:bold;}
+.day-input{border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 10px;font-size:0.82rem;flex:1;}
+
+/* 時間チップ */
+.time-group{margin-bottom:6px;}
+.time-group-label{font-size:0.68rem;color:#94a3b8;font-weight:bold;margin-bottom:4px;}
+.time-grid{display:flex;flex-wrap:wrap;gap:4px;}
+.t-chip{padding:5px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.72rem;cursor:pointer;background:white;color:#374151;white-space:nowrap;}
+.t-chip.on{background:#1e293b;color:white;border-color:#1e293b;}
+.t-chip.custom{background:#fff7ed;border-color:#f97316;color:#c2410c;}
+
+/* 生成ボタン */
+.gen-btn{width:100%;padding:14px;border:none;border-radius:10px;background:#f97316;color:white;font-size:1rem;font-weight:bold;cursor:pointer;margin-bottom:10px;}
+.save-btn{width:100%;padding:12px;border:none;border-radius:10px;background:#1e293b;color:white;font-size:0.9rem;font-weight:bold;cursor:pointer;display:none;}
+
+/* プレビュー */
+.preview-wrap{text-align:center;display:none;}
+.preview-wrap canvas{max-width:100%;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.3);}
+.share-hint{font-size:0.72rem;color:#64748b;margin-top:6px;}
+
+.add-row{display:flex;gap:6px;margin-top:6px;}
+.add-row input{flex:1;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 10px;font-size:0.78rem;}
+.add-btn{padding:6px 12px;border:none;border-radius:7px;background:#3b82f6;color:white;font-size:0.78rem;cursor:pointer;white-space:nowrap;}
+</style>
+</head>
+<body>
+<h1>倉治整骨院｜予約空き状況</h1>
+<div class="sub">最新バージョン v13</div>
+
+<!-- 日数選択 -->
+<div class="days-tabs">
+  <button class="days-tab active" onclick="setDays(1)">1日分</button>
+  <button class="days-tab" onclick="setDays(2)">2日分</button>
+  <button class="days-tab" onclick="setDays(3)">3日分</button>
+</div>
+
+<!-- 日付・時間入力エリア -->
+<div id="day-blocks"></div>
+
+<!-- 生成ボタン -->
+<button class="gen-btn" onclick="generate()">🎨 画像を生成する</button>
+
+<!-- プレビュー -->
+<div class="preview-wrap" id="preview-wrap">
+  <canvas id="cv"></canvas>
+  <div class="share-hint">👆 画像を長押し → 写真を保存</div>
+  <button class="save-btn" id="save-btn" onclick="doShare()">📲 カメラロールに保存</button>
+</div>
+
+<script>
+// ===== 定数 =====
+const AM_SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10','12:30'];
+const PM_SLOTS=['15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+const DAY_COLORS={0:'#e5e7eb',1:'#f5a623',2:'#a8c639',3:'#7ac6ee',4:'#f7f3c0',5:'#f9c0cc',6:'#f5d6d6'};
+const DAY_TEXT_COLORS={0:'#374151',1:'#7c3900',2:'#3a5c00',3:'#0c4a6e',4:'#78640a',5:'#831843',6:'#7c3d3d'};
+const DAY_NAMES=['日','月','火','水','木','金','土'];
+let numDays=1;
+let dayData=[{date:'',slots:[]},{date:'',slots:[]},{date:'',slots:[]}];
+
+function toDateStr(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function today(){return toDateStr(new Date());}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+
+function setDays(n){
+  numDays=n;
+  document.querySelectorAll('.days-tab').forEach((t,i)=>t.classList.toggle('active',i===n-1));
+  renderDayBlocks();
+}
+
+function renderDayBlocks(){
+  const wrap=document.getElementById('day-blocks');
+  wrap.innerHTML='';
+  for(let i=0;i<numDays;i++){
+    const data=dayData[i];
+    const d=data.date||toDateStr(addDays(new Date(),i));
+    if(!data.date)data.date=d;
+    const dt=new Date(d+'T00:00:00');
+    const dow=dt.getDay();
+    const bg=DAY_COLORS[dow];
+    const div=document.createElement('div');
+    div.className='day-block';
+    div.style.borderColor=bg;
+    div.innerHTML=`
+      <div class="day-header">
+        <span class="day-label">${numDays>1?'Day '+(i+1)+' ':''}日付</span>
+        <input type="date" class="day-input" id="date-${i}" value="${data.date}"
+          onchange="onDateChange(${i})" style="border-color:${bg}">
+        <span class="day-badge" id="badge-${i}" style="background:${bg};color:${DAY_TEXT_COLORS[dow]}">${DAY_NAMES[dow]}曜日</span>
+      </div>
+      <div class="time-group">
+        <div class="time-group-label">🌅 午前</div>
+        <div class="time-grid" id="am-${i}"></div>
+      </div>
+      <div class="time-group">
+        <div class="time-group-label">🌆 午後</div>
+        <div class="time-grid" id="pm-${i}"></div>
+      </div>
+      <div class="add-row">
+        <input type="text" id="custom-input-${i}" placeholder="時間を追加（例: 13:30）">
+        <button class="add-btn" onclick="addCustom(${i})">＋追加</button>
+        <button class="add-btn" style="background:#e2e8f0;color:#374151" onclick="clearSlots(${i})">クリア</button>
+      </div>
+    `;
+    wrap.appendChild(div);
+    renderSlots(i);
+  }
+}
+
+function renderSlots(i){
+  const amGrid=document.getElementById('am-'+i);
+  const pmGrid=document.getElementById('pm-'+i);
+  if(!amGrid||!pmGrid)return;
+  const allSlots=[...AM_SLOTS,...PM_SLOTS,...(dayData[i].customSlots||[])];
+  amGrid.innerHTML='';pmGrid.innerHTML='';
+  AM_SLOTS.forEach(s=>{
+    const on=dayData[i].slots.includes(s);
+    const btn=document.createElement('button');
+    btn.className='t-chip'+(on?' on':'');
+    btn.textContent=s;
+    btn.onclick=()=>{toggleSlot(i,s);};
+    amGrid.appendChild(btn);
+  });
+  PM_SLOTS.forEach(s=>{
+    const on=dayData[i].slots.includes(s);
+    const btn=document.createElement('button');
+    btn.className='t-chip'+(on?' on':'');
+    btn.textContent=s;
+    btn.onclick=()=>{toggleSlot(i,s);};
+    pmGrid.appendChild(btn);
+  });
+  (dayData[i].customSlots||[]).forEach(s=>{
+    const on=dayData[i].slots.includes(s);
+    const btn=document.createElement('button');
+    btn.className='t-chip custom'+(on?' on':'');
+    btn.textContent=s;
+    btn.onclick=()=>{toggleSlot(i,s);};
+    pmGrid.appendChild(btn);
+  });
+}
+
+function toggleSlot(i,s){
+  const idx=dayData[i].slots.indexOf(s);
+  if(idx>-1)dayData[i].slots.splice(idx,1);
+  else dayData[i].slots.push(s);
+  // ソート
+  const allSlots=[...AM_SLOTS,...PM_SLOTS,...(dayData[i].customSlots||[])];
+  dayData[i].slots.sort((a,b)=>allSlots.indexOf(a)-allSlots.indexOf(b));
+  renderSlots(i);
+}
+
+function onDateChange(i){
+  const el=document.getElementById('date-'+i);
+  dayData[i].date=el.value;
+  const dt=new Date(el.value+'T00:00:00');
+  const dow=dt.getDay();
+  const bg=DAY_COLORS[dow];
+  const badge=document.getElementById('badge-'+i);
+  const block=el.closest('.day-block');
+  if(badge){badge.textContent=DAY_NAMES[dow]+'曜日';badge.style.background=bg;badge.style.color=DAY_TEXT_COLORS[dow];}
+  if(block){block.style.borderColor=bg;el.style.borderColor=bg;}
+}
+
+function addCustom(i){
+  const inp=document.getElementById('custom-input-'+i);
+  const val=inp.value.trim().replace('時','').replace('分','');
+  const match=val.match(/^(\d{1,2})[:\.](\d{2})$/)||val.match(/^(\d{1,2})$/);
+  if(!match){alert('「13:30」または「13時30分」の形式で入力してください');return;}
+  const h=match[1].padStart(2,'0'),m=(match[2]||'00').padStart(2,'0');
+  const s=h+':'+m;
+  if(!dayData[i].customSlots)dayData[i].customSlots=[];
+  if(!dayData[i].customSlots.includes(s))dayData[i].customSlots.push(s);
+  dayData[i].slots.push(s);
+  inp.value='';
+  renderSlots(i);
+}
+
+function clearSlots(i){
+  dayData[i].slots=[];
+  renderSlots(i);
+}
+
+// ===== Canvas描画 =====
+function generate(){
+  const days=[];
+  for(let i=0;i<numDays;i++){
+    const d=dayData[i];
+    const dateEl=document.getElementById('date-'+i);
+    const dateVal=dateEl?dateEl.value:d.date;
+    if(!dateVal){alert((i+1)+'日目の日付を設定してください');return;}
+    days.push({date:dateVal,slots:d.slots});
+  }
+
+  const cv=document.getElementById('cv');
+  const ctx=cv.getContext('2d');
+  const W=800,H=800;
+  cv.width=W;cv.height=H;
+
+  // 1日分 vs 2日分 vs 3日分でレイアウトを切り替え
+  if(numDays===1){draw1day(ctx,W,H,days[0]);}
+  else if(numDays===2){draw2days(ctx,W,H,days);}
+  else{draw3days(ctx,W,H,days);}
+
+  const wrap=document.getElementById('preview-wrap');
+  const saveBtn=document.getElementById('save-btn');
+  wrap.style.display='block';
+  saveBtn.style.display='block';
+  cv.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+// ===== 共通ユーティリティ =====
+function drawStripeBackground(ctx,W,H,color){
+  ctx.fillStyle='white';
+  ctx.fillRect(0,0,W,H);
+  ctx.save();
+  ctx.globalAlpha=0.35;
+  const stripe=36;
+  for(let x=-H;x<W+H;x+=stripe*2){
+    ctx.beginPath();
+    ctx.moveTo(x,0);ctx.lineTo(x+H,H);ctx.lineTo(x+H+stripe,H);ctx.lineTo(x+stripe,0);
+    ctx.closePath();
+    ctx.fillStyle=color;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHeader(ctx,W,dateStr,mainColor,textColor){
+  const dt=new Date(dateStr+'T00:00:00');
+  const m=dt.getMonth()+1,d2=dt.getDate(),dow=DAY_NAMES[dt.getDay()];
+  // タイトル背景
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  roundRect(ctx,20,16,W-40,72,12);ctx.fill();
+  // 院名
+  ctx.fillStyle='#1e293b';ctx.font='bold 20px sans-serif';ctx.textAlign='left';
+  ctx.fillText('倉治整骨院',36,46);
+  // 日付バッジ
+  ctx.fillStyle=mainColor;
+  roundRect(ctx,W-170,20,150,60,10);ctx.fill();
+  ctx.fillStyle=textColor;ctx.font='bold 26px sans-serif';ctx.textAlign='center';
+  ctx.fillText(m+'/'+d2+'（'+dow+'）',W-95,60);
+}
+
+function drawSlotsList(ctx,slots,x,y,w,h,mainColor,textColor,fontSize){
+  if(!slots||!slots.length){
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    roundRect(ctx,x,y,w,h,10);ctx.fill();
+    ctx.fillStyle='#94a3b8';ctx.font='bold '+fontSize+'px sans-serif';ctx.textAlign='center';
+    ctx.fillText('本日は満員です',x+w/2,y+h/2+fontSize/3);
+    return;
+  }
+  ctx.fillStyle='rgba(255,255,255,0.88)';
+  roundRect(ctx,x,y,w,h,10);ctx.fill();
+  // 空きタイトル
+  ctx.fillStyle=mainColor;
+  roundRect(ctx,x+8,y+8,w-16,fontSize+10,8);ctx.fill();
+  ctx.fillStyle=textColor;ctx.font='bold '+fontSize+'px sans-serif';ctx.textAlign='center';
+  ctx.fillText('✅ 空いています',x+w/2,y+8+fontSize+2);
+  // 時間リスト
+  const lineH=Math.min(fontSize+4,(h-fontSize-30)/slots.length);
+  ctx.fillStyle='#1e293b';ctx.font='bold '+fontSize+'px sans-serif';ctx.textAlign='center';
+  slots.forEach((s,i)=>{
+    ctx.fillText(s,x+w/2,y+fontSize+26+lineH*(i+0.8));
+  });
+}
+
+function drawFooter(ctx,W,H,mainColor,textColor){
+  ctx.fillStyle=mainColor;
+  roundRect(ctx,0,H-54,W,54,0);ctx.fill();
+  ctx.fillStyle=textColor;ctx.font='bold 17px sans-serif';ctx.textAlign='center';
+  ctx.fillText('当日予約OK！ご予約お待ちしております 🙏',W/2,H-30);
+  ctx.font='13px sans-serif';
+  ctx.fillText('倉治整骨院｜交野市倉治3丁目 📞072-892-3223',W/2,H-10);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+
+// ===== 1日分レイアウト =====
+function draw1day(ctx,W,H,day){
+  const dt=new Date(day.date+'T00:00:00');
+  const mc=DAY_COLORS[dt.getDay()],tc=DAY_TEXT_COLORS[dt.getDay()];
+  drawStripeBackground(ctx,W,H,mc);
+  drawHeader(ctx,W,day.date,mc,tc);
+
+  // 院外観写真（中段）
+  const img=new Image();
+  img.onload=()=>{
+    ctx.save();
+    roundRect(ctx,30,100,W-60,220,14);ctx.clip();
+    ctx.drawImage(img,30,100,W-60,220);
+    ctx.restore();
+    // 空き状況
+    drawSlotsList(ctx,day.slots,30,330,W-60,390,mc,tc,22);
+    drawFooter(ctx,W,H,mc,tc);
+  };
+  img.onerror=()=>{
+    ctx.fillStyle='rgba(255,255,255,0.5)';
+    roundRect(ctx,30,100,W-60,220,14);ctx.fill();
+    drawSlotsList(ctx,day.slots,30,330,W-60,390,mc,tc,22);
+    drawFooter(ctx,W,H,mc,tc);
+  };
+  img.src='IMG_0904.jpeg';
+}
+
+// ===== 2日分レイアウト（横2列） =====
+function draw2days(ctx,W,H,days){
+  const dt0=new Date(days[0].date+'T00:00:00');
+  const mc=DAY_COLORS[dt0.getDay()];
+  // グラデーション背景
+  const grd=ctx.createLinearGradient(0,0,W,H);
+  const mc0=DAY_COLORS[new Date(days[0].date+'T00:00:00').getDay()];
+  const mc1=DAY_COLORS[new Date(days[1].date+'T00:00:00').getDay()];
+  ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,W,H);
+  drawStripeBackground(ctx,W,H,'#e2e8f0');
+
+  // タイトルバー
+  ctx.fillStyle='#1e293b';ctx.fillRect(0,0,W,52);
+  ctx.fillStyle='white';ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+  ctx.fillText('倉治整骨院 予約空き状況',W/2,34);
+
+  const colW=(W-54)/2,colX=[18,W/2+9];
+  days.forEach((day,i)=>{
+    const dt=new Date(day.date+'T00:00:00');
+    const mc=DAY_COLORS[dt.getDay()],tc=DAY_TEXT_COLORS[dt.getDay()];
+    const m=dt.getMonth()+1,d=dt.getDate(),dow=DAY_NAMES[dt.getDay()];
+    const x=colX[i],y=60;
+    // 日付ヘッダー
+    ctx.fillStyle=mc;
+    roundRect(ctx,x,y,colW,46,10);ctx.fill();
+    ctx.fillStyle=tc;ctx.font='bold 22px sans-serif';ctx.textAlign='center';
+    ctx.fillText(m+'/'+d+'（'+dow+'）',x+colW/2,y+31);
+    // 空き状況
+    drawSlotsList(ctx,day.slots,x,y+54,colW,H-y-54-54,mc,tc,18);
+  });
+  // フッター
+  const footMc=DAY_COLORS[new Date(days[0].date+'T00:00:00').getDay()];
+  const footTc=DAY_TEXT_COLORS[new Date(days[0].date+'T00:00:00').getDay()];
+  drawFooter(ctx,W,H,footMc,footTc);
+}
+
+// ===== 3日分レイアウト（縦3段） =====
+function draw3days(ctx,W,H,days){
+  ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,W,H);
+  drawStripeBackground(ctx,W,H,'#e2e8f0');
+
+  // タイトル
+  ctx.fillStyle='#1e293b';ctx.fillRect(0,0,W,48);
+  ctx.fillStyle='white';ctx.font='bold 19px sans-serif';ctx.textAlign='center';
+  ctx.fillText('倉治整骨院 3日間の予約空き状況',W/2,32);
+
+  const rowH=(H-48-54-12)/3,rowY=60;
+  days.forEach((day,i)=>{
+    const dt=new Date(day.date+'T00:00:00');
+    const mc=DAY_COLORS[dt.getDay()],tc=DAY_TEXT_COLORS[dt.getDay()];
+    const m=dt.getMonth()+1,d=dt.getDate(),dow=DAY_NAMES[dt.getDay()];
+    const y=rowY+(rowH+4)*i;
+    // 行背景
+    ctx.fillStyle=mc;ctx.globalAlpha=0.15;
+    roundRect(ctx,12,y,W-24,rowH,10);ctx.fill();
+    ctx.globalAlpha=1;
+    // 日付ラベル（左）
+    ctx.fillStyle=mc;
+    roundRect(ctx,14,y+4,120,rowH-8,8);ctx.fill();
+    ctx.fillStyle=tc;ctx.font='bold 20px sans-serif';ctx.textAlign='center';
+    ctx.fillText(m+'/'+d+'（'+dow+'）',74,y+rowH/2+8);
+    // 空き時間リスト（右）
+    const slotX=142,slotW=W-158;
+    if(!day.slots||!day.slots.length){
+      ctx.fillStyle='#94a3b8';ctx.font='bold 16px sans-serif';ctx.textAlign='left';
+      ctx.fillText('満員',slotX,y+rowH/2+6);
+    }else{
+      ctx.fillStyle='#1e293b';ctx.font='bold 16px sans-serif';ctx.textAlign='left';
+      // 複数列で表示
+      const cols=Math.ceil(day.slots.length/3);
+      const itemW=slotW/Math.max(cols,3);
+      day.slots.forEach((s,j)=>{
+        const col=Math.floor(j/3),row=j%3;
+        const sx=slotX+col*itemW,sy=y+14+row*((rowH-20)/3);
+        ctx.fillStyle='#1e293b';ctx.font='bold 15px sans-serif';
+        ctx.fillText('✅ '+s,sx,sy+14);
+      });
+    }
+  });
+  drawFooter(ctx,W,H,DAY_COLORS[new Date(days[0].date+'T00:00:00').getDay()],DAY_TEXT_COLORS[new Date(days[0].date+'T00:00:00').getDay()]);
+}
+
+function doShare(){
+  const cv=document.getElementById('cv');
+  cv.toBlob(blob=>{
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],'yoyaku.png',{type:'image/png'})]})){
+      navigator.share({files:[new File([blob],'yoyaku.png',{type:'image/png'})],title:'予約空き状況'});
+    }else{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='yoyaku.png';a.click();
+    }
+  },'image/png');
+}
+
+// ===== 初期化 =====
+for(let i=0;i<3;i++){
+  dayData[i].date=toDateStr(addDays(new Date(),i));
+  dayData[i].slots=[];dayData[i].customSlots=[];
+}
+renderDayBlocks();
+</script>
+</body>
+</html>
