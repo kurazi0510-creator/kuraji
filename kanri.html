@@ -228,6 +228,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         </div>
       </div>
       <button class="btn bp bsm" onclick="syncAll()" style="margin-top:16px">🔄 最新データ取得</button>
+      <button class="btn bp bsm" onclick="fixAllVisitCounts()" style="margin-top:16px;background:#22c55e;color:white;border-color:#22c55e">🔢 来院回数を正確に再計算</button>
       <button class="btn bp bsm" onclick="showFutureBookings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
       <button class="btn bp bsm" onclick="toggleDayMemo()" style="margin-top:16px;background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
@@ -2094,6 +2095,7 @@ async function syncAll(){
       }
       save();
       setStat('s-ok','✅ 同期済み');
+      recalcAllVisitCounts();
       // LINE IDを自動取得して患者と照合
       setTimeout(syncLineIds,3000);
       // 21日未来院アラートチェック（バックグラウンドで実行）
@@ -3065,9 +3067,11 @@ async function saveBk(){
   const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
   const p=patients.find(p=>p.id===cardId);
   const el=p&&p.last?elapsed(p.last):'';
-  // 既存予約の編集時は来院回数を増やさない（新規登録時のみ+1）
+  // 来院回数は予約データから正確に計算（編集しても増えない）
   const isNewBk=!bookings[date]?.[slot]||bookings[date]?.[slot]?.cancelled;
-  const vc=p?(isNewBk?(parseInt(p.count)||0)+1:parseInt(p.count)||0):'';
+  // 新規の場合は今日の分を+1して計算（保存前なのでまだbookingsに入っていない）
+  const currentCount = p ? calcVisitCount(p.name, p.id) : 0;
+  const vc = p ? (isNewBk ? currentCount + 1 : currentCount) : '';
   const kubun=getKubunPrimary();
   const kubunList=mKubunSel.slice();
   const extra=mSlotCount-1;
@@ -3086,7 +3090,10 @@ async function saveBk(){
     // 他の患者が入っている場合は触らない（上書きしない）
   }else{// 継続枠が不要な範囲：自分のcont枠のみ削除（他の患者は触らない）
     if(existing&&existing.cont&&existing.cardId===cardId)delete bookings[date][sl[ni]];}}}
-  if(p&&isNewBk){p.last=date;p.count=vc;}else if(p&&!isNewBk){p.count=vc;}
+  if(p){
+    if(isNewBk) p.last=date;
+    p.count=vc;
+  }
   shochiArr.forEach(s=>{if(s.id){const sm=shochiMaster.find(m=>m.id===s.id);if(sm?.stockId){const st=stockData.find(x=>x.id===sm.stockId);if(st)st.qty=Math.max(0,st.qty-s.qty);}}});
   bussanArr.forEach(b=>{const master=bussanMaster.find(m=>m.id===b.id);if(master?.stockId){const st=stockData.find(x=>x.id===master.stockId);if(st)st.qty=Math.max(0,st.qty-b.qty);}});
   const btn=document.getElementById('sbtn');btn.textContent='保存中...';btn.disabled=true;
@@ -3268,6 +3275,64 @@ function showFutureBookings(){
   if(countEl)countEl.textContent='今日以降 '+rows.length+'件の予約';
   document.getElementById('futureModal').style.display='block';
 }
+// ===== 来院回数を予約データから正確に計算 =====
+function calcVisitCount(patientName, cardId){
+  const td = today();
+  let count = 0;
+  const seen = new Set();
+  Object.entries(bookings).forEach(([date, slots])=>{
+    if(date > td) return; // 未来の予約は除外
+    Object.values(slots).forEach(bk=>{
+      if(!bk || bk.cont || bk.cancelled) return; // 継続枠・キャンセルは除外
+      const match = (cardId && bk.cardId === cardId) || bk.name === patientName;
+      if(!match) return;
+      if(!seen.has(date)){
+        seen.add(date); // 同日複数枠は1回としてカウント
+        count++;
+      }
+    });
+  });
+  return count;
+}
+
+// 全患者の来院回数を予約データから再計算して更新
+function fixAllVisitCounts(){
+  const updated = recalcAllVisitCounts();
+  renderPatients();
+  alert('✅ 来院回数の再計算完了！\n' + updated + '名の回数を更新しました。\n\n※予約データから実際の来院日数を正確に計算しました。');
+}
+function recalcAllVisitCounts(){
+  let updated = 0;
+  patients.forEach(p=>{
+    const realCount = calcVisitCount(p.name, p.id);
+    if(parseInt(p.count||0) !== realCount){
+      p.count = realCount;
+      updated++;
+    }
+    p.last = getLastVisitDate(p.name, p.id);
+  });
+  if(updated > 0){
+    save();
+    console.log('来院回数更新: '+updated+'名');
+  }
+  return updated;
+}
+
+// 最終来院日を取得
+function getLastVisitDate(patientName, cardId){
+  const td = today();
+  let lastDate = '';
+  Object.entries(bookings).forEach(([date, slots])=>{
+    if(date > td) return;
+    Object.values(slots).forEach(bk=>{
+      if(!bk || bk.cont || bk.cancelled) return;
+      const match = (cardId && bk.cardId === cardId) || bk.name === patientName;
+      if(match && date > lastDate) lastDate = date;
+    });
+  });
+  return lastDate;
+}
+
 // 患者の次回予約日時を返す
 function getNextAppt(name,cardId,curDate,curSlot){
   const w=['日','月','火','水','木','金','土'];
@@ -5029,7 +5094,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('bs-date').value=today();
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // まずlocalStorageから即表示（データは消えない）
-  load();renderSched();renderWeekDayTabs();renderPatients();
+  load();renderSched();renderWeekDayTabs();recalcAllVisitCounts();renderPatients();
   // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
   // ふりがな入力IME対策初期化
