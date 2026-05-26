@@ -2189,6 +2189,14 @@ function toggleKubun(btn){
   else{mKubunSel=mKubunSel.filter(x=>x!==v);}
   updateKubunDisplay();
   updateKubunFeeArea();
+  // 交通事故以外の区分も選択されている場合はpay-amountのdisabledを解除
+  const amtEl=document.getElementById('m-pay-amount');
+  const hasNonJiko=mKubunSel.some(k=>k!=='交通事故');
+  if(amtEl&&hasNonJiko){
+    amtEl.disabled=false;
+    const payArea=document.getElementById('m-pay-btns');
+    if(payArea)payArea.style.opacity='1';
+  }
 }
 
 function setJikoPay(hasPay){
@@ -2207,7 +2215,8 @@ function setJikoPay(hasPay){
     // 支払いなし：支払方法・金額をリセット・非活性
     mPaySel=[];
     document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
-    if(amountEl){amountEl.value='0';amountEl.disabled=true;}
+    if(amountEl){amountEl.value='0';// disabledは交通事故のみの場合のみ
+    if(mKubunSel.length===0||mKubunSel.every(k=>k==='交通事故'))amountEl.disabled=true;}
     if(payArea)payArea.style.opacity='0.4';
     if(nopayBtn){nopayBtn.classList.add('on');nopayBtn.style.background='#fef3c7';nopayBtn.style.color='#92400e';nopayBtn.style.borderColor='#fcd34d';}
     if(payBtn)payBtn.classList.remove('on');
