@@ -1131,22 +1131,28 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 
       <!-- 回数券 -->
       <div id="coupon-section" style="background:#fef3c7;border-radius:8px;padding:10px;margin-bottom:8px;border:1.5px solid #fcd34d;display:none">
-        <div style="font-weight:bold;color:#92400e;font-size:0.78rem;margin-bottom:6px">🎫 整体回数券</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <label style="font-size:0.74rem;color:#92400e">回数券使用：</label>
-          <select id="coupon-session-sel" class="sel" style="font-size:0.78rem;flex:1" onchange="updateCouponInfo()">
-            <option value="">-- 使用回数を選択 --</option>
+        <div style="font-weight:bold;color:#92400e;font-size:0.78rem;margin-bottom:8px">🎫 整体10回券</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+          <label style="font-size:0.74rem;color:#92400e;white-space:nowrap">使用回数：</label>
+          <select id="coupon-session-sel" class="sel" style="font-size:0.82rem;flex:1;font-weight:bold" onchange="updateCouponInfo()">
+            <option value="">-- 選択 --</option>
             <option value="1">1回目</option><option value="2">2回目</option><option value="3">3回目</option>
             <option value="4">4回目</option><option value="5">5回目</option><option value="6">6回目</option>
             <option value="7">7回目</option><option value="8">8回目</option><option value="9">9回目</option>
-            <option value="10">10回目</option><option value="11">ボーナス（無料）</option>
+            <option value="10">10回目</option><option value="bonus">ボーナス無料券</option>
           </select>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
-          <label style="font-size:0.74rem;color:#92400e">購入日：</label>
-          <input type="date" id="coupon-purchase-date" class="inp" style="font-size:0.78rem;flex:1" onchange="updateCouponInfo()">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <div>
+            <label style="font-size:0.72rem;color:#92400e">購入日</label>
+            <input type="date" id="coupon-purchase-date" class="inp" style="font-size:0.78rem" onchange="updateCouponInfo()">
+          </div>
+          <div>
+            <label style="font-size:0.72rem;color:#92400e">有効期限</label>
+            <input type="date" id="coupon-expiry-date" class="inp" style="font-size:0.78rem" onchange="updateCouponInfo()">
+          </div>
         </div>
-        <div id="coupon-info" style="font-size:0.74rem;color:#92400e;margin-top:4px;padding:4px 8px;background:#fff7ed;border-radius:6px"></div>
+        <div id="coupon-info" style="font-size:0.78rem;font-weight:bold;padding:6px 10px;border-radius:6px;background:#fff7ed;color:#92400e"></div>
       </div>
 
       <!-- 合計支払金額 -->
@@ -3536,24 +3542,41 @@ function toggleCouponSection(btn){
 
 function updateCouponInfo(){
   const sel = document.getElementById('coupon-session-sel');
-  const dt = document.getElementById('coupon-purchase-date');
+  const dtPurchase = document.getElementById('coupon-purchase-date');
+  const dtExpiry = document.getElementById('coupon-expiry-date');
   const info = document.getElementById('coupon-info');
-  if(!sel||!dt||!info) return;
+  if(!sel||!info) return;
   const session = sel.value;
-  const purchaseDate = dt.value;
-  couponData = {session, purchaseDate};
-  if(!session) {info.textContent='';return;}
-  let msg = '第'+session+'回目使用';
-  if(purchaseDate){
-    const expiry = new Date(purchaseDate);
-    expiry.setFullYear(expiry.getFullYear()+1);
+  const purchaseDate = dtPurchase?.value||'';
+  // 有効期限: 直接入力優先、なければ購入日から1年
+  let expiryDate = dtExpiry?.value||'';
+  if(!expiryDate && purchaseDate){
+    const exp = new Date(purchaseDate+'T00:00:00');
+    exp.setFullYear(exp.getFullYear()+1);
+    exp.setDate(exp.getDate()-1);
+    expiryDate = exp.getFullYear()+'-'+String(exp.getMonth()+1).padStart(2,'0')+'-'+String(exp.getDate()).padStart(2,'0');
+    if(dtExpiry) dtExpiry.value = expiryDate;
+  }
+  couponData = {session, purchaseDate, expiryDate};
+  if(!session){info.textContent='';info.style.background='#fff7ed';return;}
+  const sessionLabel = session==='bonus'?'ボーナス無料券':'第'+session+'回目使用';
+  let msg = '🎫 '+sessionLabel;
+  if(expiryDate){
+    const expiry = new Date(expiryDate+'T00:00:00');
     const today = new Date(); today.setHours(0,0,0,0);
     const diffDays = Math.floor((expiry-today)/(1000*60*60*24));
-    const expiryStr = expiry.getFullYear()+'年'+(expiry.getMonth()+1)+'月'+expiry.getDate()+'日';
-    msg += '　有効期限：'+expiryStr;
-    if(diffDays <= 30) msg += '（⚠️ あと'+diffDays+'日！）';
-    else msg += '（残り'+diffDays+'日）';
-    if(diffDays < 0) msg = '❌ 有効期限切れ！（'+expiryStr+'まで）';
+    const expiryStr = (expiry.getMonth()+1)+'月'+expiry.getDate()+'日';
+    msg += '　有効期限:'+expiryStr;
+    if(diffDays < 0){
+      msg += ' ❌期限切れ';
+      info.style.background='#fee2e2';info.style.color='#dc2626';
+    } else if(diffDays <= 30){
+      msg += ' ⚠️あと'+diffDays+'日！';
+      info.style.background='#fef3c7';info.style.color='#92400e';
+    } else {
+      msg += '（残り'+diffDays+'日）';
+      info.style.background='#dcfce7';info.style.color='#166534';
+    }
   }
   info.textContent = msg;
 }
@@ -3604,8 +3627,12 @@ function initPayItems(bk){
     couponData = bk.couponData;
     const sel = document.getElementById('coupon-session-sel');
     const dt = document.getElementById('coupon-purchase-date');
-    if(sel) sel.value = couponData.session||'';
-    if(dt) dt.value = couponData.purchaseDate||'';
+    const selEl = document.getElementById('coupon-session-sel');
+    const dtP = document.getElementById('coupon-purchase-date');
+    const dtE = document.getElementById('coupon-expiry-date');
+    if(selEl) selEl.value = couponData.session||'';
+    if(dtP) dtP.value = couponData.purchaseDate||'';
+    if(dtE) dtE.value = couponData.expiryDate||'';
     updateCouponInfo();
   }
   renderPayItems();
