@@ -2932,7 +2932,17 @@ function updateMTotal(){
   });
   const el=document.getElementById('m-total-sum');if(el)el.textContent=yen(sh+bs);
 }
-function toggleMPay(btn){btn.classList.toggle('on');const v=btn.getAttribute('data-v');if(btn.classList.contains('on')){if(!mPaySel.includes(v))mPaySel.push(v);}else{mPaySel=mPaySel.filter(x=>x!==v);}}
+function toggleMPay(btn){
+  btn.classList.toggle('on');
+  const v=btn.getAttribute('data-v');
+  if(btn.classList.contains('on')){
+    if(!mPaySel.includes(v))mPaySel.push(v);
+    // 回数券ONになったら患者マスターから有効期限を自動セット
+    if(v==='回数券') syncCouponFromPatient();
+  }else{
+    mPaySel=mPaySel.filter(x=>x!==v);
+  }
+}
 function resetMPay(){mPaySel=[];document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));document.getElementById('m-pay-amount').value='';}
 function loadMPay(pays,amount){resetMPay();(pays||[]).forEach(p=>{const btn=document.querySelector(`#m-pay-btns .pay-btn[data-v="${p}"]`);if(btn){btn.classList.add('on');mPaySel.push(p);}});document.getElementById('m-pay-amount').value=amount||'';}
 
@@ -3014,17 +3024,28 @@ function editBk(date,slot){
   loadMPay(bk.pay||[],bk.payAmount||'');
   setTimeout(()=>{
     initPayItems(bk);
-    // 患者の回数券情報を自動セット（支払方法に回数券が含まれる場合）
+    // 患者の回数券情報を自動セット
     const hasCoupon = (bk.pay||[]).includes('回数券') || (bk.couponData?.session);
     if(hasCoupon){
-      const p2 = patients.find(x=>x.id===bk.cardId||x.name===bk.name);
-      if(p2 && p2.couponPurchase){
-        const dtP = document.getElementById('coupon-purchase-date');
-        const dtE = document.getElementById('coupon-expiry-date');
-        if(dtP && !document.getElementById('coupon-purchase-date').value) dtP.value = p2.couponPurchase;
-        if(dtE && !document.getElementById('coupon-expiry-date').value) dtE.value = p2.couponExpiry||'';
-        updateCouponInfo();
+      // 回数券ボタンをONにする
+      const couponBtn = document.querySelector('#m-pay-btns .pay-btn[data-v="回数券"]');
+      if(couponBtn && !couponBtn.classList.contains('on')){
+        couponBtn.classList.add('on');
+        if(!mPaySel.includes('回数券')) mPaySel.push('回数券');
       }
+      const couponSec = document.getElementById('coupon-section');
+      if(couponSec) couponSec.style.display='block';
+      const p2 = patients.find(x=>x.id===bk.cardId||x.name===bk.name);
+      // bkにcouponDataがある場合はそちらを優先、なければ患者マスターから
+      const dtP = document.getElementById('coupon-purchase-date');
+      const dtE = document.getElementById('coupon-expiry-date');
+      const selS = document.getElementById('coupon-session-sel');
+      if(bk.couponData?.session && selS) selS.value = bk.couponData.session;
+      if(bk.couponData?.purchaseDate && dtP) dtP.value = bk.couponData.purchaseDate;
+      else if(p2?.couponPurchase && dtP) dtP.value = p2.couponPurchase;
+      if(bk.couponData?.expiryDate && dtE) dtE.value = bk.couponData.expiryDate;
+      else if(p2?.couponExpiry && dtE) dtE.value = p2.couponExpiry;
+      updateCouponInfo();
     }
   },100);
   // 選択中患者情報表示
@@ -3593,6 +3614,24 @@ function syncPayAmount(){
   if(el) el.dataset.manual = '1';
 }
 
+function syncCouponFromPatient(){
+  // 現在編集中の患者のcouponPurchase/couponExpiryをセット
+  const cardId = document.getElementById('m-id')?.value.trim();
+  const name = document.getElementById('m-nm')?.value.trim();
+  const p = patients.find(x=>(cardId&&x.id===cardId)||x.name===name);
+  if(!p) return;
+  const couponSec = document.getElementById('coupon-section');
+  if(couponSec) couponSec.style.display='block';
+  const dtP = document.getElementById('coupon-purchase-date');
+  const dtE = document.getElementById('coupon-expiry-date');
+  const selS = document.getElementById('coupon-session-sel');
+  // 購入日・有効期限がまだ入っていない場合のみ自動セット
+  if(dtP && !dtP.value && p.couponPurchase) dtP.value = p.couponPurchase;
+  if(dtE && !dtE.value && p.couponExpiry) dtE.value = p.couponExpiry;
+  // 次回使用回数を自動セット
+  if(selS && !selS.value && p.couponNextSession) selS.value = p.couponNextSession;
+  updateCouponInfo();
+}
 function toggleCouponSection(btn){
   const sec = document.getElementById('coupon-section');
   if(!sec) return;
