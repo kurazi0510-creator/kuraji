@@ -1618,6 +1618,33 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <div style="font-size:0.72rem;color:#92400e;margin-top:6px">「送らない」にすると院長への通知リストには表示されますが、患者さんへの自動LINEは送信されません。</div>
         </div>
       </div>
+
+        <!-- 整体10回券管理 -->
+        <div class="fg" style="grid-column:1/-1;background:#fef3c7;border-radius:10px;padding:12px;border:1.5px solid #fcd34d;margin-top:8px">
+          <label style="color:#92400e;font-weight:bold;font-size:0.82rem">🎫 整体10回券</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+            <div>
+              <label style="font-size:0.72rem;color:#92400e">購入日</label>
+              <input type="date" class="inp" id="pe-coupon-purchase" style="font-size:0.78rem" onchange="calcCouponExpiry()">
+            </div>
+            <div>
+              <label style="font-size:0.72rem;color:#92400e">有効期限</label>
+              <input type="date" class="inp" id="pe-coupon-expiry" style="font-size:0.78rem">
+            </div>
+          </div>
+          <div style="margin-top:6px">
+            <label style="font-size:0.72rem;color:#92400e">次回使用回数</label>
+            <select class="sel" id="pe-coupon-session" style="font-size:0.82rem;margin-top:2px">
+              <option value="">-- 次回の回数 --</option>
+              <option value="1">1回目</option><option value="2">2回目</option><option value="3">3回目</option>
+              <option value="4">4回目</option><option value="5">5回目</option><option value="6">6回目</option>
+              <option value="7">7回目</option><option value="8">8回目</option><option value="9">9回目</option>
+              <option value="10">10回目</option><option value="bonus">ボーナス無料券</option>
+            </select>
+          </div>
+          <div id="pe-coupon-status" style="font-size:0.78rem;margin-top:6px;padding:6px 8px;border-radius:6px;display:none"></div>
+        </div>
+      </div>
     </div><!-- /pe-pane-line -->
 
     <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
@@ -2045,7 +2072,7 @@ async function syncAll(){
           const rv_src_hdr = hi('流入元')>-1 ? String(r[hi('流入元')]||'').trim() : '';
           const rv_src_r6  = String(r[6]||'').trim();
           // 流入元の有効値: LINE,紹介,その他,三四郎,-
-          const validSrc = ['LINE','紹介','その他','三四郎','-'];
+          const validSrc = ['LINE','紹介','その他','三四郎','-','電話','ネット'];
           const rv_src = validSrc.includes(rv_src_hdr) ? rv_src_hdr :
                          validSrc.includes(rv_src_r6)  ? rv_src_r6  : rv_src_hdr||rv_src_r6;
 
@@ -2086,7 +2113,7 @@ async function syncAll(){
           const rv_note = gv('備考', 12);
 
           return{
-            id:rv_id, name:rv_name, kana:gv('ふりがな',99),
+            id:rv_id, name:rv_name, kana:gv('ふりがな',2),
             sex:rv_sex, tel:rv_tel, line:rv_line,
             city:rv_city, job:rv_job, src:rv_src,
             symptom:rv_sym, last:rv_last, count:rv_cnt,
@@ -2985,7 +3012,21 @@ function editBk(date,slot){
   else document.getElementById('m-shochi-memo').value='';
   mBussanQty={};(bk.bussan||[]).forEach(b=>{mBussanQty[b.id]=(b.qty||0);});renderMBussanItems();
   loadMPay(bk.pay||[],bk.payAmount||'');
-  setTimeout(()=>initPayItems(bk),100);
+  setTimeout(()=>{
+    initPayItems(bk);
+    // 患者の回数券情報を自動セット（支払方法に回数券が含まれる場合）
+    const hasCoupon = (bk.pay||[]).includes('回数券') || (bk.couponData?.session);
+    if(hasCoupon){
+      const p2 = patients.find(x=>x.id===bk.cardId||x.name===bk.name);
+      if(p2 && p2.couponPurchase){
+        const dtP = document.getElementById('coupon-purchase-date');
+        const dtE = document.getElementById('coupon-expiry-date');
+        if(dtP && !document.getElementById('coupon-purchase-date').value) dtP.value = p2.couponPurchase;
+        if(dtE && !document.getElementById('coupon-expiry-date').value) dtE.value = p2.couponExpiry||'';
+        updateCouponInfo();
+      }
+    }
+  },100);
   // 選択中患者情報表示
   const p=patients.find(x=>x.id===bk.cardId);
   if(p)showModalSelectedInfo(p);
@@ -3444,14 +3485,14 @@ function setNbSlot(n){
 let payItems = []; // [{label, amount, method}]
 let couponData = {}; // {session, purchaseDate}
 
-function addPayItem(label='', amount='', method='現金'){
+function addPayItem(label='', amount='', method='現金', menuVal=''){
   const id = 'pi-' + Date.now()+Math.random();
-  payItems.push({id, label, amount:String(amount), method});
+  payItems.push({id, label, amount:String(amount), method, menuVal});
   renderPayItems();
   recalcTotalPay();
 }
 
-function getPayMenuOptions(currentLabel, currentAmount){
+function getPayMenuOptions(currentMenuVal, currentLabel, currentAmount){
   // 処置メニュー
   const shochiItems = shochiMaster.map(s=>({name:s.name, price:s.price, type:'処置'}));
   // 物販メニュー
@@ -3466,8 +3507,10 @@ function getPayMenuOptions(currentLabel, currentAmount){
   ];
   const allItems = [...presets, ...shochiItems, ...bussanItems];
   const opts = allItems.map(item=>{
-    const selected = item.name===currentLabel && String(item.price)===String(currentAmount);
-    return `<option value="${item.name}|${item.price}" ${selected?'selected':''}>[${item.type}] ${item.name} ${item.price.toLocaleString()}円</option>`;
+    const val = item.name+'|'+item.price;
+    // menuValで一致 or label+amountで一致
+    const selected = val===currentMenuVal || (!currentMenuVal && item.name===currentLabel && String(item.price)===String(currentAmount));
+    return `<option value="${val}" ${selected?'selected':''}>[${item.type}] ${item.name} ${item.price.toLocaleString()}円</option>`;
   }).join('');
   return `<option value="">-- メニューから選択 --</option>${opts}`;
 }
@@ -3481,7 +3524,7 @@ function renderPayItems(){
       <div style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
         <select class="sel" style="font-size:0.74rem;flex:2"
           onchange="onPayMenuChange('${item.id}',this.value)">
-          ${getPayMenuOptions(item.label, item.amount)}
+          ${getPayMenuOptions(item.menuVal||'', item.label, item.amount)}
         </select>
         <select class="sel" style="font-size:0.74rem;flex:1" onchange="updatePayItem('${item.id}','method',this.value)">
           ${payMethods.map(m=>`<option ${item.method===m?'selected':''}>${m}</option>`).join('')}
@@ -3491,9 +3534,15 @@ function renderPayItems(){
       <div style="display:flex;gap:4px;align-items:center">
         <input class="inp" placeholder="内容（自由入力・編集可）" value="${item.label}"
           style="font-size:0.78rem;flex:2" oninput="updatePayItem('${item.id}','label',this.value)">
+        <span style="font-size:0.72rem;color:#64748b;white-space:nowrap">×個数</span>
+        <input class="inp" type="number" placeholder="個" value="${item.qty||1}"
+          style="font-size:0.78rem;width:48px;text-align:center" min="1"
+          oninput="updatePayItem('${item.id}','qty',parseInt(this.value)||1);recalcTotalPayWithQty()">
         <span style="font-size:0.74rem;color:#64748b">¥</span>
-        <input class="inp" type="number" placeholder="金額" value="${item.amount}"
-          style="font-size:0.78rem;flex:1" oninput="updatePayItem('${item.id}','amount',this.value);recalcTotalPay()">
+        <input class="inp" type="number" placeholder="単価" value="${item.unitPrice||item.amount}"
+          style="font-size:0.78rem;flex:1"
+          oninput="updatePayItem('${item.id}','unitPrice',this.value);updatePayItem('${item.id}','amount',String((parseInt(this.value)||0)*(item.qty||1)));recalcTotalPay()">
+        <span style="font-size:0.72rem;color:#166534;font-weight:bold;white-space:nowrap">=<span id="pi-sub-${item.id}">${((parseInt(item.unitPrice||item.amount)||0)*(item.qty||1)).toLocaleString()}</span>円</span>
       </div>
     </div>
   `).join('');
@@ -3504,6 +3553,7 @@ function onPayMenuChange(id, val){
   const parts = val.split('|');
   const label = parts[0]||'';
   const price = parts[1]||'';
+  updatePayItem(id,'menuVal',val);
   updatePayItem(id,'label',label);
   updatePayItem(id,'amount',price);
   renderPayItems();
@@ -3521,6 +3571,15 @@ function removePayItem(id){
   recalcTotalPay();
 }
 
+function recalcTotalPayWithQty(){
+  // 個数×単価で各itemのamountを更新してから合計計算
+  payItems.forEach(item=>{
+    const qty = parseInt(item.qty)||1;
+    const unitPrice = parseInt(item.unitPrice||item.amount)||0;
+    item.amount = String(unitPrice * qty);
+  });
+  recalcTotalPay();
+}
 function recalcTotalPay(){
   const total = payItems.reduce((s,p)=>s+(parseInt(p.amount)||0), 0);
   if(total > 0){
@@ -4087,6 +4146,11 @@ function openPEdit(id){
   const luid=document.getElementById('pe-line-uid');if(luid)luid.value=p.lineUid||'';
   setFamilyData(p.familyData||{});
   setAlertSend(p.alertSend!==false);// デフォルトtrue=送る
+  // 回数券情報
+  if(document.getElementById('pe-coupon-purchase'))document.getElementById('pe-coupon-purchase').value=p.couponPurchase||'';
+  if(document.getElementById('pe-coupon-expiry'))document.getElementById('pe-coupon-expiry').value=p.couponExpiry||'';
+  if(document.getElementById('pe-coupon-session'))document.getElementById('pe-coupon-session').value=p.couponNextSession||'';
+  updatePeCouponStatus();
   document.getElementById('pe-city').value=p.city||'';
   document.getElementById('pe-job').value=p.job||'';
   document.getElementById('pe-src').value=p.src||'-';
@@ -4130,7 +4194,38 @@ function openPEdit(id){
   document.getElementById('peditModal').classList.add('on');
 }
 function closePEdit(){document.getElementById('peditModal').classList.remove('on');editPatientId=null;}
-async function setAlertSend(val){
+async function calcCouponExpiry(){
+  const purchase = document.getElementById('pe-coupon-purchase')?.value;
+  if(!purchase) return;
+  const expiry = new Date(purchase+'T00:00:00');
+  expiry.setFullYear(expiry.getFullYear()+1);
+  expiry.setDate(expiry.getDate()-1);
+  const expiryStr = expiry.getFullYear()+'-'+String(expiry.getMonth()+1).padStart(2,'0')+'-'+String(expiry.getDate()).padStart(2,'0');
+  const el = document.getElementById('pe-coupon-expiry');
+  if(el) el.value = expiryStr;
+  updatePeCouponStatus();
+}
+function updatePeCouponStatus(){
+  const expiry = document.getElementById('pe-coupon-expiry')?.value;
+  const session = document.getElementById('pe-coupon-session')?.value;
+  const status = document.getElementById('pe-coupon-status');
+  if(!status) return;
+  if(!expiry && !session){status.style.display='none';return;}
+  const today = new Date(); today.setHours(0,0,0,0);
+  let msg = '';
+  if(session) msg += '次回: '+session+(session==='bonus'?'':'回目')+' ';
+  if(expiry){
+    const exp = new Date(expiry+'T00:00:00');
+    const diff = Math.floor((exp-today)/(1000*60*60*24));
+    const eStr = (exp.getMonth()+1)+'/'+exp.getDate();
+    if(diff < 0){msg += '❌ 有効期限切れ（'+eStr+'）'; status.style.background='#fee2e2'; status.style.color='#dc2626';}
+    else if(diff <= 30){msg += '⚠️ 有効期限:'+eStr+'（あと'+diff+'日！）'; status.style.background='#fef3c7'; status.style.color='#92400e';}
+    else{msg += '有効期限:'+eStr+'（残'+diff+'日）'; status.style.background='#dcfce7'; status.style.color='#166534';}
+  }
+  status.textContent = msg;
+  status.style.display = 'block';
+}
+function setAlertSend(val){
   const on=document.getElementById('pe-alert-on');
   const off=document.getElementById('pe-alert-off');
   if(on)on.classList.toggle('on',val);
@@ -4148,6 +4243,10 @@ async function savePEdit(){
   p.city=document.getElementById('pe-city').value.trim();
   p.job=document.getElementById('pe-job').value.trim();
   p.src=document.getElementById('pe-src').value;
+  // 回数券情報
+  p.couponPurchase=document.getElementById('pe-coupon-purchase')?.value||'';
+  p.couponExpiry=document.getElementById('pe-coupon-expiry')?.value||'';
+  p.couponNextSession=document.getElementById('pe-coupon-session')?.value||'';
   p.last=document.getElementById('pe-last').value;
   p.count=parseInt(document.getElementById('pe-cnt').value)||0;
   p.symptom=document.getElementById('pe-sym').value.trim();
