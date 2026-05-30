@@ -1102,18 +1102,60 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <button class="pay-btn" id="jiko-pay-btn" onclick="setJikoPay(true)" style="flex:1">患者支払いあり</button>
         </div>
       </div>
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">支払方法を選択（複数可）</div>
+
+      <!-- 処置・物販の明細サマリー -->
+      <div id="pay-detail-summary" style="background:#f0fdf4;border-radius:8px;padding:10px;margin-bottom:10px;border:1.5px solid #bbf7d0;font-size:0.76rem;display:none">
+        <div style="font-weight:bold;color:#166534;margin-bottom:6px">📋 本日の明細</div>
+        <div id="pay-shochi-summary" style="color:#1e293b;margin-bottom:4px"></div>
+        <div id="pay-bussan-summary" style="color:#1e293b"></div>
+        <div style="border-top:1px solid #bbf7d0;margin-top:6px;padding-top:6px;font-weight:bold;color:#166534">
+          合計：<span id="m-total-sum">0円</span>
+        </div>
+      </div>
+
+      <!-- 支払い項目別入力 -->
+      <div style="font-size:0.78rem;font-weight:bold;color:#374151;margin-bottom:6px">💳 支払い内訳（項目ごとに入力）</div>
+      <div id="m-pay-items">
+        <!-- 動的に生成される支払い項目 -->
+      </div>
+      <button onclick="addPayItem()" style="width:100%;padding:8px;border:2px dashed #cbd5e1;border-radius:8px;background:white;color:#64748b;font-size:0.8rem;cursor:pointer;margin-bottom:8px">＋ 支払い項目を追加</button>
+
+      <!-- 回数券 -->
+      <div id="coupon-section" style="background:#fef3c7;border-radius:8px;padding:10px;margin-bottom:8px;border:1.5px solid #fcd34d;display:none">
+        <div style="font-weight:bold;color:#92400e;font-size:0.78rem;margin-bottom:6px">🎫 整体回数券</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:0.74rem;color:#92400e">回数券使用：</label>
+          <select id="coupon-session-sel" class="sel" style="font-size:0.78rem;flex:1" onchange="updateCouponInfo()">
+            <option value="">-- 使用回数を選択 --</option>
+            <option value="1">1回目</option><option value="2">2回目</option><option value="3">3回目</option>
+            <option value="4">4回目</option><option value="5">5回目</option><option value="6">6回目</option>
+            <option value="7">7回目</option><option value="8">8回目</option><option value="9">9回目</option>
+            <option value="10">10回目</option><option value="11">ボーナス（無料）</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+          <label style="font-size:0.74rem;color:#92400e">購入日：</label>
+          <input type="date" id="coupon-purchase-date" class="inp" style="font-size:0.78rem;flex:1" onchange="updateCouponInfo()">
+        </div>
+        <div id="coupon-info" style="font-size:0.74rem;color:#92400e;margin-top:4px;padding:4px 8px;background:#fff7ed;border-radius:6px"></div>
+      </div>
+
+      <!-- 合計支払金額 -->
+      <div class="fg" style="margin-top:4px">
+        <label style="font-weight:bold">支払金額合計（円）</label>
+        <input class="inp" id="m-pay-amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" tabindex="0" style="font-size:1.1rem;padding:10px;border:2px solid #3b82f6" onclick="this.select()" autocomplete="off" oninput="syncPayAmount()">
+      </div>
+
+      <!-- 支払方法（従来互換・サブ） -->
+      <div style="font-size:0.74rem;color:var(--muted);margin-top:8px;margin-bottom:4px">支払方法（まとめ）</div>
       <div class="pay-grid" id="m-pay-btns">
         <button class="pay-btn" data-v="現金" onclick="toggleMPay(this)">💴 現金</button>
         <button class="pay-btn" data-v="クレジット" onclick="toggleMPay(this)">💳 クレカ</button>
         <button class="pay-btn" data-v="PayPay" onclick="toggleMPay(this)">📱 PayPay</button>
         <button class="pay-btn" data-v="d払い" onclick="toggleMPay(this)">🔵 d払い</button>
         <button class="pay-btn" data-v="au Pay" onclick="toggleMPay(this)">🟡 au Pay</button>
+        <button class="pay-btn" data-v="回数券" onclick="toggleMPay(this);toggleCouponSection(this)">🎫 回数券</button>
         <button class="pay-btn" data-v="その他" onclick="toggleMPay(this)">🔘 その他</button>
-      </div>
-      <div class="fg" style="margin-top:8px"><label>支払金額（円）</label><input class="inp" id="m-pay-amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" tabindex="0" style="font-size:1.1rem;padding:10px;border:2px solid #3b82f6" onclick="this.select()" autocomplete="off"></div>
-      <div style="margin-top:8px;padding:8px;background:#f8f6f1;border-radius:8px;font-size:0.78rem;color:var(--muted)">
-        処置+物販合計：<strong id="m-total-sum" style="color:var(--primary)">0円</strong>
       </div>
     </div>
 
@@ -2732,6 +2774,7 @@ async function execCancel(){
 
 // ===== モーダルタブ =====
 function switchMTab(tab){
+  if(tab==='pay') setTimeout(updatePayDetailSummary,50);
   const tabs=['basic','shochi','bussan','pay'];
   document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',tabs[i]===tab));
   document.querySelectorAll('.mpane').forEach((p,i)=>p.classList.toggle('on',tabs[i]===tab));
@@ -2838,6 +2881,7 @@ function calcMBussanTotal(){
   document.getElementById('m-bussan-total').textContent=yen(total);updateMTotal();
 }
 function updateMTotal(){
+  setTimeout(updatePayDetailSummary,50);
   let sh=0,bs=0;
   shochiMaster.forEach(s=>{sh+=s.price*(mShochiSel[s.id]||0);});
   bussanMaster.forEach(b=>{
@@ -2926,6 +2970,7 @@ function editBk(date,slot){
   else document.getElementById('m-shochi-memo').value='';
   mBussanQty={};(bk.bussan||[]).forEach(b=>{mBussanQty[b.id]=(b.qty||0);});renderMBussanItems();
   loadMPay(bk.pay||[],bk.payAmount||'');
+  setTimeout(()=>initPayItems(bk),100);
   // 選択中患者情報表示
   const p=patients.find(x=>x.id===bk.cardId);
   if(p)showModalSelectedInfo(p);
@@ -3059,6 +3104,9 @@ async function saveBk(){
   // 割引を考慮した支払金額計算
   const shochiDisc=parseInt(document.getElementById('m-shochi-discount')?.value)||0;
   const bussanDisc=parseInt(document.getElementById('m-bussan-discount')?.value)||0;
+  // 支払い詳細データを収集
+  const finalPayItems = payItems.map(p=>({label:p.label||'',amount:parseInt(p.amount)||0,method:p.method||'現金'})).filter(p=>p.label||p.amount);
+  const finalCouponData = couponData.session ? {...couponData} : null;
   let payAmount=document.getElementById('m-pay-amount').value.trim();
   // 支払金額が空の場合は合計から割引を引いた値を自動セット
   if(!payAmount){
@@ -3092,7 +3140,7 @@ async function saveBk(){
   const wasCancel=prevBk&&prevBk.cancelled;
   const menuPrice=parseInt(document.getElementById('m-menu-price')?.value)||0;
   const optPrice=parseInt(document.getElementById('m-opt-price')?.value)||0;
-  bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo:nextMemo||nextNote,nextNote:nextMemo||nextNote,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,elapsed:el,visitCount:vc};
+  bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo:nextMemo||nextNote,nextNote:nextMemo||nextNote,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,payItems:finalPayItems,couponData:finalCouponData,elapsed:el,visitCount:vc};
   // 継続枠（安全版：空枠か自分のcont枠のみ設定。他の患者の予約は絶対に上書きしない）
   for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){const existing=bookings[date][sl[ni]];if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
     if(!existing||(existing.cont&&existing.cardId===cardId)){bookings[date][sl[ni]]={cont:true,name,cardId};}
@@ -3377,6 +3425,141 @@ function setNbSlot(n){
     if(b)b.classList.toggle('on',i===n);
   });
 }
+// ===== 支払い詳細機能 =====
+let payItems = []; // [{label, amount, method}]
+let couponData = {}; // {session, purchaseDate}
+
+function addPayItem(label='', amount='', method='現金'){
+  const id = 'pi-' + Date.now();
+  payItems.push({id, label, amount, method});
+  renderPayItems();
+}
+
+function renderPayItems(){
+  const container = document.getElementById('m-pay-items');
+  if(!container) return;
+  const payMethods = ['現金','クレカ','PayPay','d払い','au Pay','回数券','その他'];
+  container.innerHTML = payItems.map((item,i) => `
+    <div style="display:grid;grid-template-columns:1fr 80px auto auto;gap:4px;margin-bottom:6px;align-items:center" data-pi="${item.id}">
+      <input class="inp" placeholder="内容（例：施術料、枕）" value="${item.label}"
+        style="font-size:0.78rem" oninput="updatePayItem('${item.id}','label',this.value)">
+      <input class="inp" type="number" placeholder="金額" value="${item.amount}"
+        style="font-size:0.78rem" oninput="updatePayItem('${item.id}','amount',this.value);recalcTotalPay()">
+      <select class="sel" style="font-size:0.76rem" onchange="updatePayItem('${item.id}','method',this.value)">
+        ${payMethods.map(m=>`<option ${item.method===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+      <button onclick="removePayItem('${item.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 8px;font-size:0.75rem;cursor:pointer">✕</button>
+    </div>
+  `).join('');
+}
+
+function updatePayItem(id, key, val){
+  const item = payItems.find(p=>p.id===id);
+  if(item) item[key] = val;
+}
+
+function removePayItem(id){
+  payItems = payItems.filter(p=>p.id!==id);
+  renderPayItems();
+  recalcTotalPay();
+}
+
+function recalcTotalPay(){
+  const total = payItems.reduce((s,p)=>s+(parseInt(p.amount)||0), 0);
+  if(total > 0){
+    const amtEl = document.getElementById('m-pay-amount');
+    if(amtEl && !amtEl.dataset.manual) amtEl.value = total;
+  }
+}
+
+function syncPayAmount(){
+  const el = document.getElementById('m-pay-amount');
+  if(el) el.dataset.manual = '1';
+}
+
+function toggleCouponSection(btn){
+  const sec = document.getElementById('coupon-section');
+  if(!sec) return;
+  sec.style.display = btn.classList.contains('on') ? 'block' : 'none';
+}
+
+function updateCouponInfo(){
+  const sel = document.getElementById('coupon-session-sel');
+  const dt = document.getElementById('coupon-purchase-date');
+  const info = document.getElementById('coupon-info');
+  if(!sel||!dt||!info) return;
+  const session = sel.value;
+  const purchaseDate = dt.value;
+  couponData = {session, purchaseDate};
+  if(!session) {info.textContent='';return;}
+  let msg = '第'+session+'回目使用';
+  if(purchaseDate){
+    const expiry = new Date(purchaseDate);
+    expiry.setFullYear(expiry.getFullYear()+1);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const diffDays = Math.floor((expiry-today)/(1000*60*60*24));
+    const expiryStr = expiry.getFullYear()+'年'+(expiry.getMonth()+1)+'月'+expiry.getDate()+'日';
+    msg += '　有効期限：'+expiryStr;
+    if(diffDays <= 30) msg += '（⚠️ あと'+diffDays+'日！）';
+    else msg += '（残り'+diffDays+'日）';
+    if(diffDays < 0) msg = '❌ 有効期限切れ！（'+expiryStr+'まで）';
+  }
+  info.textContent = msg;
+}
+
+function updatePayDetailSummary(){
+  const sumDiv = document.getElementById('pay-detail-summary');
+  const shochiDiv = document.getElementById('pay-shochi-summary');
+  const bussanDiv = document.getElementById('pay-bussan-summary');
+  if(!sumDiv||!shochiDiv||!bussanDiv) return;
+  // 処置サマリー
+  const shochiLines = [];
+  shochiMaster.forEach(s=>{
+    const qty = mShochiSel[s.id]||0;
+    if(qty>0) shochiLines.push('🩺 '+s.name+' × '+qty+' = '+((s.price*qty).toLocaleString())+'円');
+  });
+  // 物販サマリー
+  const bussanLines = [];
+  bussanMaster.forEach(b=>{
+    const qty = mBussanQty[b.id]||0;
+    if(qty>0){
+      const disc = mBussanDisc[b.id]||0;
+      const unitPrice = Math.max(0,b.price-disc);
+      bussanLines.push('🛍 '+b.name+' × '+qty+' = '+(unitPrice*qty).toLocaleString()+'円'+(disc>0?' ('+disc+'円引き)':''));
+    }
+  });
+  const hasData = shochiLines.length>0||bussanLines.length>0;
+  sumDiv.style.display = hasData?'block':'none';
+  shochiDiv.innerHTML = shochiLines.join('<br>');
+  bussanDiv.innerHTML = bussanLines.join('<br>');
+}
+
+function initPayItems(bk){
+  payItems = [];
+  couponData = {};
+  if(bk && bk.payItems && Array.isArray(bk.payItems)){
+    payItems = bk.payItems.map(p=>({...p, id:'pi-'+Date.now()+Math.random()}));
+  } else {
+    // 旧データ互換：payItemsがない場合は支払金額からデフォルト1行生成
+    const pay = document.getElementById('m-pay-btns');
+    const payMethods = pay?[...pay.querySelectorAll('.pay-btn.on')].map(b=>b.getAttribute('data-v')):[];
+    const amount = bk?.payAmount||'';
+    if(amount && parseFloat(amount)>0){
+      payItems = [{id:'pi-legacy',label:'施術料',amount:amount,method:payMethods[0]||'現金'}];
+    }
+  }
+  // 回数券データ復元
+  if(bk && bk.couponData){
+    couponData = bk.couponData;
+    const sel = document.getElementById('coupon-session-sel');
+    const dt = document.getElementById('coupon-purchase-date');
+    if(sel) sel.value = couponData.session||'';
+    if(dt) dt.value = couponData.purchaseDate||'';
+    updateCouponInfo();
+  }
+  renderPayItems();
+}
+
 // m-next-memoの入力をリアルタイムでnb-prev-memoに反映
 function syncMemoToNextForm(){
   const val=document.getElementById('m-next-memo')?.value||'';
