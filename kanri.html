@@ -979,7 +979,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
             <div style="margin-bottom:8px">
               <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">区分</label>
               <div style="display:flex;gap:6px;flex-wrap:wrap" id="nb-kubun-btns">
-                <button class="pay-btn on" data-v="保険" onclick="toggleNbKubun(this)">保険</button>
+                <button class="pay-btn" data-v="保険" onclick="toggleNbKubun(this)">保険</button>
                 <button class="pay-btn" data-v="自費" onclick="toggleNbKubun(this)">自費</button>
                 <button class="pay-btn" data-v="交通事故" onclick="toggleNbKubun(this)">交通事故</button>
                 <button class="pay-btn" data-v="新規" onclick="toggleNbKubun(this)">新規</button>
@@ -3195,6 +3195,13 @@ function onRouteChange(){
   if(form)form.style.display='block';
   window._foundNextAppt=found||null;
 
+  // foundがnullの場合（新規次回予約）は現在の区分を引き継ぐ
+  if(!found){
+    const curKubunList=mKubunSel.length?[...mKubunSel]:['保険'];
+    document.querySelectorAll('#nb-kubun-btns .pay-btn').forEach(b=>{
+      b.classList.toggle('on',curKubunList.includes(b.getAttribute('data-v')));
+    });
+  }
   if(found){
     const w=['日','月','火','水','木','金','土'];
     const dt=new Date(found.date);
