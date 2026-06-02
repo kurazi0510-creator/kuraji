@@ -1647,11 +1647,12 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       </div>
     </div><!-- /pe-pane-line -->
 
-    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
-      <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
-      <button class="btn bc" onclick="closePEdit()">キャンセル</button>
-      <button class="btn bp" onclick="savePEdit()">💾 保存</button>
-    </div>
+  </div>
+  <!-- 保存ボタンを常に画面下部に固定表示 -->
+  <div style="position:sticky;bottom:0;background:white;padding:10px 20px;border-top:1px solid #e2e8f0;display:flex;gap:6px;justify-content:flex-end;z-index:10">
+    <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
+    <button class="btn bc" onclick="closePEdit()">キャンセル</button>
+    <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
   </div>
 </div>
 
@@ -2880,6 +2881,31 @@ function calcMShochiTotal(){
   }
   updateMTotal();
 }
+function toggleDiscInput(id, btn){
+  const inp = document.getElementById('disc-input-'+id);
+  if(!inp) return;
+  const isShown = inp.style.display!=='none';
+  inp.style.display = isShown?'none':'flex';
+  if(isShown){
+    mBussanDisc[id]=0;
+    btn.textContent='割引を入力';
+    const netEl=document.getElementById('disc-net-'+id);
+    if(netEl)netEl.textContent='';
+    calcMBussanTotal();
+  }
+}
+function clearDisc(id){
+  mBussanDisc[id]=0;
+  calcMBussanTotal();
+  renderMBussanItems();
+}
+function updateDiscNet(id, price, disc){
+  const netEl=document.getElementById('disc-net-'+id);
+  const btn=document.querySelector('[onclick*="toggleDiscInput(\''+id+'\',this)"]');
+  const net=Math.max(0,price-disc);
+  if(netEl)netEl.textContent=disc>0?'→ 実質'+yen(net):'';
+  if(btn)btn.textContent=disc>0?'割引: '+disc+'円':'割引を入力';
+}
 function renderMBussanItems(){
   const area=document.getElementById('m-bussan-items');area.innerHTML='';
   bussanMaster.forEach(bs=>{
@@ -2897,11 +2923,14 @@ function renderMBussanItems(){
     if(qty>0){
       const discWrap=document.createElement('div');
       discWrap.style.cssText='display:flex;align-items:center;gap:4px;margin-top:4px;width:100%';
-      discWrap.innerHTML=`<span style="font-size:0.7rem;color:#92400e;white-space:nowrap">割引(円):</span>
-        <input type="number" class="inp" style="width:90px;padding:3px 8px;font-size:0.78rem" 
-          placeholder="0" value="${disc}" min="0" 
-          oninput="mBussanDisc['${bs.id}']=parseInt(this.value)||0;calcMBussanTotal()">
-        <span style="font-size:0.72rem;color:#16a34a;white-space:nowrap">→ 実質${yen(netPrice)}</span>`;
+      discWrap.innerHTML=`<button onclick="toggleDiscInput('${bs.id}',this)" style="background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:0.7rem;color:#64748b;cursor:pointer">${disc>0?'割引: '+disc+'円':'割引を入力'}</button>
+        <span id="disc-net-${bs.id}" style="font-size:0.72rem;color:#16a34a;white-space:nowrap">${disc>0?'→ 実質'+yen(netPrice):''}</span>
+        <div id="disc-input-${bs.id}" style="display:${disc>0?'flex':'none'};align-items:center;gap:4px;margin-top:4px">
+          <input type="number" class="inp" style="width:80px;padding:3px 8px;font-size:0.78rem" 
+            placeholder="0" value="${disc}" min="0" 
+            oninput="mBussanDisc['${bs.id}']=parseInt(this.value)||0;calcMBussanTotal();updateDiscNet('${bs.id}',${bs.price},parseInt(this.value)||0)">
+          <button onclick="clearDisc('${bs.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:2px 6px;font-size:0.7rem;cursor:pointer">×</button>
+        </div>`;
       div.appendChild(discWrap);
       if(disc>0){
         const tag=document.createElement('div');
