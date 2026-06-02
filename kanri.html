@@ -3248,7 +3248,10 @@ async function saveBk(){
   const optPrice=parseInt(document.getElementById('m-opt-price')?.value)||0;
   bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo:nextMemo||nextNote,nextNote:nextMemo||nextNote,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,payItems:finalPayItems,couponData:finalCouponData,elapsed:el,visitCount:vc};
   // 継続枠（安全版：空枠か自分のcont枠のみ設定。他の患者の予約は絶対に上書きしない）
-  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){const existing=bookings[date][sl[ni]];if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
+  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length){
+    // BREAKに当たったら継続枠生成を停止（午前→午後跨ぎ防止）
+    if(sl[ni]==='BREAK') break;
+    const existing=bookings[date][sl[ni]];if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
     if(!existing||(existing.cont&&existing.cardId===cardId)){bookings[date][sl[ni]]={cont:true,name,cardId};}
     // 他の患者が入っている場合は触らない（上書きしない）
   }else{// 継続枠が不要な範囲：自分のcont枠のみ削除（他の患者は触らない）
