@@ -2,7 +2,15 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||'getAll';
   var callback=(e&&e.parameter&&e.parameter.callback)||'';
   var result;
-  try{if(action==='getAll'){result=getAllData();}else if(action==='loadMurao'){result=handleMuraoGet(e);}else{result={ok:true,msg:'ok'};}}
+  try{
+    if(action==='getAll'){result=getAllData();}
+    else if(action==='loadMurao'){result=handleMuraoGet(e);}
+    else if(action==='saveMurao'){
+      var rawData=e&&e.parameter&&e.parameter.data?e.parameter.data:'';
+      result=handleMuraoPost(rawData?JSON.parse(decodeURIComponent(rawData)):{});
+    }
+    else{result={ok:true,msg:'ok'};}
+  }
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+'('+json+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -60,13 +68,34 @@ function resetBookings(){
 
 function handleMuraoGet(e){
   var props = PropertiesService.getScriptProperties();
-  var raw   = props.getProperty('murao_all');
-  if(!raw) return {status:'ok', data:{}};
-  return {status:'ok', data: JSON.parse(raw)};
+  var parts = parseInt(props.getProperty('murao_parts')||'0');
+  if(parts === 0){
+    // 旧形式対応
+    var raw = props.getProperty('murao_all');
+    if(!raw) return {status:'ok', data:{}};
+    return {status:'ok', data: JSON.parse(raw)};
+  }
+  var combined = '';
+  for(var i=0;i<parts;i++) combined += (props.getProperty('murao_all_'+i)||'');
+  if(!combined) return {status:'ok', data:{}};
+  return {status:'ok', data: JSON.parse(combined)};
 }
 
 function handleMuraoPost(payload){
   var props = PropertiesService.getScriptProperties();
-  props.setProperty('murao_all', JSON.stringify(payload));
+  // payloadが文字列の場合そのまま、オブジェクトの場合はJSON化
+  var val = (typeof payload === 'string') ? payload : JSON.stringify(payload);
+  // PropertiesServiceの値は9KB制限があるため分割保存
+  var MAX = 8000;
+  if(val.length <= MAX){
+    props.setProperty('murao_all_0', val);
+    props.setProperty('murao_parts', '1');
+  } else {
+    var parts = Math.ceil(val.length / MAX);
+    for(var i=0;i<parts;i++){
+      props.setProperty('murao_all_'+i, val.slice(i*MAX, (i+1)*MAX));
+    }
+    props.setProperty('murao_parts', String(parts));
+  }
   return {status:'ok'};
 }

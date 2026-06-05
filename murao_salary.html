@@ -163,7 +163,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 .btn-green{background:var(--green);color:#fff}
 .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 
-@media print{body{background:#fff;padding:0}.no-print{display:none!important}.card{break-inside:avoid}}
+@media print{body{background:#fff;padding:0}.no-print,.hide-print{display:none!important}.card{break-inside:avoid}}
 @media(min-width:768px){body{max-width:780px;margin:0 auto;padding:24px 20px}.settings-grid{grid-template-columns:repeat(4,1fr)}.rate-info{grid-column:1/-1}}
 @media(max-width:480px){.totals-grid{grid-template-columns:1fr 1fr}.total-box.highlight{grid-column:1/-1}}
 </style>
@@ -176,7 +176,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 </div>
 
 <!-- ① GAS同期バー -->
-<div class="card no-print" id="syncCard">
+<div class="card" id="syncCard">
   <div class="card-title">☁️ デバイス間データ共有（GAS同期）</div>
   <div class="sync-bar">
     <span class="sync-status" id="syncStatus">📱 未同期</span>
@@ -293,25 +293,24 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpF
 async function gasUpload(){
   const btn = document.getElementById('btnUpload');
   btn.disabled = true; btn.textContent = '⬆ 保存中…';
-  // localStorage の murao_ キー全部収集
   const payload = {};
   for(let i=0;i<localStorage.length;i++){
     const k = localStorage.key(i);
     if(k.startsWith('murao_')) payload[k] = localStorage.getItem(k);
   }
   try{
-    const res = await fetch(GAS_URL, {
-      method:'POST',
-      body: JSON.stringify({action:'saveMurao', data: payload})
-    });
+    // GASはCORSのためGET+URLエンコードで送信
+    const encoded = encodeURIComponent(JSON.stringify(payload));
+    const url = GAS_URL + '?action=saveMurao&data=' + encoded + '&t=' + Date.now();
+    const res = await fetch(url, {method:'GET', mode:'cors'});
     const json = await res.json();
     if(json.status === 'ok'){
       setSyncStatus('✅ 保存完了 ' + nowStr());
     } else {
-      setSyncStatus('⚠ 保存失敗: ' + (json.message||''));
+      setSyncStatus('⚠ 保存失敗: ' + JSON.stringify(json));
     }
   } catch(e){
-    setSyncStatus('❌ 通信エラー: ' + e.message);
+    setSyncStatus('❌ 通信エラー（GAS再デプロイ必要かも）: ' + e.message);
   }
   btn.disabled = false; btn.textContent = '⬆ このデバイスのデータを保存';
 }
