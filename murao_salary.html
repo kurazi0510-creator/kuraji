@@ -9,247 +9,214 @@
 <meta name="apple-mobile-web-app-title" content="給与管理">
 <meta name="theme-color" content="#2d2926">
 <link rel="manifest" href="murao_manifest.json">
-
-<!-- Apple Touch Icon (SVGベース → PNG代替としてData URI) -->
-<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAABmJLR0QA/wD/AP+gvaeTAAADUElEQVR4nO3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBuAABHgAAAABJRU5ErkJggg==">
-
 <title>給与管理 – 村尾さん｜倉治整骨院</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #faf9f7;
-    --surface: #ffffff;
-    --border: #e8e4df;
-    --accent: #c17b3a;
-    --accent-light: #f5ede2;
-    --text: #2d2926;
-    --muted: #8a7f75;
-    --green: #3a7c5c;
-    --red: #b84040;
-    --red-light: #fceaea;
-    --night: #5b4fcf;
-    --night-light: #eeecfb;
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body {
-    font-family: 'Noto Sans JP', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding: max(16px, calc(var(--safe-top) + 12px)) 16px max(16px, calc(var(--safe-bottom) + 12px));
-  }
+:root{
+  --bg:#faf9f7;--surface:#fff;--border:#e8e4df;
+  --accent:#c17b3a;--accent-light:#f5ede2;
+  --text:#2d2926;--muted:#8a7f75;
+  --green:#3a7c5c;--red:#b84040;--red-light:#fceaea;
+  --night:#5b4fcf;--night-light:#eeecfb;
+  --holiday-red:#e53e3e;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);
+  min-height:100dvh;
+  padding:max(16px,calc(env(safe-area-inset-top,0px) + 12px)) 16px max(16px,calc(env(safe-area-inset-bottom,0px) + 12px))}
 
-  /* ── HEADER ── */
-  .header {
-    background: var(--text); color: #fff; border-radius: 16px;
-    padding: 18px 20px; margin-bottom: 14px;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
-  }
-  .header-left h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: .03em; }
-  .header-left p { font-size: .78rem; color: #c8b9a6; margin-top: 2px; }
-  .badge { background: var(--accent); color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+.header{background:var(--text);color:#fff;border-radius:16px;padding:18px 20px;margin-bottom:14px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.header-left h1{font-size:1.05rem;font-weight:700}
+.header-left p{font-size:.78rem;color:#c8b9a6;margin-top:2px}
+.badge{background:var(--accent);color:#fff;font-size:.72rem;padding:3px 10px;border-radius:20px;font-weight:500}
 
-  /* ── CARD ── */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
-  .card-title {
-    font-size: .75rem; font-weight: 700; color: var(--muted);
-    letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .card-title::before { content: ''; width: 3px; height: 14px; background: var(--accent); border-radius: 2px; display: inline-block; }
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px}
+.card-title{font-size:.75rem;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;
+  margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.card-title::before{content:'';width:3px;height:14px;background:var(--accent);border-radius:2px;display:inline-block}
 
-  /* ── SETTINGS ── */
-  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .field label { font-size: .75rem; color: var(--muted); margin-bottom: 4px; display: block; }
-  .field input, .field select {
-    width: 100%; border: 1px solid var(--border); border-radius: 10px;
-    padding: 10px 12px; font-family: inherit; font-size: .9rem;
-    background: var(--bg); color: var(--text); outline: none;
-    transition: border-color .15s; -webkit-appearance: none; appearance: none;
-  }
-  .field input:focus, .field select:focus { border-color: var(--accent); background: #fff; }
-  .field.full { grid-column: 1 / -1; }
+/* 設定グリッド */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field label{font-size:.75rem;color:var(--muted);margin-bottom:4px;display:block}
+.field input,.field select{width:100%;border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;font-family:inherit;font-size:.9rem;background:var(--bg);color:var(--text);
+  outline:none;transition:border-color .15s;-webkit-appearance:none;appearance:none}
+.field input:focus,.field select:focus{border-color:var(--accent);background:#fff}
+.field.full{grid-column:1/-1}
+.rate-info{grid-column:1/-1;background:var(--night-light);border:1px solid var(--night);
+  border-radius:10px;padding:10px 14px;font-size:.8rem;color:var(--night);display:flex;gap:16px;flex-wrap:wrap}
+.rate-info span{font-weight:700}
 
-  .rate-info {
-    grid-column: 1 / -1; background: var(--night-light); border: 1px solid var(--night);
-    border-radius: 10px; padding: 10px 14px; font-size: .8rem; color: var(--night);
-    display: flex; gap: 16px; flex-wrap: wrap;
-  }
-  .rate-info span { font-weight: 700; }
+/* GAS同期 */
+.sync-bar{background:#f0faf5;border:1px solid #a8d5b5;border-radius:10px;padding:10px 14px;
+  margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sync-status{font-size:.78rem;color:var(--green);flex:1}
+.btn-sync{background:var(--green);color:#fff;border:none;border-radius:8px;
+  padding:7px 14px;font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer;min-height:36px}
+.btn-sync:active{opacity:.8}
+.btn-sync:disabled{background:#aaa;cursor:not-allowed}
 
-  /* ── MONTH NAV ── */
-  .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-  .month-nav button {
-    background: none; border: 1px solid var(--border); border-radius: 10px;
-    padding: 8px 18px; cursor: pointer; font-size: .88rem; color: var(--text);
-    transition: background .15s; font-family: inherit; min-width: 72px;
-  }
-  .month-nav button:active { background: var(--accent-light); }
-  .month-label { font-size: 1rem; font-weight: 700; }
+/* 休業期間 */
+.rest-period-grid{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.rest-period-grid input[type="date"],.rest-period-grid select{
+  border:1px solid var(--border);border-radius:8px;padding:7px 10px;
+  font-family:inherit;font-size:.82rem;background:var(--bg);color:var(--text);
+  outline:none;-webkit-appearance:none;flex:1;min-width:110px}
+.rest-period-grid input[type="date"]:focus,.rest-period-grid select:focus{border-color:var(--accent)}
+.rest-period-grid input[type="text"]{
+  border:1px solid var(--border);border-radius:8px;padding:7px 10px;
+  font-family:inherit;font-size:.82rem;background:var(--bg);color:var(--text);
+  outline:none;flex:2;min-width:140px}
+.rest-period-grid input[type="text"]:focus{border-color:var(--accent)}
+.btn-add-rest{background:none;border:1px dashed var(--border);border-radius:8px;
+  padding:7px 14px;font-family:inherit;font-size:.8rem;color:var(--muted);cursor:pointer;width:100%;margin-top:4px}
+.btn-add-rest:hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent)}
+.rest-tag{display:inline-flex;align-items:center;gap:4px;background:#f3f0ec;
+  border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:.75rem}
+.rest-tag button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:0 2px}
+.rest-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:24px}
 
-  /* ── TABLE ── */
-  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  table { width: 100%; border-collapse: collapse; font-size: .85rem; min-width: 400px; }
-  th {
-    text-align: center; font-size: .7rem; font-weight: 700; color: var(--muted);
-    letter-spacing: .04em; padding: 8px 4px; border-bottom: 2px solid var(--border); background: var(--bg);
-  }
-  td { text-align: center; padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  td.date-cell { font-family: 'DM Mono', monospace; font-size: .8rem; color: var(--muted); }
-  td.day-cell { font-size: .75rem; font-weight: 600; }
-  .day-sun { color: #c0392b; } .day-sat { color: #2980b9; }
+/* 月ナビ */
+.month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.month-nav button{background:none;border:1px solid var(--border);border-radius:10px;
+  padding:8px 18px;cursor:pointer;font-size:.88rem;color:var(--text);font-family:inherit;min-width:72px}
+.month-nav button:active{background:var(--accent-light)}
+.month-label{font-size:1rem;font-weight:700}
 
-  td select.time-sel {
-    width: 76px; border: 1px solid var(--border); border-radius: 8px;
-    padding: 6px 4px; font-family: 'DM Mono', monospace; font-size: .82rem;
-    background: var(--bg); color: var(--text); outline: none; cursor: pointer;
-    -webkit-appearance: none; appearance: none; text-align: center;
-  }
-  td select.time-sel:focus { border-color: var(--accent); background: #fff; }
-  td input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+/* テーブル */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.83rem;min-width:520px}
+th{text-align:center;font-size:.68rem;font-weight:700;color:var(--muted);
+  letter-spacing:.04em;padding:8px 3px;border-bottom:2px solid var(--border);background:var(--bg)}
+td{text-align:center;padding:5px 3px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#faf6f1}
+td.date-cell{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--muted)}
+td.day-cell{font-size:.75rem;font-weight:700;min-width:26px}
 
-  .hours-calc { font-family: 'DM Mono', monospace; font-size: .82rem; color: var(--accent); font-weight: 500; }
-  .day-pay { font-family: 'DM Mono', monospace; font-size: .82rem; color: var(--text); }
-  .has-night .day-pay { color: var(--night); font-weight: 700; }
+/* 曜日・祝日色 */
+.day-sun{color:#e53e3e}
+.day-sat{color:#2980b9}
+.day-hol{color:var(--holiday-red) !important;font-weight:700}
+tr.hol-row td{background:#fff8f8}
+tr.closed-row td{background:#f5f5f5;color:#bbb}
 
-  /* ── TOTALS ── */
-  .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .total-box { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px; text-align: center; }
-  .total-box .t-label { font-size: .68rem; color: var(--muted); margin-bottom: 4px; }
-  .total-box .t-value { font-family: 'DM Mono', monospace; font-size: 1.05rem; font-weight: 700; color: var(--text); }
-  .total-box.highlight { background: var(--accent-light); border-color: var(--accent); }
-  .total-box.highlight .t-value { color: var(--accent); font-size: 1.2rem; }
+/* セレクト */
+td select.time-sel{width:74px;border:1px solid var(--border);border-radius:7px;
+  padding:5px 2px;font-family:'DM Mono',monospace;font-size:.8rem;
+  background:var(--bg);color:var(--text);outline:none;-webkit-appearance:none;text-align:center}
+td select.time-sel:focus{border-color:var(--accent);background:#fff}
+td input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
 
-  /* ── NOTE ── */
-  .note-area {
-    width: 100%; border: 1px solid var(--border); border-radius: 10px;
-    padding: 10px 12px; font-family: inherit; font-size: .88rem;
-    background: var(--bg); resize: vertical; min-height: 64px; outline: none; color: var(--text);
-  }
-  .note-area:focus { border-color: var(--accent); }
+/* 休暇区分 */
+td select.abs-sel{width:86px;border:1px solid var(--border);border-radius:7px;
+  padding:5px 2px;font-family:inherit;font-size:.72rem;
+  background:var(--bg);color:var(--text);outline:none;-webkit-appearance:none}
+td select.abs-sel:focus{border-color:var(--accent)}
+td select.abs-sel.abs-staff{background:#fff8e6 !important;color:#b7791f;border-color:#f6ad55}
+td select.abs-sel.abs-clinic{background:#fff0f0 !important;color:var(--red);border-color:#fc8181}
+td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red);border-color:var(--holiday-red)}
 
-  /* ── HISTORY ── */
-  .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
-  .hist-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
-    border-radius: 10px; cursor: pointer; transition: background .15s;
-  }
-  .hist-item:active { background: var(--accent-light); }
-  .hist-month { font-size: .88rem; font-weight: 700; }
-  .hist-meta { font-size: .75rem; color: var(--muted); margin-top: 2px; }
-  .hist-pay { font-family: 'DM Mono', monospace; font-size: .95rem; font-weight: 700; color: var(--accent); }
-  .hist-del { background: none; border: none; color: var(--red); font-size: .9rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
-  .hist-del:active { background: var(--red-light); }
-  .empty-msg { text-align: center; color: var(--muted); font-size: .85rem; padding: 24px; }
+/* 休診理由テキスト */
+.abs-note-row td{background:#fafafa}
+.abs-note-row input[type="text"]{
+  width:100%;border:none;border-bottom:1px solid var(--border);
+  font-family:inherit;font-size:.75rem;padding:3px 6px;background:transparent;
+  color:var(--muted);outline:none}
+.abs-note-row input[type="text"]:focus{border-color:var(--accent);color:var(--text)}
 
-  /* ── BUTTONS ── */
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px; border: none;
-    border-radius: 12px; padding: 12px 20px; font-family: inherit;
-    font-size: .9rem; font-weight: 700; cursor: pointer;
-    transition: opacity .15s, transform .1s; min-height: 44px;
-  }
-  .btn:active { transform: scale(.97); opacity: .85; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-green { background: var(--green); color: #fff; }
-  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.hours-calc{font-family:'DM Mono',monospace;font-size:.82rem;color:var(--accent);font-weight:500}
+.day-pay{font-family:'DM Mono',monospace;font-size:.82rem}
+.has-night .day-pay{color:var(--night);font-weight:700}
 
-  /* ── PWA インストール案内 ── */
-  .install-banner {
-    background: linear-gradient(135deg, #2d2926, #4a3f38);
-    color: #fff; border-radius: 16px; padding: 16px 18px; margin-bottom: 14px;
-    display: none;
-  }
-  .install-banner.show { display: block; }
-  .install-banner h3 { font-size: .9rem; font-weight: 700; margin-bottom: 6px; }
-  .install-banner p { font-size: .78rem; color: #c8b9a6; line-height: 1.6; }
-  .install-steps { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-  .install-step { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: #e8d8c4; }
-  .step-num { background: var(--accent); color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; flex-shrink: 0; }
-  .install-close { float: right; background: none; border: none; color: #c8b9a6; font-size: 1.1rem; cursor: pointer; padding: 0; }
+/* 集計 */
+.totals-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.total-box{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px 8px;text-align:center}
+.total-box .t-label{font-size:.68rem;color:var(--muted);margin-bottom:4px}
+.total-box .t-value{font-family:'DM Mono',monospace;font-size:1rem;font-weight:700}
+.total-box.highlight{background:var(--accent-light);border-color:var(--accent)}
+.total-box.highlight .t-value{color:var(--accent);font-size:1.15rem}
+.rest-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.rest-chip{font-size:.75rem;padding:3px 10px;border-radius:20px;background:#f3f0ec;border:1px solid var(--border)}
 
-  /* ── PRINT ── */
-  @media print {
-    body { background: #fff; padding: 0; }
-    .no-print { display: none !important; }
-    .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
-  }
+.note-area{width:100%;border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;font-family:inherit;font-size:.88rem;background:var(--bg);
+  resize:vertical;min-height:60px;outline:none;color:var(--text)}
+.note-area:focus{border-color:var(--accent)}
 
-  /* ── TABLET / PC ── */
-  @media (min-width: 768px) {
-    body { max-width: 720px; margin: 0 auto; padding: 24px 20px; }
-    .settings-grid { grid-template-columns: repeat(4, 1fr); }
-    .rate-info { grid-column: 1 / -1; }
-    table { min-width: 100%; }
-    td select.time-sel { width: 86px; }
-  }
-  @media (min-width: 1024px) {
-    body { max-width: 880px; }
-    .totals-grid { grid-template-columns: repeat(3, 1fr); }
-  }
-  @media (max-width: 480px) {
-    .totals-grid { grid-template-columns: 1fr 1fr; }
-    .total-box.highlight { grid-column: 1 / -1; }
-  }
+/* 履歴 */
+.history-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto}
+.hist-item{display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer}
+.hist-item:active{background:var(--accent-light)}
+.hist-month{font-size:.88rem;font-weight:700}
+.hist-meta{font-size:.75rem;color:var(--muted);margin-top:2px}
+.hist-pay{font-family:'DM Mono',monospace;font-size:.95rem;font-weight:700;color:var(--accent)}
+.hist-del{background:none;border:none;color:var(--red);font-size:.9rem;cursor:pointer;padding:4px 8px;border-radius:6px}
+.empty-msg{text-align:center;color:var(--muted);font-size:.85rem;padding:24px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:12px;
+  padding:12px 20px;font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;min-height:44px}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+@media print{body{background:#fff;padding:0}.no-print{display:none!important}.card{break-inside:avoid}}
+@media(min-width:768px){body{max-width:780px;margin:0 auto;padding:24px 20px}.settings-grid{grid-template-columns:repeat(4,1fr)}.rate-info{grid-column:1/-1}}
+@media(max-width:480px){.totals-grid{grid-template-columns:1fr 1fr}.total-box.highlight{grid-column:1/-1}}
 </style>
 </head>
 <body>
 
-<!-- PWAインストール案内（iOSのみ表示） -->
-<div class="install-banner no-print" id="installBanner">
-  <button class="install-close" onclick="document.getElementById('installBanner').classList.remove('show'); localStorage.setItem('installDismissed','1')">✕</button>
-  <h3>📱 ホーム画面に追加できます</h3>
-  <p>Safari でこのページを開いて以下の手順で追加すると、アプリとして使えます。</p>
-  <div class="install-steps">
-    <div class="install-step"><span class="step-num">1</span>画面下の「共有」ボタン（□↑）をタップ</div>
-    <div class="install-step"><span class="step-num">2</span>「ホーム画面に追加」をタップ</div>
-    <div class="install-step"><span class="step-num">3</span>「追加」をタップして完了！</div>
-  </div>
-</div>
-
 <div class="header">
-  <div class="header-left">
-    <h1>💴 給与管理表</h1>
-    <p>倉治整骨院 ／ スタッフ管理</p>
-  </div>
-  <div class="header-right">
-    <span class="badge">村尾 さん</span>
-  </div>
+  <div class="header-left"><h1>💴 給与管理表</h1><p>倉治整骨院 ／ スタッフ管理</p></div>
+  <div class="header-right"><span class="badge">村尾 さん</span></div>
 </div>
 
-<!-- 設定 -->
+<!-- ① GAS同期バー -->
+<div class="card no-print" id="syncCard">
+  <div class="card-title">☁️ デバイス間データ共有（GAS同期）</div>
+  <div class="sync-bar">
+    <span class="sync-status" id="syncStatus">📱 未同期</span>
+    <button class="btn-sync" id="btnUpload" onclick="gasUpload()">⬆ このデバイスのデータを保存</button>
+    <button class="btn-sync" id="btnDownload" onclick="gasDownload()">⬇ 他デバイスのデータを取得</button>
+  </div>
+  <p style="font-size:.72rem;color:var(--muted);margin-top:4px">
+    ※ デスクトップで入力後「⬆保存」→ iPhone/iPad で「⬇取得」すると反映されます
+  </p>
+</div>
+
+<!-- ② 基本設定 -->
 <div class="card no-print">
   <div class="card-title">基本設定</div>
   <div class="settings-grid">
-    <div class="field">
-      <label>スタッフ名</label>
-      <input type="text" id="staffName" value="村尾" placeholder="氏名">
-    </div>
-    <div class="field">
-      <label>交通費（円/日）</label>
-      <input type="number" id="transport" value="0" min="0" step="10" inputmode="numeric">
-    </div>
-    <div class="field">
-      <label>通常時給（〜18:00）</label>
-      <input type="number" id="hourlyRate" value="1180" min="0" step="10" inputmode="numeric">
-    </div>
-    <div class="field">
-      <label>深夜時給（18〜20時）</label>
-      <input type="number" id="hourlyRateNight" value="1210" min="0" step="10" inputmode="numeric">
-    </div>
-    <div class="rate-info">
-      ⏰ <span>〜18:00</span>&nbsp;¥<span id="dispRate">1,180</span>／h　
-      🌙 <span>18〜20時</span>&nbsp;¥<span id="dispNight">1,210</span>／h
-    </div>
+    <div class="field"><label>スタッフ名</label><input type="text" id="staffName" value="村尾"></div>
+    <div class="field"><label>交通費（円/日）</label><input type="number" id="transport" value="0" min="0" step="10" inputmode="numeric"></div>
+    <div class="field"><label>通常時給（〜18:00）</label><input type="number" id="hourlyRate" value="1180" min="0" step="10" inputmode="numeric"></div>
+    <div class="field"><label>深夜時給（18:00以降）</label><input type="number" id="hourlyRateNight" value="1210" min="0" step="10" inputmode="numeric"></div>
+    <div class="rate-info">⏰ <span>〜18:00</span> ¥<span id="dispRate">1,180</span>／h　🌙 <span>18:00以降</span> ¥<span id="dispNight">1,210</span>／h</div>
   </div>
 </div>
 
-<!-- 月選択 -->
+<!-- ③ 休業期間設定 -->
+<div class="card no-print">
+  <div class="card-title">🏖 休業期間設定</div>
+  <div class="rest-period-grid">
+    <select id="newRestType" style="-webkit-appearance:none;appearance:none;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:.82rem;background:var(--bg);flex:0 0 100px">
+      <option>正月休み</option><option>盆休み</option><option>GW</option>
+      <option>夏季休暇</option><option>年末休暇</option><option>臨時休業</option>
+    </select>
+    <input type="date" id="newRestFrom">
+    <span style="font-size:.8rem;color:var(--muted)">〜</span>
+    <input type="date" id="newRestTo">
+  </div>
+  <button class="btn-add-rest" onclick="addRestPeriod()">＋ 休業期間を追加</button>
+  <div class="rest-tags" id="restTags"></div>
+</div>
+
+<!-- ④ 月別勤怠 -->
 <div class="card">
   <div class="month-nav no-print">
     <button onclick="changeMonth(-1)">◀ 前月</button>
@@ -261,7 +228,8 @@
     <table>
       <thead>
         <tr>
-          <th>日付</th><th>曜</th><th>出勤</th><th>開始</th><th>終了</th><th>時間</th><th>日当</th>
+          <th>日</th><th>曜</th><th>出勤</th><th>開始</th><th>終了</th>
+          <th>休暇区分</th><th>時間</th><th>日当</th>
         </tr>
       </thead>
       <tbody id="attendanceBody"></tbody>
@@ -269,26 +237,17 @@
   </div>
 </div>
 
-<!-- 合計 -->
+<!-- ⑤ 月次集計 -->
 <div class="card">
   <div class="card-title">月次集計</div>
   <div class="totals-grid">
-    <div class="total-box">
-      <div class="t-label">出勤日数</div>
-      <div class="t-value" id="totalDays">0 日</div>
-    </div>
-    <div class="total-box">
-      <div class="t-label">総勤務時間</div>
-      <div class="t-value" id="totalHours">0.0 h</div>
-    </div>
-    <div class="total-box highlight">
-      <div class="t-label">支給総額</div>
-      <div class="t-value" id="totalPay">¥0</div>
-    </div>
+    <div class="total-box"><div class="t-label">出勤日数</div><div class="t-value" id="totalDays">0 日</div></div>
+    <div class="total-box"><div class="t-label">総勤務時間</div><div class="t-value" id="totalHours">0.0 h</div></div>
+    <div class="total-box highlight"><div class="t-label">支給総額</div><div class="t-value" id="totalPay">¥0</div></div>
   </div>
+  <div class="rest-chips" id="restChips"></div>
   <div style="margin-top:12px">
-    <div class="field">
-      <label>備考・メモ</label>
+    <div class="field"><label>備考・メモ</label>
       <textarea class="note-area" id="noteArea" placeholder="特記事項があれば入力…"></textarea>
     </div>
   </div>
@@ -298,174 +257,405 @@
   </div>
 </div>
 
-<!-- 履歴 -->
+<!-- ⑥ 支払い履歴 -->
 <div class="card no-print">
   <div class="card-title">支払い履歴</div>
   <div class="history-list" id="historyList"></div>
 </div>
 
 <script>
-const DAYS = ['日','月','火','水','木','金','土'];
-let currentYear = new Date().getFullYear();
-let currentMonth = new Date().getMonth();
+// ═══════════════════════════════════
+// 祝日マスタ 2025〜2026
+// ═══════════════════════════════════
+const HOLIDAYS = {
+  "2025-01-01":"元日","2025-01-13":"成人の日",
+  "2025-02-11":"建国記念の日","2025-02-23":"天皇誕生日","2025-02-24":"天皇誕生日振替",
+  "2025-03-20":"春分の日","2025-04-29":"昭和の日",
+  "2025-05-03":"憲法記念日","2025-05-04":"みどりの日","2025-05-05":"こどもの日","2025-05-06":"こどもの日振替",
+  "2025-07-21":"海の日","2025-08-11":"山の日",
+  "2025-09-15":"敬老の日","2025-09-23":"秋分の日",
+  "2025-10-13":"スポーツの日","2025-11-03":"文化の日",
+  "2025-11-23":"勤労感謝の日","2025-11-24":"勤労感謝の日振替",
+  "2026-01-01":"元日","2026-01-12":"成人の日",
+  "2026-02-11":"建国記念の日","2026-02-23":"天皇誕生日",
+  "2026-03-20":"春分の日","2026-04-29":"昭和の日",
+  "2026-05-03":"憲法記念日","2026-05-04":"みどりの日","2026-05-05":"こどもの日",
+  "2026-07-20":"海の日","2026-08-11":"山の日",
+  "2026-09-21":"敬老の日","2026-09-22":"国民の休日","2026-09-23":"秋分の日",
+  "2026-10-12":"スポーツの日","2026-11-03":"文化の日","2026-11-23":"勤労感謝の日"
+};
 
-function getKey(y,m){ return `murao_salary_${y}_${m}`; }
-function getSettingsKey(){ return 'murao_settings'; }
+// ═══════════════════════════════════
+// GAS エンドポイント（kanri.html と同じ）
+// ═══════════════════════════════════
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec";
 
-// ── 30分単位セレクト生成 ──
-function buildTimeOptions(sel){
-  let h = '<option value="">--</option>';
-  for(let hh=6;hh<=22;hh++){
-    for(let mm=0;mm<60;mm+=30){
-      const v = hh + mm/60;
-      const lbl = `${String(hh).padStart(2,'0')}:${mm===0?'00':'30'}`;
-      h += `<option value="${v}"${Math.abs(v-parseFloat(sel))<0.01?' selected':''}>${lbl}</option>`;
-    }
+async function gasUpload(){
+  const btn = document.getElementById('btnUpload');
+  btn.disabled = true; btn.textContent = '⬆ 保存中…';
+  // localStorage の murao_ キー全部収集
+  const payload = {};
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k.startsWith('murao_')) payload[k] = localStorage.getItem(k);
   }
-  return h;
+  try{
+    const res = await fetch(GAS_URL, {
+      method:'POST',
+      body: JSON.stringify({action:'saveMurao', data: payload})
+    });
+    const json = await res.json();
+    if(json.status === 'ok'){
+      setSyncStatus('✅ 保存完了 ' + nowStr());
+    } else {
+      setSyncStatus('⚠ 保存失敗: ' + (json.message||''));
+    }
+  } catch(e){
+    setSyncStatus('❌ 通信エラー: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '⬆ このデバイスのデータを保存';
 }
 
+async function gasDownload(){
+  const btn = document.getElementById('btnDownload');
+  btn.disabled = true; btn.textContent = '⬇ 取得中…';
+  try{
+    const res = await fetch(GAS_URL + '?action=loadMurao&t=' + Date.now());
+    const json = await res.json();
+    if(json.status === 'ok' && json.data){
+      Object.entries(json.data).forEach(([k,v])=>{ if(k.startsWith('murao_')) localStorage.setItem(k,v); });
+      setSyncStatus('✅ 取得完了 ' + nowStr());
+      loadSettings();
+      renderRestTags();
+      buildTable(currentYear, currentMonth);
+      renderHistory();
+    } else {
+      setSyncStatus('⚠ データなし or 失敗');
+    }
+  } catch(e){
+    setSyncStatus('❌ 通信エラー: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '⬇ 他デバイスのデータを取得';
+}
+
+function setSyncStatus(msg){ document.getElementById('syncStatus').textContent = msg; }
+function nowStr(){ const d=new Date(); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+
+// ═══════════════════════════════════
+// 定数・状態
+// ═══════════════════════════════════
+const DAYS = ['日','月','火','水','木','金','土'];
+let currentYear  = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+
+const SK  = () => 'murao_settings';
+const RK  = () => 'murao_rest_periods';
+const MK  = (y,m) => `murao_salary_${y}_${m}`;
+
+// ═══════════════════════════════════
+// 祝日・休業判定
+// ═══════════════════════════════════
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dateStr(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
+function getHoliday(y,m,d){ return HOLIDAYS[dateStr(y,m,d)] || null; }
+function getRestPeriods(){ return JSON.parse(localStorage.getItem(RK())||'[]'); }
+function getRestPeriod(y,m,d){
+  const ds = dateStr(y,m,d);
+  return getRestPeriods().find(r => r.from <= ds && ds <= r.to) || null;
+}
+
+// ═══════════════════════════════════
+// 休業期間
+// ═══════════════════════════════════
+function addRestPeriod(){
+  const type = document.getElementById('newRestType').value;
+  const from = document.getElementById('newRestFrom').value;
+  const to   = document.getElementById('newRestTo').value;
+  if(!from||!to){ showToast('⚠ 開始日・終了日を入力してください'); return; }
+  if(from>to){ showToast('⚠ 終了日は開始日以降にしてください'); return; }
+  const list = getRestPeriods();
+  list.push({id:Date.now(), type, from, to});
+  localStorage.setItem(RK(), JSON.stringify(list));
+  document.getElementById('newRestFrom').value = '';
+  document.getElementById('newRestTo').value   = '';
+  renderRestTags();
+  buildTable(currentYear, currentMonth);
+}
+function removeRestPeriod(id){
+  localStorage.setItem(RK(), JSON.stringify(getRestPeriods().filter(r=>r.id!==id)));
+  renderRestTags();
+  buildTable(currentYear, currentMonth);
+}
+function renderRestTags(){
+  const tags = document.getElementById('restTags');
+  const list = getRestPeriods();
+  tags.innerHTML = list.length===0
+    ? '<span style="font-size:.75rem;color:var(--muted)">登録なし</span>'
+    : list.map(r=>`<span class="rest-tag">${r.type}：${r.from}〜${r.to}
+        <button onclick="removeRestPeriod(${r.id})">✕</button></span>`).join('');
+}
+
+// ═══════════════════════════════════
+// 設定
+// ═══════════════════════════════════
 function loadSettings(){
-  const s = JSON.parse(localStorage.getItem(getSettingsKey())||'{}');
-  if(s.staffName) document.getElementById('staffName').value = s.staffName;
-  if(s.hourlyRate) document.getElementById('hourlyRate').value = s.hourlyRate;
-  if(s.hourlyRateNight) document.getElementById('hourlyRateNight').value = s.hourlyRateNight;
-  if(s.transport!==undefined) document.getElementById('transport').value = s.transport;
+  const s = JSON.parse(localStorage.getItem(SK())||'{}');
+  if(s.staffName)        document.getElementById('staffName').value        = s.staffName;
+  if(s.hourlyRate)       document.getElementById('hourlyRate').value       = s.hourlyRate;
+  if(s.hourlyRateNight)  document.getElementById('hourlyRateNight').value  = s.hourlyRateNight;
+  if(s.transport!=null)  document.getElementById('transport').value        = s.transport;
   updateRateDisplay();
 }
 function saveSettings(){
-  localStorage.setItem(getSettingsKey(), JSON.stringify({
-    staffName: document.getElementById('staffName').value,
-    hourlyRate: +document.getElementById('hourlyRate').value,
+  localStorage.setItem(SK(), JSON.stringify({
+    staffName:       document.getElementById('staffName').value,
+    hourlyRate:      +document.getElementById('hourlyRate').value,
     hourlyRateNight: +document.getElementById('hourlyRateNight').value,
-    transport: +document.getElementById('transport').value,
+    transport:       +document.getElementById('transport').value,
   }));
   updateRateDisplay();
 }
 function updateRateDisplay(){
-  document.getElementById('dispRate').textContent = (+document.getElementById('hourlyRate').value||0).toLocaleString();
+  document.getElementById('dispRate').textContent  = (+document.getElementById('hourlyRate').value||0).toLocaleString();
   document.getElementById('dispNight').textContent = (+document.getElementById('hourlyRateNight').value||0).toLocaleString();
 }
 ['staffName','hourlyRate','hourlyRateNight','transport'].forEach(id=>{
   document.getElementById(id).addEventListener('change',()=>{ saveSettings(); recalc(); });
 });
 
+// ═══════════════════════════════════
+// セレクト生成
+// ═══════════════════════════════════
+function buildTimeOptions(sel){
+  let h = '<option value="">--</option>';
+  for(let hh=6;hh<=22;hh++){
+    for(let mm=0;mm<60;mm+=30){
+      const v   = hh + mm/60;
+      const lbl = `${pad2(hh)}:${mm===0?'00':'30'}`;
+      h += `<option value="${v}"${Math.abs(v-parseFloat(sel))<0.01?' selected':''}>${lbl}</option>`;
+    }
+  }
+  return h;
+}
+
+const ABS_OPTS = [
+  {v:'',       l:'－'},
+  {v:'staff',  l:'本人都合'},
+  {v:'clinic', l:'院都合'},
+  {v:'hol',    l:'祝日休'},
+  {v:'nenki',  l:'年末年始'},
+  {v:'bon',    l:'盆休み'},
+  {v:'other',  l:'その他'},
+];
+function buildAbsOptions(val){
+  return ABS_OPTS.map(o=>`<option value="${o.v}"${o.v===val?' selected':''}>${o.l}</option>`).join('');
+}
+function styleAbsSel(sel){
+  sel.className = 'abs-sel';
+  if(sel.value==='staff')  sel.classList.add('abs-staff');
+  else if(sel.value==='clinic') sel.classList.add('abs-clinic');
+  else if(['hol','nenki','bon'].includes(sel.value)) sel.classList.add('abs-hol');
+}
+
+// ═══════════════════════════════════
+// ★ 給与計算（修正済み）
+//   〜18:00 → 通常時給
+//   18:00以降 → 深夜時給（上限なし）
+// ═══════════════════════════════════
+function calcPay(s, e, rate, nRate){
+  const normalH = Math.max(0, Math.min(e, 18) - s);       // 〜18:00
+  const nightH  = e > 18 ? Math.max(0, e - Math.max(s, 18)) : 0; // 18:00〜
+  return Math.round(normalH * rate + nightH * nRate);
+}
+
+// ═══════════════════════════════════
+// テーブル構築
+// ═══════════════════════════════════
 function getDaysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
 
 function buildTable(y,m){
   document.getElementById('monthLabel').textContent = `${y}年 ${m+1}月`;
-  const saved = JSON.parse(localStorage.getItem(getKey(y,m))||'{}');
+  const saved = JSON.parse(localStorage.getItem(MK(y,m))||'{}');
   const tbody = document.getElementById('attendanceBody');
   tbody.innerHTML = '';
   const total = getDaysInMonth(y,m);
+
   for(let d=1;d<=total;d++){
-    const dow = new Date(y,m,d).getDay();
-    const rec = saved[`d${d}`]||{};
-    const dayClass = dow===0?'day-sun':dow===6?'day-sat':'';
+    const dow     = new Date(y,m,d).getDay();
+    const rec     = saved[`d${d}`] || {};
+    const holName = getHoliday(y,m,d);   // ← 祝日チェック
+    const closed  = getRestPeriod(y,m,d);
+
+    // 曜日セル
+    let dayLabel, dayClass;
+    if(holName){
+      dayLabel = '祝';
+      dayClass = 'day-hol';          // 赤・太字
+    } else if(dow===0){
+      dayLabel = '日'; dayClass = 'day-sun';
+    } else if(dow===6){
+      dayLabel = '土'; dayClass = 'day-sat';
+    } else {
+      dayLabel = DAYS[dow]; dayClass = '';
+    }
+
+    // 勤怠行
     const tr = document.createElement('tr');
+    if(holName)  tr.classList.add('hol-row');
+    if(closed)   tr.classList.add('closed-row');
+    tr.dataset.d = d;
+
+    const holTitle = holName ? ` title="${holName}"` : '';
     tr.innerHTML = `
       <td class="date-cell">${m+1}/${d}</td>
-      <td class="day-cell ${dayClass}">${DAYS[dow]}</td>
+      <td class="day-cell ${dayClass}"${holTitle}>${dayLabel}</td>
       <td><input type="checkbox" data-d="${d}" class="chk"${rec.work?' checked':''}></td>
       <td><select data-d="${d}" class="time-sel start">${buildTimeOptions(rec.start??'')}</select></td>
       <td><select data-d="${d}" class="time-sel end">${buildTimeOptions(rec.end??'')}</select></td>
+      <td><select data-d="${d}" class="abs-sel" onchange="styleAbsSel(this);toggleAbsNote(${d});autoSaveDay();recalc()">${buildAbsOptions(rec.absType??'')}</select></td>
       <td class="hours-calc" id="h${d}">-</td>
-      <td class="day-pay" id="p${d}">-</td>
-    `;
+      <td class="day-pay" id="p${d}">-</td>`;
     tbody.appendChild(tr);
+    styleAbsSel(tr.querySelector('.abs-sel'));
+
+    // 休診理由行（abs-sel が '' 以外の時に表示）
+    const noteRow = document.createElement('tr');
+    noteRow.classList.add('abs-note-row');
+    noteRow.dataset.noteFor = d;
+    noteRow.style.display = rec.absType ? '' : 'none';
+    noteRow.innerHTML = `
+      <td colspan="8" style="padding:2px 8px 6px 32px">
+        <input type="text" data-d="${d}" class="abs-note"
+          placeholder="休診理由・メモ（例：スタッフ都合により午後休診）"
+          value="${rec.absNote||''}">
+      </td>`;
+    tbody.appendChild(noteRow);
   }
+
   document.getElementById('noteArea').value = saved._note||'';
-  tbody.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',()=>{ autoSaveDay(); recalc(); }));
+  tbody.querySelectorAll('input[type="checkbox"],select.time-sel').forEach(el=>{
+    el.addEventListener('change',()=>{ autoSaveDay(); recalc(); });
+  });
+  tbody.querySelectorAll('.abs-note').forEach(el=>{
+    el.addEventListener('input', autoSaveDay);
+  });
   recalc();
 }
 
-function calcPay(s,e){
-  const rate=+document.getElementById('hourlyRate').value||0;
-  const nRate=+document.getElementById('hourlyRateNight').value||0;
-  let pay=0, cur=s;
-  while(cur<e){
-    const next=Math.min(cur+0.5,e);
-    const seg=next-cur;
-    const mid=(cur+next)/2;
-    pay+=seg*(mid>=18&&mid<20?nRate:rate);
-    cur=next;
-  }
-  return Math.round(pay);
+function toggleAbsNote(d){
+  const sel     = document.querySelector(`.abs-sel[data-d="${d}"]`);
+  const noteRow = document.querySelector(`tr[data-note-for="${d}"]`);
+  if(!noteRow) return;
+  noteRow.style.display = sel.value ? '' : 'none';
 }
 
+// ═══════════════════════════════════
+// 再計算
+// ═══════════════════════════════════
 function recalc(){
-  const total=getDaysInMonth(currentYear,currentMonth);
-  let sumDays=0,sumHours=0,sumPay=0;
+  const total = getDaysInMonth(currentYear, currentMonth);
+  const rate  = +document.getElementById('hourlyRate').value || 0;
+  const nRate = +document.getElementById('hourlyRateNight').value || 0;
+  const trans = +document.getElementById('transport').value || 0;
+  let sumDays=0, sumHours=0, sumPay=0;
+  const absCnt = {};
+
   for(let d=1;d<=total;d++){
-    const chk=document.querySelector(`.chk[data-d="${d}"]`);
-    const sEl=document.querySelector(`.start[data-d="${d}"]`);
-    const eEl=document.querySelector(`.end[data-d="${d}"]`);
-    const hEl=document.getElementById(`h${d}`);
-    const pEl=document.getElementById(`p${d}`);
-    const tr=chk?.closest('tr');
+    const chk  = document.querySelector(`.chk[data-d="${d}"]`);
+    const sEl  = document.querySelector(`.start[data-d="${d}"]`);
+    const eEl  = document.querySelector(`.end[data-d="${d}"]`);
+    const aEl  = document.querySelector(`.abs-sel[data-d="${d}"]`);
+    const hEl  = document.getElementById(`h${d}`);
+    const pEl  = document.getElementById(`p${d}`);
+    const tr   = document.querySelector(`tr[data-d="${d}"]`) || chk?.closest('tr');
+
+    if(aEl?.value){ absCnt[aEl.value] = (absCnt[aEl.value]||0) + 1; }
+
     if(!chk||!chk.checked){ hEl.textContent='-'; pEl.textContent='-'; tr?.classList.remove('has-night'); continue; }
     sumDays++;
-    const s=parseFloat(sEl.value), e=parseFloat(eEl.value);
+    const s = parseFloat(sEl.value), e = parseFloat(eEl.value);
     if(!isNaN(s)&&!isNaN(e)&&e>s){
-      const hours=e-s;
-      const pay=calcPay(s,e)+(+document.getElementById('transport').value||0);
-      hEl.textContent=hours.toFixed(1);
-      pEl.textContent='¥'+pay.toLocaleString();
-      sumHours+=hours; sumPay+=pay;
+      const hours = e - s;
+      const pay   = calcPay(s, e, rate, nRate) + trans;
+      hEl.textContent = hours.toFixed(1);
+      pEl.textContent = '¥' + pay.toLocaleString();
+      sumHours += hours; sumPay += pay;
       if(e>18) tr?.classList.add('has-night'); else tr?.classList.remove('has-night');
     } else {
-      hEl.textContent=sEl.value&&eEl.value?'?':'-'; pEl.textContent='-';
+      hEl.textContent = sEl.value&&eEl.value?'?':'-'; pEl.textContent='-';
       tr?.classList.remove('has-night');
     }
   }
-  document.getElementById('totalDays').textContent=`${sumDays} 日`;
-  document.getElementById('totalHours').textContent=`${sumHours.toFixed(1)} h`;
-  document.getElementById('totalPay').textContent='¥'+sumPay.toLocaleString();
+
+  document.getElementById('totalDays').textContent  = `${sumDays} 日`;
+  document.getElementById('totalHours').textContent = `${sumHours.toFixed(1)} h`;
+  document.getElementById('totalPay').textContent   = '¥' + sumPay.toLocaleString();
+
+  const labelMap = {staff:'本人都合',clinic:'院都合',hol:'祝日休',nenki:'年末年始',bon:'盆休み',other:'その他'};
+  const colorMap = {staff:'#fff8e6',clinic:'#fff0f0',hol:'#fff5f5',nenki:'#fff5f5',bon:'#fff5f5',other:'#f3f0ec'};
+  const chips = document.getElementById('restChips');
+  chips.innerHTML = Object.entries(absCnt).map(([k,v])=>
+    `<span class="rest-chip" style="background:${colorMap[k]||'#f3f0ec'}">${labelMap[k]||k}：${v}日</span>`
+  ).join('');
 }
 
+// ═══════════════════════════════════
+// 保存・読み込み
+// ═══════════════════════════════════
 function collectData(){
-  const total=getDaysInMonth(currentYear,currentMonth);
-  const data={_note:document.getElementById('noteArea').value};
+  const total = getDaysInMonth(currentYear, currentMonth);
+  const data  = {_note: document.getElementById('noteArea').value};
   for(let d=1;d<=total;d++){
-    const chk=document.querySelector(`.chk[data-d="${d}"]`);
-    const s=document.querySelector(`.start[data-d="${d}"]`);
-    const e=document.querySelector(`.end[data-d="${d}"]`);
-    data[`d${d}`]={work:chk?.checked||false,start:s?.value||'',end:e?.value||''};
+    const chk  = document.querySelector(`.chk[data-d="${d}"]`);
+    const s    = document.querySelector(`.start[data-d="${d}"]`);
+    const e    = document.querySelector(`.end[data-d="${d}"]`);
+    const a    = document.querySelector(`.abs-sel[data-d="${d}"]`);
+    const note = document.querySelector(`.abs-note[data-d="${d}"]`);
+    data[`d${d}`] = {
+      work:    chk?.checked||false,
+      start:   s?.value||'',
+      end:     e?.value||'',
+      absType: a?.value||'',
+      absNote: note?.value||''
+    };
   }
   return data;
 }
-function autoSaveDay(){ localStorage.setItem(getKey(currentYear,currentMonth),JSON.stringify(collectData())); }
+function autoSaveDay(){ localStorage.setItem(MK(currentYear,currentMonth), JSON.stringify(collectData())); }
 function saveMonth(){ autoSaveDay(); renderHistory(); showToast('💾 保存しました！'); }
 function changeMonth(delta){
   autoSaveDay();
   currentMonth+=delta;
-  if(currentMonth<0){ currentMonth=11; currentYear--; }
-  if(currentMonth>11){ currentMonth=0; currentYear++; }
+  if(currentMonth<0){currentMonth=11;currentYear--;}
+  if(currentMonth>11){currentMonth=0;currentYear++;}
   buildTable(currentYear,currentMonth);
 }
 
-function calcPayFromSettings(s,e,settings){
+// ═══════════════════════════════════
+// 履歴
+// ═══════════════════════════════════
+function calcPayStatic(s,e,settings){
   const rate=settings.hourlyRate||1180, nRate=settings.hourlyRateNight||1210;
-  let pay=0,cur=s;
-  while(cur<e){ const next=Math.min(cur+0.5,e),seg=next-cur,mid=(cur+next)/2; pay+=seg*(mid>=18&&mid<20?nRate:rate); cur=next; }
-  return Math.round(pay);
+  const normalH=Math.max(0,Math.min(e,18)-s);
+  const nightH=e>18?Math.max(0,e-Math.max(s,18)):0;
+  return Math.round(normalH*rate+nightH*nRate);
 }
-
 function renderHistory(){
-  const list=document.getElementById('historyList');
-  const keys=Object.keys(localStorage).filter(k=>k.startsWith('murao_salary_')&&!k.includes('settings'));
+  const list = document.getElementById('historyList');
+  const keys = Object.keys(localStorage).filter(k=>k.startsWith('murao_salary_'));
   keys.sort().reverse();
-  if(keys.length===0){ list.innerHTML='<div class="empty-msg">まだ保存されたデータがありません</div>'; return; }
-  const settings=JSON.parse(localStorage.getItem(getSettingsKey())||'{}');
+  if(keys.length===0){list.innerHTML='<div class="empty-msg">まだ保存されたデータがありません</div>';return;}
+  const settings = JSON.parse(localStorage.getItem(SK())||'{}');
   list.innerHTML='';
   keys.forEach(k=>{
-    const parts=k.split('_'); const y=+parts[parts.length-2],m=+parts[parts.length-1];
+    const p=k.split('_'); const y=+p[p.length-2], m=+p[p.length-1];
     const data=JSON.parse(localStorage.getItem(k)||'{}');
     const tr=settings.transport||0;
     let days=0,hours=0,pay=0;
     Object.keys(data).filter(k2=>k2.startsWith('d')).forEach(k2=>{
       const r=data[k2];
-      if(r.work){ days++; const s=parseFloat(r.start),e=parseFloat(r.end); if(!isNaN(s)&&!isNaN(e)&&e>s){ hours+=e-s; pay+=calcPayFromSettings(s,e,settings)+tr; } }
+      if(r.work){days++;const s=parseFloat(r.start),e=parseFloat(r.end);
+        if(!isNaN(s)&&!isNaN(e)&&e>s){hours+=e-s;pay+=calcPayStatic(s,e,settings)+tr;}}
     });
     const div=document.createElement('div');
     div.className='hist-item';
@@ -481,44 +671,30 @@ function renderHistory(){
     list.appendChild(div);
   });
 }
-function loadMonth(y,m){ autoSaveDay(); currentYear=y; currentMonth=m; buildTable(y,m); window.scrollTo({top:0,behavior:'smooth'}); }
-function deleteMonth(e,key){ e.stopPropagation(); if(!confirm('このデータを削除しますか？'))return; localStorage.removeItem(key); renderHistory(); }
+function loadMonth(y,m){autoSaveDay();currentYear=y;currentMonth=m;buildTable(y,m);window.scrollTo({top:0,behavior:'smooth'});}
+function deleteMonth(e,key){e.stopPropagation();if(!confirm('削除しますか？'))return;localStorage.removeItem(key);renderHistory();}
 
 function showToast(msg){
   const t=document.createElement('div');
   t.textContent=msg;
-  Object.assign(t.style,{
-    position:'fixed',bottom:'calc(24px + env(safe-area-inset-bottom, 0px))',left:'50%',transform:'translateX(-50%)',
-    background:'#2d2926',color:'#fff',padding:'10px 20px',borderRadius:'24px',
-    fontSize:'.88rem',zIndex:9999,opacity:'0',transition:'opacity .2s',whiteSpace:'nowrap'
-  });
+  Object.assign(t.style,{position:'fixed',bottom:'calc(24px + env(safe-area-inset-bottom,0px))',
+    left:'50%',transform:'translateX(-50%)',background:'#2d2926',color:'#fff',
+    padding:'10px 20px',borderRadius:'24px',fontSize:'.88rem',zIndex:9999,
+    opacity:'0',transition:'opacity .2s',whiteSpace:'nowrap'});
   document.body.appendChild(t);
-  requestAnimationFrame(()=>{ t.style.opacity='1'; });
-  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),300); },2000);
+  requestAnimationFrame(()=>{t.style.opacity='1';});
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},2200);
 }
 
-// ── PWA: iOS判定してインストール案内表示 ──
-function checkInstallBanner(){
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.navigator.standalone === true;
-  const dismissed = localStorage.getItem('installDismissed');
-  if(isIOS && !isStandalone && !dismissed){
-    document.getElementById('installBanner').classList.add('show');
-  }
-}
-
-// ── Service Worker登録 ──
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('murao_sw.js').catch(()=>{});
-  });
+  window.addEventListener('load',()=>navigator.serviceWorker.register('murao_sw.js').catch(()=>{}));
 }
 
 document.getElementById('noteArea').addEventListener('input', autoSaveDay);
 loadSettings();
+renderRestTags();
 buildTable(currentYear, currentMonth);
 renderHistory();
-checkInstallBanner();
 </script>
 </body>
 </html>

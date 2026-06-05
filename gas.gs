@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||'getAll';
   var callback=(e&&e.parameter&&e.parameter.callback)||'';
   var result;
-  try{if(action==='getAll'){result=getAllData();}else{result={ok:true,msg:'ok'};}}
+  try{if(action==='getAll'){result=getAllData();}else if(action==='loadMurao'){result=handleMuraoGet(e);}else{result={ok:true,msg:'ok'};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+'('+json+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -17,6 +17,7 @@ function doPost(e){
     else if(action==='saveCustomers'){saveSheet('kanja',JSON.parse(body.rows));result={ok:true};}
     else if(action==='saveUriage'){saveSheet('uriage',JSON.parse(body.rows));result={ok:true};}
     else if(action==='resetBookings'){resetBookings();result={ok:true};}
+    else if(action==='saveMurao'){result=handleMuraoPost(body.data);}
     else{result={ok:false,error:'unknown action'};}
   }catch(err){result={ok:false,error:err.message};}
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
@@ -50,4 +51,22 @@ function resetBookings(){
   if(!s)s=ss.insertSheet('yoyakuhyo');
   s.clearContents();
   s.getRange(1,1,1,20).setValues([['date','time','kubun','name','cardId','route','visitCount','elapsed','symptom','option','menu','shochi','shochiMemo','bussan','pay','payAmount','kubunList','reBook','cancelReason','bui']]);
+}
+
+// ═══════════════════════════════════════
+// 村尾さん給与データ 保存・読み込み
+// PropertiesService を使ってスクリプトプロパティに保存
+// ═══════════════════════════════════════
+
+function handleMuraoGet(e){
+  var props = PropertiesService.getScriptProperties();
+  var raw   = props.getProperty('murao_all');
+  if(!raw) return {status:'ok', data:{}};
+  return {status:'ok', data: JSON.parse(raw)};
+}
+
+function handleMuraoPost(payload){
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('murao_all', JSON.stringify(payload));
+  return {status:'ok'};
 }
