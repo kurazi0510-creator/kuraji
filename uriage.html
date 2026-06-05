@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>倉治整骨院｜売上手入力</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#0f172a;--card:#1e293b;--card2:#273548;--border:#334155;
+  --text:#f1f5f9;--muted:#94a3b8;--accent:#f97316;
+  --hoken:#3b82f6;--jishi:#f97316;--kureka:#8b5cf6;--bussan:#22c55e;--other:#64748b;
+}
+body{font-family:'Hiragino Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px;}
+
+/* ヘッダー */
+.hdr{background:var(--card);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+.hdr h1{font-size:0.9rem;font-weight:bold;color:var(--accent);}
+.hdr .date-disp{font-size:0.8rem;color:var(--muted);margin-left:auto;}
+.back-btn{background:var(--card2);border:none;color:var(--muted);padding:6px 12px;border-radius:7px;font-size:0.78rem;cursor:pointer;}
+
+/* 日付ナビ */
+.date-nav{padding:10px 14px;display:flex;gap:6px;align-items:center;background:var(--card);border-bottom:1px solid var(--border);}
+.date-nav button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-size:0.75rem;cursor:pointer;white-space:nowrap;}
+.date-nav button:hover{border-color:var(--accent);color:var(--accent);}
+.date-nav input[type=date]{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-size:0.82rem;flex:1;}
+
+/* タブ */
+.tabs{display:flex;gap:2px;padding:10px 14px 0;background:var(--card);overflow-x:auto;}
+.tab{padding:8px 16px;border-radius:8px 8px 0 0;font-size:0.78rem;font-weight:bold;cursor:pointer;border:none;white-space:nowrap;background:var(--card2);color:var(--muted);}
+.tab.active{color:white;}
+.tab[data-t=hoken].active{background:var(--hoken);}
+.tab[data-t=jishi].active{background:var(--jishi);}
+.tab[data-t=kureka].active{background:var(--kureka);}
+.tab[data-t=bussan].active{background:var(--bussan);}
+.tab[data-t=other].active{background:var(--other);}
+
+/* コンテンツ */
+.content{padding:12px 14px;}
+.pane{display:none;}
+.pane.active{display:block;}
+
+/* セクションタイトル */
+.sec-title{font-size:0.72rem;font-weight:bold;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;margin-top:14px;}
+.sec-title:first-child{margin-top:0;}
+
+/* 入力行 */
+.row{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;position:relative;}
+.row-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.row-label{font-size:0.78rem;font-weight:bold;flex:1;}
+.row-del{background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:3px 8px;font-size:0.72rem;cursor:pointer;}
+.row-inputs{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.row-inputs.single{grid-template-columns:1fr;}
+.inp-wrap label{font-size:0.68rem;color:var(--muted);display:block;margin-bottom:3px;}
+.inp{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:0.82rem;}
+.inp:focus{outline:none;border-color:var(--accent);}
+.inp-num{text-align:right;font-weight:bold;}
+
+/* 支払方法チップ */
+.pay-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+.chip{padding:4px 10px;border-radius:20px;font-size:0.7rem;border:1.5px solid var(--border);cursor:pointer;color:var(--muted);background:var(--card2);}
+.chip.on{border-color:var(--accent);background:var(--accent);color:white;}
+
+/* 追加ボタン */
+.add-btn{width:100%;padding:10px;border:2px dashed var(--border);border-radius:10px;background:transparent;color:var(--muted);font-size:0.82rem;cursor:pointer;margin-bottom:6px;transition:all .2s;}
+.add-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* 合計バー */
+.total-bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);padding:10px 16px;z-index:100;}
+.total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.total-label{font-size:0.72rem;color:var(--muted);}
+.total-val{font-size:0.9rem;font-weight:bold;}
+.total-grand{font-size:1.1rem;color:var(--accent);font-weight:bold;}
+.save-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:10px;color:white;font-size:0.95rem;font-weight:bold;cursor:pointer;margin-top:6px;}
+.save-btn:active{opacity:0.8;}
+
+/* バッジ */
+.badge{padding:3px 8px;border-radius:12px;font-size:0.68rem;font-weight:bold;}
+.badge-hoken{background:#1d4ed8;color:white;}
+.badge-jishi{background:#ea580c;color:white;}
+.badge-kureka{background:#6d28d9;color:white;}
+.badge-bussan{background:#15803d;color:white;}
+.saved-msg{text-align:center;color:#22c55e;font-size:0.78rem;padding:6px;display:none;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <button class="back-btn" onclick="location.href='kanri.html'">← 戻る</button>
+  <h1>💴 売上手入力</h1>
+  <span class="date-disp" id="date-disp"></span>
+</div>
+
+<div class="date-nav">
+  <button onclick="moveDay(-1)">◀ 前日</button>
+  <input type="date" id="sel-date" onchange="onDateChange()">
+  <button onclick="moveDay(0)" style="border-color:var(--accent);color:var(--accent)">今日</button>
+  <button onclick="moveDay(1)">翌日 ▶</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-t="hoken" onclick="switchTab('hoken')">🏥 窓口負担</button>
+  <button class="tab" data-t="jishi" onclick="switchTab('jishi')">💴 自費現金</button>
+  <button class="tab" data-t="kureka" onclick="switchTab('kureka')">💳 自費クレカ</button>
+  <button class="tab" data-t="bussan" onclick="switchTab('bussan')">🛍 物販</button>
+  <button class="tab" data-t="other" onclick="switchTab('other')">📝 その他</button>
+</div>
+
+<div class="content">
+
+  <!-- 窓口負担タブ -->
+  <div class="pane active" id="pane-hoken">
+    <div class="sec-title">保険（窓口負担金）</div>
+    <div id="rows-hoken"></div>
+    <button class="add-btn" onclick="addRow('hoken')">＋ 患者を追加</button>
+  </div>
+
+  <!-- 自費現金タブ -->
+  <div class="pane" id="pane-jishi">
+    <div class="sec-title">自費 現金払い</div>
+    <div id="rows-jishi"></div>
+    <button class="add-btn" onclick="addRow('jishi')">＋ 追加</button>
+  </div>
+
+  <!-- 自費クレカタブ -->
+  <div class="pane" id="pane-kureka">
+    <div class="sec-title">自費 クレジットカード払い</div>
+    <div id="rows-kureka"></div>
+    <button class="add-btn" onclick="addRow('kureka')">＋ 追加</button>
+    <div class="sec-title">自費 PayPay / au Pay / d払い</div>
+    <div id="rows-paypay"></div>
+    <button class="add-btn" onclick="addRow('paypay')">＋ 追加</button>
+  </div>
+
+  <!-- 物販タブ -->
+  <div class="pane" id="pane-bussan">
+    <div class="sec-title">物販</div>
+    <div id="rows-bussan"></div>
+    <button class="add-btn" onclick="addRow('bussan')">＋ 商品を追加</button>
+  </div>
+
+  <!-- その他タブ -->
+  <div class="pane" id="pane-other">
+    <div class="sec-title">その他 / 手数料 / 調整</div>
+    <div id="rows-other"></div>
+    <button class="add-btn" onclick="addRow('other')">＋ 追加</button>
+  </div>
+
+</div>
+
+<!-- 合計バー -->
+<div class="total-bar">
+  <div class="total-row">
+    <span class="total-label">🏥 窓口負担</span><span class="total-val" id="t-hoken">¥0</span>
+  </div>
+  <div class="total-row">
+    <span class="total-label">💴 自費現金</span><span class="total-val" id="t-jishi">¥0</span>
+  </div>
+  <div class="total-row">
+    <span class="total-label">💳 クレカ/QR</span><span class="total-val" id="t-kureka">¥0</span>
+  </div>
+  <div class="total-row">
+    <span class="total-label">🛍 物販</span><span class="total-val" id="t-bussan">¥0</span>
+  </div>
+  <div class="total-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:2px">
+    <span class="total-label" style="font-weight:bold;color:var(--text)">本日合計</span>
+    <span class="total-grand" id="t-total">¥0</span>
+  </div>
+  <div id="saved-msg" class="saved-msg">✅ 保存しました</div>
+  <button class="save-btn" onclick="saveAll()">💾 保存する</button>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
+
+const TYPES={
+  hoken:{label:'窓口負担',fields:['患者名','金額'],color:'var(--hoken)'},
+  jishi:{label:'自費(現金)',fields:['患者名','金額'],color:'var(--jishi)'},
+  kureka:{label:'自費(クレカ)',fields:['患者名','金額'],color:'var(--kureka)'},
+  paypay:{label:'自費(QR)',fields:['患者名','金額'],color:'var(--kureka)'},
+  bussan:{label:'物販',fields:['商品名','個数','単価'],color:'var(--bussan)'},
+  other:{label:'その他',fields:['内容','金額'],color:'var(--other)'},
+};
+
+const PRESETS={
+  hoken:[300,600,900,1200,2000],
+  jishi:[3980,5500,3500,3480,2000],
+  kureka:[3980,5500,3500,39600,55000],
+  paypay:[3980,5500,3500],
+  bussan:[{name:'クラウドテープS',price:300},{name:'クラウドテープL',price:500},{name:'枕（まくら）',price:39600},{name:'シリカアンカール',price:5500},{name:'スーパーエラスチンプラス',price:8800},{name:'ドクター水素ボトル',price:33000},{name:'Si-era水',price:540},{name:'スムージー',price:5400},{name:'整体10回券',price:55000}],
+  other:[],
+};
+
+let data={};// {date: {hoken:[],jishi:[],kureka:[],paypay:[],bussan:[],other:[]}}
+let curDate='';
+let curTab='hoken';
+
+function toDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function today(){return toDateStr(new Date());}
+
+function init(){
+  curDate=today();
+  document.getElementById('sel-date').value=curDate;
+  updateDateDisp();
+  loadFromStorage();
+  renderAll();
+}
+
+function moveDay(n){
+  if(n===0){curDate=today();}
+  else{const d=new Date(curDate+'T00:00:00');d.setDate(d.getDate()+n);curDate=toDateStr(d);}
+  document.getElementById('sel-date').value=curDate;
+  updateDateDisp();
+  renderAll();
+}
+
+function onDateChange(){
+  curDate=document.getElementById('sel-date').value;
+  updateDateDisp();
+  renderAll();
+}
+
+function updateDateDisp(){
+  const d=new Date(curDate+'T00:00:00');
+  const dn=['日','月','火','水','木','金','土'];
+  document.getElementById('date-disp').textContent=
+    (d.getMonth()+1)+'月'+d.getDate()+'日（'+dn[d.getDay()]+'）';
+}
+
+function ensureDate(){
+  if(!data[curDate])data[curDate]={hoken:[],jishi:[],kureka:[],paypay:[],bussan:[],other:[]};
+  ['hoken','jishi','kureka','paypay','bussan','other'].forEach(t=>{
+    if(!data[curDate][t])data[curDate][t]=[];
+  });
+}
+
+function getRows(type){ensureDate();return data[curDate][type]||[];}
+
+function addRow(type,preset=null){
+  ensureDate();
+  const id='r'+Date.now()+Math.random();
+  if(type==='bussan'){
+    data[curDate][type].push({id,name:preset?.name||'',qty:1,unitPrice:preset?.price||0,memo:''});
+  }else{
+    data[curDate][type].push({id,name:'',amount:preset||0,memo:''});
+  }
+  renderTab(type);
+  calcTotals();
+}
+
+function removeRow(type,id){
+  ensureDate();
+  data[curDate][type]=data[curDate][type].filter(r=>r.id!==id);
+  renderTab(type);
+  calcTotals();
+}
+
+function updateRow(type,id,key,val){
+  ensureDate();
+  const r=data[curDate][type].find(x=>x.id===id);
+  if(r){
+    r[key]=key==='amount'||key==='unitPrice'||key==='qty'?parseInt(val)||0:val;
+    calcTotals();
+  }
+}
+
+function switchTab(t){
+  curTab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
+  document.querySelectorAll('.pane').forEach(p=>{
+    const show=p.id==='pane-'+t||(t==='kureka'&&p.id==='pane-kureka')||(t==='kureka'&&false);
+    p.classList.toggle('active',p.id==='pane-'+t);
+  });
+}
+
+function renderAll(){
+  ['hoken','jishi','kureka','paypay','bussan','other'].forEach(t=>renderTab(t));
+  calcTotals();
+}
+
+function renderTab(type){
+  const container=document.getElementById('rows-'+type);
+  if(!container)return;
+  const rows=getRows(type);
+  const color=TYPES[type]?.color||'var(--accent)';
+  const isBussan=type==='bussan';
+
+  if(!rows.length){container.innerHTML='';return;}
+
+  container.innerHTML=rows.map(r=>{
+    if(isBussan){
+      const subtotal=(r.unitPrice||0)*(r.qty||1);
+      return `<div class="row" id="row-${r.id}">
+        <div class="row-header">
+          <span class="row-label" style="color:${color}">🛍 物販</span>
+          <button class="row-del" onclick="removeRow('${type}','${r.id}')">✕</button>
+        </div>
+        <div class="row-inputs">
+          <div class="inp-wrap" style="grid-column:1/-1">
+            <label>商品名</label>
+            <input class="inp" value="${r.name||''}" placeholder="商品名"
+              oninput="updateRow('${type}','${r.id}','name',this.value)">
+          </div>
+          <div class="inp-wrap">
+            <label>個数</label>
+            <input class="inp inp-num" type="number" min="1" value="${r.qty||1}"
+              oninput="updateRow('${type}','${r.id}','qty',this.value);this.closest('.row').querySelector('.subtotal').textContent='小計:¥'+((parseInt(this.value)||1)*(${r.unitPrice||0})).toLocaleString()">
+          </div>
+          <div class="inp-wrap">
+            <label>単価（円）</label>
+            <input class="inp inp-num" type="number" value="${r.unitPrice||0}" placeholder="0"
+              oninput="updateRow('${type}','${r.id}','unitPrice',this.value);calcTotals()">
+          </div>
+        </div>
+        <div style="text-align:right;font-size:0.78rem;color:var(--bussan);font-weight:bold;margin-top:4px" class="subtotal">小計：¥${subtotal.toLocaleString()}</div>
+      </div>`;
+    }else{
+      return `<div class="row" id="row-${r.id}">
+        <div class="row-header">
+          <span class="row-label" style="color:${color}">${TYPES[type]?.label}</span>
+          <button class="row-del" onclick="removeRow('${type}','${r.id}')">✕</button>
+        </div>
+        <div class="row-inputs">
+          <div class="inp-wrap">
+            <label>患者名 / 内容</label>
+            <input class="inp" value="${r.name||''}" placeholder="患者名"
+              oninput="updateRow('${type}','${r.id}','name',this.value)">
+          </div>
+          <div class="inp-wrap">
+            <label>金額（円）</label>
+            <input class="inp inp-num" type="number" value="${r.amount||0}" placeholder="0"
+              oninput="updateRow('${type}','${r.id}','amount',this.value)">
+          </div>
+        </div>
+        <div style="margin-top:6px">
+          <label style="font-size:0.68rem;color:var(--muted)">メモ</label>
+          <input class="inp" style="font-size:0.75rem;margin-top:2px" value="${r.memo||''}" placeholder="メモ（任意）"
+            oninput="updateRow('${type}','${r.id}','memo',this.value)">
+        </div>
+      </div>`;
+    }
+  }).join('');
+
+  // プリセットボタン
+  const presets=PRESETS[type]||[];
+  if(presets.length){
+    let presetHtml='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">';
+    if(type==='bussan'){
+      presets.forEach(p=>{
+        presetHtml+=`<button onclick="addRow('bussan',{name:'${p.name}',price:${p.price}})"
+          style="padding:5px 10px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--bussan);font-size:0.72rem;cursor:pointer">${p.name}</button>`;
+      });
+    }else{
+      presets.forEach(p=>{
+        presetHtml+=`<button onclick="addRowWithAmount('${type}',${p})"
+          style="padding:5px 10px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:${color};font-size:0.72rem;cursor:pointer;font-weight:bold">¥${p.toLocaleString()}</button>`;
+      });
+    }
+    presetHtml+='</div>';
+    container.insertAdjacentHTML('beforebegin',presetHtml);
+  }
+}
+
+function addRowWithAmount(type, amount){
+  ensureDate();
+  const id='r'+Date.now()+Math.random();
+  data[curDate][type].push({id,name:'',amount,memo:''});
+  renderTab(type);
+  calcTotals();
+  // 追加した行の患者名にフォーカス
+  setTimeout(()=>{
+    const row=document.getElementById('row-'+id);
+    if(row)row.querySelector('.inp')?.focus();
+  },100);
+}
+
+function calcTotals(){
+  const sum=(type)=>getRows(type).reduce((s,r)=>{
+    if(type==='bussan')return s+(r.unitPrice||0)*(r.qty||1);
+    return s+(r.amount||0);
+  },0);
+  const hoken=sum('hoken');
+  const jishi=sum('jishi');
+  const kureka=sum('kureka')+sum('paypay');
+  const bussan=sum('bussan');
+  const other=sum('other');
+  const total=hoken+jishi+kureka+bussan+other;
+  document.getElementById('t-hoken').textContent='¥'+hoken.toLocaleString();
+  document.getElementById('t-jishi').textContent='¥'+jishi.toLocaleString();
+  document.getElementById('t-kureka').textContent='¥'+kureka.toLocaleString();
+  document.getElementById('t-bussan').textContent='¥'+bussan.toLocaleString();
+  document.getElementById('t-total').textContent='¥'+total.toLocaleString();
+}
+
+function saveToStorage(){
+  localStorage.setItem('kj_uriage_manual',JSON.stringify(data));
+}
+function loadFromStorage(){
+  try{const d=localStorage.getItem('kj_uriage_manual');if(d)data=JSON.parse(d);}catch(e){}
+}
+
+async function saveAll(){
+  saveToStorage();
+  // GASにも送信
+  try{
+    const rows=buildRows();
+    const body=JSON.stringify({action:'saveUriage',rows:JSON.stringify(rows)});
+    await fetch(GAS,{method:'POST',body,headers:{'Content-Type':'text/plain'}});
+  }catch(e){console.error(e);}
+  const msg=document.getElementById('saved-msg');
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',2500);
+}
+
+function buildRows(){
+  const hdr=['日付','種別','患者名/内容','金額','個数','単価','小計','メモ'];
+  const rows=[hdr];
+  ['hoken','jishi','kureka','paypay','bussan','other'].forEach(type=>{
+    getRows(type).forEach(r=>{
+      if(type==='bussan'){
+        rows.push([curDate,TYPES[type].label,r.name||'','',(r.qty||1),(r.unitPrice||0),(r.unitPrice||0)*(r.qty||1),r.memo||'']);
+      }else{
+        rows.push([curDate,TYPES[type].label,r.name||'',(r.amount||0),'','',(r.amount||0),r.memo||'']);
+      }
+    });
+  });
+  return rows;
+}
+
+// プリセットボタンが重複して追加されないよう管理
+function renderTabWithPresets(type){
+  // プリセットボタンを先に削除
+  const container=document.getElementById('rows-'+type);
+  if(!container)return;
+  const prev=container.previousElementSibling;
+  if(prev&&prev.style.display==='flex')prev.remove();
+  renderTab(type);
+}
+
+init();
+</script>
+</body>
+</html>
