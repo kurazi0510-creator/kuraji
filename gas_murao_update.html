@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAS更新ガイド｜村尾給与同期</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',sans-serif;
+  background:#1a1a2e;color:#e8e8f0;min-height:100vh;padding:20px}
+.wrap{max-width:800px;margin:0 auto}
+h1{font-size:1.2rem;font-weight:700;color:#f5c842;margin-bottom:6px}
+.sub{font-size:.82rem;color:#9090b0;margin-bottom:20px}
+
+.step{background:#16213e;border:1px solid #2a2a4a;border-radius:14px;padding:18px;margin-bottom:14px}
+.step-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.step-num{background:#f5c842;color:#1a1a2e;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:900;flex-shrink:0}
+.step-title{font-size:.95rem;font-weight:700;color:#fff}
+.step p{font-size:.82rem;color:#a0a0c0;line-height:1.7;margin-bottom:8px}
+
+/* コードブロック */
+.code-wrap{position:relative;margin:10px 0}
+pre{background:#0d0d1a;border:1px solid #333360;border-radius:10px;
+  padding:14px 14px 14px 14px;font-family:'Courier New',monospace;
+  font-size:.75rem;color:#c8f0c8;overflow-x:auto;white-space:pre;line-height:1.6;
+  max-height:320px;overflow-y:auto}
+.copy-btn{position:absolute;top:8px;right:8px;background:#f5c842;color:#1a1a2e;
+  border:none;border-radius:8px;padding:5px 12px;font-size:.75rem;font-weight:700;cursor:pointer}
+.copy-btn:active{opacity:.7}
+.copy-btn.done{background:#4caf50;color:#fff}
+
+/* ステータス確認 */
+.check-btn{background:#5b4fcf;color:#fff;border:none;border-radius:10px;
+  padding:11px 20px;font-size:.88rem;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+.check-btn:active{opacity:.8}
+.status-box{margin-top:10px;padding:10px 14px;border-radius:8px;font-size:.82rem;display:none}
+.status-box.ok{background:#1a3a2a;border:1px solid #4caf50;color:#80e080;display:block}
+.status-box.ng{background:#3a1a1a;border:1px solid #e05050;color:#e08080;display:block}
+
+.arrow{text-align:center;font-size:1.4rem;color:#5b4fcf;margin:4px 0}
+.tag{display:inline-block;background:#2a2a4a;border:1px solid #4a4a7a;
+  border-radius:6px;padding:2px 8px;font-family:monospace;font-size:.78rem;color:#c8c8f0;margin:0 2px}
+.warn{background:#3a2a00;border:1px solid #f5c842;border-radius:8px;
+  padding:10px 14px;font-size:.8rem;color:#f5d060;margin-top:8px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔧 GAS更新ガイド｜村尾さん給与同期</h1>
+  <p class="sub">デスクトップ→iPhone へのデータ同期を有効にするための1回限りの設定です</p>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">GASエディタを開く</div>
+    </div>
+    <p>下のボタンをクリックしてGASエディタを新しいタブで開いてください。</p>
+    <a href="https://script.google.com/home/projects/172iE7pVa_XadyNqG_Ah49AzOVj.g9QOP5DaKw0WCP4HUtwGtSU4w_EC8/edit"
+       target="_blank"
+       style="display:inline-block;background:#4285f4;color:#fff;border-radius:10px;
+              padding:10px 20px;font-size:.88rem;font-weight:700;text-decoration:none;margin-top:4px">
+      📝 GASエディタを開く
+    </a>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">コードを全選択して貼り替える</div>
+    </div>
+    <p>GASエディタで <span class="tag">コード.gs</span> タブをクリック → エディタ内を全選択（<span class="tag">Ctrl+A</span>）→ 下のコードをコピーして貼り付け（<span class="tag">Ctrl+V</span>）</p>
+    <div class="code-wrap">
+      <button class="copy-btn" id="copyBtn" onclick="copyCode()">📋 コピー</button>
+      <pre id="gasCode"></pre>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">保存してデプロイ</div>
+    </div>
+    <p>① <span class="tag">Ctrl+S</span> で保存<br>
+       ② 右上の「<strong style="color:#f5c842">デプロイ</strong>」ボタンをクリック<br>
+       ③「<strong>デプロイを管理</strong>」をクリック<br>
+       ④ 鉛筆（✏️）アイコンをクリック<br>
+       ⑤「バージョン」を「<strong>新しいバージョン</strong>」に変更<br>
+       ⑥「<strong>デプロイ</strong>」をクリック</p>
+    <div class="warn">⚠️ 「このアプリはGoogleで確認されていません」が出たら「詳細」→「安全ではないページに移動」→「許可」をクリック</div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- STEP 4: 動作確認 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-title">動作確認（デプロイ後にクリック）</div>
+    </div>
+    <p>デプロイ完了後、下のボタンで接続確認できます。</p>
+    <button class="check-btn" onclick="checkGas()">🔍 GAS接続テスト</button>
+    <div id="statusBox" class="status-box"></div>
+  </div>
+
+</div>
+
+<script>
+// gas.gs の全コードをここに埋め込む
+const GAS_CODE = `function doGet(e){
+  var action=(e&&e.parameter&&e.parameter.action)||'getAll';
+  var callback=(e&&e.parameter&&e.parameter.callback)||'';
+  var result;
+  try{
+    if(action==='getAll'){result=getAllData();}
+    else if(action==='loadMurao'){result=handleMuraoGet(e);}
+    else if(action==='saveMurao'){
+      var rawData=e&&e.parameter&&e.parameter.data?e.parameter.data:'';
+      result=handleMuraoPost(rawData?JSON.parse(decodeURIComponent(rawData)):{});
+    }
+    else{result={ok:true,msg:'ok'};}
+  }
+  catch(err){result={ok:false,error:err.message};}
+  var json=JSON.stringify(result);
+  if(callback)return ContentService.createTextOutput(callback+'('+json+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+function doPost(e){
+  var body={};try{body=JSON.parse(e.postData.contents);}catch(err){}
+  var action=body.action||'',result;
+  try{
+    if(action==='getAll'){result=getAllData();}
+    else if(action==='saveBookings'){saveSheet('yoyakuhyo',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='saveCustomers'){saveSheet('kanja',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='saveUriage'){saveSheet('uriage',JSON.parse(body.rows));result={ok:true};}
+    else if(action==='resetBookings'){resetBookings();result={ok:true};}
+    else if(action==='saveMurao'){result=handleMuraoPost(body.data);}
+    else{result={ok:false,error:'unknown action'};}
+  }catch(err){result={ok:false,error:err.message};}
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+function getAllData(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var b=ss.getSheetByName('yoyakuhyo');
+  var c=ss.getSheetByName('kanja');
+  var u=ss.getSheetByName('uriage');
+  return{ok:true,bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};}
+function saveSheet(name,rows){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName(name);
+  if(!s)s=ss.insertSheet(name);
+  s.clearContents();
+  if(!rows||rows.length===0)return;
+  var san=rows.map(function(row){return row.map(function(cell){
+    if(cell===null||cell===undefined)return'';
+    if(cell instanceof Date){var y=cell.getFullYear(),mo=String(cell.getMonth()+1).padStart(2,'0'),d=String(cell.getDate()).padStart(2,'0');return y+'-'+mo+'-'+d;}
+    return String(cell);});});
+  var range=s.getRange(1,1,san.length,san[0].length);
+  var fmt=san.map(function(r){return r.map(function(){return'@';});});
+  range.setNumberFormats(fmt);
+  range.setValues(san);}
+function resetBookings(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName('yoyakuhyo');
+  if(!s)s=ss.insertSheet('yoyakuhyo');
+  s.clearContents();
+  s.getRange(1,1,1,20).setValues([['date','time','kubun','name','cardId','route','visitCount','elapsed','symptom','option','menu','shochi','shochiMemo','bussan','pay','payAmount','kubunList','reBook','cancelReason','bui']]);}
+function handleMuraoGet(e){
+  var props=PropertiesService.getScriptProperties();
+  var parts=parseInt(props.getProperty('murao_parts')||'0');
+  if(parts===0){
+    var raw=props.getProperty('murao_all');
+    if(!raw)return{status:'ok',data:{}};
+    return{status:'ok',data:JSON.parse(raw)};}
+  var combined='';
+  for(var i=0;i<parts;i++)combined+=(props.getProperty('murao_all_'+i)||'');
+  if(!combined)return{status:'ok',data:{}};
+  return{status:'ok',data:JSON.parse(combined)};}
+function handleMuraoPost(payload){
+  var props=PropertiesService.getScriptProperties();
+  var val=(typeof payload==='string')?payload:JSON.stringify(payload);
+  var MAX=8000;
+  if(val.length<=MAX){
+    props.setProperty('murao_all_0',val);
+    props.setProperty('murao_parts','1');
+  }else{
+    var parts=Math.ceil(val.length/MAX);
+    for(var i=0;i<parts;i++){
+      props.setProperty('murao_all_'+i,val.slice(i*MAX,(i+1)*MAX));}
+    props.setProperty('murao_parts',String(parts));}
+  return{status:'ok'};}`;
+
+document.getElementById('gasCode').textContent = GAS_CODE;
+
+function copyCode(){
+  navigator.clipboard.writeText(GAS_CODE).then(()=>{
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✅ コピー完了';
+    btn.classList.add('done');
+    setTimeout(()=>{ btn.textContent='📋 コピー'; btn.classList.remove('done'); }, 3000);
+  }).catch(()=>{
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = GAS_CODE;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✅ コピー完了';
+    btn.classList.add('done');
+    setTimeout(()=>{ btn.textContent='📋 コピー'; btn.classList.remove('done'); }, 3000);
+  });
+}
+
+async function checkGas(){
+  const box = document.getElementById('statusBox');
+  box.className = 'status-box';
+  box.style.display = 'block';
+  box.textContent = '🔍 確認中…';
+  try{
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
+    const res = await fetch(GAS_URL + '?action=loadMurao&t=' + Date.now());
+    const json = await res.json();
+    if(json.status === 'ok'){
+      box.className = 'status-box ok';
+      box.textContent = '✅ GAS接続OK！同期ボタンが使えるようになりました。';
+    } else {
+      box.className = 'status-box ng';
+      box.textContent = '⚠️ GAS応答あり（旧バージョン）。再デプロイを確認してください。';
+    }
+  }catch(e){
+    box.className = 'status-box ng';
+    box.textContent = '❌ 通信エラー：' + e.message + '　→ デプロイが完了しているか確認してください。';
+  }
+}
+</script>
+</body>
+</html>
