@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="給与管理">
+<meta name="theme-color" content="#2d2926">
+<link rel="manifest" href="murao_manifest.json">
+
+<!-- Apple Touch Icon (SVGベース → PNG代替としてData URI) -->
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAABmJLR0QA/wD/AP+gvaeTAAADUElEQVR4nO3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBuAABHgAAAABJRU5ErkJggg==">
+
+<title>給与管理 – 村尾さん｜倉治整骨院</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --border: #e8e4df;
+    --accent: #c17b3a;
+    --accent-light: #f5ede2;
+    --text: #2d2926;
+    --muted: #8a7f75;
+    --green: #3a7c5c;
+    --red: #b84040;
+    --red-light: #fceaea;
+    --night: #5b4fcf;
+    --night-light: #eeecfb;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: max(16px, calc(var(--safe-top) + 12px)) 16px max(16px, calc(var(--safe-bottom) + 12px));
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--text); color: #fff; border-radius: 16px;
+    padding: 18px 20px; margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  .header-left h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: .03em; }
+  .header-left p { font-size: .78rem; color: #c8b9a6; margin-top: 2px; }
+  .badge { background: var(--accent); color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+
+  /* ── CARD ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+  .card-title {
+    font-size: .75rem; font-weight: 700; color: var(--muted);
+    letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .card-title::before { content: ''; width: 3px; height: 14px; background: var(--accent); border-radius: 2px; display: inline-block; }
+
+  /* ── SETTINGS ── */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field label { font-size: .75rem; color: var(--muted); margin-bottom: 4px; display: block; }
+  .field input, .field select {
+    width: 100%; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; font-family: inherit; font-size: .9rem;
+    background: var(--bg); color: var(--text); outline: none;
+    transition: border-color .15s; -webkit-appearance: none; appearance: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); background: #fff; }
+  .field.full { grid-column: 1 / -1; }
+
+  .rate-info {
+    grid-column: 1 / -1; background: var(--night-light); border: 1px solid var(--night);
+    border-radius: 10px; padding: 10px 14px; font-size: .8rem; color: var(--night);
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .rate-info span { font-weight: 700; }
+
+  /* ── MONTH NAV ── */
+  .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .month-nav button {
+    background: none; border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 18px; cursor: pointer; font-size: .88rem; color: var(--text);
+    transition: background .15s; font-family: inherit; min-width: 72px;
+  }
+  .month-nav button:active { background: var(--accent-light); }
+  .month-label { font-size: 1rem; font-weight: 700; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; min-width: 400px; }
+  th {
+    text-align: center; font-size: .7rem; font-weight: 700; color: var(--muted);
+    letter-spacing: .04em; padding: 8px 4px; border-bottom: 2px solid var(--border); background: var(--bg);
+  }
+  td { text-align: center; padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  td.date-cell { font-family: 'DM Mono', monospace; font-size: .8rem; color: var(--muted); }
+  td.day-cell { font-size: .75rem; font-weight: 600; }
+  .day-sun { color: #c0392b; } .day-sat { color: #2980b9; }
+
+  td select.time-sel {
+    width: 76px; border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 4px; font-family: 'DM Mono', monospace; font-size: .82rem;
+    background: var(--bg); color: var(--text); outline: none; cursor: pointer;
+    -webkit-appearance: none; appearance: none; text-align: center;
+  }
+  td select.time-sel:focus { border-color: var(--accent); background: #fff; }
+  td input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+
+  .hours-calc { font-family: 'DM Mono', monospace; font-size: .82rem; color: var(--accent); font-weight: 500; }
+  .day-pay { font-family: 'DM Mono', monospace; font-size: .82rem; color: var(--text); }
+  .has-night .day-pay { color: var(--night); font-weight: 700; }
+
+  /* ── TOTALS ── */
+  .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .total-box { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px; text-align: center; }
+  .total-box .t-label { font-size: .68rem; color: var(--muted); margin-bottom: 4px; }
+  .total-box .t-value { font-family: 'DM Mono', monospace; font-size: 1.05rem; font-weight: 700; color: var(--text); }
+  .total-box.highlight { background: var(--accent-light); border-color: var(--accent); }
+  .total-box.highlight .t-value { color: var(--accent); font-size: 1.2rem; }
+
+  /* ── NOTE ── */
+  .note-area {
+    width: 100%; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; font-family: inherit; font-size: .88rem;
+    background: var(--bg); resize: vertical; min-height: 64px; outline: none; color: var(--text);
+  }
+  .note-area:focus { border-color: var(--accent); }
+
+  /* ── HISTORY ── */
+  .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+  .hist-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; cursor: pointer; transition: background .15s;
+  }
+  .hist-item:active { background: var(--accent-light); }
+  .hist-month { font-size: .88rem; font-weight: 700; }
+  .hist-meta { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+  .hist-pay { font-family: 'DM Mono', monospace; font-size: .95rem; font-weight: 700; color: var(--accent); }
+  .hist-del { background: none; border: none; color: var(--red); font-size: .9rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .hist-del:active { background: var(--red-light); }
+  .empty-msg { text-align: center; color: var(--muted); font-size: .85rem; padding: 24px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; border: none;
+    border-radius: 12px; padding: 12px 20px; font-family: inherit;
+    font-size: .9rem; font-weight: 700; cursor: pointer;
+    transition: opacity .15s, transform .1s; min-height: 44px;
+  }
+  .btn:active { transform: scale(.97); opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+  /* ── PWA インストール案内 ── */
+  .install-banner {
+    background: linear-gradient(135deg, #2d2926, #4a3f38);
+    color: #fff; border-radius: 16px; padding: 16px 18px; margin-bottom: 14px;
+    display: none;
+  }
+  .install-banner.show { display: block; }
+  .install-banner h3 { font-size: .9rem; font-weight: 700; margin-bottom: 6px; }
+  .install-banner p { font-size: .78rem; color: #c8b9a6; line-height: 1.6; }
+  .install-steps { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .install-step { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: #e8d8c4; }
+  .step-num { background: var(--accent); color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; flex-shrink: 0; }
+  .install-close { float: right; background: none; border: none; color: #c8b9a6; font-size: 1.1rem; cursor: pointer; padding: 0; }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: #fff; padding: 0; }
+    .no-print { display: none !important; }
+    .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
+  }
+
+  /* ── TABLET / PC ── */
+  @media (min-width: 768px) {
+    body { max-width: 720px; margin: 0 auto; padding: 24px 20px; }
+    .settings-grid { grid-template-columns: repeat(4, 1fr); }
+    .rate-info { grid-column: 1 / -1; }
+    table { min-width: 100%; }
+    td select.time-sel { width: 86px; }
+  }
+  @media (min-width: 1024px) {
+    body { max-width: 880px; }
+    .totals-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .totals-grid { grid-template-columns: 1fr 1fr; }
+    .total-box.highlight { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- PWAインストール案内（iOSのみ表示） -->
+<div class="install-banner no-print" id="installBanner">
+  <button class="install-close" onclick="document.getElementById('installBanner').classList.remove('show'); localStorage.setItem('installDismissed','1')">✕</button>
+  <h3>📱 ホーム画面に追加できます</h3>
+  <p>Safari でこのページを開いて以下の手順で追加すると、アプリとして使えます。</p>
+  <div class="install-steps">
+    <div class="install-step"><span class="step-num">1</span>画面下の「共有」ボタン（□↑）をタップ</div>
+    <div class="install-step"><span class="step-num">2</span>「ホーム画面に追加」をタップ</div>
+    <div class="install-step"><span class="step-num">3</span>「追加」をタップして完了！</div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <h1>💴 給与管理表</h1>
+    <p>倉治整骨院 ／ スタッフ管理</p>
+  </div>
+  <div class="header-right">
+    <span class="badge">村尾 さん</span>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div class="card no-print">
+  <div class="card-title">基本設定</div>
+  <div class="settings-grid">
+    <div class="field">
+      <label>スタッフ名</label>
+      <input type="text" id="staffName" value="村尾" placeholder="氏名">
+    </div>
+    <div class="field">
+      <label>交通費（円/日）</label>
+      <input type="number" id="transport" value="0" min="0" step="10" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>通常時給（〜18:00）</label>
+      <input type="number" id="hourlyRate" value="1180" min="0" step="10" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>深夜時給（18〜20時）</label>
+      <input type="number" id="hourlyRateNight" value="1210" min="0" step="10" inputmode="numeric">
+    </div>
+    <div class="rate-info">
+      ⏰ <span>〜18:00</span>&nbsp;¥<span id="dispRate">1,180</span>／h　
+      🌙 <span>18〜20時</span>&nbsp;¥<span id="dispNight">1,210</span>／h
+    </div>
+  </div>
+</div>
+
+<!-- 月選択 -->
+<div class="card">
+  <div class="month-nav no-print">
+    <button onclick="changeMonth(-1)">◀ 前月</button>
+    <span class="month-label" id="monthLabel"></span>
+    <button onclick="changeMonth(1)">翌月 ▶</button>
+  </div>
+  <div class="card-title" style="margin-top:4px">勤怠入力</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>日付</th><th>曜</th><th>出勤</th><th>開始</th><th>終了</th><th>時間</th><th>日当</th>
+        </tr>
+      </thead>
+      <tbody id="attendanceBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 合計 -->
+<div class="card">
+  <div class="card-title">月次集計</div>
+  <div class="totals-grid">
+    <div class="total-box">
+      <div class="t-label">出勤日数</div>
+      <div class="t-value" id="totalDays">0 日</div>
+    </div>
+    <div class="total-box">
+      <div class="t-label">総勤務時間</div>
+      <div class="t-value" id="totalHours">0.0 h</div>
+    </div>
+    <div class="total-box highlight">
+      <div class="t-label">支給総額</div>
+      <div class="t-value" id="totalPay">¥0</div>
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <div class="field">
+      <label>備考・メモ</label>
+      <textarea class="note-area" id="noteArea" placeholder="特記事項があれば入力…"></textarea>
+    </div>
+  </div>
+  <div class="btn-row no-print">
+    <button class="btn btn-primary" onclick="saveMonth()">💾 この月を保存</button>
+    <button class="btn btn-green" onclick="window.print()">🖨 印刷</button>
+  </div>
+</div>
+
+<!-- 履歴 -->
+<div class="card no-print">
+  <div class="card-title">支払い履歴</div>
+  <div class="history-list" id="historyList"></div>
+</div>
+
+<script>
+const DAYS = ['日','月','火','水','木','金','土'];
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+
+function getKey(y,m){ return `murao_salary_${y}_${m}`; }
+function getSettingsKey(){ return 'murao_settings'; }
+
+// ── 30分単位セレクト生成 ──
+function buildTimeOptions(sel){
+  let h = '<option value="">--</option>';
+  for(let hh=6;hh<=22;hh++){
+    for(let mm=0;mm<60;mm+=30){
+      const v = hh + mm/60;
+      const lbl = `${String(hh).padStart(2,'0')}:${mm===0?'00':'30'}`;
+      h += `<option value="${v}"${Math.abs(v-parseFloat(sel))<0.01?' selected':''}>${lbl}</option>`;
+    }
+  }
+  return h;
+}
+
+function loadSettings(){
+  const s = JSON.parse(localStorage.getItem(getSettingsKey())||'{}');
+  if(s.staffName) document.getElementById('staffName').value = s.staffName;
+  if(s.hourlyRate) document.getElementById('hourlyRate').value = s.hourlyRate;
+  if(s.hourlyRateNight) document.getElementById('hourlyRateNight').value = s.hourlyRateNight;
+  if(s.transport!==undefined) document.getElementById('transport').value = s.transport;
+  updateRateDisplay();
+}
+function saveSettings(){
+  localStorage.setItem(getSettingsKey(), JSON.stringify({
+    staffName: document.getElementById('staffName').value,
+    hourlyRate: +document.getElementById('hourlyRate').value,
+    hourlyRateNight: +document.getElementById('hourlyRateNight').value,
+    transport: +document.getElementById('transport').value,
+  }));
+  updateRateDisplay();
+}
+function updateRateDisplay(){
+  document.getElementById('dispRate').textContent = (+document.getElementById('hourlyRate').value||0).toLocaleString();
+  document.getElementById('dispNight').textContent = (+document.getElementById('hourlyRateNight').value||0).toLocaleString();
+}
+['staffName','hourlyRate','hourlyRateNight','transport'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',()=>{ saveSettings(); recalc(); });
+});
+
+function getDaysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
+
+function buildTable(y,m){
+  document.getElementById('monthLabel').textContent = `${y}年 ${m+1}月`;
+  const saved = JSON.parse(localStorage.getItem(getKey(y,m))||'{}');
+  const tbody = document.getElementById('attendanceBody');
+  tbody.innerHTML = '';
+  const total = getDaysInMonth(y,m);
+  for(let d=1;d<=total;d++){
+    const dow = new Date(y,m,d).getDay();
+    const rec = saved[`d${d}`]||{};
+    const dayClass = dow===0?'day-sun':dow===6?'day-sat':'';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="date-cell">${m+1}/${d}</td>
+      <td class="day-cell ${dayClass}">${DAYS[dow]}</td>
+      <td><input type="checkbox" data-d="${d}" class="chk"${rec.work?' checked':''}></td>
+      <td><select data-d="${d}" class="time-sel start">${buildTimeOptions(rec.start??'')}</select></td>
+      <td><select data-d="${d}" class="time-sel end">${buildTimeOptions(rec.end??'')}</select></td>
+      <td class="hours-calc" id="h${d}">-</td>
+      <td class="day-pay" id="p${d}">-</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('noteArea').value = saved._note||'';
+  tbody.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',()=>{ autoSaveDay(); recalc(); }));
+  recalc();
+}
+
+function calcPay(s,e){
+  const rate=+document.getElementById('hourlyRate').value||0;
+  const nRate=+document.getElementById('hourlyRateNight').value||0;
+  let pay=0, cur=s;
+  while(cur<e){
+    const next=Math.min(cur+0.5,e);
+    const seg=next-cur;
+    const mid=(cur+next)/2;
+    pay+=seg*(mid>=18&&mid<20?nRate:rate);
+    cur=next;
+  }
+  return Math.round(pay);
+}
+
+function recalc(){
+  const total=getDaysInMonth(currentYear,currentMonth);
+  let sumDays=0,sumHours=0,sumPay=0;
+  for(let d=1;d<=total;d++){
+    const chk=document.querySelector(`.chk[data-d="${d}"]`);
+    const sEl=document.querySelector(`.start[data-d="${d}"]`);
+    const eEl=document.querySelector(`.end[data-d="${d}"]`);
+    const hEl=document.getElementById(`h${d}`);
+    const pEl=document.getElementById(`p${d}`);
+    const tr=chk?.closest('tr');
+    if(!chk||!chk.checked){ hEl.textContent='-'; pEl.textContent='-'; tr?.classList.remove('has-night'); continue; }
+    sumDays++;
+    const s=parseFloat(sEl.value), e=parseFloat(eEl.value);
+    if(!isNaN(s)&&!isNaN(e)&&e>s){
+      const hours=e-s;
+      const pay=calcPay(s,e)+(+document.getElementById('transport').value||0);
+      hEl.textContent=hours.toFixed(1);
+      pEl.textContent='¥'+pay.toLocaleString();
+      sumHours+=hours; sumPay+=pay;
+      if(e>18) tr?.classList.add('has-night'); else tr?.classList.remove('has-night');
+    } else {
+      hEl.textContent=sEl.value&&eEl.value?'?':'-'; pEl.textContent='-';
+      tr?.classList.remove('has-night');
+    }
+  }
+  document.getElementById('totalDays').textContent=`${sumDays} 日`;
+  document.getElementById('totalHours').textContent=`${sumHours.toFixed(1)} h`;
+  document.getElementById('totalPay').textContent='¥'+sumPay.toLocaleString();
+}
+
+function collectData(){
+  const total=getDaysInMonth(currentYear,currentMonth);
+  const data={_note:document.getElementById('noteArea').value};
+  for(let d=1;d<=total;d++){
+    const chk=document.querySelector(`.chk[data-d="${d}"]`);
+    const s=document.querySelector(`.start[data-d="${d}"]`);
+    const e=document.querySelector(`.end[data-d="${d}"]`);
+    data[`d${d}`]={work:chk?.checked||false,start:s?.value||'',end:e?.value||''};
+  }
+  return data;
+}
+function autoSaveDay(){ localStorage.setItem(getKey(currentYear,currentMonth),JSON.stringify(collectData())); }
+function saveMonth(){ autoSaveDay(); renderHistory(); showToast('💾 保存しました！'); }
+function changeMonth(delta){
+  autoSaveDay();
+  currentMonth+=delta;
+  if(currentMonth<0){ currentMonth=11; currentYear--; }
+  if(currentMonth>11){ currentMonth=0; currentYear++; }
+  buildTable(currentYear,currentMonth);
+}
+
+function calcPayFromSettings(s,e,settings){
+  const rate=settings.hourlyRate||1180, nRate=settings.hourlyRateNight||1210;
+  let pay=0,cur=s;
+  while(cur<e){ const next=Math.min(cur+0.5,e),seg=next-cur,mid=(cur+next)/2; pay+=seg*(mid>=18&&mid<20?nRate:rate); cur=next; }
+  return Math.round(pay);
+}
+
+function renderHistory(){
+  const list=document.getElementById('historyList');
+  const keys=Object.keys(localStorage).filter(k=>k.startsWith('murao_salary_')&&!k.includes('settings'));
+  keys.sort().reverse();
+  if(keys.length===0){ list.innerHTML='<div class="empty-msg">まだ保存されたデータがありません</div>'; return; }
+  const settings=JSON.parse(localStorage.getItem(getSettingsKey())||'{}');
+  list.innerHTML='';
+  keys.forEach(k=>{
+    const parts=k.split('_'); const y=+parts[parts.length-2],m=+parts[parts.length-1];
+    const data=JSON.parse(localStorage.getItem(k)||'{}');
+    const tr=settings.transport||0;
+    let days=0,hours=0,pay=0;
+    Object.keys(data).filter(k2=>k2.startsWith('d')).forEach(k2=>{
+      const r=data[k2];
+      if(r.work){ days++; const s=parseFloat(r.start),e=parseFloat(r.end); if(!isNaN(s)&&!isNaN(e)&&e>s){ hours+=e-s; pay+=calcPayFromSettings(s,e,settings)+tr; } }
+    });
+    const div=document.createElement('div');
+    div.className='hist-item';
+    div.innerHTML=`
+      <div onclick="loadMonth(${y},${m})">
+        <div class="hist-month">${y}年 ${m+1}月</div>
+        <div class="hist-meta">${days}日出勤 / ${hours.toFixed(1)}h</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="hist-pay">¥${pay.toLocaleString()}</span>
+        <button class="hist-del" onclick="deleteMonth(event,'${k}')">✕</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+function loadMonth(y,m){ autoSaveDay(); currentYear=y; currentMonth=m; buildTable(y,m); window.scrollTo({top:0,behavior:'smooth'}); }
+function deleteMonth(e,key){ e.stopPropagation(); if(!confirm('このデータを削除しますか？'))return; localStorage.removeItem(key); renderHistory(); }
+
+function showToast(msg){
+  const t=document.createElement('div');
+  t.textContent=msg;
+  Object.assign(t.style,{
+    position:'fixed',bottom:'calc(24px + env(safe-area-inset-bottom, 0px))',left:'50%',transform:'translateX(-50%)',
+    background:'#2d2926',color:'#fff',padding:'10px 20px',borderRadius:'24px',
+    fontSize:'.88rem',zIndex:9999,opacity:'0',transition:'opacity .2s',whiteSpace:'nowrap'
+  });
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>{ t.style.opacity='1'; });
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),300); },2000);
+}
+
+// ── PWA: iOS判定してインストール案内表示 ──
+function checkInstallBanner(){
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone === true;
+  const dismissed = localStorage.getItem('installDismissed');
+  if(isIOS && !isStandalone && !dismissed){
+    document.getElementById('installBanner').classList.add('show');
+  }
+}
+
+// ── Service Worker登録 ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('murao_sw.js').catch(()=>{});
+  });
+}
+
+document.getElementById('noteArea').addEventListener('input', autoSaveDay);
+loadSettings();
+buildTable(currentYear, currentMonth);
+renderHistory();
+checkInstallBanner();
+</script>
+</body>
+</html>

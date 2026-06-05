@@ -1,0 +1,17 @@
+{
+  "name": "村尾さん給与管理｜倉治整骨院",
+  "short_name": "給与管理",
+  "description": "村尾さんの給与管理アプリ",
+  "start_url": "/kuraji/murao_salary.html",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#2d2926",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%232d2926'/><text x='96' y='130' font-size='100' text-anchor='middle'>💴</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
