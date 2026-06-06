@@ -4439,7 +4439,14 @@ async function savePEdit(){
     line_memo:document.getElementById('pe-line-memo')?.value||'',
   };
   // lineUidはすでに上で設定済みのため detail側は不要
-  save();renderPatients();closePEdit();await pushP();
+  save();
+  renderPatients();
+  // 保存完了を画面に表示
+  const savedName=p.name||'';
+  const savedUid=p.lineUid||'';
+  closePEdit();
+  if(savedUid) alert('✅ 保存しました\n'+savedName+'\nLINEユーザーID: '+savedUid.slice(0,15)+'...');
+  await pushP();
 }
 async function deletePatientFromModal(){
   if(!confirm('この患者を削除しますか？'))return;
