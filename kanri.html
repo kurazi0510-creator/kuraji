@@ -144,7 +144,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 .hist-item:last-child{border-bottom:none;}
 .hist-date{font-weight:700;color:var(--primary);font-size:0.8rem;}
 .hist-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
-.pedit-modal{background:white;border-radius:12px;padding:18px;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.pedit-modal{background:white;border-radius:12px;padding:0;width:100%;max-width:540px;max-height:92vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);display:flex;flex-direction:column;}
+.pedit-modal-body{flex:1;overflow-y:auto;padding:18px;min-height:0;}
 /* ===== モバイル最適化 ===== */
 @media(max-width:480px){
   .tbl{font-size:0.65rem;}
@@ -160,7 +161,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
   .sbox{padding:7px 4px;}
   .modal{padding:12px;max-height:96vh;}
   .modal-wide{padding:12px;max-height:96vh;}
-  .pedit-modal{padding:12px;max-height:96vh;}
+  .pedit-modal{max-height:96vh;}.pedit-modal-body{padding:12px;}
   .kubun-grid{grid-template-columns:1fr 1fr;}
   .kubun-btn{padding:8px 4px;font-size:0.72rem;}
   .bui-tabs{gap:3px;}
@@ -1278,6 +1279,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <!-- 患者編集モーダル -->
 <div class="modal-ov" id="peditModal">
   <div class="pedit-modal">
+  <div class="pedit-modal-body">
     <div class="mtitle">患者情報を編集</div>
     <!-- タブ -->
     <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid #e2e8f0;padding-bottom:0">
@@ -1661,9 +1663,9 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       </div>
     </div><!-- /pe-pane-line -->
 
-  </div>
+  </div><!-- /pedit-modal-body -->
   <!-- 保存ボタンを常に画面下部に固定表示 -->
-  <div style="position:sticky;bottom:0;background:white;padding:10px 20px;border-top:1px solid #e2e8f0;display:flex;gap:6px;justify-content:flex-end;z-index:10">
+  <div style="background:white;padding:10px 20px;border-top:1px solid #e2e8f0;display:flex;gap:6px;justify-content:flex-end;flex-shrink:0">
     <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
     <button class="btn bc" onclick="closePEdit()">キャンセル</button>
     <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
