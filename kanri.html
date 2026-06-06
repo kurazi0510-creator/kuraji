@@ -1331,6 +1331,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="fg"><label>症状</label><input class="inp" id="pe-sym"></div>
       <div class="fg" style="grid-column:1/-1"><label>備考</label><input class="inp" id="pe-note"></div>
     </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
+      <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
+      <button class="btn bc" onclick="closePEdit()">キャンセル</button>
+      <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
+    </div>
     </div><!-- /pe-pane-basic -->
 
     <!-- 家族構成タブ -->
@@ -1420,6 +1425,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         </div>
 
       </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
+      <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
+      <button class="btn bc" onclick="closePEdit()">キャンセル</button>
+      <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
+    </div>
     </div><!-- /pe-pane-family -->
 
     <!-- 生活習慣タブ -->
@@ -1520,6 +1530,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <textarea class="inp" id="pe-life-memo" placeholder="その他気になる生活習慣など" style="height:60px;resize:none"></textarea>
         </div>
       </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
+      <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
+      <button class="btn bc" onclick="closePEdit()">キャンセル</button>
+      <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
+    </div>
     </div><!-- /pe-pane-life -->
 
     <!-- 既往歴・医療タブ -->
@@ -1586,6 +1601,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <textarea class="inp" id="pe-med-memo" placeholder="治療上知っておくべき情報など" style="height:60px;resize:none"></textarea>
         </div>
       </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
+      <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
+      <button class="btn bc" onclick="closePEdit()">キャンセル</button>
+      <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
+    </div>
     </div><!-- /pe-pane-med -->
 
     <!-- LINE設定タブ -->
@@ -1661,15 +1681,14 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           <div id="pe-coupon-status" style="font-size:0.78rem;margin-top:6px;padding:6px 8px;border-radius:6px;display:none"></div>
         </div>
       </div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
+      <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
+      <button class="btn bc" onclick="closePEdit()">キャンセル</button>
+      <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
+    </div>
     </div><!-- /pe-pane-line -->
 
   </div><!-- /pedit-modal-body -->
-  <!-- 保存ボタンを常に画面下部に固定表示 -->
-  <div style="background:white;padding:10px 20px;border-top:1px solid #e2e8f0;display:flex;gap:6px;justify-content:flex-end;flex-shrink:0">
-    <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
-    <button class="btn bc" onclick="closePEdit()">キャンセル</button>
-    <button class="btn bp" onclick="savePEdit()" style="min-width:100px">💾 保存</button>
-  </div>
 </div>
 
 <!-- 売上編集モーダル -->
