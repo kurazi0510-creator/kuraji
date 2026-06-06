@@ -4285,6 +4285,7 @@ function openPEdit(id){
   document.getElementById('pe-tel').value=p.tel||'';
   document.getElementById('pe-line').value=p.line||'あり';
   const luid=document.getElementById('pe-line-uid');if(luid)luid.value=p.lineUid||'';
+  const luid2=document.getElementById('pe-line-uid2');if(luid2)luid2.value=p.lineUid||'';
   setFamilyData(p.familyData||{});
   setAlertSend(p.alertSend!==false);// デフォルトtrue=送る
   // 回数券情報
@@ -4380,7 +4381,10 @@ async function savePEdit(){
   p.dob=document.getElementById('pe-dob').value;
   p.tel=normTel(document.getElementById('pe-tel').value.trim());
   p.line=document.getElementById('pe-line').value;
-  p.lineUid=document.getElementById('pe-line-uid')?.value.trim()||'';
+  // LINEユーザーID: LINE設定タブ(uid2)優先、なければ基本情報タブ(uid)
+  const _uid1=document.getElementById('pe-line-uid')?.value.trim()||'';
+  const _uid2=document.getElementById('pe-line-uid2')?.value.trim()||'';
+  p.lineUid=_uid2||_uid1||p.lineUid||'';
   p.city=document.getElementById('pe-city').value.trim();
   p.job=document.getElementById('pe-job').value.trim();
   p.src=document.getElementById('pe-src').value;
@@ -4434,7 +4438,7 @@ async function savePEdit(){
     notifyReminder:document.getElementById('pe-notify-reminder')?.checked!==false,
     line_memo:document.getElementById('pe-line-memo')?.value||'',
   };
-  if(p.detail.lineUid)p.lineUid=p.detail.lineUid;
+  // lineUidはすでに上で設定済みのため detail側は不要
   save();renderPatients();closePEdit();await pushP();
 }
 async function deletePatientFromModal(){
