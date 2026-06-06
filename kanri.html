@@ -232,6 +232,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="fixAllVisitCounts()" style="margin-top:16px;background:#22c55e;color:white;border-color:#22c55e">🔢 来院回数を正確に再計算</button>
       <button class="btn bp bsm" onclick="showFutureBookings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
       <button class="btn bp bsm" onclick="toggleDayMemo()" style="margin-top:16px;background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
+      <button class="btn bp bsm" onclick="showSymptomList()" style="margin-top:16px;background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
     </div>
   </div>
@@ -898,6 +899,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div class="mtitle" id="mtitle" style="margin-bottom:0">予約入力</div>
       <button class="btn be bsm" id="hist-btn" onclick="openHistModal()" style="display:none">📋 過去履歴</button>
+      <button class="btn bsm" id="pedit-btn" onclick="openPEditFromModal()" style="display:none;background:#7c3aed;color:white;border-color:#7c3aed">👤 患者情報</button>
     </div>
 
     <!-- 区分選択（複合対応） -->
@@ -1179,6 +1181,17 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bc" onclick="closeModal()">キャンセル</button>
       <button class="btn bp" onclick="saveBk()" id="sbtn">予約を登録</button>
     </div>
+  </div>
+</div>
+
+<!-- 症状メモ一覧モーダル -->
+<div id="symptomListModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(0,0,0,0.5);align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">
+  <div style="background:white;border-radius:16px;padding:20px;width:100%;max-width:700px;max-height:80vh;overflow-y:auto;margin:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:1rem;font-weight:bold;color:#0ea5e9">🩺 症状・メモ一覧</div>
+      <button onclick="closeSymptomList()" style="background:#f1f5f9;border:none;border-radius:8px;padding:6px 12px;cursor:pointer">✕ 閉じる</button>
+    </div>
+    <div id="symptomListBody"></div>
   </div>
 </div>
 
@@ -3003,6 +3016,7 @@ function openModal(date,slot){
   if(jikoT)jikoT.style.display='none';
   const amtEl=document.getElementById('m-pay-amount');
   if(amtEl)amtEl.disabled=false;
+  const peditBtn2=document.getElementById('pedit-btn');if(peditBtn2)peditBtn2.style.display='none';
   const payArea=document.getElementById('m-pay-btns');
   if(payArea)payArea.style.opacity='1';
   // 自費メニュープルダウンを処置マスターから動的生成
@@ -3084,7 +3098,8 @@ function editBk(date,slot){
   else document.getElementById('m-selected-info').style.display='none';
   // 過去履歴ボタン
   const histBtn=document.getElementById('hist-btn');
-  if(bk.cardId){histBtn.style.display='block';histBtn.setAttribute('data-cardid',bk.cardId);histBtn.setAttribute('data-name',bk.name||'');}
+  if(bk.cardId){histBtn.style.display='block';histBtn.setAttribute('data-cardid',bk.cardId);histBtn.setAttribute('data-name',bk.name||'');
+    const peditBtn=document.getElementById('pedit-btn');if(peditBtn)peditBtn.style.display='block';}
   else{histBtn.style.display='none';}
   switchMTab('basic');
   document.getElementById('bmodal').classList.add('on');
@@ -3149,6 +3164,14 @@ function showModalSelectedInfo(p){
 }
 
 // ===== 過去履歴モーダル =====
+function openPEditFromModal(){
+  const cardId = document.getElementById('m-id')?.value.trim();
+  const name = document.getElementById('m-nm')?.value.trim();
+  const p = patients.find(x=>(cardId&&x.id===cardId)||x.name===name);
+  if(!p){alert('患者データが見つかりません');return;}
+  closeModal();
+  openPEdit(p.id);
+}
 function openHistModal(){
   const btn=document.getElementById('hist-btn');
   const cardId=btn.getAttribute('data-cardid');
@@ -3409,6 +3432,47 @@ function onRouteChange(){
   updateNbPreview();
 }
 // 未来予約一覧を表示
+function showSymptomList(){
+  const today_str = today();
+  // 過去の予約から症状・次回メモを患者別にまとめる
+  const patientNotes={};
+  Object.entries(bookings).sort().reverse().forEach(([date,slots])=>{
+    if(date>today_str)return;
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cont||bk.cancelled)return;
+      const key=bk.cardId||bk.name;
+      if(!key)return;
+      if(!patientNotes[key]){
+        patientNotes[key]={name:bk.name,cardId:bk.cardId,entries:[]};
+      }
+      if(bk.symptom||bk.nextMemo||bk.shochiMemo){
+        patientNotes[key].entries.push({date,symptom:bk.symptom||'',nextMemo:bk.nextMemo||bk.nextNote||'',shochiMemo:bk.shochiMemo||''});
+      }
+    });
+  });
+  const modal=document.getElementById('symptomListModal');
+  if(!modal)return;
+  const body=document.getElementById('symptomListBody');
+  const rows=Object.values(patientNotes).filter(p=>p.entries.length>0);
+  if(!rows.length){body.innerHTML='<div style="color:#94a3b8;text-align:center;padding:20px">記録がありません</div>';modal.style.display='flex';return;}
+  body.innerHTML=rows.map(p=>`
+    <div style="background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid #0ea5e9">
+      <div style="font-weight:bold;font-size:0.88rem;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+        ${p.name}
+        <span style="font-size:0.72rem;color:#64748b">${p.cardId?'No.'+p.cardId:''}</span>
+        <button onclick="closeSymptomList();openPEdit('${p.cardId||p.name}')" style="margin-left:auto;background:#7c3aed;color:white;border:none;border-radius:5px;padding:2px 8px;font-size:0.7rem;cursor:pointer">👤 患者情報</button>
+      </div>
+      ${p.entries.slice(0,3).map(e=>`
+        <div style="font-size:0.78rem;margin-bottom:4px;padding:4px 8px;background:white;border-radius:6px">
+          <span style="color:#64748b">${e.date}</span>
+          ${e.symptom?'<br>🩺 症状: '+e.symptom:''}
+          ${e.nextMemo?'<br>📋 次回メモ: '+e.nextMemo:''}
+          ${e.shochiMemo?'<br>🔧 処置メモ: '+e.shochiMemo:''}
+        </div>`).join('')}
+    </div>`).join('');
+  modal.style.display='flex';
+}
+function closeSymptomList(){document.getElementById('symptomListModal').style.display='none';}
 function showFutureBookings(){
   const w=['日','月','火','水','木','金','土'];
   const td=today();
@@ -4107,7 +4171,8 @@ async function addPatient(){
 
 // タブ切替
 function addFamRow(type){
-  var container=document.getElementById('pe-fam-'+type+'s');
+  var idMap={child:'pe-fam-children',grand:'pe-fam-grands',parent:'pe-fam-parents'};
+  var container=document.getElementById(idMap[type]||('pe-fam-'+type+'s'));
   if(!container)return;
   var n=container.children.length+1;
   var lbl={child:'子',grand:'孫',parent:'親'}[type]||type;
@@ -4160,7 +4225,8 @@ function setFamilyData(data){
   if(document.getElementById('pe-fam-spouse-age'))document.getElementById('pe-fam-spouse-age').value=data.spouseAge||'';
   if(document.getElementById('pe-fam-spouse-job'))document.getElementById('pe-fam-spouse-job').value=data.spouseJob||'';
   ['child','grand','parent'].forEach(function(type){
-    const container=document.getElementById('pe-fam-'+type+'s');
+    const idMap2={child:'pe-fam-children',grand:'pe-fam-grands',parent:'pe-fam-parents'};
+    const container=document.getElementById(idMap2[type]||('pe-fam-'+type+'s'));
     if(!container)return;
     container.innerHTML='';
     (data[type+'s']||[]).forEach(function(row){
