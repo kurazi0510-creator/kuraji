@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>患者データ復元ツール</title>
+<style>
+body{font-family:'Hiragino Sans',sans-serif;background:#f1f5f9;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+.card{background:white;border-radius:16px;padding:32px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.12);text-align:center;}
+h1{font-size:1.2rem;margin:0 0 8px;color:#1e293b;}
+p{font-size:0.85rem;color:#64748b;margin:0 0 24px;}
+button{background:#2563eb;color:white;border:none;padding:14px 32px;border-radius:10px;font-size:1rem;font-weight:bold;cursor:pointer;width:100%;}
+button:disabled{background:#94a3b8;cursor:not-allowed;}
+#status{margin-top:20px;padding:14px;border-radius:10px;font-size:0.9rem;font-weight:bold;display:none;}
+.ok{background:#dcfce7;color:#166534;}
+.err{background:#fee2e2;color:#991b1b;}
+.ing{background:#dbeafe;color:#1e40af;}
+#log{margin-top:12px;font-size:0.75rem;color:#64748b;text-align:left;max-height:200px;overflow-y:auto;background:#f8fafc;padding:10px;border-radius:8px;display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔧 患者データ復元ツール</h1>
+  <p>GASスプレッドシートから患者データを取得して<br>このブラウザのlocalStorageに書き込みます</p>
+  <button id="btn" onclick="restore()">▶ 患者データを復元する</button>
+  <div id="status"></div>
+  <div id="log"></div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbytM-3C2aJtZp4sbaNDuM4-QR11qOSsvTlBwhj1wzCtppckrXIxE5rIB8ONju4O9XQgUQ/exec';
+
+function log(msg){
+  const el=document.getElementById('log');
+  el.style.display='block';
+  el.innerHTML+=msg+'<br>';
+  el.scrollTop=el.scrollHeight;
+}
+function stat(msg,cls){
+  const el=document.getElementById('status');
+  el.style.display='block';
+  el.className=cls;
+  el.textContent=msg;
+}
+
+function normTel(t){
+  if(!t)return'';
+  t=String(t).replace(/[^0-9]/g,'');
+  if(t.length>=10&&!t.startsWith('0'))t='0'+t;
+  return t;
+}
+function fmtDate(v){
+  if(!v)return'';
+  try{
+    if(v instanceof Date){
+      if(isNaN(v))return'';
+      return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+    }
+    const s=String(v).trim();
+    if(!s||s==='-')return'';
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+    const d=new Date(s);
+    if(!isNaN(d))return fmtDate(d);
+  }catch(e){}
+  return'';
+}
+
+async function restore(){
+  const btn=document.getElementById('btn');
+  btn.disabled=true;
+  stat('🔄 GASからデータ取得中...','ing');
+  log('GASに接続中...');
+
+  try{
+    const res=await fetch(GAS+'?action=getAll&t='+Date.now(),{redirect:'follow',cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const raw=await res.text();
+    log('レスポンス受信: '+raw.length+'文字');
+
+    let data;
+    try{data=JSON.parse(raw);}
+    catch(e){throw new Error('JSONパースエラー: '+raw.slice(0,100));}
+
+    if(!data.ok)throw new Error('GASエラー: '+JSON.stringify(data));
+
+    const prows=data.customers||[];
+    log('患者シート行数: '+prows.length+'行（ヘッダー含む）');
+
+    if(prows.length<=1)throw new Error('患者データが空です');
+
+    const headers=(prows[0]||[]).map(h=>String(h||'').trim());
+    log('ヘッダー: '+headers.join(', '));
+
+    const hi=k=>headers.indexOf(k);
+    const isAddress=v=>v&&(v.includes('市')||v.includes('町')||v.includes('丁')||v.includes('番')||/\d+-\d+/.test(v));
+    const validSrc=['LINE','紹介','その他','三四郎','-','電話','ネット'];
+
+    const parsed=prows.slice(1).filter(r=>r[0]!==''&&r[0]!=null).map(r=>{
+      const gv=(k,fb)=>{const i=hi(k);return String((i>-1?r[i]:r[fb])||'').trim();};
+      const gd=(k,fb)=>{const i=hi(k);return fmtDate(i>-1?r[i]:r[fb]);};
+
+      const rv_id=String(r[0]||'').trim();
+      const rv_name=String(r[1]||'').trim();
+      if(!rv_id||!rv_name)return null;
+
+      const rv_sex=gv('性別',2);
+      const rv_tel=normTel((gv('電話番号',3)||gv('電話',3)).replace(/[^0-9]/g,''));
+      const rv_kana=gv('ふりがな',2);
+      const rv_lineUid=gv('LINEユーザーID',6);
+
+      const rv_line_raw=hi('LINE')>-1?String(r[hi('LINE')]||'').trim():'';
+      const rv_line=(rv_line_raw==='あり'||rv_line_raw==='なし'||rv_line_raw==='-')?rv_line_raw:'';
+
+      const rv_city_hdr=hi('住所')>-1?String(r[hi('住所')]||'').trim():'';
+      const rv_city_r4=String(r[4]||'').trim();
+      const rv_city=isAddress(rv_city_hdr)?rv_city_hdr:isAddress(rv_city_r4)?rv_city_r4:rv_city_hdr||rv_city_r4;
+
+      const rv_job_hdr=gv('職業',5);
+      const rv_job=isAddress(rv_job_hdr)?'':rv_job_hdr;
+
+      const rv_src_hdr=gv('流入元',6);
+      const rv_src=validSrc.includes(rv_src_hdr)?rv_src_hdr:rv_src_hdr;
+
+      const rv_sym_raw=gv('症状',8);
+      const rv_sym=rv_sym_raw;
+
+      const rv_last=gd('前回通院日',9);
+      const rv_cnt_val=hi('通院回数')>-1?r[hi('通院回数')]:null;
+      const rv_cnt_num=parseInt(rv_cnt_val)||0;
+      const rv_cnt=rv_cnt_num>1900?0:rv_cnt_num;
+
+      const rv_dob_i=hi('生年月日');
+      const rv_dob_raw=rv_dob_i>-1?r[rv_dob_i]:r[11];
+      const rv_dob=(()=>{
+        if(!rv_dob_raw)return'';
+        const s=String(rv_dob_raw).trim();
+        if(!s||s.includes('NaN')||s==='-')return'';
+        if(/^\d{4}$/.test(s))return s+'-01-01';
+        if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+        return fmtDate(rv_dob_raw)||'';
+      })();
+
+      const rv_note=gv('備考',12);
+
+      return{id:rv_id,name:rv_name,kana:rv_kana,sex:rv_sex,tel:rv_tel,
+        line:rv_line,lineUid:rv_lineUid,city:rv_city,job:rv_job,src:rv_src,
+        symptom:rv_sym,last:rv_last,count:rv_cnt,dob:rv_dob,note:rv_note};
+    }).filter(Boolean);
+
+    log('パース完了: '+parsed.length+'件');
+
+    // 既存のlocalStorageと比較して多い方を採用
+    let existing=[];
+    try{existing=JSON.parse(localStorage.getItem('kj_p')||'[]');}catch(e){}
+    log('現在のlocalStorage: '+existing.length+'件 → GAS: '+parsed.length+'件');
+
+    if(parsed.length<existing.length){
+      throw new Error('GASのデータ('+parsed.length+'件)が現在のデータ('+existing.length+'件)より少ないため中断しました');
+    }
+
+    localStorage.setItem('kj_p',JSON.stringify(parsed));
+    log('✅ localStorageに'+parsed.length+'件書き込み完了');
+
+    stat('✅ 復元完了！'+parsed.length+'名の患者データを書き込みました\n5秒後に管理画面に移動します...','ok');
+
+    setTimeout(()=>{location.href='kanri.html';},5000);
+
+  }catch(e){
+    stat('❌ エラー: '+e.message,'err');
+    log('エラー詳細: '+e.message);
+    btn.disabled=false;
+  }
+}
+</script>
+</body>
+</html>
