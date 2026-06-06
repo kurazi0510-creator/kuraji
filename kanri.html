@@ -429,7 +429,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <button class="btn bp" onclick="addPatient()">＋ 登録</button>
   </div>
   <div class="card">
-    <div class="ctitle">患者一覧 <span style="font-size:0.72rem;color:var(--muted);font-weight:400" id="pcnt"></span></div>
+    <div class="ctitle">患者一覧 <span style="font-size:0.72rem;color:var(--muted);font-weight:400" id="pcnt"></span><button onclick="matchLineIdsFromGAS()" style="margin-left:8px;padding:4px 10px;background:#06C755;color:white;border:none;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer">🔗 LINE ID自動照合</button><span id="line-match-result" style="font-size:0.7rem;margin-left:6px;color:var(--muted)"></span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
       <input class="inp" id="psearch" placeholder="🔍 名前・券No・電話・住所・症状・職業・年齢・和暦・流入元で検索" oninput="renderPatients()" style="flex:1;min-width:160px">
       <select class="sel" id="psort" onchange="renderPatients()" style="width:150px">
@@ -2389,6 +2389,49 @@ function loadBui(arr){
 // ===== SCHEDULE =====
 // ===== LINE ID照合 =====
 let lineIdMap={};// LINE表示名→userId
+async function matchLineIdsFromGAS(){
+  const btn=document.querySelector('[onclick="matchLineIdsFromGAS()"]');
+  const result=document.getElementById('line-match-result');
+  if(btn){btn.textContent='🔄 照合中...';btn.disabled=true;}
+  if(result)result.textContent='';
+  try{
+    // GAS側でLINE_IDsシート×患者シートを照合してlineUid列を自動更新
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'matchLineIds'}),redirect:'follow'});
+    const d=JSON.parse(await res.text());
+    if(d.ok){
+      // 照合結果をlocalStorageにも反映（GASが患者シートを更新済み→再取得）
+      const res2=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'getAll'}),redirect:'follow'});
+      const d2=JSON.parse(await res2.text());
+      if(d2.ok&&d2.customers&&d2.customers.length>1){
+        // GASの患者シートからlineUidを患者データに反映
+        const rows=d2.customers.slice(1);
+        rows.forEach(row=>{
+          const id=String(row[0]);
+          const uid=String(row[6]||'');
+          if(!uid)return;
+          const p=patients.find(x=>String(x.id)===id);
+          if(p&&!p.lineUid){p.lineUid=uid;}
+        });
+        save();
+      }
+      const msg=`✅ 照合完了：${d.matched}件紐付け・${d.already}件登録済み`+(d.skipped>0?`・${d.skipped}件要確認`:'');
+      if(result)result.textContent=msg;
+      if(d.matched>0)renderPatients();
+      if(d.skipped>0){
+        const conflicts=d.results.filter(r=>r.status==='conflict').map(r=>`・${r.name}（LINE:${r.lineName}）`).join('\n');
+        setTimeout(()=>alert('⚠ 以下の患者は別のLINE IDが既に登録されています。手動で確認してください：\n'+conflicts),300);
+      }
+    }else{
+      if(result)result.textContent='❌ エラー：'+(d.error||'不明');
+    }
+  }catch(e){
+    if(result)result.textContent='❌ 通信エラー';
+  }finally{
+    if(btn){btn.textContent='🔗 LINE ID自動照合';btn.disabled=false;}
+  }
+}
 async function syncLineIds(){
   try{
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLineUsers'}),redirect:'follow'});
@@ -2396,9 +2439,8 @@ async function syncLineIds(){
     if(d.ok&&d.users){
       lineIdMap={};
       d.users.forEach(u=>{if(u.userId&&u.name)lineIdMap[u.name.trim()]=u.userId;});
-      console.log('LINE ID取得完了:',Object.keys(lineIdMap).length,'件');
     }
-  }catch(e){console.error('LINE ID取得エラー:',e);}
+  }catch(e){}
 }
 // 患者名からLINE IDを検索
 function getPatientLineId(patientName){
