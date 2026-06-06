@@ -2393,41 +2393,33 @@ async function matchLineIdsFromGAS(){
   const btn=document.querySelector('[onclick="matchLineIdsFromGAS()"]');
   const result=document.getElementById('line-match-result');
   if(btn){btn.textContent='🔄 照合中...';btn.disabled=true;}
-  if(result)result.textContent='';
+  if(result){result.textContent='通信中...';result.style.color='#64748b';}
   try{
-    // GAS側でLINE_IDsシート×患者シートを照合してlineUid列を自動更新
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'matchLineIds'}),redirect:'follow'});
-    const d=JSON.parse(await res.text());
+    const raw=await res.text();
+    let d;
+    try{d=JSON.parse(raw);}catch(e){
+      if(result){result.textContent='❌ JSONパースエラー: '+raw.slice(0,80);result.style.color='#dc2626';}
+      return;
+    }
     if(d.ok){
-      // 照合結果をlocalStorageにも反映（GASが患者シートを更新済み→再取得）
-      const res2=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},
-        body:JSON.stringify({action:'getAll'}),redirect:'follow'});
-      const d2=JSON.parse(await res2.text());
-      if(d2.ok&&d2.customers&&d2.customers.length>1){
-        // GASの患者シートからlineUidを患者データに反映
-        const rows=d2.customers.slice(1);
-        rows.forEach(row=>{
-          const id=String(row[0]);
-          const uid=String(row[6]||'');
-          if(!uid)return;
-          const p=patients.find(x=>String(x.id)===id);
-          if(p&&!p.lineUid){p.lineUid=uid;}
+      // GASがシートに書き込み済み → matchMapでlocalStorageに反映
+      if(d.matchMap){
+        Object.keys(d.matchMap).forEach(patId=>{
+          const p=patients.find(x=>String(x.id)===patId);
+          if(p)p.lineUid=d.matchMap[patId];
         });
         save();
       }
-      const msg=`✅ 照合完了：${d.matched}件紐付け・${d.already}件登録済み`+(d.skipped>0?`・${d.skipped}件要確認`:'');
-      if(result)result.textContent=msg;
+      const msg=`✅ ${d.matched}件紐付け完了・${d.already}件登録済み`+(d.skipped>0?`・${d.skipped}件スキップ`:'');
+      if(result){result.textContent=msg;result.style.color='#16a34a';}
       if(d.matched>0)renderPatients();
-      if(d.skipped>0){
-        const conflicts=d.results.filter(r=>r.status==='conflict').map(r=>`・${r.name}（LINE:${r.lineName}）`).join('\n');
-        setTimeout(()=>alert('⚠ 以下の患者は別のLINE IDが既に登録されています。手動で確認してください：\n'+conflicts),300);
-      }
     }else{
-      if(result)result.textContent='❌ エラー：'+(d.error||'不明');
+      if(result){result.textContent='❌ '+( d.error||'不明なエラー');result.style.color='#dc2626';}
     }
   }catch(e){
-    if(result)result.textContent='❌ 通信エラー';
+    if(result){result.textContent='❌ 通信エラー: '+e.message;result.style.color='#dc2626';}
   }finally{
     if(btn){btn.textContent='🔗 LINE ID自動照合';btn.disabled=false;}
   }
