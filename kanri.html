@@ -2558,7 +2558,10 @@ function saveLineToken(){
   localStorage.setItem('kj_line_token',token);
   document.getElementById('line-token-status').innerHTML='✅ トークンを保存しました';
 }
-function getLineToken(){return localStorage.getItem('kj_line_token')||'';}
+function getLineToken(){
+  // localStorageになければGASのトークンをデフォルトとして使用
+  return localStorage.getItem('kj_line_token2')||localStorage.getItem('kj_line_token')||'RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
+}
 async function sendLineNotify(msg){
   const token=localStorage.getItem('kj_line_token2')||getLineToken();
   const userId=localStorage.getItem('kj_line_userid')||'';
@@ -2621,8 +2624,8 @@ async function testPatientLine(){
   const uid=document.getElementById('pe-line-uid')?.value.trim();
   const name=document.getElementById('pe-nm')?.value.trim()||'患者様';
   if(!uid){alert('LINEユーザーIDを入力してください');return;}
-  const token=localStorage.getItem('kj_line_token2')||'';
-  if(!token){alert('まずマスター設定でLINEトークンを設定してください');return;}
+  // GASに保存されているトークンを使用（localStorageになくてもOK）
+  const token=localStorage.getItem('kj_line_token2')||localStorage.getItem('kj_line_token')||'RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=';
   const msg='【倉治整骨院】\n'+name+'様\nLINE連携のテスト送信です✅\n正常に届いていれば設定完了です。';
   try{
     const res=await fetch('https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec',{
