@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>全データ完全復元ツール</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Hiragino Sans',sans-serif;background:#0f172a;min-height:100vh;padding:20px;display:flex;align-items:flex-start;justify-content:center;}
+.card{background:white;border-radius:16px;padding:28px;max-width:600px;width:100%;margin-top:20px;box-shadow:0 8px 40px rgba(0,0,0,0.4);}
+h1{font-size:1.2rem;color:#1e293b;margin-bottom:6px;}
+.sub{font-size:0.82rem;color:#64748b;margin-bottom:20px;line-height:1.6;}
+.btn{display:block;width:100%;padding:16px;border:none;border-radius:10px;font-size:1rem;font-weight:bold;cursor:pointer;margin-bottom:10px;}
+.btn-red{background:#dc2626;color:white;}
+.btn-blue{background:#2563eb;color:white;}
+.btn:disabled{background:#94a3b8;color:white;cursor:not-allowed;}
+#status{padding:16px;border-radius:10px;font-size:0.9rem;font-weight:bold;margin-top:16px;display:none;line-height:1.8;}
+.ok{background:#dcfce7;color:#166534;}
+.err{background:#fee2e2;color:#991b1b;}
+.ing{background:#dbeafe;color:#1e40af;}
+#log{margin-top:12px;font-size:0.72rem;color:#374151;max-height:300px;overflow-y:auto;background:#f8fafc;padding:12px;border-radius:8px;display:none;line-height:2;}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:0.85rem;}
+.row:last-child{border-bottom:none;}
+.label{color:#64748b;}
+.val{font-weight:bold;color:#1e293b;}
+.warn{background:#fef9c3;border:1.5px solid #fde047;border-radius:8px;padding:12px;font-size:0.82rem;color:#713f12;margin-bottom:16px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🚨 全データ完全復元ツール</h1>
+  <p class="sub">スプレッドシートの変更履歴で「6月6日 8:45」を復元した後、このページでlocalStorageに反映してください。</p>
+
+  <div class="warn">
+    ⚠️ まず<strong>スプレッドシートの変更履歴</strong>で「6月6日 8:45」の版を復元してから、下のボタンを押してください。
+  </div>
+
+  <div id="current" style="margin-bottom:16px;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;">
+    <div style="font-size:0.8rem;font-weight:bold;color:#64748b;margin-bottom:8px">📱 現在のlocalStorage</div>
+    <div id="current-rows"></div>
+  </div>
+
+  <button class="btn btn-red" id="btn-main" onclick="restoreAll()">🔄 GASから全データを復元する</button>
+
+  <div id="status"></div>
+  <div id="log"></div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbytM-3C2aJtZp4sbaNDuM4-QR11qOSsvTlBwhj1wzCtppckrXIxE5rIB8ONju4O9XQgUQ/exec';
+
+function addLog(msg){
+  const el=document.getElementById('log');
+  el.style.display='block';
+  el.innerHTML+=msg+'<br>';
+  el.scrollTop=el.scrollHeight;
+}
+function setStatus(msg,cls){
+  const el=document.getElementById('status');
+  el.style.display='block';el.className=cls;el.innerHTML=msg;
+}
+
+function checkCurrent(){
+  const rows=document.getElementById('current-rows');
+  try{
+    const p=JSON.parse(localStorage.getItem('kj_p')||'[]');
+    const b=JSON.parse(localStorage.getItem('kj_b')||'{}');
+    const bDays=Object.keys(b).length;
+    rows.innerHTML=`
+      <div class="row"><span class="label">患者数</span><span class="val">${p.length}名</span></div>
+      <div class="row"><span class="label">予約データ（日数）</span><span class="val">${bDays}日分</span></div>`;
+  }catch(e){rows.innerHTML='確認エラー';}
+}
+
+function normTel(t){
+  if(!t)return'';
+  t=String(t).replace(/[^0-9]/g,'');
+  if(t.length>=10&&!t.startsWith('0'))t='0'+t;
+  return t;
+}
+function fmtDate(v){
+  if(!v)return'';
+  try{
+    const s=String(v).trim();
+    if(!s||s==='-'||s.includes('NaN'))return'';
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+    const d=new Date(s);
+    if(!isNaN(d.getTime()))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }catch(e){}
+  return'';
+}
+
+function parsePatients(rows){
+  if(!rows||rows.length<=1)return[];
+  const headers=rows[0].map(h=>String(h||'').trim());
+  addLog('患者ヘッダー: '+headers.join(' | '));
+  const hi=k=>headers.indexOf(k);
+  const isAddr=v=>v&&(String(v).includes('市')||String(v).includes('町')||String(v).includes('丁')||/\d+-\d+/.test(String(v)));
+  const validSrc=['LINE','紹介','その他','三四郎','-','電話','ネット'];
+
+  return rows.slice(1).filter(r=>r[0]!==''&&r[0]!=null&&String(r[0]).trim()!=='').map(r=>{
+    const gv=(k,fb)=>{const i=hi(k);return String((i>-1?r[i]:(fb!=null?r[fb]:'')||'')).trim();};
+    const gd=(k,fb)=>{const i=hi(k);return fmtDate(i>-1?r[i]:(fb!=null?r[fb]:''));};
+    const id=String(r[0]||'').trim();
+    const name=String(r[1]||'').trim();
+    if(!id||!name)return null;
+
+    const lineUidIdx=hi('LINEユーザーID');
+    const lineUid=lineUidIdx>-1?String(r[lineUidIdx]||'').trim():'';
+    const lineRaw=hi('LINE')>-1?String(r[hi('LINE')]||'').trim():'';
+    const line=(lineRaw==='あり'||lineRaw==='なし'||lineRaw==='-')?lineRaw:'';
+    const cityHdr=hi('住所')>-1?String(r[hi('住所')]||'').trim():'';
+    const cityR4=String(r[4]||'').trim();
+    const city=isAddr(cityHdr)?cityHdr:isAddr(cityR4)?cityR4:cityHdr||cityR4;
+    const jobRaw=gv('職業',5);
+    const job=isAddr(jobRaw)?'':jobRaw;
+    const srcRaw=gv('流入元',6);
+    const src=validSrc.includes(srcRaw)?srcRaw:srcRaw;
+    const cntI=hi('通院回数');
+    const cntNum=parseInt(cntI>-1?r[cntI]:0)||0;
+    const cnt=cntNum>1900?0:cntNum;
+    const dobI=hi('生年月日');
+    const dobRaw=dobI>-1?r[dobI]:r[11];
+    const dob=(()=>{
+      if(!dobRaw)return'';
+      const s=String(dobRaw).trim();
+      if(!s||s.includes('NaN')||s==='-')return'';
+      if(/^\d{4}$/.test(s))return s+'-01-01';
+      if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+      return fmtDate(dobRaw)||'';
+    })();
+
+    return{id,name,kana:gv('ふりがな',2),sex:gv('性別',3),
+      tel:normTel(gv('電話番号',4).replace(/[^0-9]/g,'')),
+      line,lineUid,city,job,src,symptom:gv('症状',8),
+      last:gd('前回通院日',9),count:cnt,dob,note:gv('備考',12)};
+  }).filter(Boolean);
+}
+
+function parseBookings(rows){
+  if(!rows||rows.length<=1)return{};
+  const headers=rows[0].map(h=>String(h||'').trim());
+  addLog('予約ヘッダー: '+headers.join(' | '));
+  // 予約表の構造: 日付,時刻,患者ID,患者名,種別,メモ,...
+  const bookings={};
+  rows.slice(1).forEach(r=>{
+    if(!r[0])return;
+    // 日付取得
+    let dateStr='';
+    try{
+      const d=r[0];
+      if(d instanceof Date||String(d).includes('Date')){
+        const dd=new Date(d);
+        if(!isNaN(dd))dateStr=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+      }else{
+        dateStr=fmtDate(d);
+      }
+    }catch(e){}
+    if(!dateStr)return;
+
+    const timeStr=String(r[1]||'').trim();
+    const patId=String(r[2]||'').trim();
+    const patName=String(r[3]||'').trim();
+    const kubun=String(r[4]||'').trim();
+    const memo=String(r[5]||'').trim();
+    const fee=parseInt(r[6])||0;
+    const payMethod=String(r[7]||'').trim();
+    const cancelReason=String(r[18]||'').trim();
+    const bui=(String(r[19]||'')).split(',').filter(Boolean);
+
+    if(!dateStr||!timeStr)return;
+    if(!bookings[dateStr])bookings[dateStr]={};
+    if(!bookings[dateStr][timeStr])bookings[dateStr][timeStr]=[];
+
+    bookings[dateStr][timeStr].push({
+      id:patId,name:patName,kubun,memo,fee,payMethod,
+      cancelReason,bui,
+      status:cancelReason?'cancel':'booked'
+    });
+  });
+  return bookings;
+}
+
+async function fetchFromGAS(action){
+  const res=await fetch(GAS,{
+    method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action}),redirect:'follow'
+  });
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const raw=await res.text();
+  addLog(action+'レスポンス: '+raw.length+'文字');
+  let d;
+  try{d=JSON.parse(raw);}catch(e){throw new Error('JSONパースエラー: '+raw.slice(0,100));}
+  if(!d.ok)throw new Error(d.error||action+'エラー');
+  return d;
+}
+
+async function restoreAll(){
+  const btn=document.getElementById('btn-main');
+  btn.disabled=true;
+  document.getElementById('log').innerHTML='';
+  setStatus('🔄 GASからデータ取得中...','ing');
+
+  try{
+    // 患者データ取得
+    addLog('--- 患者データ取得 ---');
+    const pd=await fetchFromGAS('getRawPatients');
+    const patients=parsePatients(pd.rows);
+    addLog('✅ 患者: '+patients.length+'件パース完了');
+
+    // 予約データ取得
+    addLog('--- 予約データ取得 ---');
+    const bd=await fetchFromGAS('getRawBookings');
+    const bookings=parseBookings(bd.rows);
+    const bDays=Object.keys(bookings).length;
+    addLog('✅ 予約: '+bDays+'日分パース完了');
+
+    if(patients.length===0)throw new Error('患者データが0件です。スプレッドシートの変更履歴で8:45版を復元してから再実行してください。');
+
+    // 既存データとマージ（detailフィールド等を保持）
+    let existing=[];
+    try{existing=JSON.parse(localStorage.getItem('kj_p')||'[]');}catch(e){}
+    const merged=patients.map(np=>{
+      const old=existing.find(ep=>String(ep.id)===String(np.id));
+      return old?Object.assign({},old,np):np;
+    });
+    const gasIds=new Set(patients.map(p=>String(p.id)));
+    const onlyLocal=existing.filter(p=>!gasIds.has(String(p.id)));
+    const final=[...merged,...onlyLocal];
+
+    // localStorageに書き込み
+    localStorage.setItem('kj_p',JSON.stringify(final));
+    addLog('✅ 患者localStorage書き込み: '+final.length+'件');
+
+    if(bDays>0){
+      // 既存予約とマージ
+      let existingB={};
+      try{existingB=JSON.parse(localStorage.getItem('kj_b')||'{}');}catch(e){}
+      const mergedB=Object.assign({},existingB,bookings);
+      localStorage.setItem('kj_b',JSON.stringify(mergedB));
+      localStorage.setItem('kj_b_bak',JSON.stringify(mergedB));
+      addLog('✅ 予約localStorage書き込み: '+Object.keys(mergedB).length+'日分');
+    }
+
+    setStatus(
+      '✅ 復元完了！<br>'+
+      '👤 患者: <strong>'+final.length+'名</strong><br>'+
+      '📅 予約: <strong>'+bDays+'日分</strong><br><br>'+
+      '3秒後に管理画面へ移動します...',
+      'ok'
+    );
+    checkCurrent();
+    setTimeout(()=>{location.href='kanri.html';},3000);
+
+  }catch(e){
+    setStatus('❌ エラー: '+e.message,'err');
+    addLog('エラー: '+e.message);
+    btn.disabled=false;
+  }
+}
+
+checkCurrent();
+</script>
+</body>
+</html>
