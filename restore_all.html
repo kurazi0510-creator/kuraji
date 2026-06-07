@@ -124,35 +124,72 @@ function parsePatients(rows){
 function parseBookings(rows){
   if(!rows||rows.length<=1){addLog('⚠ 予約データなし');return{};}
   const h=rows[0].map(x=>String(x||'').trim());
-  addLog('予約ヘッダー('+h.length+'列): '+h.slice(0,8).join('|'));
+  addLog('予約ヘッダー('+h.length+'列): '+h.slice(0,10).join('|'));
   const hi=k=>h.indexOf(k);
+  // kanri.htmlのpushBの列構造に完全対応
+  // [0]日付,[1]時間,[2]区分,[3]患者名,[4]診察券No,[5]予約ルート,[6]来院回数,[7]経過日数
+  // [8]症状,[9]オプション,[10]自費メニュー,[11]処置JSON,[12]処置メモ,[13]物販JSON
+  // [14]支払方法,[15]支払金額,[16]区分リスト,[17]再予約情報,[18]キャンセル理由,[19]施術部位
   const di=hi('日付')>-1?hi('日付'):0;
-  const ti=hi('時刻')>-1?hi('時刻'):(hi('時間')>-1?hi('時間'):1);
-  const ii=hi('診察券No')>-1?hi('診察券No'):2;
+  const ti=hi('時間')>-1?hi('時間'):(hi('時刻')>-1?hi('時刻'):1);
+  const ki=hi('区分')>-1?hi('区分'):2;
   const ni=hi('患者名')>-1?hi('患者名'):3;
-  const ki=hi('区分')>-1?hi('区分'):4;
-  const mi=hi('メモ')>-1?hi('メモ'):(hi('備考')>-1?hi('備考'):5);
+  const ii=hi('診察券No')>-1?hi('診察券No'):4;
   const bk={};
+  let cnt=0;
   rows.slice(1).forEach(r=>{
     const dateStr=fmtDate(r[di]);
     if(!dateStr)return;
     const timeStr=String(r[ti]||'').trim();
     if(!timeStr)return;
-    if(!bk[dateStr])bk[dateStr]={};
-    if(!bk[dateStr][timeStr])bk[dateStr][timeStr]=[];
-    const cancelIdx=hi('キャンセル理由');
-    const cancelR=cancelIdx>-1?String(r[cancelIdx]||'').trim():'';
     const kubun=String(r[ki]||'').trim();
-    // 継続枠はスキップしない（データとして保持）
-    bk[dateStr][timeStr].push({
-      id:String(r[ii]||'').trim(),name:String(r[ni]||'').trim(),
-      kubun,memo:String(r[mi]||'').trim(),
-      fee:parseInt(r[6])||0,payMethod:String(r[7]||'').trim(),
-      cancelReason:cancelR,status:cancelR?'cancel':'booked'
-    });
+    const name=String(r[ni]||'').trim();
+    const cardId=String(r[ii]||'').trim();
+    if(!name&&!cardId)return;
+
+    if(!bk[dateStr])bk[dateStr]={};
+
+    const cancelR=hi('キャンセル理由')>-1?String(r[hi('キャンセル理由')]||'').trim():'';
+    const reBookedBy=hi('再予約情報')>-1?String(r[hi('再予約情報')]||'').trim():'';
+
+    // 継続枠
+    if(kubun==='(継続)'||kubun.includes('継続')){
+      bk[dateStr][timeStr]={cont:true,name,cardId};
+      cnt++;return;
+    }
+    // キャンセル
+    if(kubun==='(キャンセル)'||cancelR){
+      bk[dateStr][timeStr]={
+        cancelled:true,name,cardId,
+        cancelReason:cancelR,reBookedBy,
+        kubun:kubun.replace('(キャンセル)','').trim()||'自費'
+      };
+      cnt++;return;
+    }
+    // 通常予約
+    let shochi=[];let bussan=[];
+    try{shochi=JSON.parse(String(r[11]||'[]'));}catch(e){}
+    try{bussan=JSON.parse(String(r[13]||'[]'));}catch(e){}
+    bk[dateStr][timeStr]={
+      name,cardId,
+      kubun:kubun||'自費',
+      route:String(r[5]||'').trim(),
+      visitCount:parseInt(r[6])||0,
+      elapsed:parseInt(r[7])||0,
+      symptom:String(r[8]||'').trim(),
+      option:String(r[9]||'').trim(),
+      menu:String(r[10]||'').trim(),
+      shochi,
+      shochiMemo:String(r[12]||'').trim(),
+      bussan,
+      payMethod:String(r[hi('支払方法')>-1?hi('支払方法'):14]||'').trim(),
+      fee:parseInt(r[hi('支払金額')>-1?hi('支払金額'):15])||0,
+      kubunList:String(r[16]||'').trim(),
+      bui:String(r[hi('施術部位')>-1?hi('施術部位'):19]||'').split(',').filter(Boolean)
+    };
+    cnt++;
   });
-  const days=Object.keys(bk).length;
-  addLog('予約パース完了: '+days+'日分');
+  addLog('予約パース完了: '+Object.keys(bk).length+'日分 '+cnt+'件');
   return bk;
 }
 
