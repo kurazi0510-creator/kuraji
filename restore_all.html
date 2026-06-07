@@ -237,6 +237,23 @@ async function restoreAll(){
       addLog('✅ 売上localStorage書き込み: '+uDays+'日分');
     }
 
+    // GASの患者シートに61名を書き戻す（syncAllで上書きされないように）
+    addLog('--- GAS患者シートに書き戻し中 ---');
+    const hdr=['診察券No','患者名','ふりがな','性別','電話番号','LINE','LINEユーザーID','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考'];
+    const rows=[hdr,...finalP.map(p=>[
+      p.id,p.name,p.kana||'',p.sex||'',
+      p.tel||'',p.line||'',p.lineUid||'',
+      p.city||'',p.job||'',p.src||'',
+      p.symptom||'',p.last||'',p.count||0,p.dob||'',p.note||''
+    ])];
+    try{
+      const saveRes=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'saveCustomers',rows:JSON.stringify(rows)}),redirect:'follow'});
+      const saveD=JSON.parse(await saveRes.text());
+      if(saveD.ok){addLog('✅ GAS患者シート書き戻し完了: '+finalP.length+'件');}
+      else{addLog('⚠ GAS書き戻しエラー: '+JSON.stringify(saveD));}
+    }catch(e){addLog('⚠ GAS書き戻しスキップ: '+e.message);}
+
     // LINE停止も同時実行
     try{await gasPost('deleteAllTriggers');addLog('✅ LINE自動送信停止完了');}catch(e){addLog('⚠ LINE停止スキップ: '+e.message);}
 
