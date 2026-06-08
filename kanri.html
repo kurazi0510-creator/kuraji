@@ -235,6 +235,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="toggleDayMemo()" style="margin-top:16px;background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
       <button class="btn bp bsm" onclick="showSymptomList()" style="margin-top:16px;background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
+      <button class="btn ba bsm" onclick="forcePushBookings()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626" title="このデバイスの予約データをGASに送信して復元">📤 予約データ復元送信</button>
     </div>
   </div>
   <div class="stats">
@@ -2207,11 +2208,32 @@ async function syncAll(){
             payAmount:String(r[15]||'').trim()
           };}
         });
-        // ★予約マージルール（GAS完全優先版）
-        // GASのデータを正とし、GASにある全日付・全slotをそのまま使う
-        // localStorageにしかないデータ（GASに送信前の一時データ）は失わない
-        // ただし、GASにある日付はGASを優先（重複防止）
-        bookings = newB; // GASを正として全置換（重複の根本解決）
+        // ★予約マージルール（localStorage保護版）
+        // GASにあってlocalStorageにない日付 → GASから追加
+        // localStorageにある日付 → localStorageを優先（消えない）
+        // GASが空・少ない場合でもlocalStorageのデータは絶対に消えない
+        if(Object.keys(newB).length === 0){
+          // GASに予約データが1件もない場合は何もしない（localStorageを保持）
+          console.warn('GAS予約データが空のためlocalStorageを維持します');
+        } else {
+          // GASにある日付はGASを優先、localStorageにしかない日付は保持
+          const gasDateCount = Object.keys(newB).length;
+          const localDateCount = Object.keys(bookings).length;
+          // GASのデータ量がlocalStorageの50%以上なら信頼できるとみなす
+          if(gasDateCount >= localDateCount * 0.5 || localDateCount === 0){
+            // GASを基準に、localStorageにしかない日付を追加
+            Object.keys(bookings).forEach(d=>{
+              if(!newB[d]) newB[d] = bookings[d];
+            });
+            bookings = newB;
+          } else {
+            // GASのデータが大幅に少ない場合はlocalStorageを優先、GASにしかない日付のみ追加
+            console.warn(`GAS日付数(${gasDateCount}) < local日付数(${localDateCount})×50% → localStorage優先`);
+            Object.keys(newB).forEach(d=>{
+              if(!bookings[d]) bookings[d] = newB[d];
+            });
+          }
+        }
       }
       save();
       setStat('s-ok','✅ 同期済み');
@@ -2299,6 +2321,20 @@ async function forcePushPatients(){
   setStat('s-ing','🔧 修復中...');
   await pushP();
   alert('患者データをGASに送信しました。\n「最新データ取得」を押して確認してください。');
+}
+
+// ★予約データをlocalStorageからGASに強制送信（データ復旧用）
+async function forcePushBookings(){
+  const bCount = Object.values(bookings).reduce((n,d)=>n+Object.values(d).filter(s=>s&&!s.cont).length, 0);
+  if(bCount === 0){alert('localStorageに予約データがありません。\nこのデバイスにはデータが残っていない可能性があります。');return;}
+  if(!confirm(`localStorageの予約データ（${bCount}件）をGASスプレッドシートに送信します。\nGASの既存予約データは上書きされます。よろしいですか？`))return;
+  setStat('s-ing','🔧 予約データ送信中...');
+  const ok = await pushB();
+  if(ok){
+    alert(`✅ 予約データ${bCount}件をGASに送信しました。\n他のデバイスで「最新データ取得」を押すと反映されます。`);
+  } else {
+    alert('❌ 送信に失敗しました。インターネット接続を確認してください。');
+  }
 }
 
 // ===== 区分（複合対応） =====
