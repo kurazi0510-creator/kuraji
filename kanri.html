@@ -841,7 +841,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 
     <!-- アラート -->
     <div id="ltv-alert-sec" style="display:none">
-      <div class="card"><div class="ctitle">⚠ 経過日数アラート（30日以上未来院）</div>
+      <div class="card"><div class="ctitle">⚠ 経過日数アラート（17日以上・予約済は緑バッジ）</div>
         <div class="scroll"><table class="tbl"><thead><tr><th>券No</th><th>患者名</th><th>前回通院</th><th>経過日数</th><th>電話</th></tr></thead><tbody id="ltv-alert"></tbody></table></div>
         <div style="font-size:0.78rem;font-weight:bold;color:#f97316;margin-top:14px;margin-bottom:6px">🛍 物販提案タイミング（3・6・9…回来院）</div>
         <div class="scroll"><table class="tbl"><thead><tr><th>券No</th><th>患者名</th><th>来院回数</th><th>電話</th></tr></thead><tbody id="ltv-bussan-target"><tr><td colspan="4" class="empty">-</td></tr></tbody></table></div>
@@ -2696,18 +2696,66 @@ function loadLineTokenUI(){
     else st.innerHTML='❌ 未設定';
   }
 }
-// 21日以上未来院チェック（起動時・日付変更時に実行）
-async function checkElapsedAlert(date){
-  const token=getLineToken();if(!token)return;
-  const alerts=patients.filter(p=>{
-    if(!p.last||isGarbageData(p.last))return false;
-    const days=elapsed(p.last);
-    return days>=20&&days<=21;// 20日目に1回だけ通知（21日で初診料のため前日）
+// ══════════════════════════════════════════════════════
+// 17日アラート（予約表ベース・予約済み患者は除外）
+// ══════════════════════════════════════════════════════
+// ★予約表から各患者の最終来院日を集計（患者マスタのlastは使わない）
+function calcLastVisitFromBookings(){
+  const lastMap={}; // {cardId: 'YYYY-MM-DD'}
+  Object.keys(bookings).sort().forEach(date=>{
+    Object.keys(bookings[date]).forEach(slot=>{
+      const b=bookings[date][slot];
+      if(!b||b.cancelled)return; // キャンセルは除外
+      const id=String(b.cardId||'').trim();
+      if(!id)return;
+      if(!lastMap[id]||date>lastMap[id]) lastMap[id]=date;
+    });
   });
+  return lastMap;
+}
+
+// ★今日以降（本日含む）に予約が入っている患者のIDセットを返す
+function calcFutureBookedIds(todayStr){
+  const ids=new Set();
+  Object.keys(bookings).forEach(date=>{
+    if(date<todayStr)return; // 過去は無視
+    Object.keys(bookings[date]).forEach(slot=>{
+      const b=bookings[date][slot];
+      if(!b||b.cancelled)return;
+      const id=String(b.cardId||'').trim();
+      if(id) ids.add(id);
+    });
+  });
+  return ids;
+}
+
+async function checkElapsedAlert(todayStr){
+  const token=getLineToken();if(!token)return;
+
+  // 予約表から最終来院日を集計
+  const lastMap=calcLastVisitFromBookings();
+  // 今日以降に予約済みの患者ID
+  const futureIds=calcFutureBookedIds(todayStr);
+
+  const alerts=[];
+  patients.forEach(p=>{
+    const id=String(p.id||'').trim();
+    // 今日以降に予約あり → 送らない
+    if(futureIds.has(id))return;
+    // 予約表から最終来院日を取得（なければ患者マスタのlastを使う）
+    const lastDate=lastMap[id]||p.last||'';
+    if(!lastDate||isGarbageData(lastDate))return;
+    const days=elapsed(lastDate);
+    // 17日目ちょうどのみ通知（1度だけ）
+    if(days!==17)return;
+    alerts.push({name:p.name,id,last:lastDate,days});
+  });
+
   if(!alerts.length)return;
-  const msg='\n【倉治整骨院 管理システム】\n⚠️ 明日で初診料発生アラート（'+date+'）\n'+
-    alerts.map(p=>'・'+p.name+'（'+p.id+'号）前回:'+p.last+' '+elapsed(p.last)+'日経過\n　→ 明日来院なければ次回初診料').join('\n')+
-    '\n⚠️ 明日が21日目です。来院を促してください！';
+
+  const msg='\n【倉治整骨院 管理システム】\n📅 17日目アラート（'+todayStr+'）\n'+
+    alerts.map(a=>'・'+a.name+'（'+a.id+'号）最終来院:'+a.last+'\n　→ 次回来院が21日を超えると初診料が発生します').join('\n')+
+    '\n\n※次回予約済みの患者は除外済みです';
   await sendLineNotify(msg);
 }
 // 患者個別LINEテスト送信
@@ -5620,14 +5668,28 @@ function renderBussanHist(){
 }
 
 function renderLtvAlert(){
-  const alerts=patients.filter(p=>p.last&&elapsed(p.last)>=30).sort((a,b)=>elapsed(b.last)-elapsed(a.last));
-  // 3回来院ごとの物販提案対象患者
+  const todayStr=today();
+  const lastMap=calcLastVisitFromBookings();
+  const futureIds=calcFutureBookedIds(todayStr);
+  const alertList=patients.map(p=>{
+    const id=String(p.id||'').trim();
+    const lastDate=lastMap[id]||p.last||'';
+    if(!lastDate||isGarbageData(lastDate))return null;
+    const days=elapsed(lastDate);
+    if(days<17)return null;
+    return{...p,lastDate,days,hasFuture:futureIds.has(id)};
+  }).filter(Boolean).sort((a,b)=>b.days-a.days);
   const bussanTargets=patients.filter(p=>p.count&&parseInt(p.count)>0&&parseInt(p.count)%3===0&&p.last&&elapsed(p.last)<=30);
   document.getElementById('ltv-bussan-target').innerHTML=bussanTargets.length
     ?bussanTargets.map(p=>`<tr><td><strong>${p.id}</strong></td><td>${p.name}</td><td style="color:#f97316;font-weight:bold">${p.count}回</td><td>${p.tel||'-'}</td></tr>`).join('')
     :'<tr><td colspan="4" class="empty">対象患者なし</td></tr>';
-
-  document.getElementById('ltv-alert').innerHTML=alerts.length?alerts.map(p=>`<tr><td><strong>${p.id}</strong></td><td>${p.name}</td><td>${p.last}</td><td><strong style="color:var(--accent2)">${elapsed(p.last)}日</strong></td><td style="font-size:0.72rem">${p.tel||'-'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">30日以上未来院の患者はいません</td></tr>';
+  document.getElementById('ltv-alert').innerHTML=alertList.length
+    ?alertList.map(p=>{
+      const futureBadge=p.hasFuture?'<span style="background:#dcfce7;color:#166534;border-radius:4px;padding:1px 6px;font-size:0.65rem;margin-left:4px">予約済</span>':'';
+      const lineColor=p.days>=20?'#dc2626':p.days>=17?'#d97706':'var(--accent2)';
+      return`<tr><td><strong>${p.id}</strong></td><td>${p.name}${futureBadge}</td><td>${p.lastDate}</td><td><strong style="color:${lineColor}">${p.days}日</strong></td><td style="font-size:0.72rem">${p.tel||'-'}</td></tr>`;
+    }).join('')
+    :'<tr><td colspan="5" class="empty">17日以上未来院の患者はいません</td></tr>';
 }
 
 // ===== マスター =====
