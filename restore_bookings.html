@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>予約データ復元ツール</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#f0f4f8;color:#1e293b;padding:16px}
+h1{font-size:1.2rem;font-weight:700;margin-bottom:4px;color:#1e40af}
+.sub{font-size:0.78rem;color:#64748b;margin-bottom:20px}
+.card{background:white;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+.card h2{font-size:0.92rem;font-weight:700;margin-bottom:10px;color:#334155}
+textarea{width:100%;height:180px;border:2px solid #cbd5e1;border-radius:8px;padding:10px;font-size:0.78rem;font-family:monospace;resize:vertical}
+textarea:focus{outline:none;border-color:#3b82f6}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:10px}
+.btn-blue{background:#2563eb;color:white}
+.btn-green{background:#16a34a;color:white}
+.btn-red{background:#dc2626;color:white}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.result{background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:14px;margin-top:14px;font-size:0.85rem;display:none}
+.result.err{background:#fef2f2;border-color:#fca5a5}
+.preview{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:10px;font-size:0.75rem;max-height:200px;overflow-y:auto;display:none}
+.step{background:#eff6ff;border-left:4px solid #3b82f6;padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:10px;font-size:0.82rem;line-height:1.7}
+.step b{color:#1d4ed8}
+.badge{display:inline-block;background:#fef3c7;color:#92400e;border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700;margin-left:6px}
+.warn{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px;font-size:0.78rem;color:#92400e;margin-bottom:10px}
+</style>
+</head>
+<body>
+<h1>📋 予約データ復元ツール</h1>
+<p class="sub">スプレッドシートの予約表データをkanri.htmlに復元します</p>
+
+<div class="card">
+  <h2>📌 手順</h2>
+  <div class="step">
+    <b>① スプレッドシートを開く</b><br>
+    「yoyakuhyo」シートタブを選択
+  </div>
+  <div class="step">
+    <b>② 全選択してコピー</b><br>
+    セルA1をクリック → <b>Cmd+A</b> → <b>Cmd+C</b>
+  </div>
+  <div class="step">
+    <b>③ 下のテキストエリアに貼り付け</b><br>
+    テキストエリアをクリック → <b>Cmd+V</b>
+  </div>
+  <div class="step">
+    <b>④「復元実行」ボタンを押す</b>
+  </div>
+</div>
+
+<div class="card">
+  <h2>📥 スプレッドシートのデータを貼り付け</h2>
+  <textarea id="csv" placeholder="ここにスプレッドシートのデータを貼り付けてください&#10;（Cmd+A → Cmd+C → Cmd+V）"></textarea>
+  <button class="btn btn-blue" onclick="parseAndPreview()">🔍 内容を確認</button>
+  <div class="preview" id="preview"></div>
+</div>
+
+<div class="card" id="restore-card" style="display:none">
+  <h2>✅ 復元内容</h2>
+  <div id="restore-summary" style="font-size:0.85rem;line-height:1.8;margin-bottom:10px"></div>
+  <div class="warn">⚠️ 現在のkanri.htmlのlocalStorage予約データに<b>上書き追加</b>されます。<br>既存データは保持しつつ、スプレッドシートのデータを追加します。</div>
+  <button class="btn btn-green" onclick="doRestore()">🔄 kanri.htmlのlocalStorageに復元する</button>
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
+  '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
+  '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
+  '19:00','19:20','19:40'];
+
+const pad=n=>String(n).padStart(2,'0');
+
+function fmtDate(v){
+  if(!v&&v!==0)return'';
+  const s=String(v).trim();
+  if(s.startsWith('1899')||s.startsWith('1900')||s.startsWith('1905'))return'';
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.substring(0,10);
+  if(/^\d{4}\/\d{2}\/\d{2}/.test(s))return s.substring(0,10).replace(/\//g,'-');
+  return s.substring(0,10);
+}
+
+function fmtTime(v){
+  if(!v)return'';
+  const s=String(v).trim();
+  // 1899形式
+  const m=s.match(/^1899-12-3([01])T(\d{2}):(\d{2})/);
+  if(m){
+    const extra=parseInt(m[1])===1?1440:0;
+    const min=parseInt(m[2])*60+parseInt(m[3])+extra;
+    return snapSlot(min%1440);
+  }
+  // HH:MM形式
+  const m2=s.match(/^(\d{1,2}):(\d{2})/);
+  if(m2){
+    const t=pad(parseInt(m2[1]))+':'+pad(parseInt(m2[2]));
+    if(SLOTS.includes(t))return t;
+    const min=parseInt(m2[1])*60+parseInt(m2[2]);
+    return snapSlot(min);
+  }
+  return s;
+}
+
+function snapSlot(min){
+  const exact=pad(Math.floor(min/60)%24)+':'+pad(min%60);
+  if(SLOTS.includes(exact))return exact;
+  let best=null,bd=9999;
+  SLOTS.forEach(s=>{const[h,m]=s.split(':').map(Number);const d=Math.abs(h*60+m-min);if(d<bd){bd=d;best=s;}});
+  return bd<=20?best:exact;
+}
+
+function tryParse(s){try{return JSON.parse(s);}catch{return[];}}
+
+let parsedBookings={};
+
+function parseAndPreview(){
+  const raw=document.getElementById('csv').value.trim();
+  if(!raw){alert('データを貼り付けてください');return;}
+
+  // タブ区切り or カンマ区切りを自動判定
+  const lines=raw.split('\n').filter(l=>l.trim());
+  const isTab=lines[0].includes('\t');
+  const split=line=>isTab?line.split('\t'):line.split(',');
+
+  const hdr=split(lines[0]).map(h=>String(h).trim());
+  console.log('ヘッダー:', hdr);
+
+  // ヘッダーインデックス
+  const hi=k=>{
+    // 英語ヘッダー対応
+    const map={
+      '日付':['日付','date','Date'],
+      '時間':['時間','time','Time'],
+      '区分':['区分','kubun'],
+      '患者名':['患者名','name'],
+      '診察券No':['診察券No','cardId'],
+      '予約ルート':['予約ルート','route'],
+      '来院回数':['来院回数','visitCount'],
+      '経過日数':['経過日数','elapsed'],
+      '症状':['症状','symptom'],
+      'オプション':['オプション','option'],
+      '自費メニュー':['自費メニュー','menu'],
+      '処置(JSON)':['処置(JSON)','shochi','処置'],
+      '処置メモ':['処置メモ','shochiMemo'],
+      '物販(JSON)':['物販(JSON)','bussan','物販'],
+      '支払方法':['支払方法','pay'],
+      '支払金額':['支払金額','payAmount'],
+      '区分リスト':['区分リスト','kubunList'],
+      '再予約情報':['再予約情報','reBook'],
+      'キャンセル理由':['キャンセル理由','cancelReason'],
+      '施術部位':['施術部位','bui'],
+    };
+    const candidates=map[k]||[k];
+    for(const c of candidates){
+      const idx=hdr.findIndex(h=>h===c||h.includes(c));
+      if(idx>=0)return idx;
+    }
+    return -1;
+  };
+
+  parsedBookings={};
+  let count=0, skipCount=0;
+
+  lines.slice(1).forEach((line,i)=>{
+    const r=split(line);
+    const dateRaw=r[hi('日付')]||r[0]||'';
+    const timeRaw=r[hi('時間')]||r[1]||'';
+    const date=fmtDate(dateRaw);
+    const slot=fmtTime(timeRaw);
+
+    if(!date||!slot){skipCount++;return;}
+    if(date.startsWith('1899')||date.startsWith('日付'))return;
+
+    if(!parsedBookings[date])parsedBookings[date]={};
+
+    const kubunStr=String(r[hi('区分')]||'').trim();
+    if(kubunStr==='(継続)'){
+      parsedBookings[date][slot]={cont:true,name:String(r[hi('患者名')]||''),cardId:String(r[hi('診察券No')]||'')};
+    }else if(kubunStr==='(キャンセル)'){
+      parsedBookings[date][slot]={cancelled:true,name:String(r[hi('患者名')]||''),cardId:String(r[hi('診察券No')]||''),cancelReason:String(r[hi('キャンセル理由')]||''),reBookedBy:String(r[hi('再予約情報')]||'')};
+    }else{
+      const kubunList=r[hi('区分リスト')]?String(r[hi('区分リスト')]).split(',').filter(s=>s):[kubunStr].filter(s=>s);
+      parsedBookings[date][slot]={
+        kubun:kubunStr,kubunList,
+        name:String(r[hi('患者名')]||'').trim(),
+        cardId:String(r[hi('診察券No')]||'').trim(),
+        route:String(r[hi('予約ルート')]||'LINE').trim(),
+        visitCount:String(r[hi('来院回数')]||'').trim(),
+        elapsed:String(r[hi('経過日数')]||'').trim(),
+        symptom:String(r[hi('症状')]||'').trim(),
+        option:String(r[hi('オプション')]||'').trim(),
+        menu:String(r[hi('自費メニュー')]||'').trim(),
+        shochi:tryParse(r[hi('処置(JSON)')]||'[]'),
+        shochiMemo:String(r[hi('処置メモ')]||'').trim(),
+        bussan:tryParse(r[hi('物販(JSON)')]||'[]'),
+        pay:(r[hi('支払方法')]||'').split(',').filter(s=>s),
+        payAmount:String(r[hi('支払金額')]||'').trim(),
+        bui:(r[hi('施術部位')]||'').split(',').filter(s=>s),
+      };
+    }
+    count++;
+  });
+
+  const dates=Object.keys(parsedBookings).sort();
+  const preview=document.getElementById('preview');
+  const card=document.getElementById('restore-card');
+  const summary=document.getElementById('restore-summary');
+
+  if(count===0){
+    preview.style.display='block';
+    preview.textContent='⚠️ 有効なデータが見つかりませんでした。\nヘッダー: '+hdr.join(' | ');
+    card.style.display='none';
+    return;
+  }
+
+  // プレビュー表示
+  preview.style.display='block';
+  let prev='✅ 読み込み成功！\n\n';
+  prev+='ヘッダー: '+hdr.slice(0,5).join(' | ')+'...\n';
+  prev+=`有効データ: ${count}件 / スキップ: ${skipCount}件\n`;
+  prev+='日付範囲: '+dates[0]+' 〜 '+dates[dates.length-1]+'\n\n';
+  prev+='--- 日付別件数 ---\n';
+  dates.forEach(d=>{
+    const slots=Object.keys(parsedBookings[d]);
+    const names=slots.map(s=>parsedBookings[d][s]?.name||'?').join(', ');
+    prev+=`${d}: ${slots.length}件 (${names})\n`;
+  });
+  preview.textContent=prev;
+
+  // 復元カード表示
+  card.style.display='block';
+  summary.innerHTML=`
+    <b>📅 日付数:</b> ${dates.length}日分<br>
+    <b>👤 予約件数:</b> ${count}件<br>
+    <b>📆 期間:</b> ${dates[0]} 〜 ${dates[dates.length-1]}<br>
+  `;
+}
+
+function doRestore(){
+  if(Object.keys(parsedBookings).length===0){alert('先に「内容を確認」を押してください');return;}
+
+  try{
+    // 既存のlocalStorageデータを取得
+    const existing=JSON.parse(localStorage.getItem('kj_b')||'{}');
+    const existCount=Object.values(existing).reduce((n,d)=>n+Object.keys(d).length,0);
+
+    // マージ：既存を保持しつつスプレッドシートデータを追加
+    const merged={...existing};
+    let addedDates=0, addedSlots=0;
+    Object.keys(parsedBookings).forEach(date=>{
+      if(!merged[date]){merged[date]={};addedDates++;}
+      Object.keys(parsedBookings[date]).forEach(slot=>{
+        if(!merged[date][slot]){addedSlots++;}
+        merged[date][slot]=parsedBookings[date][slot]; // スプレッドシートを優先
+      });
+    });
+
+    // localStorageに保存
+    localStorage.setItem('kj_b',JSON.stringify(merged));
+    localStorage.setItem('kj_b_bak',JSON.stringify(merged));
+    localStorage.setItem('kj_b_bak_ts',Date.now().toString());
+
+    const totalAfter=Object.values(merged).reduce((n,d)=>n+Object.keys(d).length,0);
+
+    const result=document.getElementById('result');
+    result.style.display='block';
+    result.className='result';
+    result.innerHTML=`
+      ✅ <b>復元完了！</b><br><br>
+      復元前: ${existCount}件<br>
+      追加: ${addedSlots}件（${addedDates}日分）<br>
+      復元後合計: ${totalAfter}件<br><br>
+      <b>→ kanri.htmlを開いて確認してください</b><br>
+      <a href="kanri.html" style="color:#1d4ed8;font-weight:700">kanri.htmlを開く →</a>
+    `;
+  }catch(e){
+    const result=document.getElementById('result');
+    result.style.display='block';
+    result.className='result err';
+    result.textContent='❌ エラー: '+e.message;
+  }
+}
+</script>
+</body>
+</html>
