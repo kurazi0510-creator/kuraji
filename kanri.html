@@ -2740,6 +2740,8 @@ async function checkElapsedAlert(todayStr){
   const alerts=[];
   patients.forEach(p=>{
     const id=String(p.id||'').trim();
+    // 「送らない」設定の患者は除外
+    if(p.notifyReminder===false)return;
     // 今日以降に予約あり → 送らない
     if(futureIds.has(id))return;
     // 予約表から最終来院日を取得（なければ患者マスタのlastを使う）
