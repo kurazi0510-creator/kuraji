@@ -3028,13 +3028,14 @@ function buildShochiDirectTable(){
     inp.type='number';
     inp.min='0';
     inp.placeholder='0';
-    inp.value=isSelected?(window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price):'';
+    inp.value=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price; // 常に定価を自動入力
     inp.dataset.shid=sh.id;  // ★IDをdata属性に直接埋め込み
     inp.dataset.defprice=sh.price;
     inp.style.cssText='width:90px;padding:5px 8px;border:2px solid '+(isSelected?'#4ade80':'#e2e8f0')+';border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
     inp.oninput=function(){
       const id=this.dataset.shid;  // ★必ずこのinput自身のdata属性から取得
       const val=parseInt(this.value)||0;
+      const defPrice=parseInt(this.dataset.defprice)||0;
       if(val>0){
         mShochiSel[id]=1;
         window.mShochiPrice[id]=val;
