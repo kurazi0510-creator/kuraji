@@ -3005,6 +3005,7 @@ function buildShochiDirectTable(){
   // ヘッダー
   const hdr=document.createElement('tr');
   hdr.innerHTML='<th style="text-align:left;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0">処置名</th>'+
+    '<th style="text-align:center;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:60px">個数</th>'+
     '<th style="text-align:right;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:110px">金額（円）</th>';
   tbl.appendChild(hdr);
 
@@ -3021,6 +3022,20 @@ function buildShochiDirectTable(){
     nameTd.style.cssText='padding:6px 4px;font-size:0.82rem;font-weight:'+(isSelected?'700':'400')+';color:'+(isSelected?'#166534':'#334155');
     nameTd.textContent=(isSelected?'✅ ':'')+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
 
+    // 個数セル
+    const qtyTd=document.createElement('td');
+    qtyTd.style.cssText='padding:4px;text-align:center';
+    const qtyInp=document.createElement('input');
+    qtyInp.type='number';qtyInp.min='1';qtyInp.value=(mShochiSel[sh.id]||1);
+    qtyInp.dataset.shid=sh.id;
+    qtyInp.style.cssText='width:50px;padding:5px 4px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;font-weight:700;text-align:center';
+    qtyInp.oninput=function(){
+      const id=this.dataset.shid;
+      const q=parseInt(this.value)||1;
+      if((mShochiSel[id]||0)>0){mShochiSel[id]=q;calcMShochiTotal();}
+    };
+
+    // 金額セル
     const priceTd=document.createElement('td');
     priceTd.style.cssText='padding:4px;text-align:right';
 
@@ -3028,16 +3043,16 @@ function buildShochiDirectTable(){
     inp.type='number';
     inp.min='0';
     inp.placeholder='0';
-    inp.value=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price; // 常に定価を自動入力
-    inp.dataset.shid=sh.id;  // ★IDをdata属性に直接埋め込み
+    inp.value=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
+    inp.dataset.shid=sh.id;
     inp.dataset.defprice=sh.price;
     inp.style.cssText='width:90px;padding:5px 8px;border:2px solid '+(isSelected?'#4ade80':'#e2e8f0')+';border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
     inp.oninput=function(){
-      const id=this.dataset.shid;  // ★必ずこのinput自身のdata属性から取得
+      const id=this.dataset.shid;
       const val=parseInt(this.value)||0;
       const defPrice=parseInt(this.dataset.defprice)||0;
       if(val>0){
-        mShochiSel[id]=1;
+        mShochiSel[id]=mShochiSel[id]||1;
         window.mShochiPrice[id]=val;
         this.style.borderColor='#4ade80';
       }else{
@@ -3046,12 +3061,12 @@ function buildShochiDirectTable(){
         this.style.borderColor='#e2e8f0';
       }
       calcMShochiTotal();
-      // 行の色を更新（再描画せず）
       this.closest('tr').style.background=val>0?'#f0fdf4':'white';
     };
 
     priceTd.appendChild(inp);
     tr.appendChild(nameTd);
+    tr.appendChild(qtyTd);
     tr.appendChild(priceTd);
     tbl.appendChild(tr);
   });
@@ -3125,7 +3140,7 @@ function calcMShochiTotal(){
     const q=mShochiSel[sh.id]||0;
     const p=window.mShochiPrice&&window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
     total+=p*q;
-    if(q>0)selected.push(sh.name+(q>1?'×'+q:'')+(p!==sh.price?'('+yen(p)+')':''));
+    if(q>0)selected.push(sh.name+(q>1?'×'+q:'')+(p!==sh.price?'('+yen(p)+')':'')+'='+yen(p*q));
   });
   (window.mShochiFree||[]).forEach(row=>{
     if(row.name&&row.price>0){total+=row.price;selected.push(row.name+'('+yen(row.price)+')');}
