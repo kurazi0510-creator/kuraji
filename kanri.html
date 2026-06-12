@@ -3000,7 +3000,11 @@ function renderMShochiBtns(){
     const label=document.createElement('span');
     label.style.cssText='flex:1;cursor:pointer';
     label.textContent=sh.name;
-    label.onclick=function(){mShochiSel[sh.id]=(mShochiSel[sh.id]||0)>0?0:1;div.classList.toggle('on',mShochiSel[sh.id]>0);renderMShochiBtns();calcMShochiTotal();};
+    label.onclick=function(){
+      mShochiSel[sh.id]=(mShochiSel[sh.id]||0)>0?0:1;
+      div.classList.toggle('on',mShochiSel[sh.id]>0);
+      calcMShochiTotal(); // 再描画しない
+    };
     div.appendChild(label);
     // 金額入力欄（常に表示・直接変更可能）
     const priceWrap=document.createElement('span');
