@@ -2978,11 +2978,14 @@ async function execCancel(){
 
 // ===== モーダルタブ =====
 function switchMTab(tab){
-  if(tab==='pay') setTimeout(updatePayDetailSummary,50);
   const tabs=['basic','shochi','bussan','pay'];
   document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',tabs[i]===tab));
   document.querySelectorAll('.mpane').forEach((p,i)=>p.classList.toggle('on',tabs[i]===tab));
-  if(tab==='pay')updateMTotal();
+  if(tab==='pay'){
+    updateMTotal();
+    // 確実に最新の処置・物販金額で明細を更新
+    requestAnimationFrame(()=>requestAnimationFrame(()=>updatePayDetailSummary()));
+  }
 }
 
 function renderMShochiBtns(){
@@ -3218,7 +3221,6 @@ function calcMBussanTotal(){
   document.getElementById('m-bussan-total').textContent=yen(total);updateMTotal();
 }
 function updateMTotal(){
-  setTimeout(updatePayDetailSummary,50);
   let sh=0,bs=0;
   shochiMaster.forEach(s=>{const op=window.mShochiPrice&&window.mShochiPrice[s.id]!=null?window.mShochiPrice[s.id]:s.price;sh+=op*(mShochiSel[s.id]||0);});
   bussanMaster.forEach(b=>{
@@ -3226,6 +3228,7 @@ function updateMTotal(){
     bs+=Math.max(0,b.price-disc)*(mBussanQty[b.id]||0);
   });
   const el=document.getElementById('m-total-sum');if(el)el.textContent=yen(sh+bs);
+  updatePayDetailSummary();
 }
 function toggleMPay(btn){
   btn.classList.toggle('on');
