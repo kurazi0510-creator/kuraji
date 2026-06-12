@@ -3045,19 +3045,30 @@ function renderShochiSelected(){
   selected.forEach(sh=>{
     const op=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
     const row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap';
-    const nameSpan=document.createElement('span');
-    nameSpan.style.cssText='flex:1;font-size:0.82rem;font-weight:600;min-width:120px';
-    nameSpan.textContent=sh.name;
+    row.style.cssText='margin-bottom:10px;padding:8px;background:white;border-radius:8px;border:1px solid #4ade80';
+    // 処置名（大きく表示）
+    const nameDiv=document.createElement('div');
+    nameDiv.style.cssText='font-size:0.85rem;font-weight:700;color:#166534;margin-bottom:6px';
+    nameDiv.textContent='🩺 '+sh.name;
+    // 金額入力行
+    const priceRow=document.createElement('div');
+    priceRow.style.cssText='display:flex;align-items:center;gap:8px';
+    const priceLabel=document.createElement('span');
+    priceLabel.style.cssText='font-size:0.78rem;color:#64748b';
+    priceLabel.textContent='金額：';
     const priceInp=document.createElement('input');
     priceInp.type='number';priceInp.value=op;priceInp.min='0';
-    priceInp.style.cssText='width:90px;padding:5px 8px;border:2px solid #4ade80;border-radius:8px;font-size:0.9rem;font-weight:700;text-align:right';
+    priceInp.style.cssText='width:100px;padding:6px 10px;border:2px solid #4ade80;border-radius:8px;font-size:1rem;font-weight:700;text-align:right';
     const sid=sh.id;
     priceInp.oninput=function(){window.mShochiPrice[sid]=parseInt(this.value)||0;calcMShochiTotal();};
     const enSpan=document.createElement('span');
-    enSpan.style.cssText='font-size:0.8rem;color:#64748b';
+    enSpan.style.cssText='font-size:0.9rem;font-weight:600';
     enSpan.textContent='円';
-    row.appendChild(nameSpan);row.appendChild(priceInp);row.appendChild(enSpan);
+    const defSpan=document.createElement('span');
+    defSpan.style.cssText='font-size:0.7rem;color:#94a3b8;margin-left:4px';
+    defSpan.textContent='（定価'+sh.price.toLocaleString()+'円）';
+    priceRow.appendChild(priceLabel);priceRow.appendChild(priceInp);priceRow.appendChild(enSpan);priceRow.appendChild(defSpan);
+    row.appendChild(nameDiv);row.appendChild(priceRow);
     wrap.appendChild(row);
   });
   // 自由入力行
