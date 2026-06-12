@@ -3114,6 +3114,7 @@ function calcMShochiTotal(){
   const menuPriceEl=document.getElementById('m-menu-price');
   if(menuEl&&selected.length>0){menuEl.value=selected.join('・');if(menuPriceEl)menuPriceEl.value=total;updateMenuTotal();}
   updateMTotal();
+  updatePayDetailSummary();
 }
 function toggleDiscInput(id, btn){
   const inp = document.getElementById('disc-input-'+id);
