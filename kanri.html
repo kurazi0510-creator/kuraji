@@ -1071,24 +1071,19 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div class="bui-tab" data-v="左下腿" onclick="toggleBui(this)">左下腿</div>
       </div>
       <div style="border-top:1.5px solid var(--border);padding-top:10px;margin-top:8px">
-        <div style="font-size:0.75rem;font-weight:700;color:var(--primary);margin-bottom:6px">🩺 処置内容（選択後に金額を直接変更できます）</div>
-        <div id="m-shochi-btns" class="shochi-grid"></div>
-        <!-- 選択済み処置の金額入力テーブル -->
-        <div id="shochi-price-table" style="display:none;margin-top:10px;background:#f0fdf4;border-radius:8px;padding:10px;border:1px solid #86efac">
-          <div style="font-size:0.72rem;font-weight:700;color:#166534;margin-bottom:8px">✅ 選択中の処置 ← 金額を直接変更できます</div>
-          <table style="width:100%;border-collapse:collapse" id="shochi-price-rows"></table>
-          <button onclick="addShochiFreeRow()" style="margin-top:8px;background:#f59e0b;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:0.78rem;cursor:pointer">＋ マスタにない処置を追加</button>
-        </div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--primary);margin-bottom:6px">🩺 処置内容（金額欄に数字を入れると選択されます）</div>
+        <div id="m-shochi-btns" style="display:none"></div>
+        <table id="shochi-direct-table" style="width:100%;border-collapse:collapse"></table>
         <div class="fg" style="margin-top:6px"><label>処置メモ</label><input class="inp" id="m-shochi-memo" placeholder="その他処置があれば記入"></div>
       </div>
       <div style="margin-top:8px;padding:8px;background:#f8f6f1;border-radius:8px;font-size:0.8rem">
-        処置合計（定価）：<strong id="m-shochi-total" style="color:var(--primary)">0円</strong>
+        処置合計：<strong id="m-shochi-total" style="color:var(--primary)">0円</strong>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px;background:#fef3c7;border-radius:8px">
         <span style="font-size:0.74rem;color:#92400e;white-space:nowrap">💰 割引</span>
         <input class="inp" id="m-shochi-discount" type="number" placeholder="0" min="0" style="width:90px;padding:4px 8px" oninput="updateShochiNet()">
         <span style="font-size:0.74rem;color:#92400e">円引き</span>
-        <strong id="m-shochi-net" style="font-size:0.8rem;color:#166534"></strong>
+        <strong id="m-shochi-net" style="font-size:0.8rem;color:#166634"></strong>
       </div>
     </div>
 
@@ -2995,95 +2990,117 @@ function switchMTab(tab){
 }
 
 function renderMShochiBtns(){
-  const area=document.getElementById('m-shochi-btns');
-  if(!area)return;
-  area.innerHTML='';
+  // 処置テーブルを全マスタ分、最初から全行表示する
+  // 金額欄に数字を入れたら選択扱い、0または空で非選択
   if(!window.mShochiPrice)window.mShochiPrice={};
   if(!window.mShochiFree)window.mShochiFree=[];
-  shochiMaster.forEach(sh=>{
-    const needQty=sh.unit==='枚'||sh.unit==='本';
-    const qty=mShochiSel[sh.id]||0;
-    const div=document.createElement('div');
-    div.className='shochi-btn'+(qty>0?' on':'');
-    div.innerHTML=sh.name+'<span class="shochi-price">'+sh.price.toLocaleString()+'円/'+sh.unit+'</span>';
-    if(needQty){
-      const qinp=document.createElement('input');
-      qinp.type='number';qinp.min='0';qinp.value=qty||0;
-      qinp.style.cssText='width:52px;padding:2px 4px;border:1.5px solid var(--border);border-radius:5px;font-size:0.8rem;text-align:center;margin-top:4px;';
-      qinp.onclick=e=>e.stopPropagation();
-      qinp.oninput=function(){mShochiSel[sh.id]=parseInt(this.value)||0;div.classList.toggle('on',mShochiSel[sh.id]>0);updateShochiPriceTable();calcMShochiTotal();};
-      div.appendChild(qinp);
-    }else{
-      div.onclick=function(){
-        mShochiSel[sh.id]=(mShochiSel[sh.id]||0)>0?0:1;
-        div.classList.toggle('on',mShochiSel[sh.id]>0);
-        updateShochiPriceTable();
-        calcMShochiTotal();
-      };
-    }
-    area.appendChild(div);
-  });
-  updateShochiPriceTable();
+  buildShochiDirectTable();
 }
 
-// 選択済み処置の金額テーブルを更新
-function updateShochiPriceTable(){
-  const tbl=document.getElementById('shochi-price-rows');
-  const wrap=document.getElementById('shochi-price-table');
-  if(!tbl||!wrap)return;
-
-  const selected=shochiMaster.filter(s=>(mShochiSel[s.id]||0)>0);
-  const freeRows=window.mShochiFree||[];
-
-  if(selected.length===0&&freeRows.length===0){
-    wrap.style.display='none';
-    return;
-  }
-  wrap.style.display='block';
+function buildShochiDirectTable(){
+  const tbl=document.getElementById('shochi-direct-table');
+  if(!tbl)return;
   tbl.innerHTML='';
 
-  // マスタ処置の行（IDをdata属性で管理）
-  selected.forEach(sh=>{
-    const op=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
+  // ヘッダー
+  const hdr=document.createElement('tr');
+  hdr.innerHTML='<th style="text-align:left;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0">処置名</th>'+
+    '<th style="text-align:right;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:110px">金額（円）</th>';
+  tbl.appendChild(hdr);
+
+  // マスタ全件表示
+  shochiMaster.forEach(sh=>{
+    const price=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:
+                (mShochiSel[sh.id]>0?sh.price:0);
+    const isSelected=(mShochiSel[sh.id]||0)>0;
     const tr=document.createElement('tr');
-    tr.innerHTML=
-      '<td style="padding:6px 4px;font-size:0.82rem;font-weight:600;color:#166534">🩺 '+sh.name+'</td>'+
-      '<td style="padding:6px 4px;white-space:nowrap">'+
-        '<input type="number" data-id="'+sh.id+'" value="'+op+'" min="0" '+
-        'style="width:90px;padding:5px 8px;border:2px solid #4ade80;border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right" '+
-        'oninput="window.mShochiPrice[this.dataset.id]=parseInt(this.value)||0;calcMShochiTotal()"> 円'+
-      '</td>'+
-      '<td style="padding:6px 4px;font-size:0.68rem;color:#94a3b8">定価'+sh.price.toLocaleString()+'円</td>';
+    tr.style.background=isSelected?'#f0fdf4':'white';
+    tr.style.borderBottom='1px solid #f1f5f9';
+
+    const nameTd=document.createElement('td');
+    nameTd.style.cssText='padding:6px 4px;font-size:0.82rem;font-weight:'+(isSelected?'700':'400')+';color:'+(isSelected?'#166534':'#334155');
+    nameTd.textContent=(isSelected?'✅ ':'')+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
+
+    const priceTd=document.createElement('td');
+    priceTd.style.cssText='padding:4px;text-align:right';
+
+    const inp=document.createElement('input');
+    inp.type='number';
+    inp.min='0';
+    inp.placeholder='0';
+    inp.value=isSelected?(window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price):'';
+    inp.dataset.shid=sh.id;  // ★IDをdata属性に直接埋め込み
+    inp.dataset.defprice=sh.price;
+    inp.style.cssText='width:90px;padding:5px 8px;border:2px solid '+(isSelected?'#4ade80':'#e2e8f0')+';border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
+    inp.oninput=function(){
+      const id=this.dataset.shid;  // ★必ずこのinput自身のdata属性から取得
+      const val=parseInt(this.value)||0;
+      if(val>0){
+        mShochiSel[id]=1;
+        window.mShochiPrice[id]=val;
+        this.style.borderColor='#4ade80';
+      }else{
+        mShochiSel[id]=0;
+        delete window.mShochiPrice[id];
+        this.style.borderColor='#e2e8f0';
+      }
+      calcMShochiTotal();
+      // 行の色を更新（再描画せず）
+      this.closest('tr').style.background=val>0?'#f0fdf4':'white';
+    };
+
+    priceTd.appendChild(inp);
+    tr.appendChild(nameTd);
+    tr.appendChild(priceTd);
     tbl.appendChild(tr);
   });
 
   // 自由入力行
+  const freeRows=window.mShochiFree||[];
   freeRows.forEach((row,i)=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=
-      '<td style="padding:6px 4px">'+
-        '<input type="text" placeholder="処置名" value="'+(row.name||'')+'" '+
-        'style="width:120px;padding:4px 8px;border:2px solid #fbbf24;border-radius:8px;font-size:0.82rem" '+
-        'oninput="window.mShochiFree['+i+'].name=this.value;calcMShochiTotal()">'+
-      '</td>'+
-      '<td style="padding:6px 4px;white-space:nowrap">'+
-        '<input type="number" placeholder="金額" value="'+(row.price||'')+'" min="0" '+
-        'style="width:90px;padding:5px 8px;border:2px solid #fbbf24;border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right" '+
-        'oninput="window.mShochiFree['+i+'].price=parseInt(this.value)||0;calcMShochiTotal()"> 円'+
-      '</td>'+
-      '<td style="padding:6px 4px">'+
-        '<button onclick="window.mShochiFree.splice('+i+',1);updateShochiPriceTable();calcMShochiTotal();" '+
-        'style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:3px 8px;font-size:0.75rem;cursor:pointer">削除</button>'+
-      '</td>';
+    tr.style.cssText='border-bottom:1px solid #f1f5f9;background:#fffbeb';
+
+    const nameTd=document.createElement('td');
+    nameTd.style.padding='4px';
+    const nameInp=document.createElement('input');
+    nameInp.type='text';nameInp.placeholder='処置名を入力';nameInp.value=row.name||'';
+    nameInp.style.cssText='width:100%;padding:5px 8px;border:2px solid #fbbf24;border-radius:8px;font-size:0.82rem';
+    nameInp.oninput=function(){window.mShochiFree[i].name=this.value;calcMShochiTotal();};
+
+    const priceTd=document.createElement('td');
+    priceTd.style.cssText='padding:4px;text-align:right;white-space:nowrap';
+    const priceInp=document.createElement('input');
+    priceInp.type='number';priceInp.placeholder='金額';priceInp.value=row.price||'';priceInp.min='0';
+    priceInp.style.cssText='width:80px;padding:5px 8px;border:2px solid #fbbf24;border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
+    priceInp.oninput=function(){window.mShochiFree[i].price=parseInt(this.value)||0;calcMShochiTotal();};
+    const delBtn=document.createElement('button');
+    delBtn.textContent='削除';
+    delBtn.style.cssText='margin-left:4px;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 6px;font-size:0.72rem;cursor:pointer';
+    delBtn.onclick=function(){window.mShochiFree.splice(i,1);buildShochiDirectTable();calcMShochiTotal();};
+
+    nameTd.appendChild(nameInp);
+    priceTd.appendChild(priceInp);priceTd.appendChild(delBtn);
+    tr.appendChild(nameTd);tr.appendChild(priceTd);
     tbl.appendChild(tr);
   });
+
+  // 自由入力追加ボタン行
+  const addTr=document.createElement('tr');
+  const addTd=document.createElement('td');
+  addTd.colSpan=2;addTd.style.padding='6px 4px';
+  const addBtn=document.createElement('button');
+  addBtn.textContent='＋ マスタにない処置を追加';
+  addBtn.style.cssText='background:#f59e0b;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:0.78rem;cursor:pointer';
+  addBtn.onclick=function(){window.mShochiFree.push({name:'',price:0});buildShochiDirectTable();};
+  addTd.appendChild(addBtn);addTr.appendChild(addTd);
+  tbl.appendChild(addTr);
 }
 
-function addShochiFreeRow(){
-  if(!window.mShochiFree)window.mShochiFree=[];
-  window.mShochiFree.push({name:'',price:0});
-  updateShochiPriceTable();
-}
+function updateShochiPriceTable(){buildShochiDirectTable();}
+function addShochiFreeRow(){window.mShochiFree.push({name:'',price:0});buildShochiDirectTable();}
+
+
 function updateShochiNet(){
   const totalEl=document.getElementById('m-shochi-total');
   const disc=parseInt(document.getElementById('m-shochi-discount')?.value)||0;
