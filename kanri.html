@@ -2992,13 +2992,30 @@ function renderMShochiBtns(){
   shochiMaster.forEach(sh=>{
     const needQty=sh.unit==='枚'||sh.unit==='本';
     const qty=mShochiSel[sh.id]||0;
-    const disc=window.mShochiDisc[sh.id]||0;
-    const basePrice=sh.price;
-    const netPrice=Math.max(0,basePrice-disc);
+    const currentPrice=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
     const div=document.createElement('div');
     div.className='shochi-btn'+(qty>0?' on':'');
     div.style.flexWrap='wrap';
-    div.innerHTML=`${sh.name}<span class="shochi-price">${disc>0?yen(netPrice):yen(basePrice)}/${sh.unit}</span>`;
+    // ボタン本体（タップで選択/解除）
+    const label=document.createElement('span');
+    label.style.cssText='flex:1;cursor:pointer';
+    label.textContent=sh.name;
+    label.onclick=function(){mShochiSel[sh.id]=(mShochiSel[sh.id]||0)>0?0:1;div.classList.toggle('on',mShochiSel[sh.id]>0);renderMShochiBtns();calcMShochiTotal();};
+    div.appendChild(label);
+    // 金額入力欄（常に表示・直接変更可能）
+    const priceWrap=document.createElement('span');
+    priceWrap.className='shochi-price';
+    const priceInp=document.createElement('input');
+    priceInp.type='number';priceInp.min='0';priceInp.value=currentPrice;
+    priceInp.style.cssText='width:65px;padding:1px 4px;border:1px solid #cbd5e1;border-radius:4px;font-size:0.78rem;text-align:right';
+    priceInp.onclick=e=>e.stopPropagation();
+    priceInp.oninput=function(){
+      window.mShochiPrice[sh.id]=parseInt(this.value)||0;
+      calcMShochiTotal();
+    };
+    priceWrap.appendChild(priceInp);
+    priceWrap.appendChild(document.createTextNode('円/'+sh.unit));
+    div.appendChild(priceWrap);
     if(needQty){
       const qinp=document.createElement('input');
       qinp.type='number';qinp.min='0';qinp.value=qty||0;
@@ -3006,31 +3023,6 @@ function renderMShochiBtns(){
       qinp.onclick=e=>e.stopPropagation();
       qinp.oninput=function(){mShochiSel[sh.id]=parseInt(this.value)||0;div.classList.toggle('on',mShochiSel[sh.id]>0);calcMShochiTotal();};
       div.appendChild(qinp);
-    }else{
-      div.onclick=function(e){if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON')return;mShochiSel[sh.id]=(mShochiSel[sh.id]||0)>0?0:1;div.classList.toggle('on',mShochiSel[sh.id]>0);calcMShochiTotal();};
-    }
-    // 割引入力（数量>0の時）
-    if(qty>0){
-      const discWrap=document.createElement('div');
-      discWrap.style.cssText='display:flex;align-items:center;gap:4px;margin-top:4px;width:100%;flex-wrap:wrap';
-      discWrap.innerHTML=`<button onclick="event.stopPropagation();toggleShochiDisc('${sh.id}',this)" style="background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:0.7rem;color:#64748b;cursor:pointer">${disc>0?'割引: '+disc+'円':'金額を変更'}</button>
-        <span id="shochi-disc-net-${sh.id}" style="font-size:0.72rem;color:#16a34a;white-space:nowrap">${disc>0?'→ 実質'+yen(netPrice):''}</span>
-        <div id="shochi-disc-input-${sh.id}" style="display:${disc>0?'flex':'none'};align-items:center;gap:4px;margin-top:4px">
-          <span style="font-size:0.7rem;color:#64748b">${yen(basePrice)} - </span>
-          <input type="number" style="width:75px;padding:3px 8px;font-size:0.78rem;border:1.5px solid #e2e8f0;border-radius:6px" 
-            placeholder="割引額" value="${disc}" min="0"
-            onclick="event.stopPropagation()"
-            oninput="event.stopPropagation();window.mShochiDisc['${sh.id}']=parseInt(this.value)||0;calcMShochiTotal();document.getElementById('shochi-disc-net-${sh.id}').textContent=parseInt(this.value)>0?'→ 実質'+yen(Math.max(0,${basePrice}-parseInt(this.value))):'';document.querySelector('[onclick*=toggleShochiDisc][onclick*=${sh.id}]').textContent=parseInt(this.value)>0?'割引: '+parseInt(this.value)+'円':'金額を変更'">
-          <span style="font-size:0.7rem">円引き</span>
-          <button onclick="event.stopPropagation();window.mShochiDisc['${sh.id}']=0;calcMShochiTotal();renderMShochiBtns();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:2px 6px;font-size:0.7rem;cursor:pointer">×</button>
-        </div>`;
-      div.appendChild(discWrap);
-      if(disc>0){
-        const tag=document.createElement('div');
-        tag.style.cssText='font-size:0.68rem;color:#dc2626;margin-top:2px;width:100%';
-        tag.textContent='割引適用: -'+yen(disc)+'（実質'+yen(netPrice)+'）';
-        div.appendChild(tag);
-      }
     }
     area.appendChild(div);
   });
@@ -3057,13 +3049,7 @@ function renderMShochiBtns(){
   freeWrap.appendChild(addBtn);
   area.appendChild(freeWrap);
 }
-function toggleShochiDisc(id,btn){
-  const inp=document.getElementById('shochi-disc-input-'+id);
-  if(!inp)return;
-  const isShown=inp.style.display!=='none';
-  inp.style.display=isShown?'none':'flex';
-  if(isShown){window.mShochiDisc[id]=0;btn.textContent='金額を変更';const netEl=document.getElementById('shochi-disc-net-'+id);if(netEl)netEl.textContent='';calcMShochiTotal();}
-}
+function toggleShochiDisc(){}
 
 function updateShochiNet(){
   const totalEl=document.getElementById('m-shochi-total');
@@ -3086,10 +3072,9 @@ function calcMShochiTotal(){
   const selected=[];
   shochiMaster.forEach(sh=>{
     const q=mShochiSel[sh.id]||0;
-    const disc=window.mShochiDisc&&window.mShochiDisc[sh.id]||0;
-    const netPrice=Math.max(0,sh.price-disc);
-    total+=netPrice*q;
-    if(q>0)selected.push(sh.name+(q>1?'×'+q:'')+(disc>0?'('+yen(netPrice)+')':''));
+    const p=window.mShochiPrice&&window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
+    total+=p*q;
+    if(q>0)selected.push(sh.name+(q>1?'×'+q:'')+(p!==sh.price?'('+yen(p)+')':''));
   });
   (window.mShochiFree||[]).forEach(row=>{
     if(row.name&&row.price>0){total+=row.price;selected.push(row.name+'('+yen(row.price)+')');}
@@ -3097,11 +3082,7 @@ function calcMShochiTotal(){
   document.getElementById('m-shochi-total').textContent=yen(total);
   const menuEl=document.getElementById('m-menu');
   const menuPriceEl=document.getElementById('m-menu-price');
-  if(menuEl&&selected.length>0){
-    menuEl.value=selected.join('・');
-    if(menuPriceEl)menuPriceEl.value=total;
-    updateMenuTotal();
-  }
+  if(menuEl&&selected.length>0){menuEl.value=selected.join('・');if(menuPriceEl)menuPriceEl.value=total;updateMenuTotal();}
   updateMTotal();
 }
 function toggleDiscInput(id, btn){
@@ -3489,9 +3470,8 @@ async function saveBk(){
   }
   if(!name){alert('患者名を入力してください');return;}
   const shochiArr=shochiMaster.filter(s=>mShochiSel[s.id]>0).map(s=>{
-    const disc=window.mShochiDisc&&window.mShochiDisc[s.id]||0;
-    const netPrice=Math.max(0,s.price-disc);
-    return{id:s.id,name:s.name,price:netPrice,qty:mShochiSel[s.id]||1};
+    const p=window.mShochiPrice&&window.mShochiPrice[s.id]!=null?window.mShochiPrice[s.id]:s.price;
+    return{id:s.id,name:s.name,price:p,qty:mShochiSel[s.id]||1};
   });
   // 自由入力処置を追加
   (window.mShochiFree||[]).forEach(row=>{if(row.name&&row.price>0)shochiArr.push({id:'free_'+Date.now(),name:row.name,price:row.price,qty:1});});
@@ -4031,11 +4011,10 @@ function updatePayDetailSummary(){
   if(!sumDiv||!shochiDiv||!bussanDiv) return;
   const shochiLines = [];
   shochiMaster.forEach(s=>{
-    const qty = mShochiSel[s.id]||0;
+    const qty=mShochiSel[s.id]||0;
     if(qty>0){
-      const disc=window.mShochiDisc&&window.mShochiDisc[s.id]||0;
-      const netPrice=Math.max(0,s.price-disc);
-      shochiLines.push('🩺 '+s.name+' × '+qty+' = '+((netPrice*qty).toLocaleString())+'円'+(disc>0?' ('+disc+'円引き)':''));
+      const p=window.mShochiPrice&&window.mShochiPrice[s.id]!=null?window.mShochiPrice[s.id]:s.price;
+      shochiLines.push('🩺 '+s.name+' × '+qty+' = '+((p*qty).toLocaleString())+'円');
     }
   });
   (window.mShochiFree||[]).forEach(row=>{if(row.name&&row.price>0)shochiLines.push('🩺 '+row.name+' = '+row.price.toLocaleString()+'円');});
