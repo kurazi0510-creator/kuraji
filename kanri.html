@@ -3179,7 +3179,7 @@ function calcMBussanTotal(){
 function updateMTotal(){
   setTimeout(updatePayDetailSummary,50);
   let sh=0,bs=0;
-  shochiMaster.forEach(s=>{sh+=s.price*(mShochiSel[s.id]||0);});
+  shochiMaster.forEach(s=>{const op=window.mShochiPrice&&window.mShochiPrice[s.id]!=null?window.mShochiPrice[s.id]:s.price;sh+=op*(mShochiSel[s.id]||0);});
   bussanMaster.forEach(b=>{
     const disc=mBussanDisc[b.id]||0;
     bs+=Math.max(0,b.price-disc)*(mBussanQty[b.id]||0);
@@ -3459,8 +3459,12 @@ async function saveBk(){
     if(autoTotal>0)payAmount=String(autoTotal);
   }
   if(!name){alert('患者名を入力してください');return;}
-  const shochiArr=shochiMaster.filter(s=>mShochiSel[s.id]>0).map(s=>({id:s.id,name:s.name,price:s.price,qty:mShochiSel[s.id]||1}));
-  const bussanArr=bussanMaster.filter(b=>mBussanQty[b.id]>0).map(b=>({id:b.id,name:b.name,price:b.price,actualPrice:Math.max(0,b.price-(mBussanDisc[b.id]||0)),discount:mBussanDisc[b.id]||0,qty:mBussanQty[b.id]}));
+  const shochiArr=shochiMaster.filter(s=>mShochiSel[s.id]>0).map(s=>{const op=window.mShochiPrice&&window.mShochiPrice[s.id]!=null?window.mShochiPrice[s.id]:s.price;return{id:s.id,name:s.name,price:op,qty:mShochiSel[s.id]||1};});
+  // 自由入力処置を追加
+  (window.mShochiFree||[]).forEach(row=>{if(row.name&&row.price>0)shochiArr.push({id:'free_'+Date.now(),name:row.name,price:row.price,qty:1});});
+  const bussanArr=bussanMaster.filter(b=>mBussanQty[b.id]>0).map(b=>{const op=mBussanPrice&&mBussanPrice[b.id]!=null?mBussanPrice[b.id]:b.price;return{id:b.id,name:b.name,price:op,actualPrice:Math.max(0,op-(mBussanDisc[b.id]||0)),discount:mBussanDisc[b.id]||0,qty:mBussanQty[b.id]};});
+  // 自由入力物販を追加
+  (window.mBussanFree||[]).forEach(row=>{if(row.name&&row.price>0)bussanArr.push({id:'free_'+Date.now(),name:row.name,price:row.price,actualPrice:row.price,discount:0,qty:row.qty||1});});
   if(!bookings[date])bookings[date]={};
   const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
   const p=patients.find(p=>p.id===cardId);
@@ -3996,18 +4000,26 @@ function updatePayDetailSummary(){
   const shochiLines = [];
   shochiMaster.forEach(s=>{
     const qty = mShochiSel[s.id]||0;
-    if(qty>0) shochiLines.push('🩺 '+s.name+' × '+qty+' = '+((s.price*qty).toLocaleString())+'円');
+    if(qty>0){
+      const op=window.mShochiPrice&&window.mShochiPrice[s.id]!=null?window.mShochiPrice[s.id]:s.price;
+      shochiLines.push('🩺 '+s.name+' × '+qty+' = '+((op*qty).toLocaleString())+'円'+(op!==s.price?' (変更後)':''));
+    }
   });
+  // 自由入力処置
+  (window.mShochiFree||[]).forEach(row=>{if(row.name&&row.price>0)shochiLines.push('🩺 '+row.name+' = '+row.price.toLocaleString()+'円');});
   // 物販サマリー
   const bussanLines = [];
   bussanMaster.forEach(b=>{
     const qty = mBussanQty[b.id]||0;
     if(qty>0){
+      const op=mBussanPrice&&mBussanPrice[b.id]!=null?mBussanPrice[b.id]:b.price;
       const disc = mBussanDisc[b.id]||0;
-      const unitPrice = Math.max(0,b.price-disc);
+      const unitPrice = Math.max(0,op-disc);
       bussanLines.push('🛍 '+b.name+' × '+qty+' = '+(unitPrice*qty).toLocaleString()+'円'+(disc>0?' ('+disc+'円引き)':''));
     }
   });
+  // 自由入力物販
+  (window.mBussanFree||[]).forEach(row=>{if(row.name&&row.price>0)bussanLines.push('🛍 '+row.name+' × '+(row.qty||1)+' = '+((row.price*(row.qty||1)).toLocaleString())+'円');});
   const hasData = shochiLines.length>0||bussanLines.length>0;
   sumDiv.style.display = hasData?'block':'none';
   shochiDiv.innerHTML = shochiLines.join('<br>');
