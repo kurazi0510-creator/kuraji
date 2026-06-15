@@ -3019,29 +3019,51 @@ function buildShochiDirectTable(){
     tr.style.borderBottom='1px solid #f1f5f9';
 
     const nameTd=document.createElement('td');
-    nameTd.style.cssText='padding:6px 4px;font-size:0.82rem;font-weight:'+(isSelected?'700':'400')+';color:'+(isSelected?'#166534':'#334155');
+    nameTd.style.cssText='padding:6px 4px;font-size:0.82rem;font-weight:'+(isSelected?'700':'400')+';color:'+(isSelected?'#166534':'#334155')+';cursor:pointer';
     nameTd.textContent=(isSelected?'✅ ':'')+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
+    nameTd.onclick=function(){
+      const tr=this.closest('tr');
+      const priceInp=tr.querySelector('input[data-shid="'+sh.id+'"]');
+      const qtyInp=tr.querySelectorAll('input[type=number]')[0];
+      if((mShochiSel[sh.id]||0)>0){
+        // 解除
+        mShochiSel[sh.id]=0;
+        delete window.mShochiPrice[sh.id];
+        if(priceInp){priceInp.value='';priceInp.style.borderColor='#e2e8f0';}
+        tr.style.background='white';
+        this.style.fontWeight='400';this.style.color='#334155';
+        this.textContent=sh.name+'（定価'+sh.price.toLocaleString()+'円）';
+      }else{
+        // 選択（定価で選択）
+        const q=qtyInp?parseInt(qtyInp.value)||1:1;
+        mShochiSel[sh.id]=q;
+        window.mShochiPrice[sh.id]=sh.price;
+        if(priceInp){priceInp.value=sh.price;priceInp.style.borderColor='#4ade80';}
+        tr.style.background='#f0fdf4';
+        this.style.fontWeight='700';this.style.color='#166534';
+        this.textContent='✅ '+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
+      }
+      calcMShochiTotal();
+    };
 
-    // 個数セル（枚・本単位のみ表示）
+    // 個数セル（全処置で入力可能）
     const qtyTd=document.createElement('td');
     qtyTd.style.cssText='padding:4px;text-align:center';
-    if(sh.unit==='枚'||sh.unit==='本'){
-      const qtyInp=document.createElement('input');
-      qtyInp.type='number';qtyInp.min='1';
-      qtyInp.value=Math.max(1,mShochiSel[sh.id]||1);
-      qtyInp.dataset.shid=sh.id;
-      qtyInp.style.cssText='width:50px;padding:5px 4px;border:1.5px solid #94a3b8;border-radius:8px;font-size:0.9rem;font-weight:700;text-align:center';
-      qtyInp.oninput=function(){
-        const id=this.dataset.shid;
-        const q=parseInt(this.value)||1;
+    const qtyInp=document.createElement('input');
+    qtyInp.type='number';qtyInp.min='1';
+    qtyInp.value=Math.max(1,mShochiSel[sh.id]||1);
+    qtyInp.dataset.shid=sh.id;
+    qtyInp.style.cssText='width:50px;padding:5px 4px;border:1.5px solid #94a3b8;border-radius:8px;font-size:0.9rem;font-weight:700;text-align:center';
+    qtyInp.oninput=function(){
+      const id=this.dataset.shid;
+      const q=parseInt(this.value)||1;
+      // 金額が入っていれば選択済みとして個数更新
+      if((window.mShochiPrice[id]!=null&&window.mShochiPrice[id]>0)){
         mShochiSel[id]=q;
         calcMShochiTotal();
-      };
-      qtyTd.appendChild(qtyInp);
-    }else{
-      qtyTd.textContent='1';
-      qtyTd.style.cssText='padding:4px;text-align:center;font-size:0.9rem;color:#94a3b8';
-    }
+      }
+    };
+    qtyTd.appendChild(qtyInp);
 
     // 金額セル
     const priceTd=document.createElement('td');
@@ -3060,7 +3082,10 @@ function buildShochiDirectTable(){
       const val=parseInt(this.value)||0;
       const defPrice=parseInt(this.dataset.defprice)||0;
       if(val>0){
-        mShochiSel[id]=mShochiSel[id]||1;
+        // 個数欄の値を取得して反映
+        const qtyEl=this.closest('tr').querySelector('input[type=number][data-shid]');
+        const q=qtyEl&&qtyEl!==this?parseInt(qtyEl.value)||1:mShochiSel[id]||1;
+        mShochiSel[id]=q;
         window.mShochiPrice[id]=val;
         this.style.borderColor='#4ade80';
       }else{
