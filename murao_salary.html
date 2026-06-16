@@ -163,7 +163,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 .btn-green{background:var(--green);color:#fff}
 .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 
-@media print{body{background:#fff;padding:0}.no-print,.hide-print{display:none!important}.card{break-inside:avoid}}
+@media print{body{background:#fff;padding:0}.hide-on-print{display:none!important}.card{break-inside:avoid}}
 @media(min-width:768px){body{max-width:780px;margin:0 auto;padding:24px 20px}.settings-grid{grid-template-columns:repeat(4,1fr)}.rate-info{grid-column:1/-1}}
 @media(max-width:480px){.totals-grid{grid-template-columns:1fr 1fr}.total-box.highlight{grid-column:1/-1}}
 </style>
@@ -189,7 +189,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 </div>
 
 <!-- ② 基本設定 -->
-<div class="card no-print">
+<div class="card hide-on-print">
   <div class="card-title">基本設定</div>
   <div class="settings-grid">
     <div class="field"><label>スタッフ名</label><input type="text" id="staffName" value="村尾"></div>
@@ -201,7 +201,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 </div>
 
 <!-- ③ 休業期間設定 -->
-<div class="card no-print">
+<div class="card hide-on-print">
   <div class="card-title">🏖 休業期間設定</div>
   <div class="rest-period-grid">
     <select id="newRestType" style="-webkit-appearance:none;appearance:none;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:.82rem;background:var(--bg);flex:0 0 100px">
@@ -218,7 +218,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 
 <!-- ④ 月別勤怠 -->
 <div class="card">
-  <div class="month-nav no-print">
+  <div class="month-nav hide-on-print">
     <button onclick="changeMonth(-1)">◀ 前月</button>
     <span class="month-label" id="monthLabel"></span>
     <button onclick="changeMonth(1)">翌月 ▶</button>
@@ -251,14 +251,14 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
       <textarea class="note-area" id="noteArea" placeholder="特記事項があれば入力…"></textarea>
     </div>
   </div>
-  <div class="btn-row no-print">
+  <div class="btn-row hide-on-print">
     <button class="btn btn-primary" onclick="saveMonth()">💾 この月を保存</button>
     <button class="btn btn-green" onclick="window.print()">🖨 印刷</button>
   </div>
 </div>
 
 <!-- ⑥ 支払い履歴 -->
-<div class="card no-print">
+<div class="card hide-on-print">
   <div class="card-title">支払い履歴</div>
   <div class="history-list" id="historyList"></div>
 </div>
@@ -620,7 +620,33 @@ function collectData(){
   }
   return data;
 }
-function autoSaveDay(){ localStorage.setItem(MK(currentYear,currentMonth), JSON.stringify(collectData())); }
+function autoSaveDay(){
+  const data = collectData();
+  localStorage.setItem(MK(currentYear,currentMonth), JSON.stringify(data));
+  // GASにも自動バックアップ（サイレント・エラーは無視）
+  clearTimeout(window._gasTimer);
+  window._gasTimer = setTimeout(()=>{ gasAutoBackup(); }, 2000);
+}
+
+async function gasAutoBackup(){
+  try{
+    const payload = {};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k.startsWith('murao_')) payload[k]=localStorage.getItem(k);
+    }
+    const encoded = encodeURIComponent(JSON.stringify(payload));
+    const url = GAS_URL+'?action=saveMurao&data='+encoded+'&t='+Date.now();
+    const res = await fetch(url,{method:'GET',mode:'cors'});
+    const json = await res.json();
+    if(json.status==='ok'){
+      setSyncStatus('✅ 自動バックアップ完了 '+nowStr());
+    }
+  }catch(e){
+    // サイレントエラー（通信失敗時はlocalStorageに残る）
+    setSyncStatus('⚠ バックアップ失敗（ローカルには保存済）');
+  }
+}
 function saveMonth(){ autoSaveDay(); renderHistory(); showToast('💾 保存しました！'); }
 function changeMonth(delta){
   autoSaveDay();
@@ -694,6 +720,29 @@ loadSettings();
 renderRestTags();
 buildTable(currentYear, currentMonth);
 renderHistory();
+// 起動時: localStorageにデータがなければGASから自動取得
+(async ()=>{
+  const hasMuraoData = Object.keys(localStorage).some(k=>k.startsWith('murao_salary_'));
+  if(!hasMuraoData){
+    setSyncStatus('🔄 クラウドからデータ取得中…');
+    try{
+      const res = await fetch(GAS_URL+'?action=loadMurao&t='+Date.now());
+      const json = await res.json();
+      if(json.status==='ok' && json.data && Object.keys(json.data).length>0){
+        Object.entries(json.data).forEach(([k,v])=>{ if(k.startsWith('murao_')) localStorage.setItem(k,v); });
+        setSyncStatus('✅ クラウドからデータ復元 '+nowStr());
+        loadSettings();
+        renderRestTags();
+        buildTable(currentYear,currentMonth);
+        renderHistory();
+      } else {
+        setSyncStatus('📱 新規データなし');
+      }
+    }catch(e){
+      setSyncStatus('⚠ クラウド接続失敗（オフライン？）');
+    }
+  }
+})();
 </script>
 </body>
 </html>
