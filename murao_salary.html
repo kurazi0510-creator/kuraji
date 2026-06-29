@@ -736,8 +736,18 @@ function showToast(msg){
   setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},2200);
 }
 
+// ★ Service Workerは廃止しました（古いキャッシュが原因で入力内容が
+//    一切反映されない不具合が発生したため）。以前インストールされた
+//    Service Workerとキャッシュを自動的に解除・削除します。
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('murao_sw.js').catch(()=>{}));
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(r=>r.unregister());
+  }).catch(()=>{});
+}
+if('caches' in window){
+  caches.keys().then(keys=>{
+    keys.forEach(k=>caches.delete(k));
+  }).catch(()=>{});
 }
 
 document.getElementById('noteArea').addEventListener('input', autoSaveDay);
