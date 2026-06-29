@@ -225,7 +225,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
   </div>
   <div class="card-title" style="margin-top:4px">勤怠入力</div>
   <p style="font-size:.72rem;color:var(--muted);margin:-6px 0 10px">
-    📌 基本スケジュール（水・金 15:00–20:00／土 8:30–12:30）を自動入力済み。早上がりの日は「終了」時刻だけ変更、急な休みは「出勤」のチェックを外して「休暇区分」と理由を選んでください。
+    📌 水・金は開始15:00、土は開始8:30を自動入力済み。終了時刻は早上がりに対応するため毎回ご入力ください。急な休みは「出勤」のチェックを外して「休暇区分」と理由を選んでください。
   </p>
   <div class="table-wrap">
     <table>
@@ -356,12 +356,12 @@ const MK  = (y,m) => `murao_salary_${y}_${m}`;
 
 // ═══════════════════════════════════
 // 基本勤務スケジュール（曜日デフォルト）
-//   水・金：15:00〜20:00 ／ 土：8:30〜12:30
+//   水・金：開始 15:00 ／ 土：開始 8:30　※終了時刻は早上がり対応のため自動入力しない
 //   未入力の日のみ自動で反映（既存の入力・休暇は上書きしない）
 // ═══════════════════════════════════
-function getDefaultForDow(dow){
-  if(dow===3 || dow===5) return {start:15,   end:20};   // 水・金
-  if(dow===6)            return {start:8.5,  end:12.5}; // 土
+function getDefaultStartForDow(dow){
+  if(dow===3 || dow===5) return 15;   // 水・金
+  if(dow===6)            return 8.5;  // 土
   return null;
 }
 
@@ -454,8 +454,9 @@ function buildTimeOptions(sel){
 
 const ABS_OPTS = [
   {v:'',       l:'－'},
-  {v:'staff',  l:'本人都合'},
   {v:'clinic', l:'院都合'},
+  {v:'staff2', l:'スタッフ都合'},
+  {v:'staff',  l:'本人都合'},
   {v:'hol',    l:'祝日休'},
   {v:'nenki',  l:'年末年始'},
   {v:'bon',    l:'盆休み'},
@@ -466,7 +467,7 @@ function buildAbsOptions(val){
 }
 function styleAbsSel(sel){
   sel.className = 'abs-sel';
-  if(sel.value==='staff')  sel.classList.add('abs-staff');
+  if(sel.value==='staff' || sel.value==='staff2')  sel.classList.add('abs-staff');
   else if(sel.value==='clinic') sel.classList.add('abs-clinic');
   else if(['hol','nenki','bon'].includes(sel.value)) sel.classList.add('abs-hol');
 }
@@ -503,8 +504,8 @@ function buildTable(y,m){
     if(hasRec){
       rec = saved[`d${d}`];               // 既に入力・編集済みの日はそのまま使う
     } else if(!holName && !closed){
-      const def = getDefaultForDow(dow);  // 未入力日は基本スケジュールを自動反映
-      rec = def ? {work:true, start:def.start, end:def.end, absType:'', absNote:''} : {};
+      const defStart = getDefaultStartForDow(dow);  // 未入力日は開始時刻だけ自動反映（終了は本人入力）
+      rec = defStart!=null ? {work:true, start:defStart, end:'', absType:'', absNote:''} : {};
     } else {
       rec = {};
     }
@@ -614,8 +615,8 @@ function recalc(){
   document.getElementById('totalHours').textContent = `${sumHours.toFixed(1)} h`;
   document.getElementById('totalPay').textContent   = '¥' + sumPay.toLocaleString();
 
-  const labelMap = {staff:'本人都合',clinic:'院都合',hol:'祝日休',nenki:'年末年始',bon:'盆休み',other:'その他'};
-  const colorMap = {staff:'#fff8e6',clinic:'#fff0f0',hol:'#fff5f5',nenki:'#fff5f5',bon:'#fff5f5',other:'#f3f0ec'};
+  const labelMap = {staff:'本人都合',staff2:'スタッフ都合',clinic:'院都合',hol:'祝日休',nenki:'年末年始',bon:'盆休み',other:'その他'};
+  const colorMap = {staff:'#fff8e6',staff2:'#fff8e6',clinic:'#fff0f0',hol:'#fff5f5',nenki:'#fff5f5',bon:'#fff5f5',other:'#f3f0ec'};
   const chips = document.getElementById('restChips');
   chips.innerHTML = Object.entries(absCnt).map(([k,v])=>
     `<span class="rest-chip" style="background:${colorMap[k]||'#f3f0ec'}">${labelMap[k]||k}：${v}日</span>`
