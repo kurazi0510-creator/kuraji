@@ -4709,9 +4709,7 @@ async function savePEdit(){
   // 診察券No変更処理
   const newId=document.getElementById('pe-id').value.trim();
   if(newId && newId!==p.id){
-    if(patients.find(x=>x.id===newId&&x!==p)){
-      alert('この診察券No（'+newId+'）は既に他の患者に使われています');return;
-    }
+    // 重複チェックなし（同じ番号への変更も許可）
     const oldId=p.id;
     // 予約表の全cardIdを更新
     Object.keys(bookings).forEach(date=>{
