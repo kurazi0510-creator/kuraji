@@ -1294,7 +1294,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <!-- 基本情報タブ -->
     <div id="pe-pane-basic">
     <div class="fgrid">
-      <div class="fg"><label>診察券No</label><input class="inp" id="pe-id" readonly style="background:#f4f1eb"></div>
+      <div class="fg"><label>診察券No <span style="font-size:0.68rem;color:#e67e22;font-weight:700">※変更すると予約表も全て更新されます</span></label><input class="inp" id="pe-id" type="number" placeholder="診察券No"></div>
       <div class="fg"><label>患者名</label><input class="inp" id="pe-nm"></div>
       <div class="fg"><label>ふりがな（カタカナ）</label><input class="inp" id="pe-kana" placeholder="ヤマダ タロウ"></div>
       <div class="fg"><label>性別</label><select class="sel" id="pe-sex"><option value="女性">女性</option><option value="男性">男性</option><option value="-">-</option></select></div>
@@ -4706,6 +4706,24 @@ function setAlertSend(val){
 }
 async function savePEdit(){
   const p=patients.find(x=>x.id===editPatientId);if(!p)return;
+  // 診察券No変更処理
+  const newId=document.getElementById('pe-id').value.trim();
+  if(newId && newId!==p.id){
+    if(patients.find(x=>x.id===newId&&x!==p)){
+      alert('この診察券No（'+newId+'）は既に他の患者に使われています');return;
+    }
+    const oldId=p.id;
+    // 予約表の全cardIdを更新
+    Object.keys(bookings).forEach(date=>{
+      Object.keys(bookings[date]).forEach(slot=>{
+        const b=bookings[date][slot];
+        if(b&&String(b.cardId)===oldId) b.cardId=newId;
+      });
+    });
+    p.id=newId;
+    editPatientId=newId;
+    alert('診察券Noを '+oldId+' → '+newId+' に変更しました');
+  }
   p.name=document.getElementById('pe-nm').value.trim();
   p.kana=document.getElementById('pe-kana').value.trim();
   p.sex=document.getElementById('pe-sex').value;
