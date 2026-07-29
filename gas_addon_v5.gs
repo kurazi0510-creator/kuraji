@@ -1,34 +1,22 @@
 // ═══════════════════════════════════════════════════════════
 // 倉治整骨院 管理システム v5 追加分
-// 以下を「既存のgas.gs（Apps Scriptエディタで開いているコード）」の
-// 一番下にそのまま貼り付けてください。doGet/doPostは既存のものを
-// 下記の【必須修正】の通り書き換えてください。
+//
+// ★やることは1つだけです★
+// 既存のコードの中から「var action=body.action」という文字を検索(Ctrl+F)して、
+// 見つかった行の一番後ろにカーソルを置いてEnterで改行し、
+// 下の【ここから】〜【ここまで】の6行をそのまま貼り付けてください。
+//
+// 【ここから】
+//   if(body.events){ return handleLineWebhook(body); }
+//   if(action==='saveWebBooking'){ return ContentService.createTextOutput(JSON.stringify(saveWebBooking(body.data))).setMimeType(ContentService.MimeType.JSON); }
+//   if(action==='lineNotifyV2'){ return ContentService.createTextOutput(JSON.stringify(sendLinePush(body.token,body.userId,body.message))).setMimeType(ContentService.MimeType.JSON); }
+//   if(action==='getMenuMaster'){ return ContentService.createTextOutput(JSON.stringify(getMenuMaster())).setMimeType(ContentService.MimeType.JSON); }
+//   if(action==='saveMenuMaster'){ return ContentService.createTextOutput(JSON.stringify(saveMenuMaster(body.rows))).setMimeType(ContentService.MimeType.JSON); }
+// 【ここまで】
+//
+// これ以外は一切さわらなくて大丈夫です。
+// この6行より下（この説明文より下）は、まるごとファイルの一番下に貼り付けるだけでOKです。
 // ═══════════════════════════════════════════════════════════
-
-// ─────────────────────────────────────────────
-// 【必須修正1】既存の doPost 関数の一番上、
-// 「var body={};try{body=JSON.parse...」の直後に以下を追加してください。
-// （LINEからのWebhookと、通常のアプリからのリクエストを振り分けるため）
-// ─────────────────────────────────────────────
-//
-//   if(body.events){ return handleLineWebhook(body); }   // ★この1行を追加
-//
-// 追加場所イメージ：
-// function doPost(e){
-//   var body={};try{body=JSON.parse(e.postData.contents);}catch(err){}
-//   if(body.events){ return handleLineWebhook(body); }   // ★追加
-//   var action=body.action||'',result;
-//   ...（以下は既存のまま）
-
-// ─────────────────────────────────────────────
-// 【必須修正2】既存の doPost 内の if/else if チェーンに、
-// 以下の3行を追加してください（"unknown action"の手前に入れる）
-// ─────────────────────────────────────────────
-//
-//   else if(action==='saveWebBooking'){result=saveWebBooking(body.data);}
-//   else if(action==='lineNotifyV2'){result=sendLinePush(body.token,body.userId,body.message);}
-//   else if(action==='getMenuMaster'){result=getMenuMaster();}
-//   else if(action==='saveMenuMaster'){result=saveMenuMaster(body.rows);}
 
 // ─────────────────────────────────────────────
 // 【設定】チャネルアクセストークンをスクリプトプロパティに保存
