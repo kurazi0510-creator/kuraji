@@ -234,6 +234,9 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="showFutureBookings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
       <button class="btn bp bsm" onclick="toggleDayMemo()" style="margin-top:16px;background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
       <button class="btn bp bsm" onclick="showSymptomList()" style="margin-top:16px;background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
+      <button class="btn bp bsm" onclick="window.open('consent.html','_blank')" style="margin-top:16px;background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
+      <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
+      <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
       <button class="btn ba bsm" onclick="forcePushBookings()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626" title="このデバイスの予約データをGASに送信して復元">📤 予約データ復元送信</button>
     </div>
@@ -2644,6 +2647,21 @@ function generateCarePlan(){
       '<div class="sign-box">施術者<br><br><br>倉治整骨院 院長</div>'+
     '</div>';
   showPrintModal('施術計画書 - '+p.name+'様', html);
+}
+
+// ===== Web予約フォーム用：自費メニューをGASに同期 =====
+async function syncMenuMasterToGAS(){
+  try{
+    const sm=JSON.parse(localStorage.getItem('kj_sm')||'[]');
+    const rows=sm.map(m=>[m.name, m.price, m.unit||'']);
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveMenuMaster',rows})
+    });
+    const d=await res.json();
+    alert(d.ok?'✅ Web予約フォームにメニューを反映しました':'❌ 失敗：'+(d.error||''));
+  }catch(e){alert('❌ 通信エラー：'+e.message);}
 }
 
 // ===== LINE Notify =====

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>電子同意書 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;font-family:'Hiragino Sans',sans-serif;}
+body{background:#f0f4f8;min-height:100vh;}
+.header{background:#1e293b;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.header h1{font-size:.85rem;font-weight:bold;}
+.back-btn{background:#f97316;color:#fff;padding:7px 14px;border:none;border-radius:7px;font-size:.75rem;font-weight:bold;cursor:pointer;}
+.wrap{padding:10px;max-width:680px;margin:0 auto;}
+.card{background:#fff;border-radius:10px;padding:12px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.07);}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
+.tab{padding:8px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:.74rem;font-weight:bold;cursor:pointer;background:#fff;color:#374151;white-space:nowrap;flex-shrink:0;}
+.tab.active{border-color:#1e293b;background:#1e293b;color:#fff;}
+label{display:block;font-size:.75rem;color:#64748b;font-weight:bold;margin:8px 0 4px;}
+input,select{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px 10px;font-size:.82rem;}
+.doc-title{font-size:1rem;font-weight:bold;text-align:center;margin:6px 0 12px;color:#1e293b;}
+.doc-body{font-size:.8rem;line-height:1.9;color:#374151;white-space:pre-wrap;background:#f8fafc;border-radius:8px;padding:12px;max-height:280px;overflow-y:auto;}
+.sign-lbl{font-size:.78rem;color:#374151;font-weight:bold;margin:10px 0 6px;}
+.canvas-wrap{position:relative;border:2px dashed #cbd5e1;border-radius:8px;overflow:hidden;background:#fff;touch-action:none;}
+#sigPad{display:block;width:100%;height:160px;touch-action:none;}
+.sig-placeholder{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:.72rem;color:#cbd5e1;pointer-events:none;}
+.action-row{display:flex;gap:6px;margin-top:8px;}
+.btn{padding:10px 12px;border:none;border-radius:8px;font-size:.8rem;font-weight:bold;cursor:pointer;flex:1;}
+.b-clr{background:#fef3c7;color:#92400e;}
+.b-save{background:#1e293b;color:#fff;}
+.b-print{background:#16a34a;color:#fff;}
+.saved-list{margin-top:6px;}
+.saved-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.78rem;}
+.saved-row button{padding:5px 10px;border:none;border-radius:5px;font-size:.68rem;font-weight:bold;cursor:pointer;background:#e2e8f0;color:#374151;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📝 電子同意書｜倉治整骨院</h1>
+  <button class="back-btn" onclick="location.href='kanri.html'">← 戻る</button>
+</div>
+<div class="wrap">
+
+<div class="card">
+  <div class="tabs" id="tplTabs"></div>
+</div>
+
+<div class="card">
+  <label>患者名<span style="color:#dc2626">*</span></label>
+  <input type="text" id="c-name" placeholder="山田 太郎">
+  <label>診察券No（任意）</label>
+  <input type="text" id="c-card" placeholder="0123">
+  <label>作成日</label>
+  <input type="date" id="c-date">
+</div>
+
+<div class="card">
+  <div class="doc-title" id="docTitle"></div>
+  <div class="doc-body" id="docBody"></div>
+</div>
+
+<div class="card">
+  <div class="sign-lbl">✍️ ご署名（指またはマウスでご記入ください）</div>
+  <div class="canvas-wrap">
+    <canvas id="sigPad"></canvas>
+    <div class="sig-placeholder" id="sigPh">ここに署名</div>
+  </div>
+  <div class="action-row">
+    <button class="btn b-clr" onclick="clearSig()">🧹 消去</button>
+    <button class="btn b-save" onclick="saveConsent()">💾 保存</button>
+    <button class="btn b-print" onclick="printConsent()">🖨 印刷</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="sign-lbl">📋 保存済み同意書</div>
+  <div class="saved-list" id="savedList"></div>
+</div>
+
+</div>
+<script>
+const TEMPLATES=[
+  {key:'shochi',label:'施術同意書',title:'施術に関する同意書',
+   body:`私は、倉治整骨院における施術内容について、以下の説明を受け、内容を理解した上で施術を受けることに同意します。
+
+・症状、施術方針について院長より説明を受けました
+・施術には個人差があり、効果を保証するものではないことを理解しました
+・施術中・施術後に痛み・違和感等があれば速やかに申し出ます
+・持病、既往歴、アレルギー等がある場合は事前に申告済みです
+
+上記内容に同意の上、署名いたします。`},
+  {key:'kojin',label:'個人情報同意書',title:'個人情報の取り扱いについての同意書',
+   body:`倉治整骨院は、お預かりする個人情報を以下の目的の範囲内で適正に取り扱います。
+
+・施術・カルテ管理のため
+・予約管理、来院リマインド等のご連絡のため（電話・LINE・メール等）
+・保険請求、各種手続きに必要な範囲での利用
+
+法令に基づく場合を除き、ご本人の同意なく第三者へ提供することはありません。
+
+上記内容に同意の上、署名いたします。`},
+  {key:'jihi',label:'自費料金同意書',title:'自由診療（自費メニュー）料金に関する同意書',
+   body:`ご案内した自費メニューについて、内容・料金の説明を受け、施術を受けることに同意します。
+
+・自費メニューは健康保険の適用外であることを理解しました
+・料金について事前に説明を受け、了承しました
+・途中でメニューの中止・変更を希望する場合はお申し出ください
+
+上記内容に同意の上、署名いたします。`}
+];
+let curTpl=TEMPLATES[0].key;
+
+function renderTabs(){
+  document.getElementById('tplTabs').innerHTML=TEMPLATES.map(t=>
+    `<div class="tab ${t.key===curTpl?'active':''}" onclick="switchTpl('${t.key}')">${t.label}</div>`
+  ).join('');
+}
+function switchTpl(key){
+  curTpl=key; renderTabs();
+  const t=TEMPLATES.find(x=>x.key===key);
+  document.getElementById('docTitle').textContent=t.title;
+  document.getElementById('docBody').textContent=t.body;
+}
+document.getElementById('c-date').value=new Date().toISOString().slice(0,10);
+renderTabs(); switchTpl(curTpl);
+
+// ===== 署名パッド =====
+const cv=document.getElementById('sigPad');
+const cx=cv.getContext('2d');
+let drawing=false, hasSig=false;
+function fitCanvas(){
+  const rect=cv.getBoundingClientRect();
+  const ratio=window.devicePixelRatio||1;
+  cv.width=rect.width*ratio; cv.height=160*ratio;
+  cx.scale(ratio,ratio);
+  cx.lineWidth=2.4; cx.lineCap='round'; cx.strokeStyle='#1e293b';
+}
+fitCanvas(); window.addEventListener('resize',()=>{const img=cv.toDataURL();fitCanvas();});
+function getPos(e){
+  const r=cv.getBoundingClientRect();
+  const p=e.touches?e.touches[0]:e;
+  return {x:p.clientX-r.left, y:p.clientY-r.top};
+}
+function start(e){e.preventDefault();drawing=true;hasSig=true;document.getElementById('sigPh').style.display='none';const p=getPos(e);cx.beginPath();cx.moveTo(p.x,p.y);}
+function move(e){if(!drawing)return;e.preventDefault();const p=getPos(e);cx.lineTo(p.x,p.y);cx.stroke();}
+function end(e){drawing=false;}
+cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);
+function clearSig(){cx.clearRect(0,0,cv.width,cv.height);hasSig=false;document.getElementById('sigPh').style.display='block';}
+
+// ===== 保存 =====
+const STORE_KEY='kj_consents';
+function loadConsents(){return JSON.parse(localStorage.getItem(STORE_KEY)||'[]');}
+function persistConsents(list){localStorage.setItem(STORE_KEY,JSON.stringify(list));}
+
+function saveConsent(){
+  const name=document.getElementById('c-name').value.trim();
+  if(!name){alert('患者名を入力してください');return;}
+  if(!hasSig){alert('署名をお願いします');return;}
+  const t=TEMPLATES.find(x=>x.key===curTpl);
+  const rec={
+    id:'cs_'+Date.now(),
+    name, cardId:document.getElementById('c-card').value.trim(),
+    date:document.getElementById('c-date').value,
+    tplKey:curTpl, tplLabel:t.label, title:t.title, body:t.body,
+    sig: cv.toDataURL('image/png'),
+    savedAt:new Date().toISOString()
+  };
+  const list=loadConsents(); list.unshift(rec); persistConsents(list);
+  renderSaved();
+  clearSig();
+  alert('✅ 保存しました');
+}
+function renderSaved(){
+  const list=loadConsents();
+  if(!list.length){document.getElementById('savedList').innerHTML='<p style="font-size:.76rem;color:#94a3b8">保存済みの同意書はありません</p>';return;}
+  document.getElementById('savedList').innerHTML=list.slice(0,30).map(r=>
+    `<div class="saved-row">
+      <div style="flex:1">${r.date}　${r.name}様　<span style="color:#64748b">${r.tplLabel}</span></div>
+      <button onclick="printSaved('${r.id}')">印刷</button>
+      <button onclick="delSaved('${r.id}')" style="background:#fee2e2;color:#dc2626">削除</button>
+    </div>`
+  ).join('');
+}
+function delSaved(id){
+  if(!confirm('削除しますか？'))return;
+  persistConsents(loadConsents().filter(r=>r.id!==id));
+  renderSaved();
+}
+function buildPrintHtml(rec){
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${rec.title}</title>
+  <style>body{font-family:'Hiragino Sans',sans-serif;padding:36px;color:#1e293b}
+  h1{font-size:1.3rem;text-align:center;margin-bottom:24px}
+  .meta{display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:20px;border-bottom:1px solid #cbd5e1;padding-bottom:10px}
+  .body{font-size:.95rem;line-height:2;white-space:pre-wrap;margin-bottom:30px}
+  .sign{display:flex;justify-content:flex-end;align-items:flex-end;gap:16px}
+  .sign img{height:80px;border-bottom:1px solid #1e293b}
+  .sign-lbl{font-size:.8rem;color:#64748b}
+  </style></head><body>
+  <h1>${rec.title}</h1>
+  <div class="meta"><span>患者名：${rec.name} 様${rec.cardId?'（診察券No.'+rec.cardId+'）':''}</span><span>${rec.date}</span></div>
+  <div class="body">${rec.body}</div>
+  <div class="sign"><span class="sign-lbl">署名：</span><img src="${rec.sig}"></div>
+  </body></html>`;
+}
+function printSaved(id){
+  const rec=loadConsents().find(r=>r.id===id);
+  if(!rec)return;
+  const w=window.open('','_blank');
+  w.document.write(buildPrintHtml(rec));
+  w.document.close();
+  setTimeout(()=>w.print(),300);
+}
+function printConsent(){
+  if(!hasSig){alert('署名をお願いしてから印刷してください（先に保存を推奨します）');return;}
+  const t=TEMPLATES.find(x=>x.key===curTpl);
+  const rec={
+    name:document.getElementById('c-name').value.trim()||'（未入力）',
+    cardId:document.getElementById('c-card').value.trim(),
+    date:document.getElementById('c-date').value,
+    title:t.title, body:t.body, sig:cv.toDataURL('image/png')
+  };
+  const w=window.open('','_blank');
+  w.document.write(buildPrintHtml(rec));
+  w.document.close();
+  setTimeout(()=>w.print(),300);
+}
+renderSaved();
+</script>
+</body>
+</html>
