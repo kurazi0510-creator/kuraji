@@ -50,7 +50,7 @@ async function search(){
   if(tel.length<10){ err.textContent='電話番号を正しく入力してください'; err.style.display='block'; return; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>確認中...';
   try{
-    const r=await fetch(GAS+'?action=lookupBooking&tel='+encodeURIComponent(tel));
+    const r=await fetch(GAS+'?action=lookupBooking&tel='+encodeURIComponent(tel)+'&t='+Date.now(),{cache:'no-store'});
     const d=await r.json();
     if(!d.ok){ err.textContent='⚠️ '+(d.error||'確認に失敗しました'); err.style.display='block'; }
     else if(!d.list || !d.list.length){

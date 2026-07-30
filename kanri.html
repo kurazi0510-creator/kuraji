@@ -2699,6 +2699,27 @@ async function syncMenuMasterToGAS(){
   }catch(e){alert('❌ 通信エラー：'+e.message);}
 }
 
+// ===== 日本の祝日データ（外部の公式祝日カレンダーAPIから取得。1日1回のみ取得しキャッシュ） =====
+let jpHolidays={};
+async function loadJpHolidays(){
+  try{
+    const cache=JSON.parse(localStorage.getItem('kj_holidays_cache')||'null');
+    const oneDayMs=24*60*60*1000;
+    if(cache && cache.fetchedAt && (Date.now()-cache.fetchedAt)<oneDayMs){
+      jpHolidays=cache.data||{};
+      return;
+    }
+    const res=await fetch('https://holidays-jp.github.io/api/v1/date.json',{cache:'no-store'});
+    const data=await res.json();
+    jpHolidays=data||{};
+    localStorage.setItem('kj_holidays_cache',JSON.stringify({fetchedAt:Date.now(),data:jpHolidays}));
+  }catch(e){
+    // 取得失敗時はキャッシュがあればそれを使う
+    const cache=JSON.parse(localStorage.getItem('kj_holidays_cache')||'null');
+    if(cache) jpHolidays=cache.data||{};
+  }
+}
+
 // ===== 営業時間設定 =====
 const BIZ_DOW_LABELS=['日','月','火','水','木','金','土'];
 let bizHours=JSON.parse(localStorage.getItem('kj_biz_hours')||'null')||{
@@ -2822,7 +2843,7 @@ function toHHMM(v){
 }
 async function syncBizHoursFromGAS(){
   try{
-    const res=await fetch(GAS+'?action=getBizHours');
+    const res=await fetch(GAS+'?action=getBizHours&t='+Date.now(),{cache:'no-store'});
     const d=await res.json();
     if(!d.ok) return;
     if(d.weekly && d.weekly.length){
@@ -3041,7 +3062,9 @@ function renderSched(){
   statOverride={}; // 日付が変わったら手動入力をリセット
   const dt=dayType(date);
   const badge=document.getElementById('daybadge');
-  badge.textContent={hei:'終日診療',moku:'午前のみ診療',gogo:'午後のみ診療',nichi:'休診日'}[dt]||dt;
+  const holidayName=jpHolidays[date]||'';
+  badge.textContent=({hei:'終日診療',moku:'午前のみ診療',gogo:'午後のみ診療',nichi:'休診日'}[dt]||dt)+(holidayName?`　🎌${holidayName}`:'');
+  badge.style.color=holidayName?'#dc2626':'';
   badge.className='day-b '+({hei:'d-hei',moku:'d-moku',gogo:'d-gogo',nichi:'d-nichi'}[dt]||'d-nichi');
   const sl=getSlots(dt,date),tbody=document.getElementById('sbody');
   tbody.innerHTML='';
@@ -6185,10 +6208,12 @@ function renderWeekDayTabs(){
     const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const isCur=ds===curVal,isToday=ds===today();
     const di=d.getDay();
+    const holidayName=jpHolidays[ds]||'';
+    const isHoliday=!!holidayName;
     const bg=isCur?'#1e293b':dc[di];
-    const tc=isCur?'white':di===0?'#dc2626':di===6?'#1d4ed8':'#374151';
+    const tc=isCur?'white':(di===0||isHoliday)?'#dc2626':di===6?'#1d4ed8':'#374151';
     const bdr=isToday&&!isCur?'2px solid #f97316':'2px solid transparent';
-    return `<button onclick="selectDate('${ds}')" style="background:${bg};color:${tc};border:${bdr};border-radius:8px;padding:5px 7px;cursor:pointer;font-size:0.72rem;font-weight:bold;min-width:40px;line-height:1.3;text-align:center"><div>${dn[di]}</div><div style="font-size:0.68rem">${d.getDate()}</div></button>`;
+    return `<button onclick="selectDate('${ds}')" title="${holidayName}" style="background:${bg};color:${tc};border:${bdr};border-radius:8px;padding:5px 7px;cursor:pointer;font-size:0.72rem;font-weight:bold;min-width:40px;line-height:1.3;text-align:center">${isHoliday?'<div style="font-size:0.55rem;line-height:1">🎌</div>':''}<div>${dn[di]}</div><div style="font-size:0.68rem">${d.getDate()}</div></button>`;
   }).join('');
 }
 function goPage(id){
@@ -6219,6 +6244,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // まずlocalStorageから即表示（データは消えない）
   load();renderSched();renderWeekDayTabs();recalcAllVisitCounts();renderPatients();
+  loadJpHolidays().then(()=>{renderWeekDayTabs();renderSched();});
   // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
   await syncBizHoursFromGAS();

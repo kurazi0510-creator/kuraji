@@ -118,7 +118,7 @@ const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
 let bizHoursCache=null;
 async function loadBizHours(){
   try{
-    const res=await fetch(GAS+'?action=getBizHours');
+    const res=await fetch(GAS+'?action=getBizHours&t='+Date.now(),{cache:'no-store'});
     const d=await res.json();
     if(d.ok) bizHoursCache={weekly:d.weekly||[], overrides:d.overrides||[]};
   }catch(e){ bizHoursCache=null; }
@@ -221,7 +221,7 @@ async function onDateChange(){
   }
   document.getElementById('slotArea').innerHTML='<p class="note">読み込み中...</p>';
   try{
-    const res=await fetch(GAS+'?action=getAll');
+    const res=await fetch(GAS+'?action=getAll&t='+Date.now(),{cache:'no-store'});
     const d=await res.json();
     bookedSlots={};
     (d.bookings||[]).forEach((row,i)=>{
