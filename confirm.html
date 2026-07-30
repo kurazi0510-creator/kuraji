@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>予約確認 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}
+body{background:#faf6f0;color:#3d3226;min-height:100vh;padding-bottom:40px;}
+.header{background:linear-gradient(135deg,#c98a4b,#e0a86a);color:#fff;padding:22px 16px 18px;text-align:center;}
+.header h1{font-size:1.1rem;font-weight:bold;margin-bottom:4px;}
+.header p{font-size:.75rem;opacity:.95;}
+.wrap{max-width:480px;margin:0 auto;padding:14px;}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(120,90,50,.08);}
+label{display:block;font-size:.76rem;color:#8a7860;font-weight:bold;margin-bottom:6px;}
+input{width:100%;border:1.6px solid #ecdfd0;border-radius:9px;padding:11px 12px;font-size:.95rem;background:#fffdfb;color:#3d3226;}
+input:focus{outline:none;border-color:#c98a4b;}
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:11px;font-size:.9rem;font-weight:bold;cursor:pointer;margin-top:10px;background:#c98a4b;color:#fff;}
+.btn:disabled{background:#e5d9c8;color:#b3a48c;}
+.result-item{background:#fdf8f2;border:1.5px solid #f0e2cf;border-radius:11px;padding:14px;margin-bottom:10px;}
+.result-item .d{font-size:.95rem;font-weight:bold;color:#c98a4b;margin-bottom:4px;}
+.result-item .n{font-size:.82rem;color:#3d3226;}
+.result-item .m{font-size:.78rem;color:#8a7860;margin-top:4px;}
+.empty{text-align:center;padding:24px 10px;color:#a08a6d;font-size:.85rem;}
+.err{background:#fdecec;color:#b3382c;border-radius:9px;padding:10px 12px;font-size:.8rem;margin-top:10px;display:none;}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📋 ご予約内容の確認</h1>
+  <p>ご予約時のお電話番号を入力してください</p>
+</div>
+<div class="wrap">
+  <div class="card">
+    <label>お電話番号</label>
+    <input type="tel" id="tel" placeholder="09012345678" inputmode="numeric">
+    <button class="btn" id="btn" onclick="search()">確認する</button>
+    <div class="err" id="err"></div>
+  </div>
+  <div id="results"></div>
+</div>
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbyKj_YkWdU747zl6IcanFsI1-O2IBUDli8wMSRnAJUfYEptCexelUHgl4uYnDiNwYnEqg/exec';
+async function search(){
+  const tel=document.getElementById('tel').value.replace(/[^0-9]/g,'');
+  const btn=document.getElementById('btn'), err=document.getElementById('err'), res=document.getElementById('results');
+  err.style.display='none'; res.innerHTML='';
+  if(tel.length<10){ err.textContent='電話番号を正しく入力してください'; err.style.display='block'; return; }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>確認中...';
+  try{
+    const r=await fetch(GAS+'?action=lookupBooking&tel='+encodeURIComponent(tel));
+    const d=await r.json();
+    if(!d.ok){ err.textContent='⚠️ '+(d.error||'確認に失敗しました'); err.style.display='block'; }
+    else if(!d.list || !d.list.length){
+      res.innerHTML='<div class="card empty">今後のご予約は見つかりませんでした。<br>Web予約フォームからのご予約のみ確認できます。</div>';
+    }else{
+      res.innerHTML=d.list.map(b=>{
+        const dd=new Date(b.date);
+        const disp=isNaN(dd.getTime())?b.date:dd.toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'});
+        return `<div class="result-item"><div class="d">${disp} ${b.time}〜</div><div class="n">${b.name} 様</div><div class="m">${b.menu||''}</div></div>`;
+      }).join('');
+    }
+  }catch(e){
+    err.textContent='⚠️ 通信エラーが発生しました'; err.style.display='block';
+  }
+  btn.disabled=false; btn.innerHTML='確認する';
+}
+</script>
+</body>
+</html>

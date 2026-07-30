@@ -73,6 +73,8 @@ textarea{resize:none;height:64px;}
     <input type="text" id="f-name" placeholder="山田 太郎">
     <label>お電話番号<span class="req">必須</span></label>
     <input type="tel" id="f-tel" placeholder="09012345678" inputmode="numeric">
+    <label>メールアドレス（お持ちの方は入力ください・LINEをお使いでない方はこちらに確認メールが届きます）</label>
+    <input type="text" id="f-email" placeholder="example@mail.com" inputmode="email">
     <label>診察券No（お持ちの方のみ）</label>
     <input type="text" id="f-card" placeholder="例：0123">
     <label>症状・ご要望（任意）</label>
@@ -94,6 +96,9 @@ textarea{resize:none;height:64px;}
     </div>
     <a id="lineAddBtn" href="#" target="_blank" style="display:block;margin-top:12px">
       <button class="btn" style="background:#06c755;color:#fff">LINEで倉治整骨院を友だち追加</button>
+    </a>
+    <a href="confirm.html" style="display:block;margin-top:8px">
+      <button class="btn" style="background:#fff;color:#c98a4b;border:2px solid #c98a4b">📋 あとで予約内容を確認する</button>
     </a>
   </div>
 </div>
@@ -205,6 +210,7 @@ async function submitBooking(){
   const date=document.getElementById('f-date').value;
   const name=document.getElementById('f-name').value.trim();
   const tel=document.getElementById('f-tel').value.replace(/[^0-9\-]/g,'');
+  const email=document.getElementById('f-email').value.trim();
   const cardId=document.getElementById('f-card').value.trim();
   const sym=document.getElementById('f-sym').value.trim();
   const errBox=document.getElementById('errBox');
@@ -215,7 +221,7 @@ async function submitBooking(){
       method:'POST',
       headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'saveWebBooking',data:{
-        date,time:selSlot,name,tel,cardId,symptom:sym,
+        date,time:selSlot,name,tel,email,cardId,symptom:sym,
         menu:selMenu.label,slotsNeeded:selMenu.slots
       }})
     });

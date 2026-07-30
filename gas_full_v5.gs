@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -300,6 +300,11 @@ function saveWebBooking(data){
       s.appendRow(newRow);
     });
 
+    // 予約確認ページ(confirm.html)から電話番号で検索できるよう、別シートに控えを保存
+    var meta=ss.getSheetByName("web_yoyaku_meta");
+    if(!meta){ meta=ss.insertSheet("web_yoyaku_meta"); meta.getRange(1,1,1,7).setValues([["date","time","name","tel","email","menu","createdAt"]]); }
+    meta.appendRow([data.date, data.time, data.name||"", data.tel||"", data.email||"", data.menu||"", new Date()]);
+
     var p=PropertiesService.getScriptProperties();
     var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
     var nl=String.fromCharCode(10);
@@ -325,8 +330,44 @@ function saveWebBooking(data){
         }
       }
     }
+    // メールアドレスが入力されていれば、LINEの有無に関わらずメールでも確認を送る
+    if(data.email){
+      try{
+        var dispDate2=Utilities.formatDate(new Date(data.date),"Asia/Tokyo","M月d日(E)");
+        MailApp.sendEmail({
+          to: data.email,
+          subject: "【倉治整骨院】ご予約確認",
+          body: (data.name||"")+" 様"+nl+nl+"この度はご予約ありがとうございます。以下の内容で承りました。"+nl+nl+
+                "日時："+dispDate2+" "+data.time+"〜"+nl+
+                "メニュー："+(data.menu||"")+nl+nl+
+                "ご都合が悪くなった場合はお電話にてご連絡ください。"+nl+nl+
+                "倉治整骨院"
+        });
+      }catch(err){ Logger.log("mail error:"+err); }
+    }
     return {ok:true};
   }catch(err){ return {ok:false, error:err.message}; }
+}
+
+// 予約確認ページ(confirm.html)用：電話番号から今後の予約を検索
+function lookupBooking(tel){
+  var digits=String(tel||"").replace(/[^0-9]/g,"");
+  if(!digits) return {ok:false, error:"電話番号を入力してください"};
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var meta=ss.getSheetByName("web_yoyaku_meta");
+  if(!meta) return {ok:true, list:[]};
+  var rows=meta.getDataRange().getValues();
+  var today=new Date();today.setHours(0,0,0,0);
+  var list=[];
+  for(var i=1;i<rows.length;i++){
+    var rTel=String(rows[i][3]||"").replace(/[^0-9]/g,"");
+    if(rTel!==digits) continue;
+    var d=new Date(String(rows[i][0]));
+    if(isNaN(d.getTime())||d<today) continue;
+    list.push({date:String(rows[i][0]), time:String(rows[i][1]), name:String(rows[i][2]), menu:String(rows[i][5])});
+  }
+  list.sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1;});
+  return {ok:true, list:list};
 }
 
 // 自費メニュー(処置マスター)をGASにも保存し、Web予約フォームから見えるようにする
