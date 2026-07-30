@@ -16,6 +16,10 @@ function doPost(e){
     if(body.events){
       body.events.forEach(function(ev){
         try{
+          if(ev.type==="follow"&&ev.source&&ev.source.userId){
+            var tok0=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
+            if(tok0)sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"ご予約のお知らせ・前日リマインドをこちらのLINEでお受け取りいただくために、お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、お電話番号での確認をお願いしております）");
+          }
           if(ev.type==="message"&&ev.source&&ev.source.userId){
             var uid=ev.source.userId;
             var dname="";
@@ -24,7 +28,16 @@ function doPost(e){
               var r=UrlFetchApp.fetch("https://api.line.me/v2/bot/profile/"+uid,{headers:{"Authorization":"Bearer "+tok},muteHttpExceptions:true});
               if(r.getResponseCode()===200)dname=JSON.parse(r.getContentText()).displayName||"";
             }
-            saveLineUserId(uid,dname,ev.message.text||"");
+            var msgText=(ev.message&&ev.message.text)||"";
+            var digits=String(msgText).replace(/[^0-9]/g,"");
+            if(digits.length>=10&&digits.length<=11){
+              saveLinePhone_(uid,digits,dname);
+              if(tok)sendLineMessagingAPI(tok,uid,"📱 お電話番号を登録しました！"+String.fromCharCode(10)+"今後、ご予約確認・前日リマインドをこちらのLINEにお送りします。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
+            }else{
+              var already=findPhoneByUid_(uid);
+              saveLineUserId(uid,dname,msgText);
+              if(tok&&!already)sendLineMessagingAPI(tok,uid,"いつもありがとうございます😊"+String.fromCharCode(10)+"ご予約のお知らせを受け取るには、お電話番号を数字のみで送ってください。"+String.fromCharCode(10)+"例）09012345678");
+            }
           }
         }catch(err){Logger.log("event error:"+err);}
       });
@@ -51,13 +64,62 @@ function doPost(e){
 function saveLineUserId(userId,displayName,message){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("LINE_IDs");
-  if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,4).setValues([["userId","name","lastMsg","updated"]]);}
+  if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,5).setValues([["userId","name","lastMsg","updated","phone"]]);}
   var data=s.getDataRange().getValues();
   var now=new Date();
   for(var i=1;i<data.length;i++){
     if(data[i][0]===userId){s.getRange(i+1,2,1,3).setValues([[displayName||data[i][1],message,now]]);return;}
   }
-  s.appendRow([userId,displayName,message,now]);
+  s.appendRow([userId,displayName,message,now,""]);
+}
+// 電話番号でLINE友だちを紐付け（表示名があだ名でも確実に照合できる）
+function saveLinePhone_(userId,phoneDigits,displayName){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("LINE_IDs");
+  if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,5).setValues([["userId","name","lastMsg","updated","phone"]]);}
+  var data=s.getDataRange().getValues();
+  var now=new Date();
+  for(var i=1;i<data.length;i++){
+    if(data[i][0]===userId){
+      s.getRange(i+1,2,1,4).setValues([[displayName||data[i][1],"(電話番号登録)",now,phoneDigits]]);
+      return;
+    }
+  }
+  s.appendRow([userId,displayName||"",("(電話番号登録)"),now,phoneDigits]);
+}
+function findPhoneByUid_(userId){
+  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+  if(!s) return "";
+  var data=s.getDataRange().getValues();
+  for(var i=1;i<data.length;i++){ if(data[i][0]===userId) return String(data[i][4]||""); }
+  return "";
+}
+// 電話番号からLINEのuserIdを検索（表示名の一致に頼らない、最優先の照合方法）
+function findLineUidByPhone_(phone){
+  var digits=String(phone||"").replace(/[^0-9]/g,"");
+  if(!digits) return "";
+  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+  if(!s) return "";
+  var data=s.getDataRange().getValues();
+  for(var i=1;i<data.length;i++){
+    var p=String(data[i][4]||"").replace(/[^0-9]/g,"");
+    if(p&&p===digits) return String(data[i][0]);
+  }
+  return "";
+}
+// 患者名から電話番号を検索（患者シートから）。dailyLineAlert/sendDayBeforeReminders用
+function getTelByPatientName_(name){
+  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
+  if(!s) return "";
+  var data=s.getDataRange().getValues();
+  var headers=(data[0]||[]).map(function(h){return String(h||"").trim();});
+  var ni=headers.indexOf("患者名"), ti=headers.indexOf("電話番号");
+  if(ni<0)ni=1; if(ti<0)ti=3;
+  var target=String(name||"").trim();
+  for(var i=1;i<data.length;i++){
+    if(String(data[i][ni]||"").trim()===target) return String(data[i][ti]||"");
+  }
+  return "";
 }
 function getLineUsers(){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
@@ -139,11 +201,16 @@ function dailyLineAlert(){
   sendLineMessagingAPI(token,ownerId,ownerMsg);
   var sent=0,skip=0;
   alerts.forEach(function(v){
-    var tid=lu[v.name]||null;
+    var tid="";
+    var tel=getTelByPatientName_(v.name);
+    if(tel) tid=findLineUidByPhone_(tel);
     if(!tid){
-      var ln=v.name.split(" ")[0];
-      var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});
-      if(fk)tid=lu[fk];
+      tid=lu[v.name]||null;
+      if(!tid){
+        var ln=v.name.split(" ")[0];
+        var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});
+        if(fk)tid=lu[fk];
+      }
     }
     if(!tid){skip++;return;}
     var deadline=new Date(v.date);deadline.setDate(deadline.getDate()+20);
@@ -186,8 +253,13 @@ function sendDayBeforeReminders(){
   if(!Object.keys(bp).length)return;
   var sent=0,skip=[];
   Object.keys(bp).forEach(function(name){
-    var tid=lu[name];
-    if(!tid){var ln=name.split(" ")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    var tid="";
+    var tel=getTelByPatientName_(name);
+    if(tel) tid=findLineUidByPhone_(tel);
+    if(!tid){
+      tid=lu[name];
+      if(!tid){var ln=name.split(" ")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
     if(!tid){skip.push(name);return;}
     var msg="[倉治整骨院]"+nl+tmrDisp+"のご予約リマインドです"+nl+nl+"時間: "+bp[name].join(" / ")+nl+nl+"お気をつけてお越しください。"+nl+"(自動送信のため返信不要です)";
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;}else{skip.push(name);}
@@ -311,23 +383,27 @@ function saveWebBooking(data){
     if(token&&ownerId){
       sendLineMessagingAPI(token,ownerId,"[倉治整骨院] Web予約が入りました"+nl+data.date+" "+data.time+"〜"+nl+(data.menu||"")+nl+(data.name||"")+" 様"+nl+(data.tel||""));
     }
-    // 患者様ご本人のLINEにも、お名前が一致すれば即座に予約確認メッセージを送信
-    if(token && data.name){
-      var ls=ss.getSheetByName("LINE_IDs");
-      if(ls){
-        var lu={};
-        ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
-        var nameTrim=String(data.name).trim();
-        var tid=lu[nameTrim];
-        if(!tid){
-          var ln=nameTrim.split(" ")[0].split("　")[0];
-          var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln.replace(/[ 　]/g,""))===0;});
-          if(fk)tid=lu[fk];
+    // 患者様ご本人のLINEにも即座に予約確認メッセージを送信（電話番号での照合を最優先）
+    if(token){
+      var tid="";
+      if(data.tel) tid=findLineUidByPhone_(data.tel);
+      if(!tid && data.name){
+        var ls=ss.getSheetByName("LINE_IDs");
+        if(ls){
+          var lu={};
+          ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+          var nameTrim=String(data.name).trim();
+          tid=lu[nameTrim];
+          if(!tid){
+            var ln=nameTrim.split(" ")[0].split("　")[0];
+            var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln.replace(/[ 　]/g,""))===0;});
+            if(fk)tid=lu[fk];
+          }
         }
-        if(tid){
-          var dispDate=Utilities.formatDate(new Date(data.date),"Asia/Tokyo","M月d日(E)");
-          sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"ご予約を承りました。"+nl+dispDate+" "+data.time+"〜"+nl+"メニュー："+(data.menu||"")+nl+nl+"前日にもリマインドをお送りします。"+nl+"お気をつけてお越しください。"+nl+"(自動送信のため返信不要です)");
-        }
+      }
+      if(tid){
+        var dispDate=Utilities.formatDate(new Date(data.date),"Asia/Tokyo","M月d日(E)");
+        sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"ご予約を承りました。"+nl+dispDate+" "+data.time+"〜"+nl+"メニュー："+(data.menu||"")+nl+nl+"前日にもリマインドをお送りします。"+nl+"お気をつけてお越しください。"+nl+"(自動送信のため返信不要です)");
       }
     }
     // メールアドレスが入力されていれば、LINEの有無に関わらずメールでも確認を送る
