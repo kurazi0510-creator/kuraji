@@ -254,31 +254,57 @@ function sendLineMessagingAPI(token,userId,message){
 // ═══════════════════════════════════════
 
 // Web予約フォーム(book.html)からの予約受付。ダブルブッキング防止つき。
+// 60分メニュー=3枠、40分メニュー=2枠など、複数枠をまとめて予約できる。
+// 2枠目以降は区分に「(継続)」を付けて登録する（＝既存の来院アラート等の集計対象から自動的に除外される仕組みを利用）
+var SLOTS_LIST_=["08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50",
+  "11:10","11:30","11:50","12:10","15:00","15:20","15:40","16:00",
+  "16:20","16:40","17:00","17:20","17:40","18:00","18:20","18:40",
+  "19:00","19:20","19:40"];
 function saveWebBooking(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
     var s=ss.getSheetByName("予約表");
     if(!s) return {ok:false, error:"予約表シートが見つかりません"};
+
+    var need=Number(data.slotsNeeded)||1;
+    var startIdx=SLOTS_LIST_.indexOf(data.time);
+    if(startIdx<0) return {ok:false, error:"時間の指定が不正です"};
+    var slotsToUse=[];
+    for(var k=0;k<need;k++){
+      var idx=startIdx+k;
+      if(idx>=SLOTS_LIST_.length) return {ok:false, error:"その時間からでは施術時間が足りません。別の時間をお選びください。"};
+      var slot=SLOTS_LIST_[idx];
+      // 午前と午後をまたぐ予約は不可（12:10の次が15:00に飛ぶため）
+      if(k>0 && slot<SLOTS_LIST_[startIdx] && SLOTS_LIST_[startIdx]<"13:00" && slot>="13:00"){
+        return {ok:false, error:"施術時間が午前・午後をまたいでしまいます。別の時間をお選びください。"};
+      }
+      slotsToUse.push(slot);
+    }
+
     var rows=s.getDataRange().getValues();
     for(var i=1;i<rows.length;i++){
-      if(String(rows[i][0])===String(data.date) && String(rows[i][1])===String(data.time)){
+      if(String(rows[i][0])===String(data.date) && slotsToUse.indexOf(String(rows[i][1]))>-1){
         if(String(rows[i][3]||"").trim()!==""){
-          return {ok:false, error:"この時間は既にご予約が入っています。別の時間をお選びください。"};
+          return {ok:false, error:"ご指定の時間帯は既にご予約が入っています。別の時間をお選びください。"};
         }
       }
     }
-    var newRow=[
-      data.date, data.time, data.kubun||"自費", data.name||"", data.cardId||"",
-      "Web予約", data.visitCount||"", "", data.symptom||"", "",
-      data.menu||"", "", "", "", "", "", "", "", "", ""
-    ];
-    s.appendRow(newRow);
+
+    slotsToUse.forEach(function(slot,k){
+      var kubun=(data.kubun||"自費")+(k>0?"(継続)":"");
+      var newRow=[
+        data.date, slot, kubun, data.name||"", data.cardId||"",
+        "Web予約", data.visitCount||"", "", k===0?(data.symptom||""):"", "",
+        k===0?(data.menu||""):"", "", "", "", "", "", "", "", "", ""
+      ];
+      s.appendRow(newRow);
+    });
 
     var p=PropertiesService.getScriptProperties();
     var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
     if(token&&ownerId){
       var nl=String.fromCharCode(10);
-      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] Web予約が入りました"+nl+data.date+" "+data.time+nl+(data.name||"")+" 様"+nl+(data.tel||""));
+      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] Web予約が入りました"+nl+data.date+" "+data.time+"〜"+nl+(data.menu||"")+nl+(data.name||"")+" 様"+nl+(data.tel||""));
     }
     return {ok:true};
   }catch(err){ return {ok:false, error:err.message}; }

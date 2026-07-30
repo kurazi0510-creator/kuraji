@@ -26,10 +26,10 @@ textarea{resize:none;height:64px;}
 .slot.full{background:#f2ede6;color:#c4b8a5;text-decoration:line-through;cursor:not-allowed;}
 .slot.sel{background:#c98a4b;color:#fff;border-color:#c98a4b;font-weight:bold;}
 .menu-list{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
-.menu-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1.6px solid #ecdfd0;border-radius:9px;font-size:.82rem;cursor:pointer;}
+.menu-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.6px solid #ecdfd0;border-radius:9px;font-size:.84rem;cursor:pointer;}
 .menu-item.on{background:#fdf3e7;border-color:#c98a4b;}
 .menu-item input{width:auto;}
-.menu-item .price{margin-left:auto;color:#a08a6d;font-size:.75rem;}
+.menu-item .time{margin-left:auto;color:#a08a6d;font-size:.75rem;white-space:nowrap;}
 .btn{display:block;width:100%;padding:14px;border:none;border-radius:11px;font-size:.95rem;font-weight:bold;cursor:pointer;margin-top:6px;}
 .btn-main{background:#c98a4b;color:#fff;}
 .btn-main:disabled{background:#e5d9c8;color:#b3a48c;}
@@ -37,7 +37,7 @@ textarea{resize:none;height:64px;}
 .done{text-align:center;padding:20px 10px;}
 .done .ok{font-size:2.4rem;margin-bottom:8px;}
 .done h2{font-size:1.05rem;margin-bottom:8px;color:#3d3226;}
-.done p{font-size:.82rem;color:#6b5c47;line-height:1.8;margin-bottom:14px;}
+.done p{font-size:.82rem;color:#6b5c47;line-height:1.8;margin-bottom:14px;white-space:pre-wrap;}
 .line-box{background:#eaf9ec;border:1.5px solid #b6e6bd;border-radius:12px;padding:14px;text-align:left;font-size:.8rem;color:#2f6b3a;line-height:1.8;margin-top:10px;}
 .line-box b{color:#1f7d33;}
 .err{background:#fdecec;color:#b3382c;border-radius:9px;padding:10px 12px;font-size:.8rem;margin-top:10px;display:none;}
@@ -48,23 +48,23 @@ textarea{resize:none;height:64px;}
 <body>
 <div class="header">
   <h1>🌿 倉治整骨院 ご予約フォーム</h1>
-  <p>ご希望の日時・メニューをお選びください</p>
+  <p>ご希望のメニュー・日時をお選びください</p>
 </div>
 <div class="wrap" id="formWrap">
 
   <div class="card">
-    <h2><span class="step-num">1</span>ご希望日を選択</h2>
+    <h2><span class="step-num">1</span>ご希望メニュー</h2>
+    <div class="menu-list" id="menuArea"></div>
+  </div>
+
+  <div class="card" id="dateCard" style="display:none">
+    <h2><span class="step-num">2</span>ご希望日</h2>
     <input type="date" id="f-date" onchange="onDateChange()">
   </div>
 
   <div class="card" id="slotCard" style="display:none">
-    <h2><span class="step-num">2</span>ご希望のお時間</h2>
+    <h2><span class="step-num">3</span>ご希望のお時間</h2>
     <div id="slotArea"><p class="note">日付を選択すると空き状況が表示されます</p></div>
-  </div>
-
-  <div class="card" id="menuCard" style="display:none">
-    <h2><span class="step-num">3</span>ご希望メニュー</h2>
-    <div class="menu-list" id="menuArea"></div>
   </div>
 
   <div class="card" id="infoCard" style="display:none">
@@ -90,9 +90,7 @@ textarea{resize:none;height:64px;}
     <p id="doneSummary"></p>
     <div class="line-box">
       <b>📱 LINEで前日リマインドを受け取る（任意）</b><br><br>
-      ①下のボタンから倉治整骨院を友だち追加<br>
-      ②トークに「<b>お電話番号（数字のみ）</b>」を送信<br>
-      ③自動でご予約前日にリマインドが届きます
+      LINEで倉治整骨院を友だち追加しておくと、前日にリマインドが届きます(お名前でお呼びしています)。
     </div>
     <a id="lineAddBtn" href="#" target="_blank" style="display:block;margin-top:12px">
       <button class="btn" style="background:#06c755;color:#fff">LINEで倉治整骨院を友だち追加</button>
@@ -101,7 +99,7 @@ textarea{resize:none;height:64px;}
 </div>
 
 <script>
-// ▼▼▼ 設定：GAS URL・LINE公式アカウントのIDに変更してください ▼▼▼
+// ▼▼▼ 設定 ▼▼▼
 const GAS='https://script.google.com/macros/s/AKfycbyKj_YkWdU747zl6IcanFsI1-O2IBUDli8wMSRnAJUfYEptCexelUHgl4uYnDiNwYnEqg/exec';
 const LINE_ADD_URL='https://line.me/R/ti/p/@qin9307o';
 // ▲▲▲ ここまで ▲▲▲
@@ -110,15 +108,32 @@ const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
   '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
   '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
   '19:00','19:20','19:40'];
-const DEFAULT_MENU=[
-  {name:'クラウドテープS',price:300},{name:'クラウドテープL',price:300},
-  {name:'シリカアンカール',price:770},{name:'ツイスター',price:770},
-  {name:'水素5分',price:770},{name:'水素+ツイスター',price:1100},
-  {name:'水素+シリカアンカール',price:1100},{name:'ツイスター+シリカアンカール',price:1100},
-  {name:'水素+ツイスター+シリカアンカール',price:1650},{name:'超音波10分',price:1100},
-  {name:'整体10分',price:1100}
+
+// メニュー：所要時間(分) と 必要枠数(1枠=20分)
+const MENUS=[
+  {key:'sotai_first', label:'整体（初診）', minutes:60, slots:3},
+  {key:'sotai_repeat',label:'整体（再診）', minutes:40, slots:2},
+  {key:'raku_first',  label:'楽トレ（初診）', minutes:40, slots:2},
+  {key:'raku_repeat', label:'楽トレ（再診）', minutes:40, slots:2},
+  {key:'bigan_first', label:'美顔整顔（初診）', minutes:60, slots:3},
+  {key:'bigan_repeat',label:'美顔整顔（再診）', minutes:40, slots:2},
 ];
-let bookedSlots={}, selSlot='', selMenus=[];
+
+let bookedSlots={}, selMenu=null, selSlot='';
+
+document.getElementById('menuArea').innerHTML=MENUS.map((m,i)=>
+  `<label class="menu-item" id="mi-${i}"><input type="radio" name="menu" onchange="pickMenu(${i})"> ${m.label}<span class="time">${m.minutes}分</span></label>`
+).join('');
+function pickMenu(i){
+  selMenu=MENUS[i];
+  MENUS.forEach((m,j)=>document.getElementById('mi-'+j).classList.toggle('on',j===i));
+  document.getElementById('dateCard').style.display='block';
+  document.getElementById('slotCard').style.display='none';
+  document.getElementById('infoCard').style.display='none';
+  selSlot='';
+  const dEl=document.getElementById('f-date');
+  if(dEl.value) onDateChange();
+}
 
 // 日付の下限＝今日、上限＝60日後
 (function(){
@@ -130,7 +145,7 @@ let bookedSlots={}, selSlot='', selMenus=[];
 
 async function onDateChange(){
   const date=document.getElementById('f-date').value;
-  if(!date)return;
+  if(!date||!selMenu)return;
   document.getElementById('slotCard').style.display='block';
   document.getElementById('slotArea').innerHTML='<p class="note">読み込み中...</p>';
   try{
@@ -143,50 +158,43 @@ async function onDateChange(){
     });
   }catch(e){ bookedSlots={}; }
   renderSlots();
-  loadMenu();
-  document.getElementById('menuCard').style.display='block';
+}
+
+// 開始時刻sから、selMenu.slots個ぶん連続して空いているか（午前午後をまたがないか）を判定
+function canStartAt(startIdx){
+  const need=selMenu.slots;
+  const startsAM = SLOTS[startIdx] < '13:00';
+  for(let k=0;k<need;k++){
+    const idx=startIdx+k;
+    if(idx>=SLOTS.length) return false;
+    const s=SLOTS[idx];
+    if(startsAM && s>='13:00') return false; // 午前→午後をまたぐ
+    if(bookedSlots[s]) return false;
+  }
+  return true;
 }
 
 function renderSlots(){
   const am=SLOTS.filter(s=>s<'13:00'), pm=SLOTS.filter(s=>s>='13:00');
-  let html='<div class="slot-sec">午前</div><div class="slot-grid">'+
+  let html=`<p class="note">所要時間：${selMenu.minutes}分（${selMenu.slots}枠）</p>`+
+    '<div class="slot-sec">午前</div><div class="slot-grid">'+
     am.map(s=>slotHtml(s)).join('')+'</div>'+
     '<div class="slot-sec">午後</div><div class="slot-grid">'+
     pm.map(s=>slotHtml(s)).join('')+'</div>';
   document.getElementById('slotArea').innerHTML=html;
 }
 function slotHtml(s){
-  const full=bookedSlots[s];
-  return `<div class="slot ${full?'full':''} ${selSlot===s?'sel':''}" ${full?'':`onclick="pickSlot('${s}')"`}>${s}</div>`;
+  const idx=SLOTS.indexOf(s);
+  const ok=canStartAt(idx);
+  return `<div class="slot ${ok?'':'full'} ${selSlot===s?'sel':''}" ${ok?`onclick="pickSlot('${s}')"`:''}>${s}</div>`;
 }
 function pickSlot(s){ selSlot=s; renderSlots(); checkReady(); document.getElementById('infoCard').style.display='block'; }
 
-async function loadMenu(){
-  let menus=DEFAULT_MENU;
-  try{
-    const res=await fetch(GAS+'?action=getMenuMaster');
-    const d=await res.json();
-    if(d.ok && d.rows && d.rows.length){
-      menus=d.rows.map(r=>({name:r[0],price:Number(r[1])||0}));
-    }
-  }catch(e){}
-  document.getElementById('menuArea').innerHTML=menus.map((m,i)=>
-    `<label class="menu-item" id="mi-${i}"><input type="checkbox" onchange="toggleMenu(${i},'${m.name.replace(/'/g,"")}')"> ${m.name}<span class="price">${m.price.toLocaleString()}円</span></label>`
-  ).join('');
-}
-function toggleMenu(i,name){
-  const el=document.getElementById('mi-'+i);
-  const idx=selMenus.indexOf(name);
-  if(idx>-1){selMenus.splice(idx,1);el.classList.remove('on');}
-  else{selMenus.push(name);el.classList.add('on');}
-  checkReady();
-}
-['f-name','f-tel'].forEach(id=>{});
 document.addEventListener('input',checkReady);
 function checkReady(){
   const name=document.getElementById('f-name')?.value.trim();
   const tel=document.getElementById('f-tel')?.value.replace(/[^0-9]/g,'');
-  const ok=selSlot && name && tel && tel.length>=10;
+  const ok=selMenu && selSlot && name && tel && tel.length>=10;
   document.getElementById('submitBtn').disabled=!ok;
 }
 
@@ -205,7 +213,8 @@ async function submitBooking(){
       method:'POST',
       headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'saveWebBooking',data:{
-        date,time:selSlot,name,tel,cardId,symptom:sym,menu:selMenus.join('・')
+        date,time:selSlot,name,tel,cardId,symptom:sym,
+        menu:selMenu.label,slotsNeeded:selMenu.slots
       }})
     });
     const d=await res.json();
@@ -213,10 +222,10 @@ async function submitBooking(){
       errBox.textContent='⚠️ '+(d.error||'送信に失敗しました。恐れ入りますがお電話にてご予約ください。');
       errBox.style.display='block';
       btn.disabled=false; btn.innerHTML='この内容で予約する';
-      if((d.error||'').includes('既にご予約')){ onDateChange(); }
+      onDateChange();
       return;
     }
-    document.getElementById('doneSummary').textContent=`${date} ${selSlot}〜　${name} 様\n${selMenus.join('・')||''}`;
+    document.getElementById('doneSummary').textContent=`${date} ${selSlot}〜（${selMenu.minutes}分）\n${selMenu.label}\n${name} 様`;
     document.getElementById('lineAddBtn').href=LINE_ADD_URL;
     document.getElementById('formWrap').style.display='none';
     document.getElementById('doneWrap').style.display='block';
