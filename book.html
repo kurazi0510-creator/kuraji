@@ -198,12 +198,14 @@ function pickMenu(i){
   d.max=max.toISOString().slice(0,10);
 })();
 
+let currentDate='', currentCfg=null;
 async function onDateChange(){
   const date=document.getElementById('f-date').value;
   if(!date||!selMenu)return;
   document.getElementById('slotCard').style.display='block';
   if(!bizHoursCache) await loadBizHours();
   const cfg=getDayConfig(date);
+  currentDate=date; currentCfg=cfg;
   if(cfg.closed){
     document.getElementById('slotArea').innerHTML='<p class="note" style="color:#b3382c;font-weight:bold">😌 申し訳ございません、本日は休診日です。別の日をお選びください。</p>';
     selSlot=''; checkReady();
@@ -251,7 +253,7 @@ function slotHtml(s,availSlots){
   const ok=canStartAt(idx,availSlots);
   return `<div class="slot ${ok?'':'full'} ${selSlot===s?'sel':''}" ${ok?`onclick="pickSlot('${s}')"`:''}>${s}</div>`;
 }
-function pickSlot(s){ selSlot=s; renderSlots(); checkReady(); document.getElementById('infoCard').style.display='block'; }
+function pickSlot(s){ selSlot=s; renderSlots(currentDate,currentCfg); checkReady(); document.getElementById('infoCard').style.display='block'; }
 
 document.addEventListener('input',checkReady);
 function checkReady(){

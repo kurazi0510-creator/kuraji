@@ -55,6 +55,9 @@ function doPost(e){
       else if(action==="saveWebBooking")result=saveWebBooking(body.data);
       else if(action==="getMenuMaster")result=getMenuMaster();
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
+      else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
+      else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
+      else if(action==="getBizHours")result=getBizHours();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
