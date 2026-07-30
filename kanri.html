@@ -45,7 +45,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 .sbox .l{font-size:0.68rem;color:var(--muted);}
 .date-inp{padding:7px 10px;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;font-family:inherit;}
 .day-b{padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;}
-.d-hei{background:#dbeafe;color:#1e40af;} .d-moku{background:#fef3c7;color:#92400e;} .d-nichi{background:#fee2e2;color:#991b1b;}
+.d-hei{background:#dbeafe;color:#1e40af;} .d-moku{background:#fef3c7;color:#92400e;} .d-nichi{background:#fee2e2;color:#991b1b;} .d-gogo{background:#fef3c7;color:#92400e;}
 .tbl{width:100%;border-collapse:collapse;font-size:0.78rem;}
 .tbl th{background:var(--primary);color:white;padding:6px 7px;text-align:left;font-size:0.73rem;}
 .tbl td{padding:4px 6px;border-bottom:1px solid #f0ece4;vertical-align:middle;}
@@ -238,6 +238,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
       <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="margin-top:16px;background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
+      <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
       <button class="btn ba bsm" onclick="forcePushBookings()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626" title="このデバイスの予約データをGASに送信して復元">📤 予約データ復元送信</button>
     </div>
@@ -896,6 +897,33 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="wname" id="wname">---</div>
       <div style="font-size:0.8rem;opacity:0.8">様が当選されました！</div>
     </div>
+  </div>
+</div>
+
+<!-- 営業時間設定モーダル -->
+<div class="modal-ov" id="bizmodal">
+  <div class="modal" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="font-size:1rem">⏰ 営業時間設定</h3>
+      <button onclick="closeBizHoursModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:0.78rem;color:#166534;font-weight:bold;margin-bottom:10px">📅 曜日ごとの基本診療時間</div>
+    <div id="biz-weekly-area"></div>
+    <div style="font-size:0.78rem;color:#166534;font-weight:bold;margin:16px 0 8px">🎌 特定日の上書き（祝日など）</div>
+    <div style="display:grid;grid-template-columns:1fr;gap:6px;background:#f8f6f1;border-radius:8px;padding:10px;margin-bottom:10px">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="date" class="inp" id="biz-ov-date" style="flex:1;min-width:130px">
+        <label style="font-size:0.75rem;display:flex;align-items:center;gap:4px"><input type="checkbox" id="biz-ov-closed" onchange="toggleBizOvFields()" style="width:auto">休診にする</label>
+      </div>
+      <div id="biz-ov-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><label style="font-size:0.68rem;color:#8a7860">午前 開始〜終了</label><div style="display:flex;gap:4px"><input type="time" class="inp" id="biz-ov-am-s" value="08:30"><input type="time" class="inp" id="biz-ov-am-e" value="12:30"></div></div>
+        <div><label style="font-size:0.68rem;color:#8a7860">午後 開始〜終了</label><div style="display:flex;gap:4px"><input type="time" class="inp" id="biz-ov-pm-s" value="15:00"><input type="time" class="inp" id="biz-ov-pm-e" value="20:00"></div></div>
+      </div>
+      <input type="text" class="inp" id="biz-ov-note" placeholder="メモ（例：祝日診療）">
+      <button class="btn bp bsm" onclick="addBizOverride()" style="background:#22c55e;color:white;border-color:#22c55e">＋ この日を追加</button>
+    </div>
+    <div id="biz-ov-list" style="margin-bottom:12px"></div>
+    <button class="btn bp bsm" onclick="saveBizHours()" style="width:100%;background:#0891b2;color:white;border-color:#0891b2;padding:12px">💾 保存してWeb予約フォームに反映</button>
   </div>
 </div>
 
@@ -2671,6 +2699,145 @@ async function syncMenuMasterToGAS(){
   }catch(e){alert('❌ 通信エラー：'+e.message);}
 }
 
+// ===== 営業時間設定 =====
+const BIZ_DOW_LABELS=['日','月','火','水','木','金','土'];
+let bizHours=JSON.parse(localStorage.getItem('kj_biz_hours')||'null')||{
+  weekly:{
+    0:{closed:true,am:['',''],pm:['','']},
+    1:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    2:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    3:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    4:{closed:false,am:['08:30','12:30'],pm:['','']},
+    5:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    6:{closed:false,am:['08:30','12:30'],pm:['','']}
+  },
+  overrides:{}
+};
+function openBizHoursModal(){
+  renderBizWeekly();
+  renderBizOverrides();
+  document.getElementById('bizmodal').classList.add('on');
+}
+function closeBizHoursModal(){document.getElementById('bizmodal').classList.remove('on');}
+function renderBizWeekly(){
+  const area=document.getElementById('biz-weekly-area');
+  area.innerHTML=[1,2,3,4,5,6,0].map(dow=>{
+    const c=bizHours.weekly[dow]||{closed:true,am:['',''],pm:['','']};
+    return `<div style="display:grid;grid-template-columns:36px 1fr 1fr auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
+      <div style="font-weight:bold;font-size:0.82rem">${BIZ_DOW_LABELS[dow]}</div>
+      <div style="display:flex;gap:3px"><input type="time" class="inp" id="biz-w-${dow}-am-s" value="${c.am?c.am[0]:''}" style="font-size:0.72rem;padding:5px"><input type="time" class="inp" id="biz-w-${dow}-am-e" value="${c.am?c.am[1]:''}" style="font-size:0.72rem;padding:5px"></div>
+      <div style="display:flex;gap:3px"><input type="time" class="inp" id="biz-w-${dow}-pm-s" value="${c.pm?c.pm[0]:''}" style="font-size:0.72rem;padding:5px"><input type="time" class="inp" id="biz-w-${dow}-pm-e" value="${c.pm?c.pm[1]:''}" style="font-size:0.72rem;padding:5px"></div>
+      <label style="font-size:0.68rem;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" id="biz-w-${dow}-closed" ${c.closed?'checked':''} style="width:auto">休診</label>
+    </div>`;
+  }).join('')+'<div style="font-size:0.65rem;color:#a08a6d;margin-top:6px">午前・午後どちらかを空欄にすると、その時間帯は休診になります</div>';
+}
+function toggleBizOvFields(){
+  document.getElementById('biz-ov-fields').style.display=document.getElementById('biz-ov-closed').checked?'none':'grid';
+}
+function renderBizOverrides(){
+  const list=document.getElementById('biz-ov-list');
+  const dates=Object.keys(bizHours.overrides).sort();
+  if(!dates.length){list.innerHTML='<p style="font-size:0.72rem;color:#a08a6d">上書き設定はありません</p>';return;}
+  list.innerHTML=dates.map(d=>{
+    const o=bizHours.overrides[d];
+    const desc=o.closed?'休診':`午前${o.am&&o.am[0]?o.am[0]+'〜'+o.am[1]:'なし'}／午後${o.pm&&o.pm[0]?o.pm[0]+'〜'+o.pm[1]:'なし'}`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fef9f0;border-radius:7px;margin-bottom:4px;font-size:0.76rem">
+      <div style="flex:1"><b>${d}</b>　${desc}${o.note?'　'+o.note:''}</div>
+      <button onclick="removeBizOverride('${d}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:4px 8px;font-size:0.68rem;font-weight:bold;cursor:pointer">削除</button>
+    </div>`;
+  }).join('');
+}
+function addBizOverride(){
+  const date=document.getElementById('biz-ov-date').value;
+  if(!date){alert('日付を選択してください');return;}
+  const closed=document.getElementById('biz-ov-closed').checked;
+  bizHours.overrides[date]=closed
+    ? {closed:true,am:null,pm:null,note:document.getElementById('biz-ov-note').value.trim()}
+    : {closed:false,
+       am:[document.getElementById('biz-ov-am-s').value,document.getElementById('biz-ov-am-e').value],
+       pm:[document.getElementById('biz-ov-pm-s').value,document.getElementById('biz-ov-pm-e').value],
+       note:document.getElementById('biz-ov-note').value.trim()};
+  renderBizOverrides();
+  document.getElementById('biz-ov-note').value='';
+}
+function removeBizOverride(date){
+  delete bizHours.overrides[date];
+  renderBizOverrides();
+}
+async function saveBizHours(){
+  // 曜日設定を画面から読み取る
+  [0,1,2,3,4,5,6].forEach(dow=>{
+    const closed=document.getElementById('biz-w-'+dow+'-closed').checked;
+    const amS=document.getElementById('biz-w-'+dow+'-am-s').value, amE=document.getElementById('biz-w-'+dow+'-am-e').value;
+    const pmS=document.getElementById('biz-w-'+dow+'-pm-s').value, pmE=document.getElementById('biz-w-'+dow+'-pm-e').value;
+    bizHours.weekly[dow]={closed, am:(amS&&amE)?[amS,amE]:null, pm:(pmS&&pmE)?[pmS,pmE]:null};
+  });
+  localStorage.setItem('kj_biz_hours',JSON.stringify(bizHours));
+  // GASに同期（Web予約フォームに反映）
+  try{
+    const weeklyRows=[0,1,2,3,4,5,6].map(dow=>{
+      const c=bizHours.weekly[dow];
+      return [dow, c.closed, c.am?c.am[0]:'', c.am?c.am[1]:'', c.pm?c.pm[0]:'', c.pm?c.pm[1]:''];
+    });
+    const overrideRows=Object.keys(bizHours.overrides).map(d=>{
+      const o=bizHours.overrides[d];
+      return [d, o.closed, o.am?o.am[0]:'', o.am?o.am[1]:'', o.pm?o.pm[0]:'', o.pm?o.pm[1]:'', o.note||''];
+    });
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBizHoursWeekly',rows:weeklyRows})});
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBizHoursOverride',rows:overrideRows})});
+    alert('✅ 営業時間を保存し、Web予約フォームにも反映しました');
+    closeBizHoursModal();
+    renderSched();
+  }catch(e){
+    alert('⚠️ ローカルには保存しましたが、Web予約フォームへの反映に失敗しました：'+e.message);
+  }
+}
+// 指定日の設定を取得（上書き優先→曜日設定→従来デフォルト）
+function getBizDayConfig(dateStr){
+  if(bizHours.overrides[dateStr]) return bizHours.overrides[dateStr];
+  const dow=new Date(dateStr+'T00:00:00').getDay();
+  if(bizHours.weekly[dow]) return bizHours.weekly[dow];
+  return dow===0?{closed:true,am:null,pm:null}:(dow===4||dow===6)?{closed:false,am:['08:30','12:30'],pm:null}:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']};
+}
+function genSlotsFromRange(startStr,endStr){
+  if(!startStr||!endStr) return [];
+  let [h,m]=startStr.split(':').map(Number);
+  const [eh,em]=endStr.split(':').map(Number);
+  const out=[]; let guard=0;
+  while(!(h===eh&&m===em)&&guard<100){
+    out.push(pad(h)+':'+pad(m));
+    m+=20; if(m>=60){m-=60;h++;}
+    guard++;
+  }
+  return out;
+}
+async function syncBizHoursFromGAS(){
+  try{
+    const res=await fetch(GAS+'?action=getBizHours');
+    const d=await res.json();
+    if(!d.ok) return;
+    if(d.weekly && d.weekly.length){
+      const w={};
+      d.weekly.forEach(r=>{
+        const dow=Number(r[0]);
+        const closed=r[1]===true||r[1]==='TRUE';
+        w[dow]={closed, am:(r[2]&&r[3])?[String(r[2]),String(r[3])]:null, pm:(r[4]&&r[5])?[String(r[4]),String(r[5])]:null};
+      });
+      bizHours.weekly={...bizHours.weekly,...w};
+    }
+    if(d.overrides && d.overrides.length){
+      const o={};
+      d.overrides.forEach(r=>{
+        const closed=r[1]===true||r[1]==='TRUE';
+        o[String(r[0])]={closed, am:(r[2]&&r[3])?[String(r[2]),String(r[3])]:null, pm:(r[4]&&r[5])?[String(r[4]),String(r[5])]:null, note:r[6]||''};
+      });
+      bizHours.overrides=o;
+    }
+    localStorage.setItem('kj_biz_hours',JSON.stringify(bizHours));
+    renderSched();
+  }catch(e){ /* 取得失敗時はローカル設定のまま */ }
+}
+
 // ===== LINE Notify =====
 function saveLineToken(){
   const token=document.getElementById('line-notify-token').value.trim();
@@ -2831,17 +2998,41 @@ function loadDayMemo(date){
   const el=document.getElementById('day-memo-text');
   if(el)el.value=text;
 }
-function dayType(d){const w=new Date(d+'T00:00:00').getDay();return w===0?'nichi':(w===4||w===6)?'moku':'hei';}
-function getSlots(dt){if(dt==='nichi')return[];const mo=[];let h=8,m=30;while(!(h===12&&m===30)){mo.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}if(dt==='moku')return mo;const af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}return[...mo,'BREAK',...af];}
+function dayType(d){
+  const cfg=getBizDayConfig(d);
+  if(cfg.closed) return 'nichi';
+  if(cfg.am&&cfg.am[0]&&cfg.pm&&cfg.pm[0]) return 'hei';
+  if(cfg.am&&cfg.am[0]) return 'moku';
+  if(cfg.pm&&cfg.pm[0]) return 'gogo';
+  return 'nichi';
+}
+function getSlots(dt,d){
+  const cfg=d?getBizDayConfig(d):null;
+  if(cfg){
+    if(cfg.closed) return [];
+    const mo=genSlotsFromRange(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
+    const af=genSlotsFromRange(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
+    if(mo.length&&af.length) return [...mo,'BREAK',...af];
+    if(mo.length) return mo;
+    if(af.length) return af;
+    return [];
+  }
+  // フォールバック（従来ロジック・dのみ渡された旧呼び出しへの互換用）
+  if(dt==='nichi')return[];
+  const mo=[];let h=8,m=30;while(!(h===12&&m===30)){mo.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
+  if(dt==='moku')return mo;
+  const af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
+  return[...mo,'BREAK',...af];
+}
 
 function renderSched(){
   const date=document.getElementById('selDate').value;if(!date)return;
   statOverride={}; // 日付が変わったら手動入力をリセット
   const dt=dayType(date);
   const badge=document.getElementById('daybadge');
-  badge.textContent={hei:'平日',moku:'木・土（午前のみ）',nichi:'日・祝（休診）'}[dt];
-  badge.className='day-b '+{hei:'d-hei',moku:'d-moku',nichi:'d-nichi'}[dt];
-  const sl=getSlots(dt),tbody=document.getElementById('sbody');
+  badge.textContent={hei:'終日診療',moku:'午前のみ診療',gogo:'午後のみ診療',nichi:'休診日'}[dt]||dt;
+  badge.className='day-b '+({hei:'d-hei',moku:'d-moku',gogo:'d-gogo',nichi:'d-nichi'}[dt]||'d-nichi');
+  const sl=getSlots(dt,date),tbody=document.getElementById('sbody');
   tbody.innerHTML='';
   if(dt==='nichi'){tbody.innerHTML='<tr><td colspan="10" class="empty">本日は休診日です</td></tr>';updateStats(date,[]);return;}
   const bkDate=bookings[date]||{};
@@ -2927,7 +3118,7 @@ function editStat(idx){
   if(val.trim()===''){delete statOverride[idx];}
   else{statOverride[idx]=val.trim();}
   const date=document.getElementById('selDate').value;
-  if(date)updateStats(date,getSlots(dayType(date)).filter(s=>s!=='BREAK'));
+  if(date)updateStats(date,getSlots(dayType(date),date).filter(s=>s!=='BREAK'));
 }
 function updateStats(date,sl){
   const e=Object.values(bookings[date]||{}).filter(b=>!b.cont&&!b.cancelled);
@@ -2989,7 +3180,7 @@ async function execCancel(){
   const name=bk.name||'';
   const cardId=bk.cardId||'';
   // 継続枠も削除
-  const sl=getSlots(dayType(cancelDate)),idx=sl.indexOf(cancelSlot);
+  const sl=getSlots(dayType(cancelDate),cancelDate),idx=sl.indexOf(cancelSlot);
   for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'&&bookings[cancelDate]?.[sl[ni]]?.cont)delete bookings[cancelDate][sl[ni]];else break;}
   // キャンセル記録に変換（空き枠として再利用可能にする）
   bookings[cancelDate][cancelSlot]={cancelled:true,name,cardId,cancelReason:reason,reBookedBy:''};
@@ -3609,7 +3800,7 @@ async function saveBk(){
   // 自由入力物販を追加
   (window.mBussanFree||[]).forEach(row=>{if(row.name&&row.price>0)bussanArr.push({id:'free_'+Date.now(),name:row.name,price:row.price,actualPrice:row.price,discount:0,qty:row.qty||1});});
   if(!bookings[date])bookings[date]={};
-  const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
+  const sl=getSlots(dayType(date),date),idx=sl.indexOf(slot);
   const p=patients.find(p=>p.id===cardId);
   const el=p&&p.last?elapsed(p.last):'';
   // 来院回数は予約データから正確に計算（編集しても増えない）
@@ -3652,7 +3843,7 @@ async function saveBk(){
 
 async function delBk(date,slot){
   if(!confirm('この予約を完全に削除しますか？'))return;
-  const sl=getSlots(dayType(date)),idx=sl.indexOf(slot);
+  const sl=getSlots(dayType(date),date),idx=sl.indexOf(slot);
   const delCardId=bookings[date]?.[slot]?.cardId;
   for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){const ex=bookings[date]?.[sl[ni]];if(ex?.cont&&(!delCardId||ex.cardId===delCardId))delete bookings[date][sl[ni]];else break;}}
   delete bookings[date][slot];save();renderSched();await pushB();
@@ -6019,6 +6210,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   load();renderSched();renderWeekDayTabs();recalcAllVisitCounts();renderPatients();
   // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
+  await syncBizHoursFromGAS();
   // ふりがな入力IME対策初期化
   setupKanaInput('c-kana');
   setupKanaInput('pe-kana');

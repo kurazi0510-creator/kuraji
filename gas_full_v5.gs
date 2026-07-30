@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -55,6 +55,9 @@ function doPost(e){
       else if(action==="saveWebBooking")result=saveWebBooking(body.data);
       else if(action==="getMenuMaster")result=getMenuMaster();
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
+      else if(action==="getBizHours")result=getBizHours();
+      else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
+      else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
       else result={ok:false,error:"unknown"};
       if(result)ret=ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
     }
@@ -328,24 +331,107 @@ function sendLineMessagingAPI(token,userId,message){
 // Web予約フォーム(book.html)からの予約受付。ダブルブッキング防止つき。
 // 60分メニュー=3枠、40分メニュー=2枠など、複数枠をまとめて予約できる。
 // 2枠目以降は区分に「(継続)」を付けて登録する（＝既存の来院アラート等の集計対象から自動的に除外される仕組みを利用）
+// ═══════════════════════════════════════
+// ⑤ 営業時間設定（曜日ごとの診療時間＋祝日などの個別上書き）
+// ═══════════════════════════════════════
+function saveBizHoursWeekly(rows){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("biz_hours_weekly");
+    if(!s) s=ss.insertSheet("biz_hours_weekly");
+    s.clearContents();
+    s.getRange(1,1,1,6).setValues([["dow","closed","amStart","amEnd","pmStart","pmEnd"]]);
+    if(rows && rows.length) s.getRange(2,1,rows.length,6).setValues(rows);
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+function saveBizHoursOverride(rows){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("biz_hours_override");
+    if(!s) s=ss.insertSheet("biz_hours_override");
+    s.clearContents();
+    s.getRange(1,1,1,7).setValues([["date","closed","amStart","amEnd","pmStart","pmEnd","note"]]);
+    if(rows && rows.length) s.getRange(2,1,rows.length,7).setValues(rows);
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+function getBizHours(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var w=ss.getSheetByName("biz_hours_weekly");
+  var o=ss.getSheetByName("biz_hours_override");
+  return {
+    ok:true,
+    weekly: w?w.getDataRange().getValues().slice(1):[],
+    overrides: o?o.getDataRange().getValues().slice(1):[]
+  };
+}
+
 var SLOTS_LIST_=["08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50",
   "11:10","11:30","11:50","12:10","15:00","15:20","15:40","16:00",
   "16:20","16:40","17:00","17:20","17:40","18:00","18:20","18:40",
   "19:00","19:20","19:40"];
-// 曜日ごとの診療ルール：日曜休診／木・土は午前のみ／それ以外は終日（book.htmlと同じルール、サーバー側でも二重チェック）
-function dayType_(dateStr){
-  var w=new Date(dateStr+"T00:00:00").getDay();
-  return w===0?"nichi":(w===4||w===6)?"moku":"hei";
+// 20分刻みのスロット配列を生成（開始〜終了時刻から）
+function genSlots_(startStr,endStr){
+  if(!startStr||!endStr) return [];
+  var sp=startStr.split(":"),ep=endStr.split(":");
+  var h=parseInt(sp[0]),m=parseInt(sp[1]);
+  var eh=parseInt(ep[0]),em=parseInt(ep[1]);
+  var out=[];
+  var guard=0;
+  while(!(h===eh&&m===em)&&guard<100){
+    out.push((h<10?"0"+h:h)+":"+(m<10?"0"+m:m));
+    m+=20; if(m>=60){m-=60;h++;}
+    guard++;
+  }
+  return out.filter(function(s){return SLOTS_LIST_.indexOf(s)>-1;});
 }
+// 指定日の診療設定を取得（特定日の上書き優先、無ければ曜日の設定、それも無ければ従来のデフォルト）
+function getDayConfig_(dateStr){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var o=ss.getSheetByName("biz_hours_override");
+  if(o){
+    var od=o.getDataRange().getValues();
+    for(var i=1;i<od.length;i++){
+      if(String(od[i][0])===dateStr){
+        return {closed:od[i][1]===true||od[i][1]==="TRUE", am:od[i][1]?null:[String(od[i][2]),String(od[i][3])], pm:od[i][1]?null:[String(od[i][4]),String(od[i][5])]};
+      }
+    }
+  }
+  var w=ss.getSheetByName("biz_hours_weekly");
+  var dow=new Date(dateStr+"T00:00:00").getDay();
+  if(w){
+    var wd=w.getDataRange().getValues();
+    for(var j=1;j<wd.length;j++){
+      if(Number(wd[j][0])===dow){
+        var closed=wd[j][1]===true||wd[j][1]==="TRUE";
+        return {closed:closed, am:closed?null:[String(wd[j][2]),String(wd[j][3])], pm:closed?null:[String(wd[j][4]),String(wd[j][5])]};
+      }
+    }
+  }
+  // 設定が無い場合の従来デフォルト（日曜休診・木土は午前のみ）
+  if(dow===0) return {closed:true, am:null, pm:null};
+  if(dow===4||dow===6) return {closed:false, am:["08:30","12:30"], pm:null};
+  return {closed:false, am:["08:30","12:30"], pm:["15:00","20:00"]};
+}
+function getSlotsForDate_(dateStr){
+  var cfg=getDayConfig_(dateStr);
+  if(cfg.closed) return [];
+  var mo=genSlots_(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
+  var af=genSlots_(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
+  return mo.concat(af);
+}
+
 function saveWebBooking(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
     var s=ss.getSheetByName("予約表");
     if(!s) return {ok:false, error:"予約表シートが見つかりません"};
 
-    var dt=dayType_(data.date);
-    if(dt==="nichi") return {ok:false, error:"日曜日は休診日です。別の日をお選びください。"};
+    var dayCfg=getDayConfig_(data.date);
+    if(dayCfg.closed) return {ok:false, error:"本日は休診日です。別の日をお選びください。"};
 
+    var validSlots=getSlotsForDate_(data.date);
     var need=Number(data.slotsNeeded)||1;
     var startIdx=SLOTS_LIST_.indexOf(data.time);
     if(startIdx<0) return {ok:false, error:"時間の指定が不正です"};
@@ -354,7 +440,7 @@ function saveWebBooking(data){
       var idx=startIdx+k;
       if(idx>=SLOTS_LIST_.length) return {ok:false, error:"その時間からでは施術時間が足りません。別の時間をお選びください。"};
       var slot=SLOTS_LIST_[idx];
-      if(dt==="moku" && slot>="13:00") return {ok:false, error:"本日は午前診療のみです。別の時間をお選びください。"};
+      if(validSlots.indexOf(slot)<0) return {ok:false, error:"その時間は診療時間外です。別の時間をお選びください。"};
       // 午前と午後をまたぐ予約は不可（12:10の次が15:00に飛ぶため）
       if(k>0 && slot<SLOTS_LIST_[startIdx] && SLOTS_LIST_[startIdx]<"13:00" && slot>="13:00"){
         return {ok:false, error:"施術時間が午前・午後をまたいでしまいます。別の時間をお選びください。"};

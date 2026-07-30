@@ -114,16 +114,53 @@ const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
   '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
   '19:00','19:20','19:40'];
 
-// 曜日ごとの診療ルール：日曜休診／木・土は午前のみ／それ以外は終日
-function dayType(dateStr){
-  const w=new Date(dateStr+'T00:00:00').getDay();
-  return w===0?'nichi':(w===4||w===6)?'moku':'hei';
+// 曜日ごとの診療ルール（GASの営業時間設定を反映。未取得時は従来のデフォルトにフォールバック）
+let bizHoursCache=null;
+async function loadBizHours(){
+  try{
+    const res=await fetch(GAS+'?action=getBizHours');
+    const d=await res.json();
+    if(d.ok) bizHoursCache={weekly:d.weekly||[], overrides:d.overrides||[]};
+  }catch(e){ bizHoursCache=null; }
 }
-function slotsForDayType(dt){
-  if(dt==='nichi') return [];
-  if(dt==='moku') return SLOTS.filter(s=>s<'13:00');
-  return SLOTS;
+function genSlots(startStr,endStr){
+  if(!startStr||!endStr) return [];
+  let [h,m]=startStr.split(':').map(Number);
+  const [eh,em]=endStr.split(':').map(Number);
+  const out=[]; let guard=0;
+  while(!(h===eh&&m===em)&&guard<100){
+    const s=(h<10?'0'+h:h)+':'+(m<10?'0'+m:m);
+    if(SLOTS.includes(s)) out.push(s);
+    m+=20; if(m>=60){m-=60;h++;}
+    guard++;
+  }
+  return out;
 }
+function getDayConfig(dateStr){
+  if(bizHoursCache){
+    const ov=bizHoursCache.overrides.find(r=>String(r[0])===dateStr);
+    if(ov) return {closed: ov[1]===true||ov[1]==='TRUE', am:[String(ov[2]),String(ov[3])], pm:[String(ov[4]),String(ov[5])]};
+    const dow=new Date(dateStr+'T00:00:00').getDay();
+    const wk=bizHoursCache.weekly.find(r=>Number(r[0])===dow);
+    if(wk){
+      const closed=wk[1]===true||wk[1]==='TRUE';
+      return {closed, am:[String(wk[2]),String(wk[3])], pm:[String(wk[4]),String(wk[5])]};
+    }
+  }
+  // フォールバック（従来のデフォルト：日曜休診、木・土は午前のみ）
+  const dow=new Date(dateStr+'T00:00:00').getDay();
+  if(dow===0) return {closed:true, am:null, pm:null};
+  if(dow===4||dow===6) return {closed:false, am:['08:30','12:30'], pm:null};
+  return {closed:false, am:['08:30','12:30'], pm:['15:00','20:00']};
+}
+function slotsForDay(dateStr){
+  const cfg=getDayConfig(dateStr);
+  if(cfg.closed) return [];
+  const mo=genSlots(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
+  const af=genSlots(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
+  return [...mo,...af];
+}
+loadBizHours();
 
 // メニュー：所要時間(分) と 必要枠数(1枠=20分)
 const MENUS=[
@@ -165,9 +202,10 @@ async function onDateChange(){
   const date=document.getElementById('f-date').value;
   if(!date||!selMenu)return;
   document.getElementById('slotCard').style.display='block';
-  const dt=dayType(date);
-  if(dt==='nichi'){
-    document.getElementById('slotArea').innerHTML='<p class="note" style="color:#b3382c;font-weight:bold">😌 申し訳ございません、日曜日は休診日です。別の日をお選びください。</p>';
+  if(!bizHoursCache) await loadBizHours();
+  const cfg=getDayConfig(date);
+  if(cfg.closed){
+    document.getElementById('slotArea').innerHTML='<p class="note" style="color:#b3382c;font-weight:bold">😌 申し訳ございません、本日は休診日です。別の日をお選びください。</p>';
     selSlot=''; checkReady();
     return;
   }
@@ -181,7 +219,7 @@ async function onDateChange(){
       if(String(row[0])===date && String(row[3]||'').trim()!=='') bookedSlots[String(row[1])]=true;
     });
   }catch(e){ bookedSlots={}; }
-  renderSlots(dt);
+  renderSlots(date,cfg);
 }
 
 // 開始時刻sから、selMenu.slots個ぶん連続して空いているか（診療時間内かどうか・午前午後をまたがないか）を判定
@@ -192,23 +230,20 @@ function canStartAt(startIdx,availSlots){
     const idx=startIdx+k;
     if(idx>=SLOTS.length) return false;
     const s=SLOTS[idx];
-    if(!availSlots.includes(s)) return false; // 診療時間外（休診・午後休診など）
+    if(!availSlots.includes(s)) return false; // 診療時間外
     if(startsAM && s>='13:00') return false; // 午前→午後をまたぐ
     if(bookedSlots[s]) return false;
   }
   return true;
 }
 
-function renderSlots(dt){
-  const availSlots=slotsForDayType(dt);
+function renderSlots(dateStr,cfg){
+  const availSlots=slotsForDay(dateStr);
+  const hasAM=cfg.am&&cfg.am[0], hasPM=cfg.pm&&cfg.pm[0];
   const am=SLOTS.filter(s=>s<'13:00'), pm=SLOTS.filter(s=>s>='13:00');
-  let html=`<p class="note">所要時間：${selMenu.minutes}分（${selMenu.slots}枠）${dt==='moku'?'　※本日は午前診療のみです':''}</p>`+
-    '<div class="slot-sec">午前</div><div class="slot-grid">'+
-    am.map(s=>slotHtml(s,availSlots)).join('')+'</div>';
-  if(dt!=='moku'){
-    html+='<div class="slot-sec">午後</div><div class="slot-grid">'+
-      pm.map(s=>slotHtml(s,availSlots)).join('')+'</div>';
-  }
+  let html=`<p class="note">所要時間：${selMenu.minutes}分（${selMenu.slots}枠）${!hasPM?'　※本日は午前診療のみです':(!hasAM?'　※本日は午後診療のみです':'')}</p>`;
+  if(hasAM) html+='<div class="slot-sec">午前</div><div class="slot-grid">'+am.map(s=>slotHtml(s,availSlots)).join('')+'</div>';
+  if(hasPM) html+='<div class="slot-sec">午後</div><div class="slot-grid">'+pm.map(s=>slotHtml(s,availSlots)).join('')+'</div>';
   document.getElementById('slotArea').innerHTML=html;
 }
 function slotHtml(s,availSlots){
