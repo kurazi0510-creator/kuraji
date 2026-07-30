@@ -332,11 +332,19 @@ var SLOTS_LIST_=["08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50"
   "11:10","11:30","11:50","12:10","15:00","15:20","15:40","16:00",
   "16:20","16:40","17:00","17:20","17:40","18:00","18:20","18:40",
   "19:00","19:20","19:40"];
+// 曜日ごとの診療ルール：日曜休診／木・土は午前のみ／それ以外は終日（book.htmlと同じルール、サーバー側でも二重チェック）
+function dayType_(dateStr){
+  var w=new Date(dateStr+"T00:00:00").getDay();
+  return w===0?"nichi":(w===4||w===6)?"moku":"hei";
+}
 function saveWebBooking(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
     var s=ss.getSheetByName("予約表");
     if(!s) return {ok:false, error:"予約表シートが見つかりません"};
+
+    var dt=dayType_(data.date);
+    if(dt==="nichi") return {ok:false, error:"日曜日は休診日です。別の日をお選びください。"};
 
     var need=Number(data.slotsNeeded)||1;
     var startIdx=SLOTS_LIST_.indexOf(data.time);
@@ -346,6 +354,7 @@ function saveWebBooking(data){
       var idx=startIdx+k;
       if(idx>=SLOTS_LIST_.length) return {ok:false, error:"その時間からでは施術時間が足りません。別の時間をお選びください。"};
       var slot=SLOTS_LIST_[idx];
+      if(dt==="moku" && slot>="13:00") return {ok:false, error:"本日は午前診療のみです。別の時間をお選びください。"};
       // 午前と午後をまたぐ予約は不可（12:10の次が15:00に飛ぶため）
       if(k>0 && slot<SLOTS_LIST_[startIdx] && SLOTS_LIST_[startIdx]<"13:00" && slot>="13:00"){
         return {ok:false, error:"施術時間が午前・午後をまたいでしまいます。別の時間をお選びください。"};

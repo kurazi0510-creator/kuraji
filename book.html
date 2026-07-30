@@ -114,6 +114,17 @@ const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
   '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
   '19:00','19:20','19:40'];
 
+// 曜日ごとの診療ルール：日曜休診／木・土は午前のみ／それ以外は終日
+function dayType(dateStr){
+  const w=new Date(dateStr+'T00:00:00').getDay();
+  return w===0?'nichi':(w===4||w===6)?'moku':'hei';
+}
+function slotsForDayType(dt){
+  if(dt==='nichi') return [];
+  if(dt==='moku') return SLOTS.filter(s=>s<'13:00');
+  return SLOTS;
+}
+
 // メニュー：所要時間(分) と 必要枠数(1枠=20分)
 const MENUS=[
   {key:'sotai_first', label:'整体（初診）', minutes:60, slots:3},
@@ -154,6 +165,12 @@ async function onDateChange(){
   const date=document.getElementById('f-date').value;
   if(!date||!selMenu)return;
   document.getElementById('slotCard').style.display='block';
+  const dt=dayType(date);
+  if(dt==='nichi'){
+    document.getElementById('slotArea').innerHTML='<p class="note" style="color:#b3382c;font-weight:bold">😌 申し訳ございません、日曜日は休診日です。別の日をお選びください。</p>';
+    selSlot=''; checkReady();
+    return;
+  }
   document.getElementById('slotArea').innerHTML='<p class="note">読み込み中...</p>';
   try{
     const res=await fetch(GAS+'?action=getAll');
@@ -164,35 +181,39 @@ async function onDateChange(){
       if(String(row[0])===date && String(row[3]||'').trim()!=='') bookedSlots[String(row[1])]=true;
     });
   }catch(e){ bookedSlots={}; }
-  renderSlots();
+  renderSlots(dt);
 }
 
-// 開始時刻sから、selMenu.slots個ぶん連続して空いているか（午前午後をまたがないか）を判定
-function canStartAt(startIdx){
+// 開始時刻sから、selMenu.slots個ぶん連続して空いているか（診療時間内かどうか・午前午後をまたがないか）を判定
+function canStartAt(startIdx,availSlots){
   const need=selMenu.slots;
   const startsAM = SLOTS[startIdx] < '13:00';
   for(let k=0;k<need;k++){
     const idx=startIdx+k;
     if(idx>=SLOTS.length) return false;
     const s=SLOTS[idx];
+    if(!availSlots.includes(s)) return false; // 診療時間外（休診・午後休診など）
     if(startsAM && s>='13:00') return false; // 午前→午後をまたぐ
     if(bookedSlots[s]) return false;
   }
   return true;
 }
 
-function renderSlots(){
+function renderSlots(dt){
+  const availSlots=slotsForDayType(dt);
   const am=SLOTS.filter(s=>s<'13:00'), pm=SLOTS.filter(s=>s>='13:00');
-  let html=`<p class="note">所要時間：${selMenu.minutes}分（${selMenu.slots}枠）</p>`+
+  let html=`<p class="note">所要時間：${selMenu.minutes}分（${selMenu.slots}枠）${dt==='moku'?'　※本日は午前診療のみです':''}</p>`+
     '<div class="slot-sec">午前</div><div class="slot-grid">'+
-    am.map(s=>slotHtml(s)).join('')+'</div>'+
-    '<div class="slot-sec">午後</div><div class="slot-grid">'+
-    pm.map(s=>slotHtml(s)).join('')+'</div>';
+    am.map(s=>slotHtml(s,availSlots)).join('')+'</div>';
+  if(dt!=='moku'){
+    html+='<div class="slot-sec">午後</div><div class="slot-grid">'+
+      pm.map(s=>slotHtml(s,availSlots)).join('')+'</div>';
+  }
   document.getElementById('slotArea').innerHTML=html;
 }
-function slotHtml(s){
+function slotHtml(s,availSlots){
   const idx=SLOTS.indexOf(s);
-  const ok=canStartAt(idx);
+  const ok=canStartAt(idx,availSlots);
   return `<div class="slot ${ok?'':'full'} ${selSlot===s?'sel':''}" ${ok?`onclick="pickSlot('${s}')"`:''}>${s}</div>`;
 }
 function pickSlot(s){ selSlot=s; renderSlots(); checkReady(); document.getElementById('infoCard').style.display='block'; }
