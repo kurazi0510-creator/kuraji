@@ -60,6 +60,7 @@ textarea{resize:none;height:64px;}
   <div class="card" id="dateCard" style="display:none">
     <h2><span class="step-num">2</span>ご希望日</h2>
     <input type="date" id="f-date" onchange="onDateChange()">
+    <p class="note" style="color:#c98a4b;font-weight:bold">📞 本日中のご予約をご希望の方は、お手数ですがLINE(@qin9307o)か、お電話にてご連絡ください。</p>
   </div>
 
   <div class="card" id="slotCard" style="display:none">
@@ -198,10 +199,11 @@ function pickMenu(i){
   if(dEl.value) onDateChange();
 }
 
-// 日付の下限＝今日、上限＝60日後
+// 日付の下限＝明日（当日はWeb予約不可。急ぎの方はLINE・電話へ誘導）、上限＝60日後
 (function(){
   const d=document.getElementById('f-date');
-  const t=new Date(),max=new Date();max.setDate(t.getDate()+60);
+  const t=new Date();t.setDate(t.getDate()+1);
+  const max=new Date();max.setDate(max.getDate()+60);
   d.min=t.toISOString().slice(0,10);
   d.max=max.toISOString().slice(0,10);
 })();

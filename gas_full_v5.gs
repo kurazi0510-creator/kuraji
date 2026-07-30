@@ -454,6 +454,9 @@ function saveWebBooking(data){
     var s=ss.getSheetByName("予約表");
     if(!s) return {ok:false, error:"予約表シートが見つかりません"};
 
+    var todayStr=Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd");
+    if(String(data.date)===todayStr) return {ok:false, error:"本日中のご予約はWebフォームでは受け付けておりません。お手数ですがLINEかお電話でご連絡ください。"};
+
     var dayCfg=getDayConfig_(data.date);
     if(dayCfg.closed) return {ok:false, error:"本日は休診日です。別の日をお選びください。"};
 
