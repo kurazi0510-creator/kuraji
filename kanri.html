@@ -944,9 +944,14 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <div class="fg"><label>診察券No</label><input class="inp" id="m-id" type="number" placeholder="入力で自動入力" oninput="autoFill()"></div>
         <div class="fg"><label>患者名</label><input class="inp" id="m-nm" placeholder="患者名"></div>
         <div class="fg"><label>予約ルート</label>
-          <select class="sel" id="m-rt" onchange="onRouteChange()">
+          <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:0.8rem;color:#166534;font-weight:bold;cursor:pointer;background:#f0fdf4;padding:6px 8px;border-radius:7px;border:1.5px solid #86efac">
+            <input type="checkbox" id="m-nextbook-cb" onchange="onRouteChange()" style="width:auto">
+            🔜 次回予約（前回予約済みの来院）
+          </label>
+          <div id="m-arrival-wrap">
+            <label style="font-size:0.72rem;color:#374151;display:block;margin-bottom:3px">来院ルート（今回どのように予約されたか）</label>
+            <select class="sel" id="m-rt">
   <optgroup label="── 今回の来院ルート ──">
-    <option value="次回予約">次回予約（前回予約済み）</option>
     <option value="LINE">LINE予約</option>
     <option value="電話">電話予約</option>
     <option value="当日LINE予約">当日LINE予約</option>
@@ -954,6 +959,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <option value="飛び込み">飛び込み</option>
   </optgroup>
 </select>
+          </div>
           <div id="next-appt-info" style="display:none;margin-top:6px;padding:8px 10px;background:#eff6ff;border-radius:8px;font-size:0.78rem;color:#1e40af;font-weight:bold"></div>
           <!-- 次回予約入力フォーム -->
           <div id="next-book-form" style="display:none;margin-top:8px;background:#f0fdf4;border-radius:10px;padding:12px;border:1.5px solid #86efac">
@@ -3375,6 +3381,8 @@ function openModal(date,slot){
     menuSel.appendChild(custom);
   }
   document.getElementById('m-rt').value='LINE';
+  const nbcb0=document.getElementById('m-nextbook-cb');if(nbcb0)nbcb0.checked=false;
+  const awrap0=document.getElementById('m-arrival-wrap');if(awrap0)awrap0.style.display='block';
   document.getElementById('m-patient-list').style.display='none';
   document.getElementById('m-selected-info').style.display='none';
   resetKubun();resetBui();
@@ -3390,9 +3398,12 @@ function editBk(date,slot){
   document.getElementById('mtitle').textContent='予約編集 '+slot;
   document.getElementById('m-id').value=bk.cardId||'';
   document.getElementById('m-nm').value=bk.name||'';
-  document.getElementById('m-rt').value=bk.route||'LINE';
+  const isNB=(bk.route||'LINE')==='次回予約';
+  const nbcb=document.getElementById('m-nextbook-cb');if(nbcb)nbcb.checked=isNB;
+  document.getElementById('m-rt').value=isNB?'LINE':(bk.route||'LINE');
+  const awrap=document.getElementById('m-arrival-wrap');if(awrap)awrap.style.display=isNB?'none':'block';
   // 次回予約の場合は自動でフォームを表示
-  if((bk.route||'LINE')==='次回予約')setTimeout(onRouteChange,100);
+  if(isNB)setTimeout(onRouteChange,100);
   document.getElementById('m-sym').value=bk.symptom||'';
   const nmEl=document.getElementById('m-next-memo');if(nmEl)nmEl.value=bk.nextMemo||bk.nextNote||'';
   document.getElementById('m-opt').value=bk.option||'';
@@ -3564,7 +3575,7 @@ async function saveBk(){
   if(!mKubunSel.length){alert('区分を選択してください');return;}
   const name=document.getElementById('m-nm').value.trim();
   const cardId=document.getElementById('m-id').value.trim();
-  const route=document.getElementById('m-rt').value;
+  const route=document.getElementById('m-nextbook-cb')?.checked?'次回予約':document.getElementById('m-rt').value;
   const symptom=document.getElementById('m-sym').value.trim();
   const nextMemo=document.getElementById('m-next-memo')?.value.trim()||'';
   const nextNote=nextMemo;// 統一
@@ -3690,11 +3701,14 @@ function updateMenuTotal(){
 // ===== 枠数選択 =====
 let mSlotCount=1;
 function onRouteChange(){
-  const rt=document.getElementById('m-rt').value;
+  const cb=document.getElementById('m-nextbook-cb');
+  const isNextBook=cb?cb.checked:false;
+  const arrivalWrap=document.getElementById('m-arrival-wrap');
+  if(arrivalWrap)arrivalWrap.style.display=isNextBook?'none':'block';
   const info=document.getElementById('next-appt-info');
   const form=document.getElementById('next-book-form');
   if(!info)return;
-  if(rt!=='次回予約'){
+  if(!isNextBook){
     info.style.display='none';
     if(form)form.style.display='none';
     return;
