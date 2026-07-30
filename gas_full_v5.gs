@@ -302,9 +302,28 @@ function saveWebBooking(data){
 
     var p=PropertiesService.getScriptProperties();
     var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+    var nl=String.fromCharCode(10);
     if(token&&ownerId){
-      var nl=String.fromCharCode(10);
       sendLineMessagingAPI(token,ownerId,"[倉治整骨院] Web予約が入りました"+nl+data.date+" "+data.time+"〜"+nl+(data.menu||"")+nl+(data.name||"")+" 様"+nl+(data.tel||""));
+    }
+    // 患者様ご本人のLINEにも、お名前が一致すれば即座に予約確認メッセージを送信
+    if(token && data.name){
+      var ls=ss.getSheetByName("LINE_IDs");
+      if(ls){
+        var lu={};
+        ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+        var nameTrim=String(data.name).trim();
+        var tid=lu[nameTrim];
+        if(!tid){
+          var ln=nameTrim.split(" ")[0].split("　")[0];
+          var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln.replace(/[ 　]/g,""))===0;});
+          if(fk)tid=lu[fk];
+        }
+        if(tid){
+          var dispDate=Utilities.formatDate(new Date(data.date),"Asia/Tokyo","M月d日(E)");
+          sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"ご予約を承りました。"+nl+dispDate+" "+data.time+"〜"+nl+"メニュー："+(data.menu||"")+nl+nl+"前日にもリマインドをお送りします。"+nl+"お気をつけてお越しください。"+nl+"(自動送信のため返信不要です)");
+        }
+      }
     }
     return {ok:true};
   }catch(err){ return {ok:false, error:err.message}; }
