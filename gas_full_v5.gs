@@ -344,7 +344,11 @@ function saveBizHoursWeekly(rows){
     if(!s) s=ss.insertSheet("biz_hours_weekly");
     s.clearContents();
     s.getRange(1,1,1,6).setValues([["dow","closed","amStart","amEnd","pmStart","pmEnd"]]);
-    if(rows && rows.length) s.getRange(2,1,rows.length,6).setValues(rows);
+    if(rows && rows.length){
+      var rng=s.getRange(2,1,rows.length,6);
+      rng.setNumberFormats(rows.map(function(){return ["@","@","@","@","@","@"];}));
+      rng.setValues(rows);
+    }
     return {ok:true};
   }catch(err){ return {ok:false, error:err.message}; }
 }
@@ -355,19 +359,38 @@ function saveBizHoursOverride(rows){
     if(!s) s=ss.insertSheet("biz_hours_override");
     s.clearContents();
     s.getRange(1,1,1,7).setValues([["date","closed","amStart","amEnd","pmStart","pmEnd","note"]]);
-    if(rows && rows.length) s.getRange(2,1,rows.length,7).setValues(rows);
+    if(rows && rows.length){
+      var rng=s.getRange(2,1,rows.length,7);
+      rng.setNumberFormats(rows.map(function(){return ["@","@","@","@","@","@","@"];}));
+      rng.setValues(rows);
+    }
     return {ok:true};
   }catch(err){ return {ok:false, error:err.message}; }
+}
+// 時刻セルがGoogleスプレッドシートによって日付型に自動変換されてしまった場合でも、
+// "HH:MM"形式の文字列に安全に復元する
+function toHHMM_(v){
+  if(v===null||v===undefined||v==="") return "";
+  if(Object.prototype.toString.call(v)==="[object Date]"){
+    var h=v.getHours(),m=v.getMinutes();
+    return (h<10?"0"+h:String(h))+":"+(m<10?"0"+m:String(m));
+  }
+  var s=String(v);
+  var m2=s.match(/(\d{1,2}):(\d{2})/);
+  if(m2) return (m2[1].length<2?"0"+m2[1]:m2[1])+":"+m2[2];
+  return "";
 }
 function getBizHours(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var w=ss.getSheetByName("biz_hours_weekly");
   var o=ss.getSheetByName("biz_hours_override");
-  return {
-    ok:true,
-    weekly: w?w.getDataRange().getValues().slice(1):[],
-    overrides: o?o.getDataRange().getValues().slice(1):[]
-  };
+  var weekly=w?w.getDataRange().getValues().slice(1).map(function(r){
+    return [r[0], r[1], toHHMM_(r[2]), toHHMM_(r[3]), toHHMM_(r[4]), toHHMM_(r[5])];
+  }):[];
+  var overrides=o?o.getDataRange().getValues().slice(1).map(function(r){
+    return [r[0], r[1], toHHMM_(r[2]), toHHMM_(r[3]), toHHMM_(r[4]), toHHMM_(r[5]), r[6]];
+  }):[];
+  return { ok:true, weekly:weekly, overrides:overrides };
 }
 
 var SLOTS_LIST_=["08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50",
@@ -397,7 +420,7 @@ function getDayConfig_(dateStr){
     var od=o.getDataRange().getValues();
     for(var i=1;i<od.length;i++){
       if(String(od[i][0])===dateStr){
-        return {closed:od[i][1]===true||od[i][1]==="TRUE", am:od[i][1]?null:[String(od[i][2]),String(od[i][3])], pm:od[i][1]?null:[String(od[i][4]),String(od[i][5])]};
+        return {closed:od[i][1]===true||od[i][1]==="TRUE", am:od[i][1]?null:[toHHMM_(od[i][2]),toHHMM_(od[i][3])], pm:od[i][1]?null:[toHHMM_(od[i][4]),toHHMM_(od[i][5])]};
       }
     }
   }
@@ -408,7 +431,7 @@ function getDayConfig_(dateStr){
     for(var j=1;j<wd.length;j++){
       if(Number(wd[j][0])===dow){
         var closed=wd[j][1]===true||wd[j][1]==="TRUE";
-        return {closed:closed, am:closed?null:[String(wd[j][2]),String(wd[j][3])], pm:closed?null:[String(wd[j][4]),String(wd[j][5])]};
+        return {closed:closed, am:closed?null:[toHHMM_(wd[j][2]),toHHMM_(wd[j][3])], pm:closed?null:[toHHMM_(wd[j][4]),toHHMM_(wd[j][5])]};
       }
     }
   }

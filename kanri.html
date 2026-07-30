@@ -2801,8 +2801,10 @@ function getBizDayConfig(dateStr){
 }
 function genSlotsFromRange(startStr,endStr){
   if(!startStr||!endStr) return [];
+  if(!/^\d{1,2}:\d{2}$/.test(startStr)||!/^\d{1,2}:\d{2}$/.test(endStr)) return []; // 形式が壊れている場合は空扱いにしてNaN表示を防ぐ
   let [h,m]=startStr.split(':').map(Number);
   const [eh,em]=endStr.split(':').map(Number);
+  if(isNaN(h)||isNaN(m)||isNaN(eh)||isNaN(em)) return [];
   const out=[]; let guard=0;
   while(!(h===eh&&m===em)&&guard<100){
     out.push(pad(h)+':'+pad(m));
@@ -2810,6 +2812,13 @@ function genSlotsFromRange(startStr,endStr){
     guard++;
   }
   return out;
+}
+// 時刻文字列を安全な"HH:MM"形式に変換（スプレッドシート側で日付型に化けた値も復元する）
+function toHHMM(v){
+  if(v===null||v===undefined||v==='') return '';
+  const m=String(v).match(/(\d{1,2}):(\d{2})/);
+  if(m) return (m[1].length<2?'0'+m[1]:m[1])+':'+m[2];
+  return '';
 }
 async function syncBizHoursFromGAS(){
   try{
@@ -2821,7 +2830,8 @@ async function syncBizHoursFromGAS(){
       d.weekly.forEach(r=>{
         const dow=Number(r[0]);
         const closed=r[1]===true||r[1]==='TRUE';
-        w[dow]={closed, am:(r[2]&&r[3])?[String(r[2]),String(r[3])]:null, pm:(r[4]&&r[5])?[String(r[4]),String(r[5])]:null};
+        const amS=toHHMM(r[2]),amE=toHHMM(r[3]),pmS=toHHMM(r[4]),pmE=toHHMM(r[5]);
+        w[dow]={closed, am:(amS&&amE)?[amS,amE]:null, pm:(pmS&&pmE)?[pmS,pmE]:null};
       });
       bizHours.weekly={...bizHours.weekly,...w};
     }
@@ -2829,7 +2839,8 @@ async function syncBizHoursFromGAS(){
       const o={};
       d.overrides.forEach(r=>{
         const closed=r[1]===true||r[1]==='TRUE';
-        o[String(r[0])]={closed, am:(r[2]&&r[3])?[String(r[2]),String(r[3])]:null, pm:(r[4]&&r[5])?[String(r[4]),String(r[5])]:null, note:r[6]||''};
+        const amS=toHHMM(r[2]),amE=toHHMM(r[3]),pmS=toHHMM(r[4]),pmE=toHHMM(r[5]);
+        o[String(r[0])]={closed, am:(amS&&amE)?[amS,amE]:null, pm:(pmS&&pmE)?[pmS,pmE]:null, note:r[6]||''};
       });
       bizHours.overrides=o;
     }

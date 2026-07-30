@@ -125,8 +125,10 @@ async function loadBizHours(){
 }
 function genSlots(startStr,endStr){
   if(!startStr||!endStr) return [];
+  if(!/^\d{1,2}:\d{2}$/.test(startStr)||!/^\d{1,2}:\d{2}$/.test(endStr)) return [];
   let [h,m]=startStr.split(':').map(Number);
   const [eh,em]=endStr.split(':').map(Number);
+  if(isNaN(h)||isNaN(m)||isNaN(eh)||isNaN(em)) return [];
   const out=[]; let guard=0;
   while(!(h===eh&&m===em)&&guard<100){
     const s=(h<10?'0'+h:h)+':'+(m<10?'0'+m:m);
@@ -136,15 +138,21 @@ function genSlots(startStr,endStr){
   }
   return out;
 }
+function toHHMM(v){
+  if(v===null||v===undefined||v==='') return '';
+  const m=String(v).match(/(\d{1,2}):(\d{2})/);
+  if(m) return (m[1].length<2?'0'+m[1]:m[1])+':'+m[2];
+  return '';
+}
 function getDayConfig(dateStr){
   if(bizHoursCache){
     const ov=bizHoursCache.overrides.find(r=>String(r[0])===dateStr);
-    if(ov) return {closed: ov[1]===true||ov[1]==='TRUE', am:[String(ov[2]),String(ov[3])], pm:[String(ov[4]),String(ov[5])]};
+    if(ov) return {closed: ov[1]===true||ov[1]==='TRUE', am:[toHHMM(ov[2]),toHHMM(ov[3])], pm:[toHHMM(ov[4]),toHHMM(ov[5])]};
     const dow=new Date(dateStr+'T00:00:00').getDay();
     const wk=bizHoursCache.weekly.find(r=>Number(r[0])===dow);
     if(wk){
       const closed=wk[1]===true||wk[1]==='TRUE';
-      return {closed, am:[String(wk[2]),String(wk[3])], pm:[String(wk[4]),String(wk[5])]};
+      return {closed, am:[toHHMM(wk[2]),toHHMM(wk[3])], pm:[toHHMM(wk[4]),toHHMM(wk[5])]};
     }
   }
   // フォールバック（従来のデフォルト：日曜休診、木・土は午前のみ）
