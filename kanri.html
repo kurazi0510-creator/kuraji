@@ -2258,23 +2258,15 @@ async function syncAll(){
           // GASに予約データが1件もない場合は何もしない（localStorageを保持）
           console.warn('GAS予約データが空のためlocalStorageを維持します');
         } else {
-          // GASにある日付はGASを優先、localStorageにしかない日付は保持
-          const gasDateCount = Object.keys(newB).length;
-          const localDateCount = Object.keys(bookings).length;
-          // GASのデータ量がlocalStorageの50%以上なら信頼できるとみなす
-          if(gasDateCount >= localDateCount * 0.5 || localDateCount === 0){
-            // GASを基準に、localStorageにしかない日付を追加
-            Object.keys(bookings).forEach(d=>{
-              if(!newB[d]) newB[d] = bookings[d];
+          // ★スロット単位の安全マージ
+          // ・GASにあってlocalStorageに無い「予約枠」→ 追加（Web予約など新規分を確実に反映）
+          // ・両方にある予約枠 → localStorageを優先（消えない・上書きされない）
+          Object.keys(newB).forEach(d=>{
+            if(!bookings[d]){ bookings[d]=newB[d]; return; }
+            Object.keys(newB[d]).forEach(slot=>{
+              if(!bookings[d][slot]) bookings[d][slot]=newB[d][slot];
             });
-            bookings = newB;
-          } else {
-            // GASのデータが大幅に少ない場合はlocalStorageを優先、GASにしかない日付のみ追加
-            console.warn(`GAS日付数(${gasDateCount}) < local日付数(${localDateCount})×50% → localStorage優先`);
-            Object.keys(newB).forEach(d=>{
-              if(!bookings[d]) bookings[d] = newB[d];
-            });
-          }
+          });
         }
       }
       save();
