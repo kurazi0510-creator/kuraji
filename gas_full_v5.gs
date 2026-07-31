@@ -17,8 +17,9 @@ function doPost(e){
       body.events.forEach(function(ev){
         try{
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
-            var tok0=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
-            if(tok0)sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"ご予約のお知らせ・前日リマインドをこちらのLINEでお受け取りいただくために、お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、お電話番号での確認をお願いしております）");
+            // ※電話番号登録の案内メッセージは一時停止中（システム完成後に再開予定）
+            // var tok0=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
+            // if(tok0)sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"ご予約のお知らせ・前日リマインドをこちらのLINEでお受け取りいただくために、お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、お電話番号での確認をお願いしております）");
           }
           if(ev.type==="message"&&ev.source&&ev.source.userId){
             var uid=ev.source.userId;
@@ -34,9 +35,10 @@ function doPost(e){
               saveLinePhone_(uid,digits,dname);
               if(tok)sendLineMessagingAPI(tok,uid,"📱 お電話番号を登録しました！"+String.fromCharCode(10)+"今後、ご予約確認・前日リマインドをこちらのLINEにお送りします。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
             }else{
-              var already=findPhoneByUid_(uid);
               saveLineUserId(uid,dname,msgText);
-              if(tok&&!already)sendLineMessagingAPI(tok,uid,"いつもありがとうございます😊"+String.fromCharCode(10)+"ご予約のお知らせを受け取るには、お電話番号を数字のみで送ってください。"+String.fromCharCode(10)+"例）09012345678");
+              // ※電話番号未登録の方への案内メッセージは一時停止中（システム完成後に再開予定）
+              // var already=findPhoneByUid_(uid);
+              // if(tok&&!already)sendLineMessagingAPI(tok,uid,"いつもありがとうございます😊"+String.fromCharCode(10)+"ご予約のお知らせを受け取るには、お電話番号を数字のみで送ってください。"+String.fromCharCode(10)+"例）09012345678");
             }
           }
         }catch(err){Logger.log("event error:"+err);}
