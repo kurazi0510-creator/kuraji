@@ -237,6 +237,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="window.open('consent.html','_blank')" style="margin-top:16px;background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
       <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
       <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="margin-top:16px;background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
+      <button class="btn bp bsm" onclick="deleteBookingsByNamePrompt()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626">🗑 名前でテスト予約を一括削除</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
@@ -1978,12 +1979,14 @@ function fmtTime(v){
   if(typeof v==='string'){
     // GASのExcelシリアル値バグ: 1899-12-30 or 1899-12-31 形式
     // JST時刻 + 510分 = GAS UTC分。逆変換: GAS分 - 510 = JST分
-    const isoM=v.match(/^1899-12-3([01])T(\d{2}):(\d{2})/);
+    const isoM=v.match(/^1899-12-(2[89]|3[01])T(\d{2}):(\d{2})/);
     if(isoM){
-      const extraDay=parseInt(isoM[1])===1?1440:0;
-      const gasMin=parseInt(isoM[2])*60+parseInt(isoM[3])+extraDay;
-      // 予約表シートはGASがUTCとして時刻を保存するため変換不要（-540は不要）
-      return snapSlot(gasMin%1440);
+      const dayNum=parseInt(isoM[1]);
+      const extraDay=(dayNum-29)*1440; // 29日を基準(0分)として日ズレを補正
+      const utcMin=parseInt(isoM[2])*60+parseInt(isoM[3])+extraDay;
+      // スプレッドシートはJSTの時刻をUTCとして絶対時刻保存するため、+540分(9時間)で復元する
+      const jstMin=((utcMin+540)%1440+1440)%1440;
+      return snapSlot(jstMin);
     }
     // 通常のHH:MM形式（予約表シートはJST文字列で保存済み→変換不要、そのまま返す）
     const m=v.trim().match(/^(\d{1,2}):(\d{2})/);
@@ -2000,9 +2003,10 @@ function fmtTime(v){
     return v.trim();
   }
   if(v instanceof Date){
-    // 予約表シートはUTCとして時刻を保存するため変換不要
-    const gasMin=v.getUTCHours()*60+v.getUTCMinutes();
-    return snapSlot(gasMin%1440);
+    // JST絶対時刻がUTCとして保存されているため、+540分(9時間)で復元する
+    const utcMin=v.getUTCHours()*60+v.getUTCMinutes();
+    const jstMin=((utcMin+540)%1440+1440)%1440;
+    return snapSlot(jstMin);
   }
   if(typeof v==='number'){
     const t=Math.round(v*24*60);
@@ -2674,6 +2678,37 @@ function generateCarePlan(){
       '<div class="sign-box">施術者<br><br><br>倉治整骨院 院長</div>'+
     '</div>';
   showPrintModal('施術計画書 - '+p.name+'様', html);
+}
+
+// ===== 名前で予約を一括削除（テストデータ整理用） =====
+async function deleteBookingsByNamePrompt(){
+  const name=prompt('削除したい患者名を入力してください（前方一致で全部消えます。例：「郡」と入れると「郡」「郡 雄一朗」などが全部消えます）');
+  if(!name)return;
+  if(!confirm(`「${name}」で始まる予約を全部削除します。元に戻せません。よろしいですか？`))return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'deleteBookingsByName',namePrefix:name})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ GAS側の削除に失敗：'+(d.error||'')); return; }
+    // ローカルデータからも同じ条件で削除
+    let localDeleted=0;
+    Object.keys(bookings).forEach(date=>{
+      Object.keys(bookings[date]).forEach(slot=>{
+        const bk=bookings[date][slot];
+        const bkName=String(bk?.name||'').trim();
+        if(bkName && (bkName===name.trim() || bkName.indexOf(name.trim())===0)){
+          delete bookings[date][slot];
+          localDeleted++;
+        }
+      });
+    });
+    save();
+    renderSched();
+    alert(`✅ 削除しました\nスプレッドシート側：${d.deleted}件\n画面表示側：${localDeleted}件`);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 
 // ===== Web予約フォーム用：自費メニューをGASに同期 =====

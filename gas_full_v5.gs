@@ -60,6 +60,7 @@ function doPost(e){
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
       else if(action==="getBizHours")result=getBizHours();
+      else if(action==="deleteBookingsByName")result=deleteBookingsByName(body.namePrefix);
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
@@ -495,7 +496,10 @@ function saveWebBooking(data){
         "Web予約", data.visitCount||"", "", k===0?(data.symptom||""):"", "",
         k===0?(data.menu||""):"", "", "", "", "", "", "", "", "", ""
       ];
-      s.appendRow(newRow);
+      var newRowIdx=s.getLastRow()+1;
+      var rng=s.getRange(newRowIdx,1,1,newRow.length);
+      rng.setNumberFormat("@"); // テキスト形式を強制し、日付/時刻型への自動変換を防止
+      rng.setValues([newRow]);
     });
 
     // 予約確認ページ(confirm.html)から電話番号で検索できるよう、別シートに控えを保存
@@ -592,4 +596,24 @@ function getMenuMaster(){
   if(!s) return {ok:true, rows:[]};
   var data=s.getDataRange().getValues();
   return {ok:true, rows:data.slice(1)};
+}
+// 指定した名前(前方一致)の予約を予約表からすべて削除する（テストデータの一括整理用）
+function deleteBookingsByName(namePrefix){
+  try{
+    if(!namePrefix) return {ok:false, error:"名前を指定してください"};
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("予約表");
+    if(!s) return {ok:false, error:"予約表シートが見つかりません"};
+    var data=s.getDataRange().getValues();
+    var target=String(namePrefix).trim();
+    var deleted=0;
+    for(var i=data.length-1;i>=1;i--){
+      var name=String(data[i][3]||"").trim();
+      if(name && (name===target || name.indexOf(target)===0)){
+        s.deleteRow(i+1);
+        deleted++;
+      }
+    }
+    return {ok:true, deleted:deleted};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
