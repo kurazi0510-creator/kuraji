@@ -940,7 +940,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button class="btn bp bsm" onclick="loadLineUsers()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
-      <input type="text" id="lu-search" placeholder="名前で検索" class="inp" style="flex:1" oninput="renderLineUsers()">
+      <input type="text" id="lu-search" placeholder="名前・診察券番号で検索" class="inp" style="flex:1" oninput="renderLineUsers()">
     </div>
     <div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.82rem">
       <div>✅ 登録済み：<b id="lu-count-ok">0</b>人</div>
@@ -2762,13 +2762,13 @@ async function loadLineUsers(){
 function renderLineUsers(){
   const kw=(document.getElementById('lu-search')?.value||'').trim();
   let list=lineUsersCache;
-  if(kw) list=list.filter(u=>u.name.includes(kw));
+  if(kw) list=list.filter(u=>u.name.includes(kw)||(u.cardId||'').includes(kw));
   const okCount=lineUsersCache.filter(u=>u.registered).length;
   const ngCount=lineUsersCache.length-okCount;
   document.getElementById('lu-count-ok').textContent=okCount;
   document.getElementById('lu-count-ng').textContent=ngCount;
-  // 未登録の人を先に表示（対応が必要な人を見つけやすくする）
-  list=[...list].sort((a,b)=>(a.registered===b.registered)?0:(a.registered?1:-1));
+  // 登録済みの人を先に表示
+  list=[...list].sort((a,b)=>(a.registered===b.registered)?0:(a.registered?-1:1));
   if(!list.length){ document.getElementById('lu-list').innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">該当する友だちがいません</p>'; return; }
   document.getElementById('lu-list').innerHTML=list.map(u=>{
     const badge=u.registered?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅登録済み</span>':'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜未登録</span>';
@@ -2778,6 +2778,7 @@ function renderLineUsers(){
         <input type="text" value="${(u.name||'').replace(/"/g,'&quot;')}" placeholder="お名前を修正" class="lu-name" data-uid="${uidSafe}" style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.82rem;font-weight:bold;margin-bottom:3px" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
         <div style="font-size:0.68rem;color:#94a3b8">最終メッセージ：${(u.lastMsg||'').slice(0,20)}</div>
       </div>
+      <input type="text" value="${u.cardId||''}" placeholder="診察券No" class="lu-card" data-uid="${uidSafe}" style="width:90px;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.8rem" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
       <input type="text" value="${u.phone||''}" placeholder="電話番号を手入力" class="lu-phone" data-uid="${uidSafe}" style="width:140px;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.8rem" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
       <button onclick="saveLineUserRow('${uidSafe}')" style="padding:6px 10px;border:none;border-radius:6px;background:#1e293b;color:white;font-size:0.72rem;cursor:pointer">保存</button>
       ${badge}
@@ -2787,13 +2788,15 @@ function renderLineUsers(){
 async function saveLineUserRow(userId){
   const nameEl=document.querySelector(`.lu-name[data-uid="${userId}"]`);
   const phoneEl=document.querySelector(`.lu-phone[data-uid="${userId}"]`);
+  const cardEl=document.querySelector(`.lu-card[data-uid="${userId}"]`);
   const name=nameEl?nameEl.value:'';
   const phone=phoneEl?phoneEl.value:'';
+  const cardId=cardEl?cardEl.value:'';
   try{
     const res=await fetch(GAS,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'saveLineUserPhoneManual',userId,phone,name})
+      body:JSON.stringify({action:'saveLineUserPhoneManual',userId,phone,name,cardId})
     });
     const d=await res.json();
     if(!d.ok){ alert('❌ 保存に失敗：'+(d.error||'')); return; }
