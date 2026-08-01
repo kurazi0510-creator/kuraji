@@ -66,6 +66,9 @@ function doPost(e){
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="deleteBookingsByName")result=deleteBookingsByName(body.namePrefix);
       else if(action==="saveLineUserPhoneManual")result=saveLineUserPhoneManual(body.userId,body.phone);
+      else if(action==="setTestMode")result=setTestMode(body.name);
+      else if(action==="getTestMode")result=getTestMode();
+      else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
@@ -276,6 +279,7 @@ function sendDayBeforeReminders(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
   if(!token)return;
+  var testModeName=p.getProperty("TEST_MODE_NAME")||""; // 例:"郡" と設定すると、その名前を含む患者にしか送らない
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var today=new Date();today.setHours(0,0,0,0);
   var tmr=new Date(today);tmr.setDate(tmr.getDate()+1);
@@ -296,6 +300,7 @@ function sendDayBeforeReminders(){
     if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1||dv!==tmrStr)return;
     var n=String(r[ni]||"").trim(),t=String(r[ti]||"").trim();
     if(!n||!t||seen[n+"_"+t])return;
+    if(testModeName && n.indexOf(testModeName)<0)return; // テストモード中は対象外の患者をスキップ
     seen[n+"_"+t]=true;
     if(!bp[n])bp[n]=[];
     bp[n].push(t);
@@ -311,14 +316,25 @@ function sendDayBeforeReminders(){
       if(!tid){var ln=name.split(" ")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
     }
     if(!tid){skip.push(name);return;}
-    var msg="[倉治整骨院]"+nl+tmrDisp+"のご予約リマインドです"+nl+nl+"時間: "+bp[name].join(" / ")+nl+nl+"お気をつけてお越しください。"+nl+"(自動送信のため返信不要です)";
+    var msg=(testModeName?"【テスト送信】"+nl:"")+"[倉治整骨院]"+nl+tmrDisp+"のご予約リマインドです"+nl+nl+"時間: "+bp[name].join(" / ")+nl+nl+"お気をつけてお越しください。"+nl+"(自動送信のため返信不要です)";
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;}else{skip.push(name);}
   });
   if(ownerId){
-    var s="[倉治整骨院] 前日リマインド完了"+nl+tmrDisp+nl+"送信:"+sent+"件";
+    var s=(testModeName?"【テストモード中：「"+testModeName+"」のみ対象】"+nl:"")+"[倉治整骨院] 前日リマインド完了"+nl+tmrDisp+nl+"送信:"+sent+"件";
     if(skip.length)s+=nl+"未登録: "+skip.join(", ");
     sendLineMessagingAPI(token,ownerId,s);
   }
+}
+// テストモードの設定・解除（設定するとその名前を含む患者にしか自動送信されなくなる。空にすると全員に送信される通常運用に戻る）
+function setTestMode(name){
+  var p=PropertiesService.getScriptProperties();
+  if(name){ p.setProperty("TEST_MODE_NAME", String(name).trim()); }
+  else{ p.deleteProperty("TEST_MODE_NAME"); }
+  return {ok:true, testModeName: p.getProperty("TEST_MODE_NAME")||""};
+}
+function getTestMode(){
+  var p=PropertiesService.getScriptProperties();
+  return {ok:true, testModeName: p.getProperty("TEST_MODE_NAME")||""};
 }
 function getFollowers(){
   var p=PropertiesService.getScriptProperties();
@@ -356,7 +372,7 @@ function getFollowers(){
 function setupAllTriggers(){
   ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(8).create();
-  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(18).create();
+  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(19).create();
   Logger.log("Triggers set OK");
 }
 function sendLineMessagingAPI(token,userId,message){

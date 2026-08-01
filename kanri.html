@@ -239,6 +239,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="margin-top:16px;background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
       <button class="btn bp bsm" onclick="deleteBookingsByNamePrompt()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626">🗑 名前でテスト予約を一括削除</button>
       <button class="btn bp bsm" onclick="openLineUsersModal()" style="margin-top:16px;background:#06c755;color:white;border-color:#06c755">📱 LINE電話番号 登録状況一覧</button>
+      <button class="btn bp bsm" onclick="openTestModeSettings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">🧪 前日リマインド テスト設定</button>
+      <button class="btn bp bsm" onclick="runReminderTestNow()" style="margin-top:16px;background:#f59e0b;color:white;border-color:#f59e0b">▶ 前日リマインドを今すぐテスト送信</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
@@ -2698,6 +2700,45 @@ function generateCarePlan(){
       '<div class="sign-box">施術者<br><br><br>倉治整骨院 院長</div>'+
     '</div>';
   showPrintModal('施術計画書 - '+p.name+'様', html);
+}
+
+// ===== 前日リマインド テストモード設定 =====
+async function openTestModeSettings(){
+  try{
+    const res=await fetch(GAS+'?action=getTestMode&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const cur=d.testModeName||'';
+    const msg=cur
+      ? `現在のテストモード：「${cur}」のみに送信中です。\n\n・新しい名前に変えたい → 名前を入力してOK\n・テストモードを終了して全員に送信を再開する → 「解除」と入力\n・今の設定のままにする → キャンセル`
+      : `現在テストモードは無効（全員に送信されます）。\n\nテストしたい患者名を入力してください（例：郡）\n入力すると、前日リマインドはその名前を含む患者様にしか送られなくなります。`;
+    const input=prompt(msg, cur);
+    if(input===null)return; // キャンセル
+    const newName=(input.trim()==='解除')?'':input.trim();
+    const res2=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'setTestMode',name:newName})
+    });
+    const d2=await res2.json();
+    if(!d2.ok){ alert('❌ 設定に失敗しました'); return; }
+    if(d2.testModeName){
+      alert(`✅ テストモードON\n「${d2.testModeName}」を含む患者様にしか前日リマインドが送られなくなりました。\n\n下の「🧪 前日リマインドを今すぐテスト送信」ボタンで、19時を待たずにすぐ試せます。`);
+    }else{
+      alert('✅ テストモードOFF\n通常運用（全員に送信）に戻りました。');
+    }
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function runReminderTestNow(){
+  if(!confirm('前日リマインドを今すぐ実行します。テストモード中でなければ全員に届いてしまいます。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'runDayBeforeRemindersNow'})
+    });
+    const d=await res.json();
+    alert(d.ok?'✅ 実行しました。院長のLINEに結果が届きます。':'❌ 実行に失敗しました');
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 
 // ===== LINE電話番号 登録状況一覧 =====
