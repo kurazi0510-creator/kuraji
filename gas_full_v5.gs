@@ -113,7 +113,7 @@ function findPhoneByUid_(userId){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
   if(!s) return "";
   var data=s.getDataRange().getValues();
-  for(var i=1;i<data.length;i++){ if(data[i][0]===userId) return String(data[i][4]||""); }
+  for(var i=1;i<data.length;i++){ if(data[i][0]===userId) return fixPhoneLeadingZero_(data[i][4]); }
   return "";
 }
 // 案内メッセージを送信済みかどうかを確認（1人1回だけ送るための管理）
@@ -138,14 +138,22 @@ function markPromptSent_(userId){
   rng.setValues([[userId,"","","",new Date(),"TRUE"]]);
 }
 // 電話番号からLINEのuserIdを検索（表示名の一致に頼らない、最優先の照合方法）
+// 電話番号の先頭の「0」が数値変換で消えてしまった場合に自動で復元する
+// （日本の電話番号は必ず0から始まるため、9〜10桁で0始まりでなければ0を補う）
+function fixPhoneLeadingZero_(v){
+  var digits=String(v||"").replace(/[^0-9]/g,"");
+  if(!digits) return "";
+  if(digits.charAt(0)!=="0" && digits.length>=9 && digits.length<=10) return "0"+digits;
+  return digits;
+}
 function findLineUidByPhone_(phone){
-  var digits=String(phone||"").replace(/[^0-9]/g,"");
+  var digits=fixPhoneLeadingZero_(phone);
   if(!digits) return "";
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
   if(!s) return "";
   var data=s.getDataRange().getValues();
   for(var i=1;i<data.length;i++){
-    var p=String(data[i][4]||"").replace(/[^0-9]/g,"");
+    var p=fixPhoneLeadingZero_(data[i][4]);
     if(p&&p===digits) return String(data[i][0]);
   }
   return "";
@@ -160,7 +168,7 @@ function getTelByPatientName_(name){
   if(ni<0)ni=1; if(ti<0)ti=3;
   var target=String(name||"").trim();
   for(var i=1;i<data.length;i++){
-    if(String(data[i][ni]||"").trim()===target) return String(data[i][ti]||"");
+    if(String(data[i][ni]||"").trim()===target) return fixPhoneLeadingZero_(data[i][ti]);
   }
   return "";
 }
@@ -168,7 +176,8 @@ function getLineUsers(){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
   if(!s)return{ok:true,users:[]};
   return{ok:true,users:s.getDataRange().getValues().slice(1).map(function(r){
-    return{userId:String(r[0]||''),name:String(r[1]||''),lastMsg:String(r[2]||''),updated:String(r[3]||''),phone:String(r[4]||''),registered:!!String(r[4]||'').trim(),cardId:String(r[6]||'')};
+    var phoneFixed=fixPhoneLeadingZero_(r[4]);
+    return{userId:String(r[0]||''),name:String(r[1]||''),lastMsg:String(r[2]||''),updated:String(r[3]||''),phone:phoneFixed,registered:!!phoneFixed,cardId:String(r[6]||'')};
   })};
 }
 // kanri.html側から手動で電話番号・名前・診察券番号を登録・修正する（LINEを介さず、スタッフが直接編集する場合）
