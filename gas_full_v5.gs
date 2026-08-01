@@ -90,11 +90,16 @@ function saveLinePhone_(userId,phoneDigits,displayName){
   var now=new Date();
   for(var i=1;i<data.length;i++){
     if(data[i][0]===userId){
-      s.getRange(i+1,2,1,4).setValues([[displayName||data[i][1],"(電話番号登録)",now,phoneDigits]]);
+      var rng1=s.getRange(i+1,2,1,4);
+      rng1.setNumberFormat("@");
+      rng1.setValues([[displayName||data[i][1],"(電話番号登録)",now,phoneDigits]]);
       return;
     }
   }
-  s.appendRow([userId,displayName||"",("(電話番号登録)"),now,phoneDigits]);
+  var newIdx=s.getLastRow()+1;
+  var rng2=s.getRange(newIdx,1,1,5);
+  rng2.setNumberFormat("@");
+  rng2.setValues([[userId,displayName||"","(電話番号登録)",now,phoneDigits]]);
 }
 function findPhoneByUid_(userId){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
@@ -505,7 +510,11 @@ function saveWebBooking(data){
     // 予約確認ページ(confirm.html)から電話番号で検索できるよう、別シートに控えを保存
     var meta=ss.getSheetByName("web_yoyaku_meta");
     if(!meta){ meta=ss.insertSheet("web_yoyaku_meta"); meta.getRange(1,1,1,7).setValues([["date","time","name","tel","email","menu","createdAt"]]); }
-    meta.appendRow([data.date, data.time, data.name||"", data.tel||"", data.email||"", data.menu||"", new Date()]);
+    var metaRow=[data.date, data.time, data.name||"", data.tel||"", data.email||"", data.menu||"", Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss")];
+    var metaRowIdx=meta.getLastRow()+1;
+    var metaRng=meta.getRange(metaRowIdx,1,1,metaRow.length);
+    metaRng.setNumberFormat("@"); // テキスト形式を強制（電話番号の先頭0消失・日付自動変換を防止）
+    metaRng.setValues([metaRow]);
 
     var p=PropertiesService.getScriptProperties();
     var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
@@ -574,6 +583,18 @@ function lookupBooking(tel){
   }
   list.sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1;});
   return {ok:true, list:list};
+}
+
+// ★メール送信の権限をGoogleに許可させるためのテスト用関数★
+// 上のプルダウンで「testSendMail」を選んで▶実行ボタンを押してください。
+// 初回は「承認が必要です」という画面が出るので、ご自身のGoogleアカウントで許可してください。
+// 許可が終われば、以後Web予約のメール確認が正常に送信されるようになります。
+function testSendMail(){
+  MailApp.sendEmail({
+    to: Session.getActiveUser().getEmail(),
+    subject: "【テスト】倉治整骨院システムからのメール送信テスト",
+    body: "このメールが届いていれば、メール送信の設定は正常です。"
+  });
 }
 
 // 自費メニュー(処置マスター)をGASにも保存し、Web予約フォームから見えるようにする
