@@ -2772,23 +2772,28 @@ function renderLineUsers(){
   if(!list.length){ document.getElementById('lu-list').innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">該当する友だちがいません</p>'; return; }
   document.getElementById('lu-list').innerHTML=list.map(u=>{
     const badge=u.registered?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅登録済み</span>':'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜未登録</span>';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #f1f5f9">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:bold;font-size:0.85rem">${u.name||'(表示名なし)'}</div>
+    const uidSafe=u.userId.replace(/'/g,"");
+    return `<div style="display:flex;align-items:center;gap:6px;padding:8px 4px;border-bottom:1px solid #f1f5f9;flex-wrap:wrap">
+      <div style="flex:1;min-width:140px">
+        <input type="text" value="${(u.name||'').replace(/"/g,'&quot;')}" placeholder="お名前を修正" class="lu-name" data-uid="${uidSafe}" style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.82rem;font-weight:bold;margin-bottom:3px" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
         <div style="font-size:0.68rem;color:#94a3b8">最終メッセージ：${(u.lastMsg||'').slice(0,20)}</div>
       </div>
-      <input type="text" value="${u.phone||''}" placeholder="電話番号を手入力" data-uid="${u.userId}" style="width:150px;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.8rem" onkeydown="if(event.key==='Enter')saveLineUserPhone('${u.userId}',this.value)">
-      <button onclick="saveLineUserPhone('${u.userId}',this.previousElementSibling.value)" style="padding:6px 10px;border:none;border-radius:6px;background:#1e293b;color:white;font-size:0.72rem;cursor:pointer">保存</button>
+      <input type="text" value="${u.phone||''}" placeholder="電話番号を手入力" class="lu-phone" data-uid="${uidSafe}" style="width:140px;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.8rem" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
+      <button onclick="saveLineUserRow('${uidSafe}')" style="padding:6px 10px;border:none;border-radius:6px;background:#1e293b;color:white;font-size:0.72rem;cursor:pointer">保存</button>
       ${badge}
     </div>`;
   }).join('');
 }
-async function saveLineUserPhone(userId,phone){
+async function saveLineUserRow(userId){
+  const nameEl=document.querySelector(`.lu-name[data-uid="${userId}"]`);
+  const phoneEl=document.querySelector(`.lu-phone[data-uid="${userId}"]`);
+  const name=nameEl?nameEl.value:'';
+  const phone=phoneEl?phoneEl.value:'';
   try{
     const res=await fetch(GAS,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'saveLineUserPhoneManual',userId,phone})
+      body:JSON.stringify({action:'saveLineUserPhoneManual',userId,phone,name})
     });
     const d=await res.json();
     if(!d.ok){ alert('❌ 保存に失敗：'+(d.error||'')); return; }

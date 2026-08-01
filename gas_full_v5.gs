@@ -65,7 +65,7 @@ function doPost(e){
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="deleteBookingsByName")result=deleteBookingsByName(body.namePrefix);
-      else if(action==="saveLineUserPhoneManual")result=saveLineUserPhoneManual(body.userId,body.phone);
+      else if(action==="saveLineUserPhoneManual")result=saveLineUserPhoneManual(body.userId,body.phone,body.name);
       else if(action==="setTestMode")result=setTestMode(body.name);
       else if(action==="getTestMode")result=getTestMode();
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
@@ -172,10 +172,30 @@ function getLineUsers(){
   })};
 }
 // kanri.html側から手動で電話番号を登録・修正する（LINEを介さず、スタッフが直接編集する場合）
-function saveLineUserPhoneManual(userId,phone){
+function saveLineUserPhoneManual(userId,phone,name){
   try{
     if(!userId) return {ok:false,error:'userIdが指定されていません'};
-    saveLinePhone_(userId, String(phone||'').replace(/[^0-9]/g,''), '');
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("LINE_IDs");
+    if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,6).setValues([["userId","name","lastMsg","updated","phone","promptSent"]]);}
+    var data=s.getDataRange().getValues();
+    var phoneDigits=String(phone||'').replace(/[^0-9]/g,'');
+    var nameVal=(name!==undefined && name!==null)?String(name).trim():'';
+    for(var i=1;i<data.length;i++){
+      if(data[i][0]===userId){
+        var rng=s.getRange(i+1,2,1,3); // name, lastMsg, updated
+        rng.setNumberFormat("@");
+        rng.setValues([[nameVal||data[i][1], data[i][2], new Date()]]);
+        var rngPhone=s.getRange(i+1,5);
+        rngPhone.setNumberFormat("@");
+        rngPhone.setValue(phoneDigits);
+        return {ok:true};
+      }
+    }
+    var newIdx=s.getLastRow()+1;
+    var rng2=s.getRange(newIdx,1,1,5);
+    rng2.setNumberFormat("@");
+    rng2.setValues([[userId,nameVal,'',new Date(),phoneDigits]]);
     return {ok:true};
   }catch(err){ return {ok:false, error:err.message}; }
 }
