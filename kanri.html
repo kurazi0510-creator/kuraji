@@ -238,6 +238,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
       <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="margin-top:16px;background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
       <button class="btn bp bsm" onclick="deleteBookingsByNamePrompt()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626">🗑 名前でテスト予約を一括削除</button>
+      <button class="btn bp bsm" onclick="openLineUsersModal()" style="margin-top:16px;background:#06c755;color:white;border-color:#06c755">📱 LINE電話番号 登録状況一覧</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
@@ -925,6 +926,25 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
     <div id="biz-ov-list" style="margin-bottom:12px"></div>
     <button class="btn bp bsm" onclick="saveBizHours()" style="width:100%;background:#0891b2;color:white;border-color:#0891b2;padding:12px">💾 保存してWeb予約フォームに反映</button>
+  </div>
+</div>
+
+<!-- LINE電話番号 登録状況一覧モーダル -->
+<div class="modal-ov" id="lineUsersModal">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="font-size:1rem">📱 LINE電話番号 登録状況一覧</h3>
+      <button onclick="document.getElementById('lineUsersModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn bp bsm" onclick="loadLineUsers()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
+      <input type="text" id="lu-search" placeholder="名前で検索" class="inp" style="flex:1" oninput="renderLineUsers()">
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.82rem">
+      <div>✅ 登録済み：<b id="lu-count-ok">0</b>人</div>
+      <div>⬜ 未登録：<b id="lu-count-ng">0</b>人</div>
+    </div>
+    <div id="lu-list" style="max-height:60vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -2678,6 +2698,61 @@ function generateCarePlan(){
       '<div class="sign-box">施術者<br><br><br>倉治整骨院 院長</div>'+
     '</div>';
   showPrintModal('施術計画書 - '+p.name+'様', html);
+}
+
+// ===== LINE電話番号 登録状況一覧 =====
+let lineUsersCache=[];
+function openLineUsersModal(){
+  document.getElementById('lineUsersModal').classList.add('on');
+  loadLineUsers();
+}
+async function loadLineUsers(){
+  document.getElementById('lu-list').innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getLineUsers&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ document.getElementById('lu-list').innerHTML='<p style="color:#dc2626">取得に失敗しました</p>'; return; }
+    lineUsersCache=d.users||[];
+    renderLineUsers();
+  }catch(e){
+    document.getElementById('lu-list').innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>';
+  }
+}
+function renderLineUsers(){
+  const kw=(document.getElementById('lu-search')?.value||'').trim();
+  let list=lineUsersCache;
+  if(kw) list=list.filter(u=>u.name.includes(kw));
+  const okCount=lineUsersCache.filter(u=>u.registered).length;
+  const ngCount=lineUsersCache.length-okCount;
+  document.getElementById('lu-count-ok').textContent=okCount;
+  document.getElementById('lu-count-ng').textContent=ngCount;
+  // 未登録の人を先に表示（対応が必要な人を見つけやすくする）
+  list=[...list].sort((a,b)=>(a.registered===b.registered)?0:(a.registered?1:-1));
+  if(!list.length){ document.getElementById('lu-list').innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">該当する友だちがいません</p>'; return; }
+  document.getElementById('lu-list').innerHTML=list.map(u=>{
+    const badge=u.registered?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅登録済み</span>':'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜未登録</span>';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #f1f5f9">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:bold;font-size:0.85rem">${u.name||'(表示名なし)'}</div>
+        <div style="font-size:0.68rem;color:#94a3b8">最終メッセージ：${(u.lastMsg||'').slice(0,20)}</div>
+      </div>
+      <input type="text" value="${u.phone||''}" placeholder="電話番号を手入力" data-uid="${u.userId}" style="width:150px;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.8rem" onkeydown="if(event.key==='Enter')saveLineUserPhone('${u.userId}',this.value)">
+      <button onclick="saveLineUserPhone('${u.userId}',this.previousElementSibling.value)" style="padding:6px 10px;border:none;border-radius:6px;background:#1e293b;color:white;font-size:0.72rem;cursor:pointer">保存</button>
+      ${badge}
+    </div>`;
+  }).join('');
+}
+async function saveLineUserPhone(userId,phone){
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveLineUserPhoneManual',userId,phone})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 保存に失敗：'+(d.error||'')); return; }
+    await loadLineUsers();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 
 // ===== 名前で予約を一括削除（テストデータ整理用） =====

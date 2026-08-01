@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -17,9 +17,11 @@ function doPost(e){
       body.events.forEach(function(ev){
         try{
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
-            // ※電話番号登録の案内メッセージは一時停止中（システム完成後に再開予定）
-            // var tok0=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
-            // if(tok0)sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"ご予約のお知らせ・前日リマインドをこちらのLINEでお受け取りいただくために、お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、お電話番号での確認をお願いしております）");
+            var tok0=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
+            if(tok0){
+              sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"ご予約のお知らせ・前日リマインドをこちらのLINEでお受け取りいただくために、お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、お電話番号での確認をお願いしております）");
+              markPromptSent_(ev.source.userId);
+            }
           }
           if(ev.type==="message"&&ev.source&&ev.source.userId){
             var uid=ev.source.userId;
@@ -36,9 +38,11 @@ function doPost(e){
               if(tok)sendLineMessagingAPI(tok,uid,"📱 お電話番号を登録しました！"+String.fromCharCode(10)+"今後、ご予約確認・前日リマインドをこちらのLINEにお送りします。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
             }else{
               saveLineUserId(uid,dname,msgText);
-              // ※電話番号未登録の方への案内メッセージは一時停止中（システム完成後に再開予定）
-              // var already=findPhoneByUid_(uid);
-              // if(tok&&!already)sendLineMessagingAPI(tok,uid,"いつもありがとうございます😊"+String.fromCharCode(10)+"ご予約のお知らせを受け取るには、お電話番号を数字のみで送ってください。"+String.fromCharCode(10)+"例）09012345678");
+              // 案内メッセージは友だち1人につき1回だけ送信（すでに送信済み・登録済みの方には送らない）
+              if(tok && !hasPromptSent_(uid) && !findPhoneByUid_(uid)){
+                sendLineMessagingAPI(tok,uid,"いつもありがとうございます😊"+String.fromCharCode(10)+"ご予約のお知らせを受け取るには、お電話番号を数字のみで送ってください。"+String.fromCharCode(10)+"例）09012345678");
+                markPromptSent_(uid);
+              }
             }
           }
         }catch(err){Logger.log("event error:"+err);}
@@ -61,6 +65,7 @@ function doPost(e){
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="deleteBookingsByName")result=deleteBookingsByName(body.namePrefix);
+      else if(action==="saveLineUserPhoneManual")result=saveLineUserPhoneManual(body.userId,body.phone);
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
@@ -108,6 +113,27 @@ function findPhoneByUid_(userId){
   for(var i=1;i<data.length;i++){ if(data[i][0]===userId) return String(data[i][4]||""); }
   return "";
 }
+// 案内メッセージを送信済みかどうかを確認（1人1回だけ送るための管理）
+function hasPromptSent_(userId){
+  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+  if(!s) return false;
+  var data=s.getDataRange().getValues();
+  for(var i=1;i<data.length;i++){ if(data[i][0]===userId) return String(data[i][5]||"")==="TRUE"; }
+  return false;
+}
+function markPromptSent_(userId){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("LINE_IDs");
+  if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,6).setValues([["userId","name","lastMsg","updated","phone","promptSent"]]);}
+  var data=s.getDataRange().getValues();
+  for(var i=1;i<data.length;i++){
+    if(data[i][0]===userId){ s.getRange(i+1,6).setValue("TRUE"); return; }
+  }
+  var newIdx=s.getLastRow()+1;
+  var rng=s.getRange(newIdx,1,1,6);
+  rng.setNumberFormat("@");
+  rng.setValues([[userId,"","","",new Date(),"TRUE"]]);
+}
 // 電話番号からLINEのuserIdを検索（表示名の一致に頼らない、最優先の照合方法）
 function findLineUidByPhone_(phone){
   var digits=String(phone||"").replace(/[^0-9]/g,"");
@@ -138,7 +164,17 @@ function getTelByPatientName_(name){
 function getLineUsers(){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
   if(!s)return{ok:true,users:[]};
-  return{ok:true,users:s.getDataRange().getValues().slice(1).map(function(r){return{userId:r[0],name:String(r[1]),lastMsg:String(r[2])};})};
+  return{ok:true,users:s.getDataRange().getValues().slice(1).map(function(r){
+    return{userId:String(r[0]||''),name:String(r[1]||''),lastMsg:String(r[2]||''),updated:String(r[3]||''),phone:String(r[4]||''),registered:!!String(r[4]||'').trim()};
+  })};
+}
+// kanri.html側から手動で電話番号を登録・修正する（LINEを介さず、スタッフが直接編集する場合）
+function saveLineUserPhoneManual(userId,phone){
+  try{
+    if(!userId) return {ok:false,error:'userIdが指定されていません'};
+    saveLinePhone_(userId, String(phone||'').replace(/[^0-9]/g,''), '');
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
 function getAllData(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
