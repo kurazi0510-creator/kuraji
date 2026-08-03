@@ -453,7 +453,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       </select>
     </div>
     <div class="scroll"><table class="tbl"><thead><tr>
-      <th>診察券</th><th>患者名</th><th>性別</th><th>年齢</th><th>電話</th><th>LINE</th><th>住所</th><th>職業</th><th>流入</th><th>症状</th><th></th>
+      <th>診察券</th><th>患者名</th><th>性別</th><th>年齢</th><th>電話</th><th>LINE</th><th>住所</th><th>職業</th><th>流入</th><th>症状</th><th>最終来院</th><th></th>
     </tr></thead><tbody id="pbody"></tbody></table></div>
   </div>
 </div>
@@ -947,6 +947,34 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div>⬜ 未登録：<b id="lu-count-ng">0</b>人</div>
     </div>
     <div id="lu-list" style="max-height:60vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- 通院履歴モーダル -->
+<div class="modal-ov" id="patientHistoryModal">
+  <div class="modal" style="max-width:600px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem" id="ph-title">📋 通院履歴</h3>
+      <button onclick="document.getElementById('patientHistoryModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:8px 14px;flex:1;min-width:140px">
+        <div style="font-size:0.68rem;color:#166534">最終来院日</div>
+        <div style="font-size:1rem;font-weight:bold;color:#166534" id="ph-last">-</div>
+      </div>
+      <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:8px 14px;flex:1;min-width:140px">
+        <div style="font-size:0.68rem;color:#1e40af">来院回数</div>
+        <div style="font-size:1rem;font-weight:bold;color:#1e40af" id="ph-count">-</div>
+      </div>
+      <div style="background:#fdf3e7;border:1.5px solid #f0c789;border-radius:10px;padding:8px 14px;flex:1;min-width:140px">
+        <div style="font-size:0.68rem;color:#92400e">支払金額 合計</div>
+        <div style="font-size:1rem;font-weight:bold;color:#92400e" id="ph-total">-</div>
+      </div>
+    </div>
+    <div class="scroll"><table class="tbl" style="width:100%">
+      <thead><tr><th>日付</th><th>区分</th><th>症状/メニュー</th><th>支払金額</th></tr></thead>
+      <tbody id="ph-body"></tbody>
+    </table></div>
   </div>
 </div>
 
@@ -2700,6 +2728,52 @@ function generateCarePlan(){
       '<div class="sign-box">施術者<br><br><br>倉治整骨院 院長</div>'+
     '</div>';
   showPrintModal('施術計画書 - '+p.name+'様', html);
+}
+
+// ===== 通院履歴モーダル =====
+function openPatientHistory(patientId){
+  const p=patients.find(x=>x.id===patientId);
+  if(!p){alert('患者が見つかりません');return;}
+  const history=[];
+  Object.keys(bookings).sort().forEach(date=>{
+    const slots=bookings[date]||{};
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cancelled)return;
+      if(bk.name===p.name||bk.cardId===p.id){
+        history.push({
+          date,
+          time:bk.time||'',
+          kubun:bk.kubun||'',
+          symptom:bk.symptom||bk.menu||'',
+          payAmount:parseInt(bk.payAmount)||0,
+          isCont:!!bk.cont
+        });
+      }
+    });
+  });
+  // 継続枠（同じ来院の2枠目以降）は合計・回数に含めない
+  const realVisits=history.filter(h=>!h.isCont);
+  const total=realVisits.reduce((s,h)=>s+h.payAmount,0);
+  const last=realVisits.length?realVisits[realVisits.length-1].date:(p.last||'−');
+
+  document.getElementById('ph-title').textContent=`📋 ${p.name} 様（#${p.id}）の通院履歴`;
+  document.getElementById('ph-last').textContent=last;
+  document.getElementById('ph-count').textContent=realVisits.length+'回';
+  document.getElementById('ph-total').textContent=yen(total);
+  const tbody=document.getElementById('ph-body');
+  if(!realVisits.length){
+    tbody.innerHTML='<tr><td colspan="4" class="empty">通院履歴が見つかりません</td></tr>';
+  }else{
+    tbody.innerHTML=[...realVisits].reverse().map(h=>
+      `<tr>
+        <td style="font-size:0.78rem">${h.date}</td>
+        <td style="font-size:0.78rem">${h.kubun||'−'}</td>
+        <td style="font-size:0.78rem">${h.symptom||'−'}</td>
+        <td style="font-size:0.78rem;font-weight:bold;color:${h.payAmount>0?'#16a34a':'#94a3b8'}">${h.payAmount>0?yen(h.payAmount):'−'}</td>
+      </tr>`
+    ).join('');
+  }
+  document.getElementById('patientHistoryModal').classList.add('on');
 }
 
 // ===== 前日リマインド テストモード設定 =====
@@ -5253,7 +5327,7 @@ function renderPatients(){
   list=sortPatients(list,sort);
   document.getElementById('pcnt').textContent='（'+list.length+'名）';
   const tbody=document.getElementById('pbody');
-  if(!list.length){tbody.innerHTML='<tr><td colspan="11" class="empty">患者が見つかりません</td></tr>';return;}
+  if(!list.length){tbody.innerHTML='<tr><td colspan="12" class="empty">患者が見つかりません</td></tr>';return;}
   tbody.innerHTML=list.map(p=>{
     const age=p.dob?calcAge(p.dob):'';
     // 年齢：○○歳・○○年○月生まれ形式
@@ -5306,9 +5380,11 @@ function renderPatients(){
       <td style="font-size:0.7rem">${p.city||'−'}</td>
       <td style="font-size:0.7rem">${p.job||'−'}</td>
       <td>${srcBadge}</td>
-      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}${p.last&&!isGarbageData(p.last)?'<br><span style="font-size:0.6rem;color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'('+elDays+'日前)':'')+(elDays>=20?' 🚨初診料注意':elDays>=14?' ⚠️まもなく初診料':'')  +'</span>':''}</td>
+      <td style="font-size:0.7rem">${cleanSymptom(p.symptom)}</td>
+      <td style="font-size:0.72rem">${p.last&&!isGarbageData(p.last)?'<span style="color:'+elColor+';font-weight:'+(elDays>=30?'700':'400')+'">'+p.last+(elDays?'<br>('+elDays+'日前)':'')+(elDays>=20?'<br>🚨初診料注意':elDays>=14?'<br>⚠️まもなく初診料':'')+'</span>':'−'}</td>
       <td>
         <button class="btn be bsm" onclick="openPEdit('${p.id}')">編集</button>
+        <button class="btn be bsm" onclick="openPatientHistory('${p.id}')" style="margin-top:3px;background:#0891b2;color:white;border-color:#0891b2">📋履歴</button>
         ${p.count&&parseInt(p.count)>0&&parseInt(p.count)%3===0?'<br><span style="font-size:0.62rem;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:4px;display:inline-block;margin-top:2px">🛍 物販提案タイミング</span>':''}
       </td>
     </tr>`;
