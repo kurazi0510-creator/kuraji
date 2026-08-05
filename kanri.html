@@ -2826,7 +2826,7 @@ async function dedupeLineUsersPrompt(){
       body:JSON.stringify({action:'dedupeLineUsers'})
     });
     const d=await res.json();
-    if(!d.ok){ alert('❌ 整理に失敗しました'); return; }
+    if(!d.ok){ alert('❌ 整理に失敗しました\n\n詳細：'+(d.error||'（エラー内容なし）')); return; }
     alert(`✅ 整理しました\n${d.merged}件の重複をまとめました`);
     await loadLineUsers();
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
