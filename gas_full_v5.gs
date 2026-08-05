@@ -212,14 +212,21 @@ function dedupeLineUsers(){
       if(rec.lastMsg) ex.lastMsg=rec.lastMsg; // 最後のメッセージは新しい方を残す
     }
   }
-  var mergedCount=(data.length-1)-order.length;
-  s.clearContents();
-  s.getRange(1,1,1,7).setValues([["userId","name","lastMsg","updated","phone","promptSent","cardId"]]);
-  if(order.length){
-    var rows=order.map(function(uid){var r=byUid[uid];return[uid,r.name,r.lastMsg,r.updated instanceof Date?r.updated:new Date(),r.phone,r.promptSent,r.cardId];});
-    var rng=s.getRange(2,1,rows.length,7);
-    rng.setNumberFormats(rows.map(function(){return["@","@","@","@","@","@","@"];}));
-    rng.setValues(rows);
+  var totalRows=data.length-1;
+  var mergedCount=totalRows-order.length;
+  // ★安全対策：重複が1件も無ければ、シートには一切手を加えず終了する（誤動作でデータが消えるのを防ぐ）
+  if(mergedCount<=0) return {ok:true, merged:0};
+  if(!order.length) return {ok:false, error:"整理対象のデータが読み取れなかったため、安全のため何もせず終了しました。"};
+
+  var rows=order.map(function(uid){var r=byUid[uid];return[uid,r.name,r.lastMsg,r.updated instanceof Date?r.updated:new Date(),r.phone,r.promptSent,r.cardId];});
+  // 既存の行を「上書き」する（一度も全消去しない。書き込みが失敗しても元データはそのまま残る）
+  var rng=s.getRange(2,1,rows.length,7);
+  rng.setNumberFormats(rows.map(function(){return["@","@","@","@","@","@","@"];}));
+  rng.setValues(rows);
+  // 統合によって不要になった余った行だけを末尾から削除する
+  var lastRowToKeep=1+rows.length; // ヘッダー+データ行数
+  if(s.getLastRow()>lastRowToKeep){
+    s.deleteRows(lastRowToKeep+1, s.getLastRow()-lastRowToKeep);
   }
   return {ok:true, merged:mergedCount};
 }
