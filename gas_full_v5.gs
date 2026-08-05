@@ -77,7 +77,7 @@ function doPost(e){
       else if(action==="setTestMode")result=setTestMode(body.name);
       else if(action==="getTestMode")result=getTestMode();
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
-      else if(action==="dedupeLineUsers")result=dedupeLineUsers();
+      else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
@@ -190,45 +190,32 @@ function getLineUsers(){
   })};
 }
 // 同じuserIdが複数行に分かれてしまった重複を1行にまとめる（電話番号・名前・診察券Noは最も情報が多いものを残す）
-function dedupeLineUsers(){
+// ★書き込みは一切行わない（安全のため自動修正機能は廃止）★
+// 重複しているuserIdを見つけて一覧を返すだけ。実際の削除・修正は一覧画面から1件ずつ手動で行う。
+function findDuplicateLineUsers(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("LINE_IDs");
-  if(!s) return {ok:true, merged:0};
+  if(!s) return {ok:true, duplicates:[]};
   var data=s.getDataRange().getValues();
-  var byUid={}; // userId -> 統合済みレコード
-  var order=[];
+  var byUid={};
   for(var i=1;i<data.length;i++){
     var uid=String(data[i][0]||'').trim();
     if(!uid) continue;
-    var rec={name:String(data[i][1]||''), lastMsg:String(data[i][2]||''), updated:data[i][3], phone:fixPhoneLeadingZero_(data[i][4]), promptSent:String(data[i][5]||''), cardId:String(data[i][6]||'')};
-    if(!byUid[uid]){ byUid[uid]=rec; order.push(uid); }
-    else{
-      var ex=byUid[uid];
-      // より情報量の多い方（電話番号・名前・診察券Noが入っている方）を優先して残す
-      if(!ex.phone && rec.phone) ex.phone=rec.phone;
-      if(!ex.name && rec.name) ex.name=rec.name;
-      if(!ex.cardId && rec.cardId) ex.cardId=rec.cardId;
-      if(rec.promptSent==="TRUE") ex.promptSent="TRUE";
-      if(rec.lastMsg) ex.lastMsg=rec.lastMsg; // 最後のメッセージは新しい方を残す
+    if(!byUid[uid]) byUid[uid]=[];
+    byUid[uid].push({
+      row:i+1,
+      name:String(data[i][1]||''),
+      phone:fixPhoneLeadingZero_(data[i][4]),
+      cardId:String(data[i][6]||'')
+    });
+  }
+  var duplicates=[];
+  Object.keys(byUid).forEach(function(uid){
+    if(byUid[uid].length>1){
+      duplicates.push({userId:uid, entries:byUid[uid]});
     }
-  }
-  var totalRows=data.length-1;
-  var mergedCount=totalRows-order.length;
-  // ★安全対策：重複が1件も無ければ、シートには一切手を加えず終了する（誤動作でデータが消えるのを防ぐ）
-  if(mergedCount<=0) return {ok:true, merged:0};
-  if(!order.length) return {ok:false, error:"整理対象のデータが読み取れなかったため、安全のため何もせず終了しました。"};
-
-  var rows=order.map(function(uid){var r=byUid[uid];return[uid,r.name,r.lastMsg,r.updated instanceof Date?r.updated:new Date(),r.phone,r.promptSent,r.cardId];});
-  // 既存の行を「上書き」する（一度も全消去しない。書き込みが失敗しても元データはそのまま残る）
-  var rng=s.getRange(2,1,rows.length,7);
-  rng.setNumberFormats(rows.map(function(){return["@","@","@","@","@","@","@"];}));
-  rng.setValues(rows);
-  // 統合によって不要になった余った行だけを末尾から削除する
-  var lastRowToKeep=1+rows.length; // ヘッダー+データ行数
-  if(s.getLastRow()>lastRowToKeep){
-    s.deleteRows(lastRowToKeep+1, s.getLastRow()-lastRowToKeep);
-  }
-  return {ok:true, merged:mergedCount};
+  });
+  return {ok:true, duplicates:duplicates};
 }
 // kanri.html側から手動で電話番号・名前・診察券番号を登録・修正する（LINEを介さず、スタッフが直接編集する場合）
 function saveLineUserPhoneManual(userId,phone,name,cardId){

@@ -940,7 +940,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button class="btn bp bsm" onclick="loadLineUsers()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
-      <button class="btn bp bsm" onclick="dedupeLineUsersPrompt()" style="background:#f59e0b;color:white;border-color:#f59e0b">🧹 重複を整理</button>
+      <button class="btn bp bsm" onclick="showDuplicateLineUsers()" style="background:#f59e0b;color:white;border-color:#f59e0b">🔍 重複を見つける(表示のみ)</button>
       <input type="text" id="lu-search" placeholder="名前・診察券番号で検索" class="inp" style="flex:1" oninput="renderLineUsers()">
     </div>
     <div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.82rem">
@@ -2817,18 +2817,21 @@ async function runReminderTestNow(){
 }
 
 // ===== LINE電話番号 登録状況一覧 =====
-async function dedupeLineUsersPrompt(){
-  if(!confirm('重複しているLINE友だち情報を1件にまとめます。電話番号・名前・診察券Noは情報が入っている方を残します。実行しますか？'))return;
+async function showDuplicateLineUsers(){
   try{
     const res=await fetch(GAS,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'dedupeLineUsers'})
+      body:JSON.stringify({action:'findDuplicateLineUsers'})
     });
     const d=await res.json();
-    if(!d.ok){ alert('❌ 整理に失敗しました\n\n詳細：'+(d.error||'（エラー内容なし）')); return; }
-    alert(`✅ 整理しました\n${d.merged}件の重複をまとめました`);
-    await loadLineUsers();
+    if(!d.ok){ alert('❌ 確認に失敗しました\n\n詳細：'+(d.error||'')); return; }
+    if(!d.duplicates||!d.duplicates.length){ alert('✅ 重複している人は見つかりませんでした'); return; }
+    const msg=d.duplicates.map(dup=>{
+      const lines=dup.entries.map(e=>`　行${e.row}：${e.name||'(名前なし)'} / 電話:${e.phone||'未登録'} / 診察券:${e.cardId||'-'}`).join('\n');
+      return `【${dup.userId.slice(0,8)}...】\n${lines}`;
+    }).join('\n\n');
+    alert(`⚠️ ${d.duplicates.length}人分、重複が見つかりました\n\n${msg}\n\n※ここでは自動で消しません。データが消える事故を防ぐため、内容を確認しながら「LINE電話番号 登録状況一覧」の中で、不要な行を手動で削除してください（各行を編集して電話番号・名前を空にし保存すれば実質無効化できます）。`);
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 let lineUsersCache=[];
