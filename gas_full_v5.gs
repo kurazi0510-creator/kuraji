@@ -14,6 +14,10 @@ function doPost(e){
     var raw=e&&e.postData&&e.postData.contents?e.postData.contents:"{}";
     var body=JSON.parse(raw);
     if(body.events){
+      // 同時に複数のLINEイベントが届いた際、LINE_IDsシートへの書き込みが競合して
+      // 同じ人が重複登録されてしまう不具合を防ぐため、処理をロックする
+      var lock=LockService.getScriptLock();
+      try{ lock.waitLock(10000); }catch(lockErr){ /* ロック取得失敗時もそのまま続行（最悪重複の可能性は残るが処理は止めない） */ }
       body.events.forEach(function(ev){
         try{
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
@@ -32,9 +36,12 @@ function doPost(e){
               if(r.getResponseCode()===200)dname=JSON.parse(r.getContentText()).displayName||"";
             }
             var msgText=(ev.message&&ev.message.text)||"";
-            var digits=String(msgText).replace(/[^0-9]/g,"");
-            if(digits.length>=10&&digits.length<=11){
-              saveLinePhone_(uid,digits,dname);
+            var trimmedMsg=String(msgText).trim().replace(/[-‐－ー―\s()（）]/g,"");
+            // メッセージ全体が「0で始まる9〜10桁の数字だけ」の場合のみ電話番号として認識する
+            // （文章の中に混ざった数字を誤って電話番号として拾ってしまう不具合の対策）
+            var isPhoneOnly=/^0\d{9,10}$/.test(trimmedMsg);
+            if(isPhoneOnly){
+              saveLinePhone_(uid,trimmedMsg,dname);
               if(tok)sendLineMessagingAPI(tok,uid,"📱 お電話番号を登録しました！"+String.fromCharCode(10)+"今後、ご予約確認・前日リマインドをこちらのLINEにお送りします。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
             }else{
               saveLineUserId(uid,dname,msgText);
@@ -47,6 +54,7 @@ function doPost(e){
           }
         }catch(err){Logger.log("event error:"+err);}
       });
+      try{ lock.releaseLock(); }catch(relErr){}
     }else{
       var action=body.action||"";
       var result;
@@ -69,6 +77,7 @@ function doPost(e){
       else if(action==="setTestMode")result=setTestMode(body.name);
       else if(action==="getTestMode")result=getTestMode();
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
+      else if(action==="dedupeLineUsers")result=dedupeLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
@@ -179,6 +188,40 @@ function getLineUsers(){
     var phoneFixed=fixPhoneLeadingZero_(r[4]);
     return{userId:String(r[0]||''),name:String(r[1]||''),lastMsg:String(r[2]||''),updated:String(r[3]||''),phone:phoneFixed,registered:!!phoneFixed,cardId:String(r[6]||'')};
   })};
+}
+// 同じuserIdが複数行に分かれてしまった重複を1行にまとめる（電話番号・名前・診察券Noは最も情報が多いものを残す）
+function dedupeLineUsers(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("LINE_IDs");
+  if(!s) return {ok:true, merged:0};
+  var data=s.getDataRange().getValues();
+  var byUid={}; // userId -> 統合済みレコード
+  var order=[];
+  for(var i=1;i<data.length;i++){
+    var uid=String(data[i][0]||'').trim();
+    if(!uid) continue;
+    var rec={name:String(data[i][1]||''), lastMsg:String(data[i][2]||''), updated:data[i][3], phone:fixPhoneLeadingZero_(data[i][4]), promptSent:String(data[i][5]||''), cardId:String(data[i][6]||'')};
+    if(!byUid[uid]){ byUid[uid]=rec; order.push(uid); }
+    else{
+      var ex=byUid[uid];
+      // より情報量の多い方（電話番号・名前・診察券Noが入っている方）を優先して残す
+      if(!ex.phone && rec.phone) ex.phone=rec.phone;
+      if(!ex.name && rec.name) ex.name=rec.name;
+      if(!ex.cardId && rec.cardId) ex.cardId=rec.cardId;
+      if(rec.promptSent==="TRUE") ex.promptSent="TRUE";
+      if(rec.lastMsg) ex.lastMsg=rec.lastMsg; // 最後のメッセージは新しい方を残す
+    }
+  }
+  var mergedCount=(data.length-1)-order.length;
+  s.clearContents();
+  s.getRange(1,1,1,7).setValues([["userId","name","lastMsg","updated","phone","promptSent","cardId"]]);
+  if(order.length){
+    var rows=order.map(function(uid){var r=byUid[uid];return[uid,r.name,r.lastMsg,r.updated instanceof Date?r.updated:new Date(),r.phone,r.promptSent,r.cardId];});
+    var rng=s.getRange(2,1,rows.length,7);
+    rng.setNumberFormats(rows.map(function(){return["@","@","@","@","@","@","@"];}));
+    rng.setValues(rows);
+  }
+  return {ok:true, merged:mergedCount};
 }
 // kanri.html側から手動で電話番号・名前・診察券番号を登録・修正する（LINEを介さず、スタッフが直接編集する場合）
 function saveLineUserPhoneManual(userId,phone,name,cardId){
@@ -349,7 +392,7 @@ function sendDayBeforeReminders(){
       if(!tid){var ln=name.split(" ")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
     }
     if(!tid){skip.push(name);return;}
-    var msg=(testModeName?"【テスト送信】"+nl:"")+"[倉治整骨院]"+nl+tmrDisp+"のご予約リマインドです"+nl+nl+"時間: "+bp[name].join(" / ")+nl+nl+"お気をつけてお越しください。"+nl+"(自動送信のため返信不要です)";
+    var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;}else{skip.push(name);}
   });
   if(ownerId){
