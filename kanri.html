@@ -2254,7 +2254,23 @@ async function syncAll(){
             dob:rv_dob, note:rv_note,
           };
         });
-        if(parsed.length>0)patients=parsed;
+        if(parsed.length>0){
+          if(patients.length===0){
+            patients=parsed;
+          }else{
+            // ★安全マージ：GASにしかない患者(ID)だけ追加。既存のローカル患者は絶対に削除・上書きしない
+            const byId={}; patients.forEach(p=>{byId[p.id]=p;});
+            parsed.forEach(p=>{
+              if(!byId[p.id]){
+                patients.push(p); // ローカルに無いIDはGASから追加
+              }else{
+                // 既存患者は、空欄の項目だけGAS側で補完する（値がある項目は上書きしない）
+                const ex=byId[p.id];
+                Object.keys(p).forEach(k=>{ if(!ex[k] && p[k]) ex[k]=p[k]; });
+              }
+            });
+          }
+        }
       }
 
       // 予約データ：★localStorageを優先・GASにしかない日付のみ追加
