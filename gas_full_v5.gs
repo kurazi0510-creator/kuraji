@@ -322,7 +322,10 @@ function dailyLineAlert(){
   if(warning.length){ownerMsg+="[17日 3日後に初診料]"+nl;warning.forEach(function(v){ownerMsg+="- "+v.name+"("+v.id+"号) 前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+nl;});}
   ownerMsg+="来院を促してください";
   sendLineMessagingAPI(token,ownerId,ownerMsg);
-  var sent=0,skip=0;
+  // ★患者様への直接送信は日付カウントの不具合により一時停止中★
+  // （院長への通知のみ行い、実際に連絡するかどうかは院長の判断で行う）
+  var sent=0,skip=alerts.length;
+  /* 
   alerts.forEach(function(v){
     var tid="";
     var tel=getTelByPatientName_(v.name);
@@ -343,6 +346,7 @@ function dailyLineAlert(){
       :"[倉治整骨院]"+nl+nl+v.name+"様"+nl+nl+"ご無沙汰しております。その後お体はいかがでしょうか？"+nl+nl+"次回ご来院の際に初診料がかからないのは"+ds+"までとなっております。"+nl+"よろしければ早めのご来院をお待ちしております。"+nl+nl+"ご予約はこのLINEでどうぞ。"+nl+"(自動送信のため返信不要です)";
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;}else{skip++;}
   });
+  */
   Logger.log("Alert done: sent="+sent+" skip="+skip);
 }
 function sendDayBeforeReminders(){
