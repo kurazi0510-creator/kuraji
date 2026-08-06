@@ -376,7 +376,7 @@ function sendDayBeforeReminders(){
     bp[n].push(t);
   });
   if(!Object.keys(bp).length)return;
-  var sent=0,skip=[];
+  var sent=0,skip=[],sentNames=[];
   Object.keys(bp).forEach(function(name){
     var tid="";
     var tel=getTelByPatientName_(name);
@@ -387,10 +387,11 @@ function sendDayBeforeReminders(){
     }
     if(!tid){skip.push(name);return;}
     var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
-    if(sendLineMessagingAPI(token,tid,msg).ok){sent++;}else{skip.push(name);}
+    if(sendLineMessagingAPI(token,tid,msg).ok){sent++;sentNames.push(name);}else{skip.push(name);}
   });
   if(ownerId){
     var s=(testModeName?"【テストモード中：「"+testModeName+"」のみ対象】"+nl:"")+"[倉治整骨院] 前日リマインド完了"+nl+tmrDisp+nl+"送信:"+sent+"件";
+    if(sentNames.length)s+=nl+"送信した人: "+sentNames.join(", ");
     if(skip.length)s+=nl+"未登録: "+skip.join(", ");
     sendLineMessagingAPI(token,ownerId,s);
   }
