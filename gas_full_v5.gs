@@ -366,7 +366,10 @@ function sendDayBeforeReminders(){
   if(di<0)return;
   var bp={},seen={};
   bd.slice(1).forEach(function(r){
-    var dv=String(r[di]||"").trim(),k=String(r[ki]||"");
+    // 日付セルがテキストでも日付型でも正しく比較できるようにする
+    var rawDate=r[di];
+    var dv=(rawDate instanceof Date)?Utilities.formatDate(rawDate,"Asia/Tokyo","yyyy-MM-dd"):String(rawDate||"").trim();
+    var k=String(r[ki]||"");
     if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1||dv!==tmrStr)return;
     var n=String(r[ni]||"").trim(),t=String(r[ti]||"").trim();
     if(!n||!t||seen[n+"_"+t])return;
