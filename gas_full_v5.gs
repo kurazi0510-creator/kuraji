@@ -81,6 +81,7 @@ function doPost(e){
       else if(action==="getBirthdayLog")result=getBirthdayLog();
       else if(action==="sendBirthdayMessageTestTo")result=sendBirthdayMessageTestTo(body.name);
       else if(action==="getTriggerInfo")result=getTriggerInfo();
+      else if(action==="runReviewRequestsNow"){sendReviewRequests();result={ok:true};}
       else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -592,6 +593,82 @@ function sendBirthdayMessageTestTo(name){
   var msg="【プレビュー送信】"+nl+"🎂 お誕生日おめでとうございます！"+nl+nl+target+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+todayDisp+"〜"+expireStr+"まで"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
   var r=sendLineMessagingAPI(token,tid,msg);
   return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+}
+
+// ═══════════════════════════════════════
+// ★口コミ依頼の自動送信（まだ運用開始していません。setupAllTriggersには含めていないため、
+//   手動で runReviewRequestsNow を実行するかテストする以外は動きません）★
+// ═══════════════════════════════════════
+// 通院回数が指定回数（デフォルト3回目）に達した患者に、Googleクチコミ依頼のLINEを1回だけ送信する
+function sendReviewRequests(){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+  if(!token)return;
+  var reviewUrl=p.getProperty("GOOGLE_REVIEW_URL")||"";
+  if(!reviewUrl){ if(ownerId)sendLineMessagingAPI(token,ownerId,"[倉治整骨院] 口コミ依頼を送ろうとしましたが、GoogleクチコミのURLが未設定のため中止しました。「setReviewUrl」関数で設定してください。"); return; }
+  var targetCount=parseInt(p.getProperty("REVIEW_TARGET_COUNT")||"3"); // 何回目の来院で送るか（デフォルト3回目）
+
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ps=ss.getSheetByName("患者");
+  if(!ps)return;
+  var nl=String.fromCharCode(10);
+  var data=ps.getDataRange().getValues();
+  var headers=data[0].map(function(h){return String(h||"").trim();});
+  var idI=0, nameI=1, telI=headers.indexOf("電話番号"), countI=headers.indexOf("通院回数");
+  var reqI=headers.indexOf("口コミ依頼済み"), revOffI=headers.indexOf("口コミ依頼送信");
+  if(telI<0)telI=4; if(countI<0)countI=12;
+
+  var targets=[];
+  for(var i=1;i<data.length;i++){
+    var cnt=parseInt(data[i][countI])||0;
+    if(cnt!==targetCount) continue; // ちょうどその回数になった日だけ対象（毎日既存患者全員に送らないため）
+    if(revOffI>-1 && String(data[i][revOffI]||"").toUpperCase()==="FALSE") continue; // 対象外設定の患者はスキップ
+    if(reqI>-1 && String(data[i][reqI]||"").toUpperCase()==="TRUE") continue; // 送信済みはスキップ
+    targets.push({rowIdx:i+1, id:String(data[i][idI]||""), name:String(data[i][nameI]||"").trim(), tel:String(data[i][telI]||"")});
+  }
+  if(!targets.length) return;
+
+  if(reqI<0){
+    reqI = headers.length;
+    ps.getRange(1, reqI+1).setValue("口コミ依頼済み");
+  }
+
+  var sentNames=[], skip=[];
+  targets.forEach(function(t){
+    var tid="";
+    if(t.tel) tid=findLineUidByPhone_(t.tel);
+    if(!tid){
+      var ls=ss.getSheetByName("LINE_IDs");
+      if(ls){
+        var lu={};
+        ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+        tid=lu[t.name];
+        if(!tid){var ln=t.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      }
+    }
+    if(!tid){skip.push(t.name);return;}
+    var msg="いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+t.name+"様には"+targetCount+"回目のご来院をいただきました。"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
+    if(sendLineMessagingAPI(token,tid,msg).ok){
+      sentNames.push(t.name);
+      var rngC=ps.getRange(t.rowIdx, reqI+1);
+      rngC.setNumberFormat("@");
+      rngC.setValue("TRUE");
+    }else{skip.push(t.name);}
+  });
+
+  if(ownerId){
+    var s="[倉治整骨院] 口コミ依頼メッセージ送信結果"+nl+"送信:"+sentNames.length+"件";
+    if(sentNames.length)s+=nl+"送信した人: "+sentNames.join(", ");
+    if(skip.length)s+=nl+"未登録: "+skip.join(", ");
+    sendLineMessagingAPI(token,ownerId,s);
+  }
+}
+// GoogleクチコミのURLを設定する（Apps Scriptエディタから手動で1回だけ実行）
+// 例: setReviewUrlの中のURLを実際のクチコミURLに書き換えてから実行してください
+function setReviewUrl(){
+  var url = "ここに倉治整骨院のGoogleクチコミ投稿用URLを貼り付けてください";
+  PropertiesService.getScriptProperties().setProperty("GOOGLE_REVIEW_URL", url);
+  Logger.log("設定しました: " + url);
 }
 function sendLineMessagingAPI(token,userId,message){
   if(!token||!userId||!message)return{ok:false};
