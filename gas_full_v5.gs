@@ -499,8 +499,8 @@ function sendBirthdayMessages(){
   }
   if(!targets.length) return;
 
-  var monthEnd=new Date(today.getFullYear(),today.getMonth()+1,0);
-  var monthEndStr=Utilities.formatDate(monthEnd,"Asia/Tokyo","M月d日");
+  var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
+  var expireStr=Utilities.formatDate(expireDate,"Asia/Tokyo","M月d日");
 
   var sentNames=[], skip=[];
   targets.forEach(function(t){
@@ -516,7 +516,7 @@ function sendBirthdayMessages(){
       }
     }
     if(!tid){skip.push(t.name);return;}
-    var msg="🎂 お誕生日おめでとうございます！"+nl+nl+t.name+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+monthEndStr+"まで"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
+    var msg="🎂 お誕生日おめでとうございます！"+nl+nl+t.name+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+expireStr+"まで（本日から30日間）"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
     if(sendLineMessagingAPI(token,tid,msg).ok){sentNames.push(t.name);}else{skip.push(t.name);}
   });
 
