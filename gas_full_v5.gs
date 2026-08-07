@@ -78,6 +78,7 @@ function doPost(e){
       else if(action==="getTestMode")result=getTestMode();
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
       else if(action==="runBirthdayMessagesNow"){sendBirthdayMessages();result={ok:true};}
+      else if(action==="getBirthdayLog")result=getBirthdayLog();
       else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -486,6 +487,7 @@ function sendBirthdayMessages(){
   var data=ps.getDataRange().getValues();
   var headers=data[0].map(function(h){return String(h||"").trim();});
   var idI=0, nameI=1, telI=headers.indexOf("電話番号"), dobI=headers.indexOf("生年月日");
+  var bsI=headers.indexOf("誕生日クーポン送信");
   if(telI<0)telI=4; if(dobI<0)dobI=13;
 
   var targets=[];
@@ -494,6 +496,7 @@ function sendBirthdayMessages(){
     var m=dob.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if(!m) continue;
     if(parseInt(m[2])===mm && parseInt(m[3])===dd){
+      if(bsI>-1 && String(data[i][bsI]||"").toUpperCase()==="FALSE") continue; // 対象外の患者はスキップ
       targets.push({id:String(data[i][idI]||""), name:String(data[i][nameI]||"").trim(), tel:String(data[i][telI]||"")});
     }
   }
@@ -501,6 +504,11 @@ function sendBirthdayMessages(){
 
   var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
   var expireStr=Utilities.formatDate(expireDate,"Asia/Tokyo","M月d日");
+  var todayStr=Utilities.formatDate(today,"Asia/Tokyo","yyyy-MM-dd");
+
+  // 送信履歴シート（無ければ作成）
+  var log=ss.getSheetByName("birthday_log");
+  if(!log){ log=ss.insertSheet("birthday_log"); log.getRange(1,1,1,5).setValues([["date","id","name","result","expireUntil"]]); }
 
   var sentNames=[], skip=[];
   targets.forEach(function(t){
@@ -515,9 +523,16 @@ function sendBirthdayMessages(){
         if(!tid){var ln=t.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
       }
     }
-    if(!tid){skip.push(t.name);return;}
-    var msg="🎂 お誕生日おめでとうございます！"+nl+nl+t.name+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+expireStr+"まで（本日から30日間）"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
-    if(sendLineMessagingAPI(token,tid,msg).ok){sentNames.push(t.name);}else{skip.push(t.name);}
+    var result;
+    if(!tid){skip.push(t.name);result="未登録";}
+    else{
+      var msg="🎂 お誕生日おめでとうございます！"+nl+nl+t.name+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+expireStr+"まで（本日から30日間）"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
+      if(sendLineMessagingAPI(token,tid,msg).ok){sentNames.push(t.name);result="送信済み";}else{skip.push(t.name);result="送信失敗";}
+    }
+    var newIdx=log.getLastRow()+1;
+    var rng=log.getRange(newIdx,1,1,5);
+    rng.setNumberFormat("@");
+    rng.setValues([[todayStr, t.id, t.name, result, expireStr]]);
   });
 
   if(ownerId){
@@ -526,6 +541,16 @@ function sendBirthdayMessages(){
     if(skip.length)s+=nl+"未登録: "+skip.join(", ");
     sendLineMessagingAPI(token,ownerId,s);
   }
+}
+// kanri.html側から送信履歴を確認するためのAPI
+function getBirthdayLog(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var log=ss.getSheetByName("birthday_log");
+  if(!log) return {ok:true, list:[]};
+  var data=log.getDataRange().getValues().slice(1);
+  var list=data.map(function(r){return{date:String(r[0]||""), id:String(r[1]||""), name:String(r[2]||""), result:String(r[3]||""), expireUntil:String(r[4]||"")};});
+  list.sort(function(a,b){return a.date<b.date?1:-1;}); // 新しい順
+  return {ok:true, list:list};
 }
 function sendLineMessagingAPI(token,userId,message){
   if(!token||!userId||!message)return{ok:false};

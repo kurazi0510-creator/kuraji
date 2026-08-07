@@ -242,6 +242,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="openTestModeSettings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">🧪 前日リマインド テスト設定</button>
       <button class="btn bp bsm" onclick="runReminderTestNow()" style="margin-top:16px;background:#f59e0b;color:white;border-color:#f59e0b">▶ 前日リマインドを今すぐテスト送信</button>
       <button class="btn bp bsm" onclick="runBirthdayTestNow()" style="margin-top:16px;background:#ec4899;color:white;border-color:#ec4899">🎂 誕生日メッセージを今すぐテスト送信</button>
+      <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
@@ -977,6 +978,22 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <thead><tr><th>日付</th><th>区分</th><th>症状/メニュー</th><th>支払金額</th></tr></thead>
       <tbody id="ph-body"></tbody>
     </table></div>
+  </div>
+</div>
+
+<!-- 誕生日クーポン管理モーダル -->
+<div class="modal-ov" id="bdayMgmtModal">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem">🎂 誕生日クーポン管理</h3>
+      <button onclick="document.getElementById('bdayMgmtModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;border-bottom:2px solid #f1f5f9">
+      <button class="btn bsm" id="bdt-tab-upcoming" onclick="switchBdayTab('upcoming')" style="border:none;border-bottom:3px solid #db2777;background:none;font-weight:bold;color:#db2777">📅 送信予定</button>
+      <button class="btn bsm" id="bdt-tab-off" onclick="switchBdayTab('off')" style="border:none;border-bottom:3px solid transparent;background:none;color:#64748b">🚫 対象外一覧</button>
+      <button class="btn bsm" id="bdt-tab-log" onclick="switchBdayTab('log')" style="border:none;border-bottom:3px solid transparent;background:none;color:#64748b">📜 送信履歴</button>
+    </div>
+    <div id="bdt-content" style="max-height:55vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -1746,6 +1763,15 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           </div>
           <div style="font-size:0.72rem;color:#92400e;margin-top:6px">「送らない」にすると院長への通知リストには表示されますが、患者さんへの自動LINEは送信されません。</div>
         </div>
+        <!-- 誕生日クーポン送信設定 -->
+        <div class="fg" style="grid-column:1/-1;background:#fce7f3;border-radius:10px;padding:12px;border:1.5px solid #f9a8d4">
+          <label style="color:#9d174d;font-weight:bold">🎂 誕生日クーポンLINE自動送信</label>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="pay-btn on" id="pe-bday-on" onclick="setBdaySend(true)" style="flex:1;background:#fce7f3;color:#9d174d;border-color:#f9a8d4">送る（デフォルト）</button>
+            <button class="pay-btn" id="pe-bday-off" onclick="setBdaySend(false)" style="flex:1">送らない</button>
+          </div>
+          <div style="font-size:0.72rem;color:#9d174d;margin-top:6px">保険診療のみ・交通事故の患者様など、クーポン対象外にしたい方は「送らない」にしてください。</div>
+        </div>
       </div>
 
         <!-- 整体10回券管理 -->
@@ -2249,13 +2275,15 @@ async function syncAll(){
 
           // アラート送信フラグ（ヘッダー「アラート送信」or [13]。未設定は送る扱い＝true）
           const rv_alertSend = (()=>{ const v=(gv('アラート送信',13)||'').toUpperCase(); if(v==='FALSE')return false; return true; })();
+          // 誕生日クーポン送信フラグ（ヘッダー「誕生日クーポン送信」。未設定は送る扱い＝true）
+          const rv_bdaySend = (()=>{ const v=(gv('誕生日クーポン送信',14)||'').toUpperCase(); if(v==='FALSE')return false; return true; })();
 
           return{
             id:rv_id, name:rv_name, kana:gv('ふりがな',2),
             sex:rv_sex, tel:rv_tel, line:rv_line,
             city:rv_city, job:rv_job, src:rv_src,
             symptom:rv_sym, last:rv_last, count:rv_cnt,
-            dob:rv_dob, note:rv_note, alertSend:rv_alertSend,
+            dob:rv_dob, note:rv_note, alertSend:rv_alertSend, birthdaySend:rv_bdaySend,
           };
         });
         if(parsed.length>0){
@@ -2418,8 +2446,8 @@ async function pushB(){
 }
 
 async function pushP(){
-  const hdr=['診察券No','患者名','ふりがな','性別','電話番号','LINE','LINEユーザーID','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考','アラート送信'];
-  const rows=[hdr,...patients.map(p=>[p.id,p.name,p.kana||'',p.sex||'',normTel(p.tel||''),p.line||'',p.lineUid||'',p.city||'',p.job||'',p.src||'',p.symptom||'',p.last||'',p.count||0,p.dob||'',p.note||'',p.alertSend===false?'FALSE':'TRUE'])];
+  const hdr=['診察券No','患者名','ふりがな','性別','電話番号','LINE','LINEユーザーID','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考','アラート送信','誕生日クーポン送信'];
+  const rows=[hdr,...patients.map(p=>[p.id,p.name,p.kana||'',p.sex||'',normTel(p.tel||''),p.line||'',p.lineUid||'',p.city||'',p.job||'',p.src||'',p.symptom||'',p.last||'',p.count||0,p.dob||'',p.note||'',p.alertSend===false?'FALSE':'TRUE',p.birthdaySend===false?'FALSE':'TRUE'])];
   try{const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveCustomers',rows:JSON.stringify(rows)}),redirect:'follow'});const d=JSON.parse(await res.text());setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');}catch(e){setStat('s-err','⚠ 保存エラー');}
 }
 
@@ -2795,6 +2823,73 @@ function openPatientHistory(patientId){
     ).join('');
   }
   document.getElementById('patientHistoryModal').classList.add('on');
+}
+
+// ===== 誕生日クーポン管理 =====
+let bdayLogCache=null;
+function openBirthdayMgmt(){
+  document.getElementById('bdayMgmtModal').classList.add('on');
+  switchBdayTab('upcoming');
+}
+function switchBdayTab(tab){
+  ['upcoming','off','log'].forEach(t=>{
+    const btn=document.getElementById('bdt-tab-'+t);
+    if(btn){ btn.style.borderBottomColor = (t===tab)?'#db2777':'transparent'; btn.style.color=(t===tab)?'#db2777':'#64748b'; }
+  });
+  if(tab==='upcoming') renderBdayUpcoming();
+  else if(tab==='off') renderBdayOffList();
+  else renderBdayLog();
+}
+// 今日から60日以内に誕生日が来る患者（クーポン送信予定）を計算して表示
+function renderBdayUpcoming(){
+  const el=document.getElementById('bdt-content');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const list=patients.filter(p=>p.dob && p.birthdaySend!==false).map(p=>{
+    const m=p.dob.match(/^\d{4}-(\d{2})-(\d{2})$/);
+    if(!m) return null;
+    let next=new Date(today.getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
+    if(next<today) next=new Date(today.getFullYear()+1, parseInt(m[1])-1, parseInt(m[2]));
+    const diffDays=Math.round((next-today)/(1000*60*60*24));
+    return {name:p.name, id:p.id, next, diffDays};
+  }).filter(x=>x && x.diffDays<=60).sort((a,b)=>a.diffDays-b.diffDays);
+  if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">60日以内に誕生日を迎える方はいません</p>'; return; }
+  el.innerHTML=list.map(x=>{
+    const dateStr=`${x.next.getMonth()+1}月${x.next.getDate()}日`;
+    const badge=x.diffDays===0?'<span style="background:#fce7f3;color:#db2777;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">🎉本日</span>':`<span style="color:#94a3b8;font-size:0.72rem">あと${x.diffDays}日</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9">
+      <div><b style="font-size:0.85rem">${x.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">#${x.id}</span></div>
+      <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.8rem">${dateStr}</span>${badge}</div>
+    </div>`;
+  }).join('');
+}
+function renderBdayOffList(){
+  const el=document.getElementById('bdt-content');
+  const list=patients.filter(p=>p.birthdaySend===false);
+  if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">対象外に設定されている患者様はいません</p>'; return; }
+  el.innerHTML=`<p style="font-size:0.75rem;color:#64748b;margin-bottom:8px">解除したい場合は、患者一覧からその方の編集画面を開いて「送る」に戻してください。</p>`+
+    list.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9">
+      <div><b style="font-size:0.85rem">${p.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">#${p.id}</span></div>
+      <button class="btn be bsm" onclick="openPEdit('${p.id}');document.getElementById('bdayMgmtModal').classList.remove('on')">編集</button>
+    </div>`).join('');
+}
+async function renderBdayLog(){
+  const el=document.getElementById('bdt-content');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getBirthdayLog&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    bdayLogCache=d.list||[];
+    if(!bdayLogCache.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">送信履歴はまだありません</p>'; return; }
+    el.innerHTML=bdayLogCache.map(h=>{
+      const badge=h.result==='送信済み'?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅送信済み</span>'
+        :h.result==='未登録'?'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜LINE未登録</span>'
+        :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⚠️送信失敗</span>';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9">
+        <div><b style="font-size:0.85rem">${h.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${h.date}</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.72rem;color:#64748b">有効期限:${h.expireUntil}</span>${badge}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
 }
 
 // ===== 前日リマインド テストモード設定 =====
@@ -5152,6 +5247,7 @@ function openPEdit(id){
   const luid2=document.getElementById('pe-line-uid2');if(luid2)luid2.value=p.lineUid||'';
   setFamilyData(p.familyData||{});
   setAlertSend(p.alertSend!==false);// デフォルトtrue=送る
+  setBdaySend(p.birthdaySend!==false);// デフォルトtrue=送る
   // 回数券情報
   if(document.getElementById('pe-coupon-purchase'))document.getElementById('pe-coupon-purchase').value=p.couponPurchase||'';
   if(document.getElementById('pe-coupon-expiry'))document.getElementById('pe-coupon-expiry').value=p.couponExpiry||'';
@@ -5237,6 +5333,12 @@ function setAlertSend(val){
   if(on)on.classList.toggle('on',val);
   if(off)off.classList.toggle('on',!val);
 }
+function setBdaySend(val){
+  const on=document.getElementById('pe-bday-on');
+  const off=document.getElementById('pe-bday-off');
+  if(on)on.classList.toggle('on',val);
+  if(off)off.classList.toggle('on',!val);
+}
 async function savePEdit(){
   const p=patients.find(x=>x.id===editPatientId);if(!p)return;
   // 診察券No変更処理
@@ -5279,6 +5381,8 @@ async function savePEdit(){
   // 初診料アラート送信スイッチ（トグルボタンの状態を保存。デフォルトtrue=送る）
   const alertOnBtn=document.getElementById('pe-alert-on');
   p.alertSend = alertOnBtn ? alertOnBtn.classList.contains('on') : true;
+  const bdayOnBtn=document.getElementById('pe-bday-on');
+  p.birthdaySend = bdayOnBtn ? bdayOnBtn.classList.contains('on') : true;
   // 詳細情報保存
   const familyBtn=document.querySelector('#pe-family-btns .pay-btn.on');
   p.detail={
