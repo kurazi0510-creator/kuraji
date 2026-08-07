@@ -80,6 +80,7 @@ function doPost(e){
       else if(action==="runBirthdayMessagesNow"){sendBirthdayMessages();result={ok:true};}
       else if(action==="getBirthdayLog")result=getBirthdayLog();
       else if(action==="sendBirthdayMessageTestTo")result=sendBirthdayMessageTestTo(body.name);
+      else if(action==="getTriggerInfo")result=getTriggerInfo();
       else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -472,6 +473,14 @@ function setupAllTriggers(){
   ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(19).create();
   ScriptApp.newTrigger("sendBirthdayMessages").timeBased().everyDays(1).atHour(9).create();
   Logger.log("Triggers set OK");
+}
+// 今設定されているトリガーを一覧で確認する（kanri.htmlから呼び出し、重複や設定漏れがないか診断する）
+function getTriggerInfo(){
+  var triggers=ScriptApp.getProjectTriggers();
+  var list=triggers.map(function(t){
+    return { handler: t.getHandlerFunction(), type: String(t.getEventType()) };
+  });
+  return { ok:true, count: list.length, list: list };
 }
 // 誕生日の患者様にLINEでお祝いメッセージ＋誕生月クーポンを自動送信（毎日9時）
 function sendBirthdayMessages(){
