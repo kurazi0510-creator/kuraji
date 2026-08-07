@@ -77,6 +77,7 @@ function doPost(e){
       else if(action==="setTestMode")result=setTestMode(body.name);
       else if(action==="getTestMode")result=getTestMode();
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
+      else if(action==="runBirthdayMessagesNow"){sendBirthdayMessages();result={ok:true};}
       else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -467,7 +468,64 @@ function setupAllTriggers(){
   ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(8).create();
   ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(19).create();
+  ScriptApp.newTrigger("sendBirthdayMessages").timeBased().everyDays(1).atHour(9).create();
   Logger.log("Triggers set OK");
+}
+// 誕生日の患者様にLINEでお祝いメッセージ＋誕生月クーポンを自動送信（毎日9時）
+function sendBirthdayMessages(){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+  if(!token)return;
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ps=ss.getSheetByName("患者");
+  if(!ps)return;
+  var nl=String.fromCharCode(10);
+  var today=new Date();
+  var mm=today.getMonth()+1, dd=today.getDate();
+
+  var data=ps.getDataRange().getValues();
+  var headers=data[0].map(function(h){return String(h||"").trim();});
+  var idI=0, nameI=1, telI=headers.indexOf("電話番号"), dobI=headers.indexOf("生年月日");
+  if(telI<0)telI=4; if(dobI<0)dobI=13;
+
+  var targets=[];
+  for(var i=1;i<data.length;i++){
+    var dob=String(data[i][dobI]||"").trim();
+    var m=dob.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m) continue;
+    if(parseInt(m[2])===mm && parseInt(m[3])===dd){
+      targets.push({id:String(data[i][idI]||""), name:String(data[i][nameI]||"").trim(), tel:String(data[i][telI]||"")});
+    }
+  }
+  if(!targets.length) return;
+
+  var monthEnd=new Date(today.getFullYear(),today.getMonth()+1,0);
+  var monthEndStr=Utilities.formatDate(monthEnd,"Asia/Tokyo","M月d日");
+
+  var sentNames=[], skip=[];
+  targets.forEach(function(t){
+    var tid="";
+    if(t.tel) tid=findLineUidByPhone_(t.tel);
+    if(!tid){
+      var ls=ss.getSheetByName("LINE_IDs");
+      if(ls){
+        var lu={};
+        ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+        tid=lu[t.name];
+        if(!tid){var ln=t.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      }
+    }
+    if(!tid){skip.push(t.name);return;}
+    var msg="🎂 お誕生日おめでとうございます！"+nl+nl+t.name+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+monthEndStr+"まで"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
+    if(sendLineMessagingAPI(token,tid,msg).ok){sentNames.push(t.name);}else{skip.push(t.name);}
+  });
+
+  if(ownerId){
+    var s="[倉治整骨院] 本日の誕生日メッセージ"+nl+Utilities.formatDate(today,"Asia/Tokyo","M月d日")+nl+"送信:"+sentNames.length+"件";
+    if(sentNames.length)s+=nl+"送信した人: "+sentNames.join(", ");
+    if(skip.length)s+=nl+"未登録: "+skip.join(", ");
+    sendLineMessagingAPI(token,ownerId,s);
+  }
 }
 function sendLineMessagingAPI(token,userId,message){
   if(!token||!userId||!message)return{ok:false};
