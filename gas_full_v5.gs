@@ -79,6 +79,7 @@ function doPost(e){
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
       else if(action==="runBirthdayMessagesNow"){sendBirthdayMessages();result={ok:true};}
       else if(action==="getBirthdayLog")result=getBirthdayLog();
+      else if(action==="sendBirthdayMessageTestTo")result=sendBirthdayMessageTestTo(body.name);
       else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -503,6 +504,7 @@ function sendBirthdayMessages(){
   if(!targets.length) return;
 
   var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
+  var todayDisp=Utilities.formatDate(today,"Asia/Tokyo","M月d日");
   var expireStr=Utilities.formatDate(expireDate,"Asia/Tokyo","M月d日");
   var todayStr=Utilities.formatDate(today,"Asia/Tokyo","yyyy-MM-dd");
 
@@ -526,7 +528,7 @@ function sendBirthdayMessages(){
     var result;
     if(!tid){skip.push(t.name);result="未登録";}
     else{
-      var msg="🎂 お誕生日おめでとうございます！"+nl+nl+t.name+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+expireStr+"まで（本日から30日間）"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
+      var msg="🎂 お誕生日おめでとうございます！"+nl+nl+t.name+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+todayDisp+"〜"+expireStr+"まで"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
       if(sendLineMessagingAPI(token,tid,msg).ok){sentNames.push(t.name);result="送信済み";}else{skip.push(t.name);result="送信失敗";}
     }
     var newIdx=log.getLastRow()+1;
@@ -551,6 +553,36 @@ function getBirthdayLog(){
   var list=data.map(function(r){return{date:String(r[0]||""), id:String(r[1]||""), name:String(r[2]||""), result:String(r[3]||""), expireUntil:String(r[4]||"")};});
   list.sort(function(a,b){return a.date<b.date?1:-1;}); // 新しい順
   return {ok:true, list:list};
+}
+// 指定した名前の患者に、実際の誕生日に関係なく誕生日メッセージのプレビューを送信する（文面確認用）
+function sendBirthdayMessageTestTo(name){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var nl=String.fromCharCode(10);
+  var today=new Date();
+  var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
+  var todayDisp=Utilities.formatDate(today,"Asia/Tokyo","M月d日");
+  var expireStr=Utilities.formatDate(expireDate,"Asia/Tokyo","M月d日");
+
+  var target=String(name||"").trim();
+  if(!target) return {ok:false, error:"名前を指定してください"};
+  var tel=getTelByPatientName_(target);
+  var tid=tel?findLineUidByPhone_(tel):"";
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=lu[target];
+      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
+  }
+  if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
+  var msg="【プレビュー送信】"+nl+"🎂 お誕生日おめでとうございます！"+nl+nl+target+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+todayDisp+"〜"+expireStr+"まで"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
+  var r=sendLineMessagingAPI(token,tid,msg);
+  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
 }
 function sendLineMessagingAPI(token,userId,message){
   if(!token||!userId||!message)return{ok:false};
