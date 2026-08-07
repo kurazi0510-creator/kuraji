@@ -291,6 +291,21 @@ function dailyLineAlert(){
   var ls=ss.getSheetByName("LINE_IDs");
   if(ls)ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
   var alerts=[];
+  // 患者ごとの「初診料アラート送信」設定を取得（FALSEの人は除外する）
+  var alertOffIds={}, alertOffNames={};
+  var ps=ss.getSheetByName("患者");
+  if(ps){
+    var pd=ps.getDataRange().getValues(), ph=pd[0].map(function(h){return String(h||"").trim();});
+    var pai=ph.indexOf("アラート送信");
+    if(pai>-1){
+      pd.slice(1).forEach(function(r){
+        if(String(r[pai]||"").toUpperCase()==="FALSE"){
+          if(r[0])alertOffIds[String(r[0]).trim()]=true;
+          if(r[1])alertOffNames[String(r[1]).trim()]=true;
+        }
+      });
+    }
+  }
   var bs=ss.getSheetByName("予約表");
   if(bs){
     var bd=bs.getDataRange().getValues(),bh=bd[0];
@@ -308,9 +323,10 @@ function dailyLineAlert(){
         if(!lv[key]||d>lv[key].date)lv[key]={date:d,name:String(r[ni]||""),id:String(r[ii]||"")};
       });
       Object.values(lv).forEach(function(v){
+        if(alertOffIds[v.id]||alertOffNames[v.name])return; // アラート対象外の患者はスキップ
         var diff=Math.floor((today-v.date)/(1000*60*60*24));
-        if(diff>=17&&diff<=18)alerts.push({name:v.name,id:v.id,date:v.date,diff:diff,type:"warning"});
-        if(diff>=20&&diff<=21)alerts.push({name:v.name,id:v.id,date:v.date,diff:diff,type:"urgent"});
+        if(diff>=18&&diff<=19)alerts.push({name:v.name,id:v.id,date:v.date,diff:diff,type:"warning"});
+        if(diff>=21&&diff<=22)alerts.push({name:v.name,id:v.id,date:v.date,diff:diff,type:"urgent"});
       });
     }
   }
@@ -318,8 +334,8 @@ function dailyLineAlert(){
   var urgent=alerts.filter(function(v){return v.type==="urgent";});
   var warning=alerts.filter(function(v){return v.type==="warning";});
   var ownerMsg="[倉治整骨院] アラート "+Utilities.formatDate(today,"Asia/Tokyo","M/d")+nl;
-  if(urgent.length){ownerMsg+="[20日 本日初診料発生]"+nl;urgent.forEach(function(v){ownerMsg+="- "+v.name+"("+v.id+"号) 前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+nl;});}
-  if(warning.length){ownerMsg+="[17日 3日後に初診料]"+nl;warning.forEach(function(v){ownerMsg+="- "+v.name+"("+v.id+"号) 前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+nl;});}
+  if(urgent.length){ownerMsg+="[21日経過 初診料発生中]"+nl;urgent.forEach(function(v){ownerMsg+="- "+v.name+"("+v.id+"号) 前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+nl;});}
+  if(warning.length){ownerMsg+="[18日経過 3日後に初診料]"+nl;warning.forEach(function(v){ownerMsg+="- "+v.name+"("+v.id+"号) 前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+nl;});}
   ownerMsg+="来院を促してください";
   sendLineMessagingAPI(token,ownerId,ownerMsg);
   // ★患者様への直接送信は日付カウントの不具合により一時停止中★
