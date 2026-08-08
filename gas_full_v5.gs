@@ -82,6 +82,8 @@ function doPost(e){
       else if(action==="sendBirthdayMessageTestTo")result=sendBirthdayMessageTestTo(body.name);
       else if(action==="getTriggerInfo")result=getTriggerInfo();
       else if(action==="runReviewRequestsNow"){sendReviewRequests();result={ok:true};}
+      else if(action==="setGoogleReviewUrl")result=setGoogleReviewUrlFromApp(body.url);
+      else if(action==="getGoogleReviewUrl")result=getGoogleReviewUrl();
       else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -675,9 +677,19 @@ function sendReviewRequests(){
 // GoogleクチコミのURLを設定する（Apps Scriptエディタから手動で1回だけ実行）
 // 例: setReviewUrlの中のURLを実際のクチコミURLに書き換えてから実行してください
 function setReviewUrl(){
-  var url = "ここに倉治整骨院のGoogleクチコミ投稿用URLを貼り付けてください";
+  var url = "https://g.page/r/CZBfNKGrXbFyEBM/review";
   PropertiesService.getScriptProperties().setProperty("GOOGLE_REVIEW_URL", url);
   Logger.log("設定しました: " + url);
+}
+// kanri.html側から直接GoogleクチコミURLを設定・確認する
+function setGoogleReviewUrlFromApp(url){
+  if(!url) return {ok:false, error:"URLが指定されていません"};
+  PropertiesService.getScriptProperties().setProperty("GOOGLE_REVIEW_URL", String(url).trim());
+  return {ok:true};
+}
+function getGoogleReviewUrl(){
+  var url = PropertiesService.getScriptProperties().getProperty("GOOGLE_REVIEW_URL")||"";
+  return {ok:true, url:url};
 }
 function sendLineMessagingAPI(token,userId,message){
   if(!token||!userId||!message)return{ok:false};
