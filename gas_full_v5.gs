@@ -84,6 +84,7 @@ function doPost(e){
       else if(action==="runReviewRequestsNow"){sendReviewRequests();result={ok:true};}
       else if(action==="setGoogleReviewUrl")result=setGoogleReviewUrlFromApp(body.url);
       else if(action==="getGoogleReviewUrl")result=getGoogleReviewUrl();
+      else if(action==="sendReviewRequestTestTo")result=sendReviewRequestTestTo(body.name);
       else if(action==="findDuplicateLineUsers")result=findDuplicateLineUsers();
       else if(action==="getBizHours")result=getBizHours();
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -673,6 +674,34 @@ function sendReviewRequests(){
     if(skip.length)s+=nl+"未登録: "+skip.join(", ");
     sendLineMessagingAPI(token,ownerId,s);
   }
+}
+// 指定した名前の患者に、実際の通院回数に関係なく口コミ依頼メッセージのプレビューを送信する（文面確認用）
+function sendReviewRequestTestTo(name){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var reviewUrl=p.getProperty("GOOGLE_REVIEW_URL")||"";
+  if(!reviewUrl) return {ok:false, error:"GoogleクチコミのURLが未設定です"};
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var nl=String.fromCharCode(10);
+
+  var target=String(name||"").trim();
+  if(!target) return {ok:false, error:"名前を指定してください"};
+  var tel=getTelByPatientName_(target);
+  var tid=tel?findLineUidByPhone_(tel):"";
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=lu[target];
+      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
+  }
+  if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
+  var msg="【プレビュー送信】"+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+target+"様には3回目のご来院をいただきました。"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
+  var r=sendLineMessagingAPI(token,tid,msg);
+  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
 }
 // GoogleクチコミのURLを設定する（Apps Scriptエディタから手動で1回だけ実行）
 // 例: setReviewUrlの中のURLを実際のクチコミURLに書き換えてから実行してください
