@@ -3503,6 +3503,24 @@ function renderSched(){
   badge.style.color=holidayName?'#dc2626':'';
   badge.className='day-b '+({hei:'d-hei',moku:'d-moku',gogo:'d-gogo',nichi:'d-nichi'}[dt]||'d-nichi');
   const sl=getSlots(dt,date),tbody=document.getElementById('sbody');
+  const bkDate0=bookings[date]||{};
+  // ★昼休みに食い込む継続枠（12:30・12:50など）に実際に予約が入っている場合、
+  //   BREAKの直前に挿入して表示する（データはあるのに表に出ないと院長が見落とすため）
+  const breakIdx=sl.indexOf('BREAK');
+  if(breakIdx>-1){
+    const lastAm=sl[breakIdx-1];
+    if(lastAm){
+      let extra=lastAm;
+      const toInsert=[];
+      for(let i=0;i<2;i++){
+        let [eh,em]=extra.split(':').map(Number);
+        em+=20;if(em>=60){em-=60;eh++;}
+        extra=pad(eh)+':'+pad(em);
+        if(bkDate0[extra]) toInsert.push(extra); else break;
+      }
+      if(toInsert.length) sl.splice(breakIdx,0,...toInsert);
+    }
+  }
   tbody.innerHTML='';
   if(dt==='nichi'){tbody.innerHTML='<tr><td colspan="10" class="empty">本日は休診日です</td></tr>';updateStats(date,[]);return;}
   const bkDate=bookings[date]||{};
@@ -4291,14 +4309,21 @@ async function saveBk(){
   const optPrice=parseInt(document.getElementById('m-opt-price')?.value)||0;
   bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo:nextMemo||nextNote,nextNote:nextMemo||nextNote,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,payItems:finalPayItems,couponData:finalCouponData,elapsed:el,visitCount:vc};
   // 継続枠（安全版：空枠か自分のcont枠のみ設定。他の患者の予約は絶対に上書きしない）
-  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length){
-    // BREAKに当たったら継続枠生成を停止（午前→午後跨ぎ防止）
-    if(sl[ni]==='BREAK') break;
-    const existing=bookings[date][sl[ni]];if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
-    if(!existing||(existing.cont&&existing.cardId===cardId)){bookings[date][sl[ni]]={cont:true,name,cardId};}
-    // 他の患者が入っている場合は触らない（上書きしない）
-  }else{// 継続枠が不要な範囲：自分のcont枠のみ削除（他の患者は触らない）
-    if(existing&&existing.cont&&existing.cardId===cardId)delete bookings[date][sl[ni]];}}}
+  // ★時間を20分ずつ足して計算する方式（12:10など昼休み直前の枠から始めても、
+  //   休憩マーカーに関係なく12:30・12:50への継続枠を作れるようにする）
+  let contTime=slot;
+  for(let i=1;i<=2;i++){
+    let [ch,cm]=contTime.split(':').map(Number);
+    cm+=20; if(cm>=60){cm-=60;ch++;}
+    contTime=pad(ch)+':'+pad(cm);
+    const existing=bookings[date][contTime];
+    if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
+      if(!existing||(existing.cont&&existing.cardId===cardId)){bookings[date][contTime]={cont:true,name,cardId};}
+      // 他の患者が入っている場合は触らない（上書きしない）
+    }else{// 継続枠が不要な範囲：自分のcont枠のみ削除（他の患者は触らない）
+      if(existing&&existing.cont&&existing.cardId===cardId)delete bookings[date][contTime];
+    }
+  }
   if(p){
     if(isNewBk) p.last=date;
     p.count=vc;
