@@ -327,11 +327,13 @@ function dailyLineAlert(){
         var nm=String(r[ni]||"").trim();
         if(!nm)return;
         // ★キーは必ず「患者名」に統一する（診察券Noが空の行があると来院履歴が分断されてしまう不具合の対策）
+        // ★さらに、全角/半角スペース・スペースの数など表記ゆれがあっても同一人物として扱う（キーのみ正規化。表示名は元の表記を保持）
+        var key=nm.replace(/[\s　]+/g,"");
         var idVal=String(r[ii]||"").trim();
-        if(!lv[nm] || d>lv[nm].date){
-          lv[nm]={date:d, name:nm, id:idVal||(lv[nm]?lv[nm].id:"")};
-        }else if(!lv[nm].id && idVal){
-          lv[nm].id=idVal; // 診察券Noが後から分かった場合は補完する
+        if(!lv[key] || d>lv[key].date){
+          lv[key]={date:d, name:nm, id:idVal||(lv[key]?lv[key].id:"")};
+        }else if(!lv[key].id && idVal){
+          lv[key].id=idVal; // 診察券Noが後から分かった場合は補完する
         }
       });
       Object.values(lv).forEach(function(v){
