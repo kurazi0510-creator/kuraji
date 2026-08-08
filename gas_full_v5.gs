@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -853,6 +853,30 @@ function getSlotsForDate_(dateStr){
   return mo.concat(af);
 }
 
+// 指定日の「空いている時間枠」だけを返す（予約空き状況ジェネレーターとの連動用）
+function getAvailableSlots(dateStr){
+  try{
+    if(!dateStr) return {ok:false, error:"日付を指定してください"};
+    var cfg=getDayConfig_(dateStr);
+    if(cfg.closed) return {ok:true, closed:true, available:[]};
+    var validSlots=getSlotsForDate_(dateStr);
+    if(!validSlots.length) return {ok:true, closed:true, available:[]};
+
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("予約表");
+    var occupied={};
+    if(s){
+      var rows=s.getDataRange().getValues();
+      for(var i=1;i<rows.length;i++){
+        if(String(rows[i][0])===String(dateStr) && String(rows[i][3]||"").trim()!==""){
+          occupied[String(rows[i][1])]=true;
+        }
+      }
+    }
+    var available=validSlots.filter(function(t){return !occupied[t];});
+    return {ok:true, closed:false, available:available};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
 function saveWebBooking(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
