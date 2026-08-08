@@ -324,8 +324,15 @@ function dailyLineAlert(){
         var d=dv instanceof Date?new Date(dv):new Date(String(dv));
         if(isNaN(d.getTime()))return;
         d.setHours(0,0,0,0);if(d>today)return;
-        var key=String(r[ii]||"")||String(r[ni]||"");
-        if(!lv[key]||d>lv[key].date)lv[key]={date:d,name:String(r[ni]||""),id:String(r[ii]||"")};
+        var nm=String(r[ni]||"").trim();
+        if(!nm)return;
+        // ★キーは必ず「患者名」に統一する（診察券Noが空の行があると来院履歴が分断されてしまう不具合の対策）
+        var idVal=String(r[ii]||"").trim();
+        if(!lv[nm] || d>lv[nm].date){
+          lv[nm]={date:d, name:nm, id:idVal||(lv[nm]?lv[nm].id:"")};
+        }else if(!lv[nm].id && idVal){
+          lv[nm].id=idVal; // 診察券Noが後から分かった場合は補完する
+        }
       });
       Object.values(lv).forEach(function(v){
         if(alertOffIds[v.id]||alertOffNames[v.name])return; // アラート対象外の患者はスキップ
