@@ -482,8 +482,8 @@ function getFollowers(){
 }
 function setupAllTriggers(){
   ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
-  ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(8).create();
-  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(19).create();
+  ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(9).create();
+  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(9).create();
   ScriptApp.newTrigger("sendBirthdayMessages").timeBased().everyDays(1).atHour(9).create();
   Logger.log("Triggers set OK");
 }
