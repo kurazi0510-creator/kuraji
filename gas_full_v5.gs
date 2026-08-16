@@ -309,7 +309,7 @@ function dailyLineAlert(){
       pd.slice(1).forEach(function(r){
         if(String(r[pai]||"").toUpperCase()==="FALSE"){
           if(r[0])alertOffIds[String(r[0]).trim()]=true;
-          if(r[1])alertOffNames[String(r[1]).trim()]=true;
+          if(r[1])alertOffNames[String(r[1]).trim().replace(/[\s　]+/g,"")]=true;
         }
       });
     }
@@ -340,7 +340,7 @@ function dailyLineAlert(){
         }
       });
       Object.values(lv).forEach(function(v){
-        if(alertOffIds[v.id]||alertOffNames[v.name])return; // アラート対象外の患者はスキップ
+        if(alertOffIds[v.id]||alertOffNames[String(v.name).replace(/[\s　]+/g,"")])return; // アラート対象外の患者はスキップ
         var diff=Math.floor((today-v.date)/(1000*60*60*24));
         if(diff>=18&&diff<=19)alerts.push({name:v.name,id:v.id,date:v.date,diff:diff,type:"warning"});
         if(diff>=21&&diff<=22)alerts.push({name:v.name,id:v.id,date:v.date,diff:diff,type:"urgent"});
@@ -513,17 +513,32 @@ function sendBirthdayMessages(){
   var bsI=headers.indexOf("誕生日クーポン送信");
   if(telI<0)telI=4; if(dobI<0)dobI=13;
 
+  // ★安全装置：「誕生日クーポン送信」列が見つからない場合は、対象外の判定ができないため
+  //   誰にも送らず、院長に不具合を通知して終了する（列がない＝全員に送ってしまう、を防ぐ）
+  if(bsI<0){
+    if(ownerId)sendLineMessagingAPI(token,ownerId,"[倉治整骨院] 誕生日メッセージを送ろうとしましたが、「誕生日クーポン送信」の列が見つからないため、安全のため送信を中止しました。管理システムの同期状態を確認してください。");
+    return;
+  }
+
   var targets=[];
   for(var i=1;i<data.length;i++){
     var dob=String(data[i][dobI]||"").trim();
     var m=dob.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if(!m) continue;
     if(parseInt(m[2])===mm && parseInt(m[3])===dd){
-      if(bsI>-1 && String(data[i][bsI]||"").toUpperCase()==="FALSE") continue; // 対象外の患者はスキップ
+      if(String(data[i][bsI]||"").toUpperCase()==="FALSE") continue; // 対象外の患者はスキップ
       targets.push({id:String(data[i][idI]||""), name:String(data[i][nameI]||"").trim(), tel:String(data[i][telI]||"")});
     }
   }
   if(!targets.length) return;
+
+  // ★現在、原因調査のため誕生日メッセージの実際の送信を一時停止中★
+  // （院長に対象者を報告するのみ。原因が解消されたらこのreturnを削除してください）
+  if(ownerId){
+    var namesForCheck=targets.map(function(t){return t.name;}).join(", ");
+    sendLineMessagingAPI(token,ownerId,"[倉治整骨院] 本日誕生日の患者様："+namesForCheck+nl+"※現在、除外設定の不具合調査のため誕生日メッセージの送信を一時停止しています。");
+  }
+  return;
 
   var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
   var todayDisp=Utilities.formatDate(today,"Asia/Tokyo","M月d日");
