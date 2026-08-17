@@ -113,6 +113,10 @@ function saveLineUserId(userId,displayName,message){
 }
 // 電話番号でLINE友だちを紐付け（表示名があだ名でも確実に照合できる）
 function saveLinePhone_(userId,phoneDigits,displayName){
+  // ★念のための多層防御：9〜11桁以外の明らかにおかしいデータは保存しない
+  var pd=String(phoneDigits||"").replace(/[^0-9]/g,"");
+  if(pd.length<9||pd.length>11) return;
+  phoneDigits=pd;
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("LINE_IDs");
   if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,5).setValues([["userId","name","lastMsg","updated","phone"]]);}
@@ -240,7 +244,10 @@ function saveLineUserPhoneManual(userId,phone,name,cardId){
     var s=ss.getSheetByName("LINE_IDs");
     if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,7).setValues([["userId","name","lastMsg","updated","phone","promptSent","cardId"]]);}
     var data=s.getDataRange().getValues();
-    var phoneDigits=String(phone||'').replace(/[^0-9]/g,'');
+    var phoneDigitsRaw=String(phone||'').replace(/[^0-9]/g,'');
+    // ★電話番号として明らかにおかしい桁数（日時などが紛れ込んだデータ）は保存しない安全装置
+    var phoneDigits = (phoneDigitsRaw.length>=9 && phoneDigitsRaw.length<=11) ? phoneDigitsRaw : (phoneDigitsRaw==='' ? '' : null);
+    if(phoneDigits===null) return {ok:false, error:'電話番号の桁数が不正です（9〜11桁で入力してください）: '+phoneDigitsRaw};
     var nameVal=(name!==undefined && name!==null)?String(name).trim():'';
     var cardVal=(cardId!==undefined && cardId!==null)?String(cardId).trim():'';
     for(var i=1;i<data.length;i++){
