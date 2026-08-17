@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -357,6 +357,23 @@ function dailyLineAlert(){
   if(!alerts.length){Logger.log("No alert today");return;}
   var urgent=alerts.filter(function(v){return v.type==="urgent";});
   var warning=alerts.filter(function(v){return v.type==="warning";});
+
+  // 履歴シート（無ければ作成）：誰が・いつ・どの区分で対象になったかを必ず記録として残す
+  var log=ss.getSheetByName("alert_log");
+  if(!log){ log=ss.insertSheet("alert_log"); log.getRange(1,1,1,6).setValues([["date","time","name","id","type","note"]]); }
+  var nowStr=Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss");
+  var todayStr2=Utilities.formatDate(today,"Asia/Tokyo","yyyy-MM-dd");
+  var logRows=alerts.map(function(v){return [todayStr2, nowStr, v.name, v.id, v.type==="urgent"?"21日経過":"18日経過", "LINE送信は現在停止中"];});
+  var logIdx=log.getLastRow()+1;
+  var logRng=log.getRange(logIdx,1,logRows.length,6);
+  logRng.setNumberFormat("@");
+  logRng.setValues(logRows);
+
+  // ★現在、除外設定の不具合調査のためLINE送信を一時停止中★
+  // （対象者は上記の通りalert_logシートに記録される。院長への送信も含め、一切送信しない）
+  Logger.log("Alert計算のみ実施・送信は停止中: "+alerts.length+"件をalert_logに記録");
+  return;
+  /*
   var ownerMsg="[倉治整骨院] アラート "+Utilities.formatDate(today,"Asia/Tokyo","M/d")+nl;
   if(urgent.length){ownerMsg+="[21日経過 初診料発生中]"+nl;urgent.forEach(function(v){ownerMsg+="- "+v.name+"("+v.id+"号) 前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+nl;});}
   if(warning.length){ownerMsg+="[18日経過 3日後に初診料]"+nl;warning.forEach(function(v){ownerMsg+="- "+v.name+"("+v.id+"号) 前回:"+Utilities.formatDate(v.date,"Asia/Tokyo","M/d")+nl;});}
@@ -387,7 +404,7 @@ function dailyLineAlert(){
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;}else{skip++;}
   });
   */
-  Logger.log("Alert done: sent="+sent+" skip="+skip);
+  Logger.log("Alert done");
 }
 function sendDayBeforeReminders(){
   var p=PropertiesService.getScriptProperties();
@@ -587,6 +604,16 @@ function sendBirthdayMessages(){
     if(skip.length)s+=nl+"未登録: "+skip.join(", ");
     sendLineMessagingAPI(token,ownerId,s);
   }
+}
+// kanri.html側から17日/20日アラートの対象履歴を確認するためのAPI
+function getDailyAlertLog(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var log=ss.getSheetByName("alert_log");
+  if(!log) return {ok:true, list:[]};
+  var data=log.getDataRange().getValues().slice(1);
+  var list=data.map(function(r){return{date:String(r[0]||""), time:String(r[1]||""), name:String(r[2]||""), id:String(r[3]||""), type:String(r[4]||""), note:String(r[5]||"")};});
+  list.sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?1:-1;}); // 新しい順
+  return {ok:true, list:list};
 }
 // kanri.html側から送信履歴を確認するためのAPI
 function getBirthdayLog(){
