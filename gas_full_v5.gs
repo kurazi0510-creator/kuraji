@@ -102,7 +102,12 @@ function saveLineUserId(userId,displayName,message){
   var data=s.getDataRange().getValues();
   var now=new Date();
   for(var i=1;i<data.length;i++){
-    if(data[i][0]===userId){s.getRange(i+1,2,1,3).setValues([[displayName||data[i][1],message,now]]);return;}
+    if(data[i][0]===userId){
+      // ★名前は「まだ未登録の場合」だけLINEの表示名で入れる。既に名前がある場合は絶対に上書きしない
+      //   （院内で漢字フルネームなどに手動修正した名前が、LINE側のあだ名で毎回上書きされてしまう不具合の対策）
+      var nameToSave = String(data[i][1]||"").trim() ? data[i][1] : (displayName||data[i][1]);
+      s.getRange(i+1,2,1,3).setValues([[nameToSave,message,now]]);return;
+    }
   }
   s.appendRow([userId,displayName,message,now,""]);
 }
@@ -115,9 +120,11 @@ function saveLinePhone_(userId,phoneDigits,displayName){
   var now=new Date();
   for(var i=1;i<data.length;i++){
     if(data[i][0]===userId){
+      // ★同上：既に名前が登録されている場合はLINEの表示名で上書きしない
+      var nameToSave = String(data[i][1]||"").trim() ? data[i][1] : (displayName||data[i][1]);
       var rng1=s.getRange(i+1,2,1,4);
       rng1.setNumberFormat("@");
-      rng1.setValues([[displayName||data[i][1],"(電話番号登録)",now,phoneDigits]]);
+      rng1.setValues([[nameToSave,"(電話番号登録)",now,phoneDigits]]);
       return;
     }
   }
