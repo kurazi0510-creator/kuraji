@@ -248,6 +248,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="checkTriggers()" style="margin-top:16px;background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
       <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
+      <button class="btn bp bsm" onclick="openReminderLog()" style="margin-top:16px;background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
@@ -1011,6 +1012,17 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
     <p style="font-size:0.75rem;color:#dc2626;background:#fef2f2;padding:8px;border-radius:8px;margin-bottom:10px">⚠️ 現在、除外設定の不具合調査のためLINE送信(院長への通知も含む)を一時停止しています。ここには「本来なら対象になった人」の記録だけが残ります。</p>
     <div id="alertLogContent" style="max-height:55vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- 前日リマインド送信履歴モーダル -->
+<div class="modal-ov" id="reminderLogModal">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem">📋 前日リマインド送信履歴</h3>
+      <button onclick="document.getElementById('reminderLogModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div id="reminderLogContent" style="max-height:55vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -2904,6 +2916,29 @@ async function renderBdayLog(){
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9">
         <div><b style="font-size:0.85rem">${h.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${h.date}</span></div>
         <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.72rem;color:#64748b">有効期限:${h.expireUntil}</span>${badge}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+
+// ===== 前日リマインド送信履歴 =====
+async function openReminderLog(){
+  document.getElementById('reminderLogModal').classList.add('on');
+  const el=document.getElementById('reminderLogContent');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getReminderLog&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">履歴はまだありません</p>'; return; }
+    el.innerHTML=list.map(h=>{
+      const badge=h.result==='送信済み'?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅送信済み</span>':'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜LINE未連携</span>';
+      return `<div style="padding:8px 4px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><b style="font-size:0.85rem">${h.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${h.targetDate}のご予約分</span></div>
+          ${badge}
+        </div>
+        <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px">送信日時：${h.date} ${h.time}　時間：${h.note||''}</div>
       </div>`;
     }).join('');
   }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }

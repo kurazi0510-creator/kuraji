@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -453,6 +453,23 @@ function sendDayBeforeReminders(){
     var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;sentNames.push(name);}else{skip.push(name);}
   });
+
+  // 履歴シート（無ければ作成）：誰に・いつ・送れたかどうかを必ず記録として残す
+  var log=ss.getSheetByName("reminder_log");
+  if(!log){ log=ss.insertSheet("reminder_log"); log.getRange(1,1,1,6).setValues([["date","time","name","targetDate","result","note"]]); }
+  var nowStr=Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss");
+  var todayStr3=Utilities.formatDate(today,"Asia/Tokyo","yyyy-MM-dd");
+  var logRows=Object.keys(bp).map(function(name){
+    var isSent=sentNames.indexOf(name)>-1;
+    return [todayStr3, nowStr, name, tmrStr, isSent?"送信済み":"未登録(LINE連携なし)", bp[name].join("・")];
+  });
+  if(logRows.length){
+    var logIdx=log.getLastRow()+1;
+    var logRng=log.getRange(logIdx,1,logRows.length,6);
+    logRng.setNumberFormat("@");
+    logRng.setValues(logRows);
+  }
+
   if(ownerId){
     var s=(testModeName?"【テストモード中：「"+testModeName+"」のみ対象】"+nl:"")+"[倉治整骨院] 前日リマインド完了"+nl+tmrDisp+nl+"送信:"+sent+"件";
     if(sentNames.length)s+=nl+"送信した人: "+sentNames.join(", ");
@@ -604,6 +621,16 @@ function sendBirthdayMessages(){
     if(skip.length)s+=nl+"未登録: "+skip.join(", ");
     sendLineMessagingAPI(token,ownerId,s);
   }
+}
+// kanri.html側から前日リマインドの送信履歴を確認するためのAPI
+function getReminderLog(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var log=ss.getSheetByName("reminder_log");
+  if(!log) return {ok:true, list:[]};
+  var data=log.getDataRange().getValues().slice(1);
+  var list=data.map(function(r){return{date:String(r[0]||""), time:String(r[1]||""), name:String(r[2]||""), targetDate:String(r[3]||""), result:String(r[4]||""), note:String(r[5]||"")};});
+  list.sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?1:-1;}); // 新しい順
+  return {ok:true, list:list};
 }
 // kanri.html側から17日/20日アラートの対象履歴を確認するためのAPI
 function getDailyAlertLog(){
