@@ -81,6 +81,7 @@ function doPost(e){
       else if(action==="getBirthdayLog")result=getBirthdayLog();
       else if(action==="sendBirthdayMessageTestTo")result=sendBirthdayMessageTestTo(body.name);
       else if(action==="getTriggerInfo")result=getTriggerInfo();
+      else if(action==="deleteTriggerByName")result=deleteTriggerByName(body.funcName);
       else if(action==="runReviewRequestsNow"){sendReviewRequests();result={ok:true};}
       else if(action==="setGoogleReviewUrl")result=setGoogleReviewUrlFromApp(body.url);
       else if(action==="getGoogleReviewUrl")result=getGoogleReviewUrl();
@@ -542,6 +543,19 @@ function getTriggerInfo(){
     return { handler: t.getHandlerFunction(), type: String(t.getEventType()) };
   });
   return { ok:true, count: list.length, list: list };
+}
+// ボタン1つで指定した関数のトリガーを自動で見つけて削除する（Apps Script画面を探し回らなくて済むようにするため）
+function deleteTriggerByName(funcName){
+  if(!funcName) return {ok:false, error:"関数名が指定されていません"};
+  var triggers=ScriptApp.getProjectTriggers();
+  var deleted=0;
+  triggers.forEach(function(t){
+    if(t.getHandlerFunction()===funcName){
+      ScriptApp.deleteTrigger(t);
+      deleted++;
+    }
+  });
+  return {ok:true, deleted:deleted};
 }
 // 誕生日の患者様にLINEでお祝いメッセージ＋誕生月クーポンを自動送信（毎日9時）
 function sendBirthdayMessages(){

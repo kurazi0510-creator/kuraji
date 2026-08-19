@@ -248,6 +248,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="checkTriggers()" style="margin-top:16px;background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
       <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
+      <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
       <button class="btn bp bsm" onclick="openReminderLog()" style="margin-top:16px;background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
@@ -2945,6 +2946,23 @@ async function openReminderLog(){
 }
 
 // ===== 17日/20日アラート履歴 =====
+async function emergencyStopDailyAlert(){
+  if(!confirm('17日/20日アラートの自動送信を今すぐ強制的に停止します。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'deleteTriggerByName',funcName:'dailyLineAlert'})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 失敗しました：'+(d.error||'')); return; }
+    if(d.deleted>0){
+      alert(`✅ 停止しました（${d.deleted}件のトリガーを削除）\n\n明日の朝からアラートは届きません。`);
+    }else{
+      alert('⚠️ このシステムには該当のトリガーが見つかりませんでした。\n\n別のGASプロジェクトから送信されている可能性があります。院長のLINEに届いているメッセージの送信元を確認する必要があるかもしれません。');
+    }
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 async function openAlertLog(){
   document.getElementById('alertLogModal').classList.add('on');
   const el=document.getElementById('alertLogContent');
