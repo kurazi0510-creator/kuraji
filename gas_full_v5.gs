@@ -71,6 +71,7 @@ function doPost(e){
       else if(action==="getWebBookingRequests")result=getWebBookingRequests();
       else if(action==="updateWebBookingRequestStatus")result=updateWebBookingRequestStatus(body.rowIdx,body.status);
       else if(action==="toggleBlockedSlot")result=toggleBlockedSlot(body.date,body.time,body.block);
+      else if(action==="sendTestEmailTo")result=sendTestEmailTo(body.email);
       else if(action==="getMenuMaster")result=getMenuMaster();
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -930,6 +931,8 @@ function getDayConfig_(dateStr){
       }
     }
   }
+  // ★祝日は自動的に休診扱いにする（個別にその祝日だけ診療したい場合は「営業時間設定」の個別上書きで開けられる）
+  if(isJapaneseHoliday_(dateStr)) return {closed:true, am:null, pm:null};
   var w=ss.getSheetByName("biz_hours_weekly");
   var dow=new Date(dateStr+"T00:00:00").getDay();
   if(w){
@@ -945,6 +948,24 @@ function getDayConfig_(dateStr){
   if(dow===0) return {closed:true, am:null, pm:null};
   if(dow===4||dow===6) return {closed:false, am:["08:30","12:30"], pm:null};
   return {closed:false, am:["08:30","12:30"], pm:["15:00","20:00"]};
+}
+// 日本の祝日かどうかを判定する（holidays-jp APIの結果を12時間キャッシュして毎回の通信を減らす）
+function isJapaneseHoliday_(dateStr){
+  try{
+    var cache=CacheService.getScriptCache();
+    var key="holidays_jp_json";
+    var json=cache.get(key);
+    var map;
+    if(json){
+      map=JSON.parse(json);
+    }else{
+      var res=UrlFetchApp.fetch("https://holidays-jp.github.io/api/v1/date.json",{muteHttpExceptions:true});
+      if(res.getResponseCode()!==200) return false;
+      map=JSON.parse(res.getContentText());
+      cache.put(key, JSON.stringify(map), 21600); // 6時間キャッシュ
+    }
+    return !!map[dateStr];
+  }catch(e){ return false; }
 }
 function getSlotsForDate_(dateStr){
   var cfg=getDayConfig_(dateStr);
@@ -1305,6 +1326,18 @@ function testSendMail(){
     subject: "【テスト】倉治整骨院システムからのメール送信テスト",
     body: "このメールが届いていれば、メール送信の設定は正常です。"
   });
+}
+// kanri.html側から指定したメールアドレスにテストメールを送信する（権限・到達確認用）
+function sendTestEmailTo(email){
+  try{
+    if(!email) return {ok:false, error:"メールアドレスが指定されていません"};
+    MailApp.sendEmail({
+      to: email,
+      subject: "【テスト】倉治整骨院システムからのメール送信テスト",
+      body: "このメールが届いていれば、Web予約フォームのメール確認機能は正常に動作しています。\n\n倉治整骨院"
+    });
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
 
 // 自費メニュー(処置マスター)をGASにも保存し、Web予約フォームから見えるようにする
