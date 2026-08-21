@@ -250,6 +250,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
       <button class="btn bp bsm" onclick="openWebRequests()" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b;position:relative">📩 Web予約リクエスト一覧(未対応の確認・確定)<span id="webReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
       <button class="btn bp bsm" onclick="openBlockSlots()" style="margin-top:16px;background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
+      <button class="btn bp bsm" onclick="setNotifyVolume()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">🔊 新着通知の音量を設定</button>
       <button class="btn bp bsm" onclick="sendTestEmail()" style="margin-top:16px;background:#475569;color:white;border-color:#475569">✉️ テストメールを送信(到達確認)</button>
       <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
       <button class="btn bp bsm" onclick="openReminderLog()" style="margin-top:16px;background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
@@ -3023,19 +3024,35 @@ async function toggleBlockSlot(date,time){
 // ===== Web予約リクエストの新着通知（音＋バッジ。個人スマホを使わずデスクトップだけで気づけるように） =====
 let webReqKnownIds=new Set(); // これまでに確認済みの未対応リクエスト（rowIdx）
 let webReqFirstCheck=true;
+function getNotifyVolume(){
+  const v=parseFloat(localStorage.getItem('kj_notify_vol'));
+  return isNaN(v)?0.25:v; // デフォルト音量
+}
 function beepNotify(){
   try{
+    const vol=getNotifyVolume();
+    if(vol<=0)return; // 0＝ミュート
     const ctx=new (window.AudioContext||window.webkitAudioContext)();
     [0,0.18,0.36].forEach(t=>{
       const o=ctx.createOscillator(), g=ctx.createGain();
       o.type='sine'; o.frequency.value=880;
       o.connect(g); g.connect(ctx.destination);
       g.gain.setValueAtTime(0.0001,ctx.currentTime+t);
-      g.gain.exponentialRampToValueAtTime(0.25,ctx.currentTime+t+0.02);
+      g.gain.exponentialRampToValueAtTime(vol,ctx.currentTime+t+0.02);
       g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+t+0.16);
       o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.18);
     });
   }catch(e){}
+}
+async function setNotifyVolume(){
+  const cur=Math.round(getNotifyVolume()*100);
+  const input=prompt('新着通知の音量を0〜100で入力してください（大きいほど音が大きくなります。0でミュート）', cur);
+  if(input===null)return;
+  const num=parseInt(input);
+  if(isNaN(num)||num<0||num>100){ alert('0〜100の数字で入力してください'); return; }
+  localStorage.setItem('kj_notify_vol', String(num/100));
+  beepNotify(); // 設定した音量ですぐ試し鳴らし
+  alert(`✅ 音量を${num}に設定しました（今、その音量で鳴らしてみました）`);
 }
 async function checkNewWebRequests(){
   try{
