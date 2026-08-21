@@ -3068,7 +3068,7 @@ async function checkNewWebRequests(){
   }catch(e){ /* 通信エラー時は静かに次回リトライ */ }
 }
 checkNewWebRequests();
-setInterval(checkNewWebRequests, 60000); // 1分ごとに自動チェック
+setInterval(checkNewWebRequests, 600000); // 10分ごとに自動チェック
 
 function openWebRequests(){
   document.getElementById('webReqModal').classList.add('on');
