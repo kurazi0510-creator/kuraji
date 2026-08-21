@@ -3041,6 +3041,9 @@ async function loadWebRequests(){
       const cands=[[r.date1,r.time1,'第一'],[r.date2,r.time2,'第二'],[r.date3,r.time3,'第三']]
         .filter(c=>c[0]&&c[1])
         .map(c=>`<div style="font-size:0.8rem">${c[2]}希望：${c[0]} ${c[1]}〜</div>`).join('');
+      const contactBadge=r.hasLine
+        ?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">💬 LINEで連絡可能</span>'
+        :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">📞 電話'+(r.email?'かメールで連絡':'で連絡')+'</span>';
       return `<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div><b style="font-size:0.9rem">${r.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${r.menu||''}</span></div>
@@ -3048,6 +3051,7 @@ async function loadWebRequests(){
         </div>
         ${cands}
         <div style="font-size:0.72rem;color:#64748b;margin-top:4px">📞 ${r.tel}${r.email?' / ✉️ '+r.email:''}</div>
+        <div style="margin-top:4px">${contactBadge}</div>
         ${r.symptom?'<div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 '+r.symptom+'</div>':''}
         <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${r.createdAt}</div>
         ${r.status==='未対応'?`<button class="btn be bsm" onclick="markWebRequestDone(${r.rowIdx})" style="margin-top:6px;background:#16a34a;color:white;border-color:#16a34a">✅ 対応済みにする</button>`:''}

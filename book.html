@@ -225,15 +225,19 @@ function renderWeek(){
   }).join('')+'</tr>';
 
   let rows='';
-  SLOTS.forEach(s=>{
+  SLOTS.forEach((s,idx)=>{
+    // 午前の最後(12:10)の後に、見分けやすいよう「休憩」の区切り行を1本入れる
+    if(idx>0 && SLOTS[idx-1]<'13:00' && s>='13:00'){
+      rows+=`<tr><td colspan="${days.length+1}" style="background:#fdf3e7;color:#c98a4b;font-size:0.7rem;font-weight:bold;text-align:center;padding:4px 0">🍵 お昼休憩（この時間帯は施術をお休みしております）</td></tr>`;
+    }
     rows+=`<tr><td class="timecol">${s}</td>`;
     days.forEach(d=>{
       const dateStr=toISO(d);
       const info=weekData[dateStr];
       const avail=info && !info.closed && info.available && info.available.includes(s);
-      const idx=cand.findIndex(c=>c.date===dateStr&&c.time===s);
-      let cls='wk-cell'+(avail?'':' na')+(idx>-1?' sel'+(idx+1):'');
-      const mark=idx>-1?(idx+1):(avail?'◯':'−');
+      const idx2=cand.findIndex(c=>c.date===dateStr&&c.time===s);
+      let cls='wk-cell'+(avail?'':' na')+(idx2>-1?' sel'+(idx2+1):'');
+      const mark=idx2>-1?(idx2+1):(avail?'◯':'−');
       rows+=`<td class="${cls}" ${avail?`onclick="toggleCand('${dateStr}','${s}')"`:''}>${mark}</td>`;
     });
     rows+='</tr>';

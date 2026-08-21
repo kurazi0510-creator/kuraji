@@ -927,7 +927,8 @@ function getDayConfig_(dateStr){
     var od=o.getDataRange().getValues();
     for(var i=1;i<od.length;i++){
       if(String(od[i][0])===dateStr){
-        return {closed:od[i][1]===true||od[i][1]==="TRUE", am:od[i][1]?null:[toHHMM_(od[i][2]),toHHMM_(od[i][3])], pm:od[i][1]?null:[toHHMM_(od[i][4]),toHHMM_(od[i][5])]};
+        var ovClosed=od[i][1]===true||String(od[i][1]).toUpperCase()==="TRUE";
+        return {closed:ovClosed, am:ovClosed?null:[toHHMM_(od[i][2]),toHHMM_(od[i][3])], pm:ovClosed?null:[toHHMM_(od[i][4]),toHHMM_(od[i][5])]};
       }
     }
   }
@@ -939,7 +940,7 @@ function getDayConfig_(dateStr){
     var wd=w.getDataRange().getValues();
     for(var j=1;j<wd.length;j++){
       if(Number(wd[j][0])===dow){
-        var closed=wd[j][1]===true||wd[j][1]==="TRUE";
+        var closed=wd[j][1]===true||String(wd[j][1]).toUpperCase()==="TRUE";
         return {closed:closed, am:closed?null:[toHHMM_(wd[j][2]),toHHMM_(wd[j][3])], pm:closed?null:[toHHMM_(wd[j][4]),toHHMM_(wd[j][5])]};
       }
     }
@@ -1167,10 +1168,13 @@ function getWebBookingRequests(){
   var list=[];
   for(var i=1;i<data.length;i++){
     var r=data[i];
+    var tel=String(r[7]||"");
+    var hasLine=!!findLineUidByPhone_(tel); // 電話番号でLINE連携が見つかるか確認（連絡手段の目安に使う）
     list.push({
       rowIdx:i+1, date1:String(r[0]||""), time1:String(r[1]||""), date2:String(r[2]||""), time2:String(r[3]||""),
-      date3:String(r[4]||""), time3:String(r[5]||""), name:String(r[6]||""), tel:String(r[7]||""), email:String(r[8]||""),
-      menu:String(r[9]||""), symptom:String(r[10]||""), status:String(r[11]||"未対応"), createdAt:String(r[12]||"")
+      date3:String(r[4]||""), time3:String(r[5]||""), name:String(r[6]||""), tel:tel, email:String(r[8]||""),
+      menu:String(r[9]||""), symptom:String(r[10]||""), status:String(r[11]||"未対応"), createdAt:String(r[12]||""),
+      hasLine:hasLine
     });
   }
   list.sort(function(a,b){return a.createdAt<b.createdAt?1:-1;});
