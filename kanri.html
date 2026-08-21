@@ -249,6 +249,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
       <button class="btn bp bsm" onclick="openWebRequests()" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b">📩 Web予約リクエスト一覧(未対応の確認・確定)</button>
+      <button class="btn bp bsm" onclick="openBlockSlots()" style="margin-top:16px;background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
       <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
       <button class="btn bp bsm" onclick="openReminderLog()" style="margin-top:16px;background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
@@ -1039,6 +1040,19 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="loadWebRequests()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
     </div>
     <div id="webReqContent" style="max-height:60vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Web予約枠 手動ブロック管理モーダル -->
+<div class="modal-ov" id="blockSlotsModal">
+  <div class="modal" style="max-width:560px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem">🚫 Web予約枠を手動で潰す/戻す</h3>
+      <button onclick="document.getElementById('blockSlotsModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:0.75rem;color:#64748b;margin-bottom:8px">タップした時間は、Web予約フォーム上で「予約不可」として表示されます(実際の予約表には影響しません)。</p>
+    <input type="date" id="bs-date" class="inp" style="margin-bottom:10px" onchange="loadBlockSlotsForDate()">
+    <div id="bs-content" style="max-height:50vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -2935,6 +2949,60 @@ async function renderBdayLog(){
       </div>`;
     }).join('');
   }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+
+// ===== Web予約枠 手動ブロック管理 =====
+const BS_SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10',
+  '15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+function openBlockSlots(){
+  document.getElementById('blockSlotsModal').classList.add('on');
+  const dEl=document.getElementById('bs-date');
+  if(!dEl.value){
+    const t=new Date(); t.setDate(t.getDate()+1);
+    dEl.value=t.toISOString().slice(0,10);
+  }
+  loadBlockSlotsForDate();
+}
+let bsBlockedSet=new Set();
+async function loadBlockSlotsForDate(){
+  const date=document.getElementById('bs-date').value;
+  const el=document.getElementById('bs-content');
+  if(!date){ el.innerHTML=''; return; }
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getBlockedSlotsForDate&date='+date+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    bsBlockedSet=new Set(d.blocked||[]);
+    renderBlockSlots(date);
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+function renderBlockSlots(date){
+  const el=document.getElementById('bs-content');
+  const am=BS_SLOTS.filter(s=>s<'13:00'), pm=BS_SLOTS.filter(s=>s>='13:00');
+  const cell=s=>{
+    const blocked=bsBlockedSet.has(s);
+    return `<div onclick="toggleBlockSlot('${date}','${s}')" style="padding:8px 2px;text-align:center;border:1.6px solid ${blocked?'#dc2626':'#e2e8f0'};border-radius:8px;font-size:0.78rem;cursor:pointer;background:${blocked?'#fee2e2':'#f8fafc'};color:${blocked?'#b91c1c':'#334155'};font-weight:${blocked?'bold':'normal'}">${s}${blocked?'<br>🚫':''}</div>`;
+  };
+  el.innerHTML=`
+    <div style="font-size:0.72rem;color:#a08a6d;font-weight:bold;margin:6px 0 4px">午前</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${am.map(cell).join('')}</div>
+    <div style="font-size:0.72rem;color:#a08a6d;font-weight:bold;margin:10px 0 4px">午後</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${pm.map(cell).join('')}</div>
+  `;
+}
+async function toggleBlockSlot(date,time){
+  const willBlock=!bsBlockedSet.has(time);
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'toggleBlockedSlot',date,time,block:willBlock})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 更新に失敗しました'); return; }
+    if(willBlock) bsBlockedSet.add(time); else bsBlockedSet.delete(time);
+    renderBlockSlots(date);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 
 // ===== Web予約リクエスト一覧 =====

@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -70,6 +70,7 @@ function doPost(e){
       else if(action==="saveWebBookingRequest")result=saveWebBookingRequest(body.data);
       else if(action==="getWebBookingRequests")result=getWebBookingRequests();
       else if(action==="updateWebBookingRequestStatus")result=updateWebBookingRequestStatus(body.rowIdx,body.status);
+      else if(action==="toggleBlockedSlot")result=toggleBlockedSlot(body.date,body.time,body.block);
       else if(action==="getMenuMaster")result=getMenuMaster();
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -973,9 +974,87 @@ function getAvailableSlots(dateStr){
         }
       }
     }
-    var available=validSlots.filter(function(t){return !occupied[t];});
+    // 院長が手動でブロックした枠も予約不可として扱う
+    var blocked=getBlockedSlotsSet_(dateStr);
+    var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t];});
     return {ok:true, closed:false, available:available};
   }catch(err){ return {ok:false, error:err.message}; }
+}
+// 指定日にブロック（手動で潰した）されている時間のセットを返す
+function getBlockedSlotsSet_(dateStr){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var bs=ss.getSheetByName("blocked_slots");
+  var blocked={};
+  if(bs){
+    var bd=bs.getDataRange().getValues();
+    for(var j=1;j<bd.length;j++){
+      if(String(bd[j][0])===String(dateStr)) blocked[String(bd[j][1])]=true;
+    }
+  }
+  return blocked;
+}
+// 週表示など複数日分まとめて空き状況を取得する（Web予約フォームの週間カレンダー用）
+function getAvailableSlotsRange(startDateStr,numDays){
+  try{
+    if(!startDateStr) return {ok:false, error:"開始日を指定してください"};
+    numDays=parseInt(numDays)||7;
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var bs=ss.getSheetByName("予約表");
+    var allBooked={}; // date -> {time:true}
+    if(bs){
+      var rows=bs.getDataRange().getValues();
+      for(var i=1;i<rows.length;i++){
+        if(String(rows[i][3]||"").trim()===""){continue;}
+        var dd=String(rows[i][0]);
+        if(!allBooked[dd])allBooked[dd]={};
+        allBooked[dd][String(rows[i][1])]=true;
+      }
+    }
+    var result={};
+    var d0=new Date(startDateStr+"T00:00:00");
+    for(var k=0;k<numDays;k++){
+      var d=new Date(d0); d.setDate(d0.getDate()+k);
+      var dateStr=Utilities.formatDate(d,"Asia/Tokyo","yyyy-MM-dd");
+      var cfg=getDayConfig_(dateStr);
+      if(cfg.closed){ result[dateStr]={closed:true, available:[]}; continue; }
+      var validSlots=getSlotsForDate_(dateStr);
+      var occupied=allBooked[dateStr]||{};
+      var blocked=getBlockedSlotsSet_(dateStr);
+      var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t];});
+      result[dateStr]={closed:false, available:available};
+    }
+    return {ok:true, days:result};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+// 院長が手動で予約枠を潰す／解除する（kanri.htmlから使用）
+function toggleBlockedSlot(dateStr,timeStr,block){
+  try{
+    if(!dateStr||!timeStr) return {ok:false, error:"日付・時間を指定してください"};
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var bs=ss.getSheetByName("blocked_slots");
+    if(!bs){ bs=ss.insertSheet("blocked_slots"); bs.getRange(1,1,1,3).setValues([["date","time","note"]]); }
+    var data=bs.getDataRange().getValues();
+    var foundRow=-1;
+    for(var i=1;i<data.length;i++){
+      if(String(data[i][0])===String(dateStr) && String(data[i][1])===String(timeStr)){ foundRow=i+1; break; }
+    }
+    if(block){
+      if(foundRow<0){
+        var newIdx=bs.getLastRow()+1;
+        var rng=bs.getRange(newIdx,1,1,3);
+        rng.setNumberFormat("@");
+        rng.setValues([[dateStr,timeStr,"院長が手動でブロック"]]);
+      }
+    }else{
+      if(foundRow>0) bs.deleteRow(foundRow);
+    }
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+// 指定日にブロックされている時間の一覧を返す（kanri.html管理画面用）
+function getBlockedSlotsForDate(dateStr){
+  var set=getBlockedSlotsSet_(dateStr);
+  return {ok:true, blocked:Object.keys(set)};
 }
 // ═══════════════════════════════════════
 // ★Web予約リクエスト方式（第一〜第三希望を受け付け、その場では確定しない）★
