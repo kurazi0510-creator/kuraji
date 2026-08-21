@@ -1088,7 +1088,7 @@ function saveWebBookingRequest(data){
     var s=ss.getSheetByName("web_yoyaku_requests");
     if(!s){
       s=ss.insertSheet("web_yoyaku_requests");
-      s.getRange(1,1,1,13).setValues([["date1","time1","date2","time2","date3","time3","name","tel","email","menu","symptom","status","createdAt"]]);
+      s.getRange(1,1,1,15).setValues([["date1","time1","date2","time2","date3","time3","name","tel","email","menu","symptom","status","createdAt","kana","cardId"]]);
     }
     if(!data.name || !data.tel) return {ok:false, error:"お名前・お電話番号は必須です"};
     if(!data.date1 || !data.time1) return {ok:false, error:"第一希望日時を選んでください"};
@@ -1101,7 +1101,8 @@ function saveWebBookingRequest(data){
     var newRow=[
       data.date1||"", data.time1||"", data.date2||"", data.time2||"", data.date3||"", data.time3||"",
       data.name||"", data.tel||"", data.email||"", data.menu||"", data.symptom||"",
-      "未対応", Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss")
+      "未対応", Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss"),
+      data.kana||"", data.cardId||""
     ];
     var newRowIdx=s.getLastRow()+1;
     var rng=s.getRange(newRowIdx,1,1,newRow.length);
@@ -1115,9 +1116,10 @@ function saveWebBookingRequest(data){
     if(token&&ownerId){
       sendLineMessagingAPI(token,ownerId,
         "[倉治整骨院] 🗒 Web予約リクエストが届きました"+nl+nl+
-        "お名前："+(data.name||"")+" 様"+nl+
+        "お名前："+(data.name||"")+" 様"+(data.kana?"（"+data.kana+"）":"")+nl+
         "電話："+(data.tel||"")+nl+
-        "メニュー："+(data.menu||"")+nl+nl+
+        "メニュー："+(data.menu||"")+nl+
+        (data.cardId?"診察券No："+data.cardId+nl:"")+nl+
         "第一希望："+fmtCand(data.date1,data.time1)+nl+
         "第二希望："+fmtCand(data.date2,data.time2)+nl+
         "第三希望："+fmtCand(data.date3,data.time3)+nl+nl+
@@ -1174,7 +1176,7 @@ function getWebBookingRequests(){
       rowIdx:i+1, date1:String(r[0]||""), time1:String(r[1]||""), date2:String(r[2]||""), time2:String(r[3]||""),
       date3:String(r[4]||""), time3:String(r[5]||""), name:String(r[6]||""), tel:tel, email:String(r[8]||""),
       menu:String(r[9]||""), symptom:String(r[10]||""), status:String(r[11]||"未対応"), createdAt:String(r[12]||""),
-      hasLine:hasLine
+      hasLine:hasLine, kana:String(r[13]||""), cardId:String(r[14]||"")
     });
   }
   list.sort(function(a,b){return a.createdAt<b.createdAt?1:-1;});

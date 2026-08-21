@@ -115,6 +115,10 @@ textarea{resize:none;height:64px;}
     <h2><span class="step-num">3</span>お客様情報</h2>
     <label>お名前<span class="req">必須</span></label>
     <input type="text" id="f-name" placeholder="山田 太郎">
+    <label id="f-kana-label" style="display:none">ふりがな<span class="req">必須</span><span class="note" style="display:inline;margin:0 0 0 4px">（初めての方は診察券を事前に準備いたします）</span></label>
+    <input type="text" id="f-kana" placeholder="やまだ たろう" style="display:none">
+    <label id="f-cardid-label" style="display:none">診察券番号<span class="note" style="display:inline;margin:0 0 0 4px">（お分かりの方のみで結構です）</span></label>
+    <input type="text" id="f-cardid" placeholder="例：1234" inputmode="numeric" style="display:none">
     <label>お電話番号<span class="req">必須</span></label>
     <input type="tel" id="f-tel" placeholder="09012345678" inputmode="numeric">
     <label>メールアドレス（お持ちの方は入力ください・LINEをお使いでない方はこちらに確認メールが届きます）</label>
@@ -183,6 +187,14 @@ function pickMenu(i){
   MENUS.forEach((m,j)=>document.getElementById('mi-'+j).classList.toggle('on',j===i));
   document.getElementById('calCard').style.display='block';
   document.getElementById('infoCard').style.display='block';
+  const isFirst=selMenu.label.includes('初診');
+  const isRepeat=selMenu.label.includes('再診');
+  document.getElementById('f-kana-label').style.display=isFirst?'block':'none';
+  document.getElementById('f-kana').style.display=isFirst?'block':'none';
+  document.getElementById('f-cardid-label').style.display=isRepeat?'block':'none';
+  document.getElementById('f-cardid').style.display=isRepeat?'block':'none';
+  if(!isFirst) document.getElementById('f-kana').value='';
+  if(!isRepeat) document.getElementById('f-cardid').value='';
   checkReady();
 }
 
@@ -273,7 +285,9 @@ document.addEventListener('input',checkReady);
 function checkReady(){
   const name=document.getElementById('f-name')?.value.trim();
   const tel=document.getElementById('f-tel')?.value.replace(/[^0-9]/g,'');
-  const ok=selMenu && cand.length>=1 && name && tel && tel.length>=10;
+  const isFirst=selMenu&&selMenu.label.includes('初診');
+  const kana=document.getElementById('f-kana')?.value.trim();
+  const ok=selMenu && cand.length>=1 && name && tel && tel.length>=10 && (!isFirst || kana);
   const btn=document.getElementById('submitBtn');
   if(btn) btn.disabled=!ok;
 }
@@ -281,6 +295,8 @@ function checkReady(){
 async function submitRequest(){
   const btn=document.getElementById('submitBtn');
   const name=document.getElementById('f-name').value.trim();
+  const kana=document.getElementById('f-kana').value.trim();
+  const cardId=document.getElementById('f-cardid').value.trim();
   const tel=document.getElementById('f-tel').value.replace(/[^0-9\-]/g,'');
   const email=document.getElementById('f-email').value.trim();
   const sym=document.getElementById('f-sym').value.trim();
@@ -295,7 +311,7 @@ async function submitRequest(){
         date1:cand[0]?.date||'', time1:cand[0]?.time||'',
         date2:cand[1]?.date||'', time2:cand[1]?.time||'',
         date3:cand[2]?.date||'', time3:cand[2]?.time||'',
-        name,tel,email,symptom:sym,menu:selMenu.label
+        name,kana,cardId,tel,email,symptom:sym,menu:selMenu.label
       }})
     });
     const d=await res.json();

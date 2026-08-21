@@ -3115,7 +3115,7 @@ async function loadWebRequests(){
           :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">📞 お電話で連絡</span>');
       return `<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div><b style="font-size:0.9rem">${r.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${r.menu||''}</span></div>
+          <div><b style="font-size:0.9rem">${r.name}</b>${r.kana?'<span style="color:#94a3b8;font-size:0.7rem;margin-left:4px">（'+r.kana+'）</span>':''}<span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${r.menu||''}</span>${r.cardId?'<span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">診察券No:'+r.cardId+'</span>':''}</div>
           ${badge}
         </div>
         ${cands}
