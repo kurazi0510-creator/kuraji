@@ -1054,6 +1054,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button onclick="document.getElementById('mondoListModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn bp bsm" id="mondo-tab-normal" onclick="switchMondoTab('normal')" style="background:#b45309;color:white;border-color:#b45309">📋 通常問診票</button>
+      <button class="btn bp bsm" id="mondo-tab-kotsu" onclick="switchMondoTab('kotsu')" style="background:#e5d5c5;color:#7c4a2d;border-color:#e5d5c5">🚗 交通事故問診票</button>
       <button class="btn bp bsm" onclick="loadMondoList()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
     </div>
     <div id="mondoListContent" style="max-height:60vh;overflow-y:auto"></div>
@@ -3103,25 +3105,38 @@ checkNewWebRequests();
 setInterval(checkNewWebRequests, 600000); // 10分ごとに自動チェック
 
 // ===== Web問診票一覧 =====
+let mondoCurrentTab='normal';
 function openMondoList(){
   document.getElementById('mondoListModal').classList.add('on');
+  switchMondoTab('normal');
+}
+function switchMondoTab(tab){
+  mondoCurrentTab=tab;
+  const normalBtn=document.getElementById('mondo-tab-normal'), kotsuBtn=document.getElementById('mondo-tab-kotsu');
+  normalBtn.style.background=tab==='normal'?'#b45309':'#e5d5c5';
+  normalBtn.style.color=tab==='normal'?'white':'#7c4a2d';
+  kotsuBtn.style.background=tab==='kotsu'?'#b45309':'#e5d5c5';
+  kotsuBtn.style.color=tab==='kotsu'?'white':'#7c4a2d';
   loadMondoList();
 }
 async function loadMondoList(){
   const el=document.getElementById('mondoListContent');
   el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  const isKotsu=mondoCurrentTab==='kotsu';
+  const action=isKotsu?'getMondoshinKotsuList':'getMondoshinList';
+  const printPage=isKotsu?'mondo_kotsu_print.html':'mondo_print.html';
   try{
-    const res=await fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'});
+    const res=await fetch(GAS+'?action='+action+'&t='+Date.now(),{cache:'no-store'});
     const d=await res.json();
     const list=d.list||[];
     if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">問診票の提出はまだありません</p>'; return; }
     el.innerHTML=list.map(q=>`<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><b style="font-size:0.9rem">${q.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:6px">（${q.kana}）</span></div>
-        <button class="btn be bsm" onclick="window.open('mondo_print.html?id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
+        <button class="btn be bsm" onclick="window.open('${printPage}?id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
       </div>
       <div style="font-size:0.72rem;color:#64748b;margin-top:4px">📞 ${q.tel}</div>
-      <div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 ${q.symptom.split('|').join('、')||'（症状未記入）'}</div>
+      <div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 ${(isKotsu?q.symptomDetail:q.symptom.split('|').join('、'))||'（未記入）'}</div>
       <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${q.createdAt}</div>
     </div>`).join('');
   }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }

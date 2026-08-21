@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>交通事故問診票印刷 - 倉治整骨院</title>
+<style>
+@page{ size:A4; margin:8mm; }
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}
+body{background:#e5e5e5;color:#222;}
+.toolbar{position:sticky;top:0;background:#1e293b;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:10;}
+.toolbar button{padding:9px 18px;border:none;border-radius:8px;background:#c9634b;color:#fff;font-weight:bold;font-size:.85rem;cursor:pointer;}
+.toolbar span{color:#cbd5e1;font-size:.8rem;}
+.sheet{background:#fff;width:210mm;min-height:297mm;margin:16px auto;padding:10mm;box-shadow:0 2px 10px rgba(0,0,0,.15);}
+.title{text-align:center;font-size:18px;font-weight:bold;letter-spacing:6px;margin-bottom:3px;}
+.clinic{text-align:right;font-size:11px;font-weight:bold;}
+.datestamp{text-align:right;font-size:9px;color:#555;margin-bottom:6px;}
+table.info{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px;}
+table.info th,table.info td{border:1px solid #333;padding:4px 7px;text-align:left;}
+table.info th{background:#f5e5df;width:16%;white-space:nowrap;}
+.sec{background:#f5e5df;color:#8a3d24;font-weight:bold;font-size:11.5px;padding:3px 6px;margin:8px 0 4px;}
+.a{font-size:11px;margin-bottom:2px;padding-left:2px;line-height:1.55;}
+.hl{background:#fde3d5;padding:0 2px;}
+.smallnote{font-size:8.5px;color:#666;margin-top:6px;}
+@media print{
+  body{background:#fff;}
+  .toolbar{display:none;}
+  .sheet{box-shadow:none;margin:0;width:auto;min-height:auto;padding:0;}
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="window.print()">🖨 このページを印刷（A4）</button>
+  <span id="loadingMsg">読み込み中...</span>
+</div>
+<div class="sheet" id="sheet"></div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+const params=new URLSearchParams(location.search);
+const rowIdx=params.get('id');
+
+function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const OPTS={
+  accType:['車同士','バイクと車','自転車と車','歩行中に車と接触','その他'],
+  role:['運転者','同乗者','歩行者','自転車'],
+  otherParty:['あり','なし（自損事故）'],
+  police:['届出済み（人身）','届出済み（物損）','まだ','その他'],
+  bengoshi:['あり','なし','わからない'],
+  injury:['首（むち打ち）','肩','背中','腰','肘','手首','手指','股関節','膝','足首','足指','頭部','その他'],
+  onset:['事故直後から','数日後から','その他'],
+  otherHosp:['通院あり','通院なし'],
+  image:['あり','なし','これから受ける予定'],
+  freq:['毎日','週2〜3回','週1回','症状に応じて','わからない'],
+  work:['休業中','通常勤務','時短勤務','その他'],
+};
+function mark(list,key){
+  const sel=(list||'').split('|').filter(Boolean);
+  const opts=OPTS[key]||[];
+  return opts.map(o=>sel.includes(o)?`<span class="hl">〇${esc(o)}</span>`:esc(o)).join('　');
+}
+
+async function load(){
+  if(!rowIdx){ document.getElementById('loadingMsg').textContent='IDが指定されていません'; return; }
+  try{
+    const res=await fetch(GAS+'?action=getMondoshinKotsuById&rowIdx='+rowIdx+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ document.getElementById('loadingMsg').textContent='取得に失敗しました：'+(d.error||''); return; }
+    render(d.data);
+    document.getElementById('loadingMsg').textContent='読み込み完了';
+  }catch(e){ document.getElementById('loadingMsg').textContent='通信エラー：'+e.message; }
+}
+
+function render(q){
+  const dobDisp=q.dob?q.dob.replace(/-/g,'/'):'（未入力）';
+  const accDateDisp=q.accDate?q.accDate.replace(/-/g,'/'):'（未入力）';
+  document.getElementById('sheet').innerHTML=`
+    <div class="title">交通事故　問診票</div>
+    <div class="clinic">倉治整骨院</div>
+    <div class="datestamp">Web問診票受信：${esc(q.createdAt)}</div>
+
+    <table class="info">
+      <tr><th>ふりがな</th><td>${esc(q.kana)}</td><th>生年月日</th><td>${dobDisp}</td></tr>
+      <tr><th>氏名</th><td>${esc(q.name)}</td><th>携帯番号</th><td>${esc(q.tel)}</td></tr>
+    </table>
+
+    <div class="sec">■ 事故の状況</div>
+    <div class="a">事故日：<span class="hl">${accDateDisp}</span>　時刻：${esc(q.accTime)||'（未入力）'}</div>
+    <div class="a">事故場所：${esc(q.accPlace)||'（未入力）'}</div>
+    <div class="a">事故の種類：${mark(q.accType,'accType')}</div>
+    <div class="a">あなたの立場：${mark(q.role,'role')}</div>
+    <div class="a">相手の有無：${mark(q.otherParty,'otherParty')}</div>
+    <div class="a">警察への届出：${mark(q.police,'police')}</div>
+
+    <div class="sec">■ 相手方・保険について</div>
+    <div class="a">相手方保険会社：${esc(q.otherIns)||'（未入力）'}</div>
+    <div class="a">ご自身の保険会社：${esc(q.myIns)||'（未入力）'}</div>
+    <div class="a">弁護士特約：${mark(q.bengoshi,'bengoshi')}</div>
+
+    <div class="sec">■ 症状について</div>
+    <div class="a">受傷部位：${mark(q.injury,'injury')}</div>
+    <div class="a">症状の詳細：${esc(q.symptomDetail)||'（未入力）'}</div>
+    <div class="a">症状が出始めたタイミング：${mark(q.onset,'onset')}</div>
+    <div class="a">他院への通院：${mark(q.otherHosp,'otherHosp')}　${q.otherHospName?'（'+esc(q.otherHospName)+'）':''}</div>
+    <div class="a">画像検査：${mark(q.image,'image')}</div>
+
+    <div class="sec">■ 今後について</div>
+    <div class="a">通院の目安：${mark(q.freq,'freq')}</div>
+    <div class="a">お仕事への影響：${mark(q.work,'work')}</div>
+
+    <p class="smallnote">※本用紙は患者様がWeb問診票にご入力いただいた内容を院内で印刷したものです。個人情報の取り扱いについては、事前にWeb画面上でご同意をいただいております。</p>
+  `;
+}
+load();
+</script>
+</body>
+</html>

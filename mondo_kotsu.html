@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>交通事故問診票 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}
+body{background:#faf1ee;color:#3d2626;min-height:100vh;padding-bottom:40px;}
+.header{background:linear-gradient(135deg,#c9634b,#e08a6a);color:#fff;padding:20px 16px;text-align:center;}
+.header h1{font-size:1.05rem;font-weight:bold;margin-bottom:4px;}
+.header p{font-size:.72rem;opacity:.95;}
+.wrap{max-width:560px;margin:0 auto;padding:14px;}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(120,60,50,.08);}
+.card h2{font-size:.86rem;color:#c9634b;font-weight:bold;margin-bottom:10px;border-left:4px solid #c9634b;padding-left:8px;}
+label{display:block;font-size:.76rem;color:#8a6560;font-weight:bold;margin:12px 0 4px;}
+label:first-of-type{margin-top:0;}
+.req{color:#d9534f;font-size:.68rem;margin-left:4px;}
+input[type=text],input[type=date],input[type=time],textarea,select{width:100%;border:1.6px solid #ecdcd0;border-radius:9px;padding:10px 12px;font-size:.88rem;background:#fffdfb;color:#3d2626;}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#c9634b;}
+textarea{resize:none;height:56px;}
+.radio-grp,.check-grp{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+.chip{border:1.6px solid #ecdcd0;border-radius:20px;padding:7px 14px;font-size:.78rem;color:#3d2626;background:#fffdfb;cursor:pointer;user-select:none;}
+.chip.on{background:#c9634b;color:#fff;border-color:#c9634b;font-weight:bold;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:11px;font-size:.95rem;font-weight:bold;cursor:pointer;margin-top:6px;background:#c9634b;color:#fff;}
+.btn:disabled{background:#e5cdc8;color:#b39a94;}
+.err{background:#fdecec;color:#b3382c;border-radius:9px;padding:10px 12px;font-size:.8rem;margin-top:10px;display:none;}
+.done{text-align:center;padding:30px 14px;}
+.done .ok{font-size:2.4rem;margin-bottom:10px;}
+.done h2{font-size:1.05rem;margin-bottom:10px;}
+.done p{font-size:.85rem;color:#6b4c47;line-height:1.9;}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+@keyframes sp{to{transform:rotate(360deg)}}
+.consent-box{background:#fdf1ea;border:1.5px solid #f0c9b0;border-radius:10px;padding:12px;font-size:.72rem;color:#7a4629;line-height:1.7;margin-top:8px;}
+.consent-chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.82rem;color:#3d2626;font-weight:bold;}
+.consent-chk input{width:18px;height:18px;}
+.note-mini{font-size:.7rem;color:#a08070;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🚗 交通事故 問診票</h1>
+  <p>ご来院前にご記入いただくと、受付・相談がスムーズです</p>
+</div>
+<div class="wrap" id="formWrap">
+
+  <div class="card">
+    <h2>基本情報</h2>
+    <label>ふりがな<span class="req">必須</span></label>
+    <input type="text" id="q-kana" placeholder="やまだ たろう">
+    <label>お名前<span class="req">必須</span></label>
+    <input type="text" id="q-name" placeholder="山田 太郎">
+    <label>生年月日（西暦）</label>
+    <input type="date" id="q-dob">
+    <label>携帯電話番号<span class="req">必須</span></label>
+    <input type="text" id="q-tel" placeholder="09012345678" inputmode="numeric">
+  </div>
+
+  <div class="card">
+    <h2>事故の状況</h2>
+    <label>事故日<span class="req">必須</span></label>
+    <input type="date" id="q-accdate">
+    <label>事故のおおよその時刻</label>
+    <input type="time" id="q-acctime">
+    <label>事故場所</label>
+    <input type="text" id="q-accplace" placeholder="例：交野市倉治付近の交差点">
+    <label>事故の種類</label>
+    <div class="radio-grp" id="q-acctype"></div>
+    <label>あなたの立場</label>
+    <div class="radio-grp" id="q-role"></div>
+    <label>相手の有無</label>
+    <div class="radio-grp" id="q-otherparty"></div>
+    <label>警察への届出</label>
+    <div class="radio-grp" id="q-police"></div>
+  </div>
+
+  <div class="card">
+    <h2>相手方・保険について（分かる範囲で結構です）</h2>
+    <label>相手方保険会社名</label>
+    <input type="text" id="q-other-ins" placeholder="任意">
+    <label>ご自身の保険会社名</label>
+    <input type="text" id="q-my-ins" placeholder="任意">
+    <label>弁護士特約</label>
+    <div class="radio-grp" id="q-bengoshi"></div>
+    <div class="note-mini">弁護士特約について不明な場合は、受付でご相談ください。</div>
+  </div>
+
+  <div class="card">
+    <h2>症状について</h2>
+    <label>受傷部位（複数選択可）</label>
+    <div class="check-grp" id="q-injury"></div>
+    <label>症状の詳細</label>
+    <textarea id="q-symptom-detail" placeholder="例：首を動かすと痛い、腰が重だるい　など"></textarea>
+    <label>症状が出始めたタイミング</label>
+    <div class="radio-grp" id="q-onset"></div>
+    <label>他院（整形外科など）への通院</label>
+    <div class="radio-grp" id="q-otherhosp"></div>
+    <input type="text" id="q-otherhosp-name" placeholder="病院名（通院中の方）" style="margin-top:6px">
+    <label>画像検査（レントゲン・MRIなど）</label>
+    <div class="radio-grp" id="q-image"></div>
+  </div>
+
+  <div class="card">
+    <h2>今後について</h2>
+    <label>通院の目安（ご希望）</label>
+    <div class="radio-grp" id="q-freq"></div>
+    <label>お仕事への影響</label>
+    <div class="radio-grp" id="q-work"></div>
+  </div>
+
+  <div class="card">
+    <h2>個人情報の取り扱いについて</h2>
+    <div class="consent-box">
+      ご記入いただいた個人情報は、施術・ご連絡・院内での適切な管理の目的以外には使用いたしません。上記内容をご確認の上、同意して送信してください。
+    </div>
+    <label class="consent-chk"><input type="checkbox" id="q-consent"> 上記内容に同意します</label>
+    <div class="err" id="errBox"></div>
+    <button class="btn" id="submitBtn" onclick="submitMondo()" disabled>送信する</button>
+  </div>
+</div>
+
+<div class="wrap" id="doneWrap" style="display:none">
+  <div class="card done">
+    <div class="ok">✅</div>
+    <h2>問診票を受け付けました</h2>
+    <p>ご記入ありがとうございました。<br>ご来院当日、受付にてお名前をお伝えください。<br>弁護士特約など詳しいご相談も承っております。</p>
+  </div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+
+function buildChips(id,options,multi){
+  const el=document.getElementById(id);
+  el.dataset.multi=multi?'1':'0';
+  el.dataset.selected='';
+  el.innerHTML=options.map(o=>`<div class="chip" data-val="${o}" onclick="toggleChip('${id}','${o}',${!!multi})">${o}</div>`).join('');
+}
+function toggleChip(id,val,multi){
+  const el=document.getElementById(id);
+  let sel=el.dataset.selected?el.dataset.selected.split('|'):[];
+  if(multi){
+    if(sel.includes(val)) sel=sel.filter(v=>v!==val); else sel.push(val);
+  }else{
+    sel=sel.includes(val)?[]:[val];
+  }
+  el.dataset.selected=sel.join('|');
+  [...el.children].forEach(c=>c.classList.toggle('on',sel.includes(c.dataset.val)));
+  checkReady();
+}
+function chipVal(id){ return document.getElementById(id).dataset.selected||''; }
+
+buildChips('q-acctype',['車同士','バイクと車','自転車と車','歩行中に車と接触','その他']);
+buildChips('q-role',['運転者','同乗者','歩行者','自転車']);
+buildChips('q-otherparty',['あり','なし（自損事故）']);
+buildChips('q-police',['届出済み（人身）','届出済み（物損）','まだ','その他']);
+buildChips('q-bengoshi',['あり','なし','わからない']);
+buildChips('q-injury',['首（むち打ち）','肩','背中','腰','肘','手首','手指','股関節','膝','足首','足指','頭部','その他'],true);
+buildChips('q-onset',['事故直後から','数日後から','その他']);
+buildChips('q-otherhosp',['通院あり','通院なし']);
+buildChips('q-image',['あり','なし','これから受ける予定']);
+buildChips('q-freq',['毎日','週2〜3回','週1回','症状に応じて','わからない']);
+buildChips('q-work',['休業中','通常勤務','時短勤務','その他']);
+
+document.addEventListener('input',checkReady);
+function checkReady(){
+  const kana=document.getElementById('q-kana').value.trim();
+  const name=document.getElementById('q-name').value.trim();
+  const tel=document.getElementById('q-tel').value.replace(/[^0-9]/g,'');
+  const accdate=document.getElementById('q-accdate').value;
+  const consent=document.getElementById('q-consent').checked;
+  const ok=kana&&name&&tel&&tel.length>=10&&accdate&&consent;
+  document.getElementById('submitBtn').disabled=!ok;
+}
+document.getElementById('q-consent').addEventListener('change',checkReady);
+
+async function submitMondo(){
+  const btn=document.getElementById('submitBtn');
+  const errBox=document.getElementById('errBox');
+  errBox.style.display='none';
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>送信中...';
+  const data={
+    kana:document.getElementById('q-kana').value.trim(),
+    name:document.getElementById('q-name').value.trim(),
+    dob:document.getElementById('q-dob').value,
+    tel:document.getElementById('q-tel').value.replace(/[^0-9\-]/g,''),
+    accDate:document.getElementById('q-accdate').value,
+    accTime:document.getElementById('q-acctime').value,
+    accPlace:document.getElementById('q-accplace').value.trim(),
+    accType:chipVal('q-acctype'),
+    role:chipVal('q-role'),
+    otherParty:chipVal('q-otherparty'),
+    police:chipVal('q-police'),
+    otherIns:document.getElementById('q-other-ins').value.trim(),
+    myIns:document.getElementById('q-my-ins').value.trim(),
+    bengoshi:chipVal('q-bengoshi'),
+    injury:chipVal('q-injury'),
+    symptomDetail:document.getElementById('q-symptom-detail').value.trim(),
+    onset:chipVal('q-onset'),
+    otherHosp:chipVal('q-otherhosp'),
+    otherHospName:document.getElementById('q-otherhosp-name').value.trim(),
+    image:chipVal('q-image'),
+    freq:chipVal('q-freq'),
+    work:chipVal('q-work'),
+  };
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveMondoshinKotsu',data})
+    });
+    const d=await res.json();
+    if(!d.ok){
+      errBox.textContent='⚠️ '+(d.error||'送信に失敗しました。恐れ入りますが受付にて直接ご記入ください。');
+      errBox.style.display='block';
+      btn.disabled=false; btn.innerHTML='送信する';
+      return;
+    }
+    document.getElementById('formWrap').style.display='none';
+    document.getElementById('doneWrap').style.display='block';
+    window.scrollTo(0,0);
+  }catch(e){
+    errBox.textContent='⚠️ 通信エラーが発生しました。恐れ入りますが受付にて直接ご記入ください。';
+    errBox.style.display='block';
+    btn.disabled=false; btn.innerHTML='送信する';
+  }
+}
+</script>
+</body>
+</html>

@@ -141,6 +141,7 @@ textarea{resize:none;height:64px;}
       院長が内容を確認の上、改めてLINEまたはお電話にて確定のご連絡をいたします。今しばらくお待ちください。<br><br>
       お急ぎの場合や、返信が来ない・内容を変更したいなどございましたら、お手数ですがLINEまたはお電話（072-892-3223）でご連絡ください。
     </div>
+    <div id="mondoBox" style="display:none"></div>
     <div class="line-box">
       <b>📱 LINEのお友だち登録がまだの方は</b><br><br>
       LINEで倉治整骨院を友だち追加しておくと、確定のご連絡や前日リマインドをスムーズに受け取れます。
@@ -325,6 +326,24 @@ async function submitRequest(){
     const medals=['第一希望','第二希望','第三希望'];
     cand.forEach((c,i)=>{ summary+=`${medals[i]}：${c.date} ${c.time}〜\n`; });
     document.getElementById('doneSummary').textContent=summary;
+
+    // 初診の方には、メニューに応じた問診票（交通事故は専用版）へのご案内を表示する
+    const mondoBox=document.getElementById('mondoBox');
+    if(selMenu.label.includes('初診')){
+      const isKotsu=selMenu.label.includes('交通事故');
+      const url=isKotsu?'mondo_kotsu.html':'mondo.html';
+      const label=isKotsu?'交通事故問診票':'問診票';
+      mondoBox.style.display='block';
+      mondoBox.innerHTML=`
+        <div class="confirm-box" style="background:#eef6fb;border-color:#a8d3ea;color:#1e4f66">
+          <b>📋 初めてご来院の方へ</b><br><br>
+          お時間のある時に${label}へのご記入にご協力いただけますと、受付・施術がよりスムーズになります（必須ではありません）。<br><br>
+          <a href="${url}" target="_blank" style="display:block;margin-top:8px"><button class="btn" style="background:#1e6091;color:#fff">${label}を記入する</button></a>
+        </div>`;
+    }else{
+      mondoBox.style.display='none';
+    }
+
     document.getElementById('lineAddBtn').href=LINE_ADD_URL;
     document.getElementById('formWrap').style.display='none';
     document.getElementById('doneWrap').style.display='block';
