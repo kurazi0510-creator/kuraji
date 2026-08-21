@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -67,6 +67,9 @@ function doPost(e){
       else if(action==="saveLineSettings"){saveLineSettings();result={ok:true};}
       else if(action==="getLineUsers")result=getLineUsers();
       else if(action==="saveWebBooking")result=saveWebBooking(body.data);
+      else if(action==="saveWebBookingRequest")result=saveWebBookingRequest(body.data);
+      else if(action==="getWebBookingRequests")result=getWebBookingRequests();
+      else if(action==="updateWebBookingRequestStatus")result=updateWebBookingRequestStatus(body.rowIdx,body.status);
       else if(action==="getMenuMaster")result=getMenuMaster();
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -974,6 +977,116 @@ function getAvailableSlots(dateStr){
     return {ok:true, closed:false, available:available};
   }catch(err){ return {ok:false, error:err.message}; }
 }
+// ═══════════════════════════════════════
+// ★Web予約リクエスト方式（第一〜第三希望を受け付け、その場では確定しない）★
+// 個人経営で施術中に電話対応できないため、候補日時をいただいて後日院長が確認の上、確定連絡する運用。
+// ═══════════════════════════════════════
+function saveWebBookingRequest(data){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("web_yoyaku_requests");
+    if(!s){
+      s=ss.insertSheet("web_yoyaku_requests");
+      s.getRange(1,1,1,13).setValues([["date1","time1","date2","time2","date3","time3","name","tel","email","menu","symptom","status","createdAt"]]);
+    }
+    if(!data.name || !data.tel) return {ok:false, error:"お名前・お電話番号は必須です"};
+    if(!data.date1 || !data.time1) return {ok:false, error:"第一希望日時を選んでください"};
+
+    var todayStr=Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd");
+    if(data.date1===todayStr || data.date2===todayStr || data.date3===todayStr){
+      return {ok:false, error:"本日中のご希望はWebフォームでは受け付けておりません。お手数ですがLINEかお電話でご連絡ください。"};
+    }
+
+    var newRow=[
+      data.date1||"", data.time1||"", data.date2||"", data.time2||"", data.date3||"", data.time3||"",
+      data.name||"", data.tel||"", data.email||"", data.menu||"", data.symptom||"",
+      "未対応", Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss")
+    ];
+    var newRowIdx=s.getLastRow()+1;
+    var rng=s.getRange(newRowIdx,1,1,newRow.length);
+    rng.setNumberFormat("@");
+    rng.setValues([newRow]);
+
+    var p=PropertiesService.getScriptProperties();
+    var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+    var nl=String.fromCharCode(10);
+    function fmtCand(d,t){ return d&&t ? (d+" "+t) : "（未選択）"; }
+    if(token&&ownerId){
+      sendLineMessagingAPI(token,ownerId,
+        "[倉治整骨院] 🗒 Web予約リクエストが届きました"+nl+nl+
+        "お名前："+(data.name||"")+" 様"+nl+
+        "電話："+(data.tel||"")+nl+
+        "メニュー："+(data.menu||"")+nl+nl+
+        "第一希望："+fmtCand(data.date1,data.time1)+nl+
+        "第二希望："+fmtCand(data.date2,data.time2)+nl+
+        "第三希望："+fmtCand(data.date3,data.time3)+nl+nl+
+        "kanri.htmlの「Web予約リクエスト一覧」から確認し、確定のご連絡をお願いします。"
+      );
+    }
+    // 患者様ご本人には「リクエストを受け付けた」旨のみお知らせ（確定はまだ、と明記する）
+    if(token){
+      var tid="";
+      if(data.tel) tid=findLineUidByPhone_(data.tel);
+      if(tid){
+        sendLineMessagingAPI(token,tid,
+          "[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+
+          "ご予約リクエストを受け付けました。"+nl+
+          "第一希望："+fmtCand(data.date1,data.time1)+nl+
+          (data.date2?"第二希望："+fmtCand(data.date2,data.time2)+nl:"")+
+          (data.date3?"第三希望："+fmtCand(data.date3,data.time3)+nl:"")+nl+
+          "※まだご予約は確定しておりません。院長が確認の上、改めてこちらのLINEにてご連絡いたします。"+nl+nl+
+          "お急ぎの場合や、この予約システムがうまく動かない場合は、お手数ですがこのままLINEでメッセージいただくか、お電話（072-892-3223）でお問い合わせください。"+nl+nl+
+          "(自動送信のため返信不要です)"
+        );
+      }
+    }
+    if(data.email){
+      try{
+        MailApp.sendEmail({
+          to: data.email,
+          subject: "【倉治整骨院】ご予約リクエストを受け付けました",
+          body: (data.name||"")+" 様"+nl+nl+"ご予約リクエストありがとうございます。以下の内容で承りました。"+nl+nl+
+                "第一希望："+fmtCand(data.date1,data.time1)+nl+
+                (data.date2?"第二希望："+fmtCand(data.date2,data.time2)+nl:"")+
+                (data.date3?"第三希望："+fmtCand(data.date3,data.time3)+nl:"")+nl+
+                "※まだご予約は確定しておりません。院長確認の上、改めてご連絡いたします。"+nl+nl+
+                "お急ぎの場合はお電話（072-892-3223）にてご連絡ください。"+nl+nl+
+                "倉治整骨院"
+        });
+      }catch(err){ Logger.log("mail error:"+err); }
+    }
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+// kanri.html側からWeb予約リクエスト一覧を取得する
+function getWebBookingRequests(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("web_yoyaku_requests");
+  if(!s) return {ok:true, list:[]};
+  var data=s.getDataRange().getValues();
+  var list=[];
+  for(var i=1;i<data.length;i++){
+    var r=data[i];
+    list.push({
+      rowIdx:i+1, date1:String(r[0]||""), time1:String(r[1]||""), date2:String(r[2]||""), time2:String(r[3]||""),
+      date3:String(r[4]||""), time3:String(r[5]||""), name:String(r[6]||""), tel:String(r[7]||""), email:String(r[8]||""),
+      menu:String(r[9]||""), symptom:String(r[10]||""), status:String(r[11]||"未対応"), createdAt:String(r[12]||"")
+    });
+  }
+  list.sort(function(a,b){return a.createdAt<b.createdAt?1:-1;});
+  return {ok:true, list:list};
+}
+// リクエストの対応状況を更新する（対応済みにする等）
+function updateWebBookingRequestStatus(rowIdx,status){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("web_yoyaku_requests");
+  if(!s) return {ok:false, error:"シートが見つかりません"};
+  var rng=s.getRange(parseInt(rowIdx),12);
+  rng.setNumberFormat("@");
+  rng.setValue(status||"対応済み");
+  return {ok:true};
+}
+
 function saveWebBooking(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();

@@ -248,6 +248,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="checkTriggers()" style="margin-top:16px;background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
       <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
+      <button class="btn bp bsm" onclick="openWebRequests()" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b">📩 Web予約リクエスト一覧(未対応の確認・確定)</button>
       <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
       <button class="btn bp bsm" onclick="openReminderLog()" style="margin-top:16px;background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
@@ -1024,6 +1025,20 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button onclick="document.getElementById('reminderLogModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
     </div>
     <div id="reminderLogContent" style="max-height:55vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Web予約リクエスト一覧モーダル -->
+<div class="modal-ov" id="webReqModal">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem">📩 Web予約リクエスト一覧</h3>
+      <button onclick="document.getElementById('webReqModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn bp bsm" onclick="loadWebRequests()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
+    </div>
+    <div id="webReqContent" style="max-height:60vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -2920,6 +2935,55 @@ async function renderBdayLog(){
       </div>`;
     }).join('');
   }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+
+// ===== Web予約リクエスト一覧 =====
+function openWebRequests(){
+  document.getElementById('webReqModal').classList.add('on');
+  loadWebRequests();
+}
+async function loadWebRequests(){
+  const el=document.getElementById('webReqContent');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getWebBookingRequests&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">リクエストはまだありません</p>'; return; }
+    // 未対応を先に表示
+    list.sort((a,b)=>(a.status==='未対応'?0:1)-(b.status==='未対応'?0:1));
+    el.innerHTML=list.map(r=>{
+      const badge=r.status==='未対応'
+        ?'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜未対応</span>'
+        :'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅対応済み</span>';
+      const cands=[[r.date1,r.time1,'第一'],[r.date2,r.time2,'第二'],[r.date3,r.time3,'第三']]
+        .filter(c=>c[0]&&c[1])
+        .map(c=>`<div style="font-size:0.8rem">${c[2]}希望：${c[0]} ${c[1]}〜</div>`).join('');
+      return `<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div><b style="font-size:0.9rem">${r.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${r.menu||''}</span></div>
+          ${badge}
+        </div>
+        ${cands}
+        <div style="font-size:0.72rem;color:#64748b;margin-top:4px">📞 ${r.tel}${r.email?' / ✉️ '+r.email:''}</div>
+        ${r.symptom?'<div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 '+r.symptom+'</div>':''}
+        <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${r.createdAt}</div>
+        ${r.status==='未対応'?`<button class="btn be bsm" onclick="markWebRequestDone(${r.rowIdx})" style="margin-top:6px;background:#16a34a;color:white;border-color:#16a34a">✅ 対応済みにする</button>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+async function markWebRequestDone(rowIdx){
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'updateWebBookingRequestStatus',rowIdx,status:'対応済み'})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 更新に失敗しました'); return; }
+    loadWebRequests();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 
 // ===== 前日リマインド送信履歴 =====
