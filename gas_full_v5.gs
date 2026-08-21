@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -72,6 +72,7 @@ function doPost(e){
       else if(action==="updateWebBookingRequestStatus")result=updateWebBookingRequestStatus(body.rowIdx,body.status);
       else if(action==="toggleBlockedSlot")result=toggleBlockedSlot(body.date,body.time,body.block);
       else if(action==="sendTestEmailTo")result=sendTestEmailTo(body.email);
+      else if(action==="saveMondoshin")result=saveMondoshin(body.data);
       else if(action==="getMenuMaster")result=getMenuMaster();
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
@@ -1162,6 +1163,64 @@ function saveWebBookingRequest(data){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 // kanri.html側からWeb予約リクエスト一覧を取得する
+// ═══════════════════════════════════════
+// ★Web問診票（患者様が来院前にスマホで記入。院内でA4印刷して使える）★
+// ═══════════════════════════════════════
+var MONDO_HEADERS_=["createdAt","kana","name","dob","sex","job","addr","tel","telHome","emergency",
+  "medYn","medDetail","know","lineStatus","symptom","symptomMain","symptomSince","hospital","diagnosis",
+  "treatment","effort","alcohol","smoke","otherCond","pregnant","surgery","accident","goal"];
+function saveMondoshin(data){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("web_mondoshin");
+    if(!s){ s=ss.insertSheet("web_mondoshin"); s.getRange(1,1,1,MONDO_HEADERS_.length).setValues([MONDO_HEADERS_]); }
+    if(!data.kana||!data.name||!data.tel) return {ok:false, error:"ふりがな・お名前・お電話番号は必須です"};
+    var row=MONDO_HEADERS_.map(function(h){
+      if(h==="createdAt") return Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss");
+      return data[h]||"";
+    });
+    var newIdx=s.getLastRow()+1;
+    var rng=s.getRange(newIdx,1,1,row.length);
+    rng.setNumberFormat("@");
+    rng.setValues([row]);
+
+    var p=PropertiesService.getScriptProperties();
+    var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+    if(token&&ownerId){
+      var nl=String.fromCharCode(10);
+      sendLineMessagingAPI(token,ownerId,
+        "[倉治整骨院] 📋 Web問診票が届きました"+nl+nl+
+        "お名前："+data.name+"様（"+data.kana+"）"+nl+
+        "症状："+(data.symptom||"")+nl+nl+
+        "kanri.htmlの「Web問診票一覧」から内容の確認・A4印刷ができます。"
+      );
+    }
+    return {ok:true, rowIdx:newIdx};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+function getMondoshinList(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("web_mondoshin");
+  if(!s) return {ok:true, list:[]};
+  var data=s.getDataRange().getValues();
+  var list=[];
+  for(var i=1;i<data.length;i++){
+    var obj={rowIdx:i+1};
+    MONDO_HEADERS_.forEach(function(h,idx){ obj[h]=String(data[i][idx]||""); });
+    list.push(obj);
+  }
+  list.sort(function(a,b){return a.createdAt<b.createdAt?1:-1;});
+  return {ok:true, list:list};
+}
+function getMondoshinById(rowIdx){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("web_mondoshin");
+  if(!s) return {ok:false, error:"データがありません"};
+  var row=s.getRange(parseInt(rowIdx),1,1,MONDO_HEADERS_.length).getValues()[0];
+  var obj={rowIdx:rowIdx};
+  MONDO_HEADERS_.forEach(function(h,idx){ obj[h]=String(row[idx]||""); });
+  return {ok:true, data:obj};
+}
 function getWebBookingRequests(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("web_yoyaku_requests");

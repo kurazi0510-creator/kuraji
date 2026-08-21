@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Web問診票 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}
+body{background:#faf6f0;color:#3d3226;min-height:100vh;padding-bottom:40px;}
+.header{background:linear-gradient(135deg,#c98a4b,#e0a86a);color:#fff;padding:20px 16px;text-align:center;}
+.header h1{font-size:1.05rem;font-weight:bold;margin-bottom:4px;}
+.header p{font-size:.72rem;opacity:.95;}
+.wrap{max-width:560px;margin:0 auto;padding:14px;}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(120,90,50,.08);}
+.card h2{font-size:.86rem;color:#c98a4b;font-weight:bold;margin-bottom:10px;border-left:4px solid #c98a4b;padding-left:8px;}
+label{display:block;font-size:.76rem;color:#8a7860;font-weight:bold;margin:12px 0 4px;}
+label:first-of-type{margin-top:0;}
+.req{color:#d9534f;font-size:.68rem;margin-left:4px;}
+input[type=text],input[type=date],textarea,select{width:100%;border:1.6px solid #ecdfd0;border-radius:9px;padding:10px 12px;font-size:.88rem;background:#fffdfb;color:#3d3226;}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#c98a4b;}
+textarea{resize:none;height:56px;}
+.radio-grp,.check-grp{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+.chip{border:1.6px solid #ecdfd0;border-radius:20px;padding:7px 14px;font-size:.78rem;color:#3d3226;background:#fffdfb;cursor:pointer;user-select:none;}
+.chip.on{background:#c98a4b;color:#fff;border-color:#c98a4b;font-weight:bold;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.note{font-size:.7rem;color:#a08a6d;line-height:1.6;margin-top:6px;}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:11px;font-size:.95rem;font-weight:bold;cursor:pointer;margin-top:6px;background:#c98a4b;color:#fff;}
+.btn:disabled{background:#e5d9c8;color:#b3a48c;}
+.err{background:#fdecec;color:#b3382c;border-radius:9px;padding:10px 12px;font-size:.8rem;margin-top:10px;display:none;}
+.done{text-align:center;padding:30px 14px;}
+.done .ok{font-size:2.4rem;margin-bottom:10px;}
+.done h2{font-size:1.05rem;margin-bottom:10px;}
+.done p{font-size:.85rem;color:#6b5c47;line-height:1.9;}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+@keyframes sp{to{transform:rotate(360deg)}}
+.consent-box{background:#fff8ea;border:1.5px solid #f0d999;border-radius:10px;padding:12px;font-size:.72rem;color:#7a6329;line-height:1.7;margin-top:8px;}
+.consent-chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.82rem;color:#3d3226;font-weight:bold;}
+.consent-chk input{width:18px;height:18px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📋 Web問診票</h1>
+  <p>ご来院前にご記入いただくと、受付がスムーズです</p>
+</div>
+<div class="wrap" id="formWrap">
+
+  <div class="card">
+    <h2>基本情報</h2>
+    <label>ふりがな<span class="req">必須</span></label>
+    <input type="text" id="q-kana" placeholder="やまだ たろう">
+    <label>お名前<span class="req">必須</span></label>
+    <input type="text" id="q-name" placeholder="山田 太郎">
+    <label>生年月日（西暦）<span class="req">必須</span></label>
+    <input type="date" id="q-dob">
+    <label>性別</label>
+    <div class="radio-grp" id="q-sex"></div>
+    <label>職業</label>
+    <input type="text" id="q-job" placeholder="例：会社員">
+    <label>ご住所</label>
+    <input type="text" id="q-addr" placeholder="交野市〇〇1-2-3">
+    <label>携帯電話番号<span class="req">必須</span></label>
+    <input type="text" id="q-tel" placeholder="09012345678" inputmode="numeric">
+    <label>ご自宅電話番号（お持ちの方のみ）</label>
+    <input type="text" id="q-teltel" placeholder="0728920000" inputmode="numeric">
+    <label>緊急連絡先（続柄・お名前・電話番号）</label>
+    <input type="text" id="q-emergency" placeholder="例：妻　山田花子　09098765432">
+  </div>
+
+  <div class="card">
+    <h2>お薬・当院を知ったきっかけ</h2>
+    <label>現在服用中のお薬はありますか？</label>
+    <div class="radio-grp" id="q-med-yn"></div>
+    <input type="text" id="q-med-detail" placeholder="ある方はどんなお薬か教えてください" style="margin-top:6px;display:none">
+    <label>当院を何でお知りになりましたか？</label>
+    <div class="radio-grp" id="q-know"></div>
+    <label>LINEのお友だち登録</label>
+    <div class="radio-grp" id="q-line"></div>
+  </div>
+
+  <div class="card">
+    <h2>症状について</h2>
+    <label>現在の主な症状（複数選択可）<span class="req">必須</span></label>
+    <div class="check-grp" id="q-symptom"></div>
+    <label>今回、最も改善させたい症状</label>
+    <input type="text" id="q-symptom-main" placeholder="例：腰痛">
+    <label>その症状はいつ頃から出始めましたか？</label>
+    <input type="text" id="q-symptom-since" placeholder="例：1週間前から">
+    <label>病院を受診されましたか？</label>
+    <div class="row2">
+      <input type="text" id="q-hospital" placeholder="病院名">
+      <input type="text" id="q-diagnosis" placeholder="診断名">
+    </div>
+    <label>どのような治療でしたか？</label>
+    <div class="check-grp" id="q-treatment"></div>
+    <label>一番つらい症状を良くするために何かされていますか？</label>
+    <textarea id="q-effort" placeholder="例：湿布を貼っている、ストレッチしている　など"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>生活習慣・既往症</h2>
+    <label>飲酒</label>
+    <div class="radio-grp" id="q-alcohol"></div>
+    <label>喫煙</label>
+    <div class="radio-grp" id="q-smoke"></div>
+    <label>現在、主な症状以外に下記のような症状・病気はありますか？（複数選択可）</label>
+    <div class="check-grp" id="q-other-cond"></div>
+    <label>女性の方：現在妊娠されていますか？</label>
+    <div class="radio-grp" id="q-pregnant"></div>
+    <label>手術や骨折の経験はありますか？</label>
+    <input type="text" id="q-surgery" placeholder="ある方は病名・箇所（無ければ空欄で結構です）">
+    <label>事故の経験はありますか？</label>
+    <input type="text" id="q-accident" placeholder="ある方は種類（自動車事故・転倒・落下など。無ければ空欄で結構です）">
+  </div>
+
+  <div class="card">
+    <h2>今回の来院について</h2>
+    <label>今回の症状をどのようにしたいですか？</label>
+    <div class="radio-grp" id="q-goal"></div>
+  </div>
+
+  <div class="card">
+    <h2>個人情報の取り扱いについて</h2>
+    <div class="consent-box">
+      ご記入いただいた個人情報は、施術・ご連絡・院内での適切な管理の目的以外には使用いたしません。上記内容をご確認の上、同意して送信してください。
+    </div>
+    <label class="consent-chk"><input type="checkbox" id="q-consent"> 上記内容に同意します</label>
+    <div class="err" id="errBox"></div>
+    <button class="btn" id="submitBtn" onclick="submitMondo()" disabled>送信する</button>
+  </div>
+</div>
+
+<div class="wrap" id="doneWrap" style="display:none">
+  <div class="card done">
+    <div class="ok">✅</div>
+    <h2>問診票を受け付けました</h2>
+    <p>ご記入ありがとうございました。<br>ご来院当日、受付にてお名前をお伝えください。<br>スムーズにご案内いたします。</p>
+  </div>
+</div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+
+function buildChips(id,options,multi){
+  const el=document.getElementById(id);
+  el.dataset.multi=multi?'1':'0';
+  el.dataset.selected='';
+  el.innerHTML=options.map(o=>`<div class="chip" data-val="${o}" onclick="toggleChip('${id}','${o}',${!!multi})">${o}</div>`).join('');
+}
+function toggleChip(id,val,multi){
+  const el=document.getElementById(id);
+  let sel=el.dataset.selected?el.dataset.selected.split('|'):[];
+  if(multi){
+    if(sel.includes(val)) sel=sel.filter(v=>v!==val); else sel.push(val);
+  }else{
+    sel=sel.includes(val)?[]:[val];
+  }
+  el.dataset.selected=sel.join('|');
+  [...el.children].forEach(c=>c.classList.toggle('on',sel.includes(c.dataset.val)));
+  checkReady();
+}
+function chipVal(id){ return document.getElementById(id).dataset.selected||''; }
+
+buildChips('q-sex',['男性','女性']);
+buildChips('q-med-yn',['なし','あり']);
+buildChips('q-know',['紹介','ホームページ','LINE','インスタグラム','口コミ','チラシ','看板'],true);
+buildChips('q-line',['登録済み','まだ（受付でご案内します）']);
+buildChips('q-symptom',['疲労感','倦怠感','頭痛','眼精疲労','めまい','耳鳴り','不眠','首こり','首痛','肩こり','背中の痛み','腰痛','ぎっくり腰','坐骨神経痛','しびれ','だるさ','産後の骨盤矯正','顔の歪み','顎の歪み','顎の痛み','顎関節症','その他'],true);
+buildChips('q-treatment',['投薬','湿布','牽引','電気','手術','その他'],true);
+buildChips('q-alcohol',['しない','時々','毎日']);
+buildChips('q-smoke',['しない','時々','毎日']);
+buildChips('q-other-cond',['椎間板ヘルニア','顎関節症','アレルギー','喘息','気管支炎','肺炎','鼻炎','生理痛','生理不順','子宮筋腫','便秘','下痢','子宮内膜症','高血圧','低血圧','リウマチ','膀胱炎','胃痛','下肢静脈瘤','顔面神経痛','三叉神経痛'],true);
+buildChips('q-pregnant',['はい','いいえ']);
+buildChips('q-goal',['本日のみの施術を希望','つらい症状が改善すれば良い','定期的に加療したい']);
+
+document.getElementById('q-med-yn').addEventListener('click',()=>{
+  document.getElementById('q-med-detail').style.display=chipVal('q-med-yn')==='あり'?'block':'none';
+});
+
+document.addEventListener('input',checkReady);
+function checkReady(){
+  const kana=document.getElementById('q-kana').value.trim();
+  const name=document.getElementById('q-name').value.trim();
+  const tel=document.getElementById('q-tel').value.replace(/[^0-9]/g,'');
+  const symptom=chipVal('q-symptom');
+  const consent=document.getElementById('q-consent').checked;
+  const ok=kana&&name&&tel&&tel.length>=10&&symptom&&consent;
+  document.getElementById('submitBtn').disabled=!ok;
+}
+document.getElementById('q-consent').addEventListener('change',checkReady);
+
+async function submitMondo(){
+  const btn=document.getElementById('submitBtn');
+  const errBox=document.getElementById('errBox');
+  errBox.style.display='none';
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span>送信中...';
+  const data={
+    kana:document.getElementById('q-kana').value.trim(),
+    name:document.getElementById('q-name').value.trim(),
+    dob:document.getElementById('q-dob').value,
+    sex:chipVal('q-sex'),
+    job:document.getElementById('q-job').value.trim(),
+    addr:document.getElementById('q-addr').value.trim(),
+    tel:document.getElementById('q-tel').value.replace(/[^0-9\-]/g,''),
+    telHome:document.getElementById('q-teltel').value.replace(/[^0-9\-]/g,''),
+    emergency:document.getElementById('q-emergency').value.trim(),
+    medYn:chipVal('q-med-yn'),
+    medDetail:document.getElementById('q-med-detail').value.trim(),
+    know:chipVal('q-know'),
+    lineStatus:chipVal('q-line'),
+    symptom:chipVal('q-symptom'),
+    symptomMain:document.getElementById('q-symptom-main').value.trim(),
+    symptomSince:document.getElementById('q-symptom-since').value.trim(),
+    hospital:document.getElementById('q-hospital').value.trim(),
+    diagnosis:document.getElementById('q-diagnosis').value.trim(),
+    treatment:chipVal('q-treatment'),
+    effort:document.getElementById('q-effort').value.trim(),
+    alcohol:chipVal('q-alcohol'),
+    smoke:chipVal('q-smoke'),
+    otherCond:chipVal('q-other-cond'),
+    pregnant:chipVal('q-pregnant'),
+    surgery:document.getElementById('q-surgery').value.trim(),
+    accident:document.getElementById('q-accident').value.trim(),
+    goal:chipVal('q-goal'),
+  };
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveMondoshin',data})
+    });
+    const d=await res.json();
+    if(!d.ok){
+      errBox.textContent='⚠️ '+(d.error||'送信に失敗しました。恐れ入りますが受付にて直接ご記入ください。');
+      errBox.style.display='block';
+      btn.disabled=false; btn.innerHTML='送信する';
+      return;
+    }
+    document.getElementById('formWrap').style.display='none';
+    document.getElementById('doneWrap').style.display='block';
+    window.scrollTo(0,0);
+  }catch(e){
+    errBox.textContent='⚠️ 通信エラーが発生しました。恐れ入りますが受付にて直接ご記入ください。';
+    errBox.style.display='block';
+    btn.disabled=false; btn.innerHTML='送信する';
+  }
+}
+</script>
+</body>
+</html>

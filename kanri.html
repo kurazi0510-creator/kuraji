@@ -249,6 +249,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
       <button class="btn bp bsm" onclick="openWebRequests()" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b;position:relative">📩 Web予約リクエスト一覧(未対応の確認・確定)<span id="webReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
+      <button class="btn bp bsm" onclick="openMondoList()" style="margin-top:16px;background:#b45309;color:white;border-color:#b45309">📋 Web問診票一覧(内容確認・A4印刷)</button>
       <button class="btn bp bsm" onclick="openBlockSlots()" style="margin-top:16px;background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
       <button class="btn bp bsm" onclick="setNotifyVolume()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">🔊 新着通知の音量を設定</button>
       <button class="btn bp bsm" onclick="sendTestEmail()" style="margin-top:16px;background:#475569;color:white;border-color:#475569">✉️ テストメールを送信(到達確認)</button>
@@ -1042,6 +1043,20 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="loadWebRequests()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
     </div>
     <div id="webReqContent" style="max-height:60vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Web問診票一覧モーダル -->
+<div class="modal-ov" id="mondoListModal">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem">📋 Web問診票一覧</h3>
+      <button onclick="document.getElementById('mondoListModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn bp bsm" onclick="loadMondoList()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
+    </div>
+    <div id="mondoListContent" style="max-height:60vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -3086,6 +3101,31 @@ async function checkNewWebRequests(){
 }
 checkNewWebRequests();
 setInterval(checkNewWebRequests, 600000); // 10分ごとに自動チェック
+
+// ===== Web問診票一覧 =====
+function openMondoList(){
+  document.getElementById('mondoListModal').classList.add('on');
+  loadMondoList();
+}
+async function loadMondoList(){
+  const el=document.getElementById('mondoListContent');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">問診票の提出はまだありません</p>'; return; }
+    el.innerHTML=list.map(q=>`<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><b style="font-size:0.9rem">${q.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:6px">（${q.kana}）</span></div>
+        <button class="btn be bsm" onclick="window.open('mondo_print.html?id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
+      </div>
+      <div style="font-size:0.72rem;color:#64748b;margin-top:4px">📞 ${q.tel}</div>
+      <div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 ${q.symptom.split('|').join('、')||'（症状未記入）'}</div>
+      <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${q.createdAt}</div>
+    </div>`).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
 
 function openWebRequests(){
   document.getElementById('webReqModal').classList.add('on');

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>問診票印刷 - 倉治整骨院</title>
+<style>
+@page{ size:A4; margin:12mm; }
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}
+body{background:#e5e5e5;color:#222;}
+.toolbar{position:sticky;top:0;background:#1e293b;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:10;}
+.toolbar button{padding:9px 18px;border:none;border-radius:8px;background:#c98a4b;color:#fff;font-weight:bold;font-size:.85rem;cursor:pointer;}
+.toolbar span{color:#cbd5e1;font-size:.8rem;}
+.sheet{background:#fff;width:210mm;min-height:297mm;margin:16px auto;padding:12mm;box-shadow:0 2px 10px rgba(0,0,0,.15);}
+.title{text-align:center;font-size:20px;font-weight:bold;letter-spacing:6px;margin-bottom:6px;}
+.clinic{text-align:right;font-size:13px;font-weight:bold;}
+.datestamp{text-align:right;font-size:11px;color:#555;margin-bottom:8px;}
+table.info{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:12px;}
+table.info th,table.info td{border:1px solid #333;padding:5px 8px;text-align:left;}
+table.info th{background:#eee;width:16%;white-space:nowrap;}
+.q{font-weight:bold;font-size:12px;margin:9px 0 3px;}
+.q::before{content:"※  ";}
+.a{font-size:12px;margin-bottom:2px;padding-left:14px;}
+.hl{background:#fff2cc;padding:1px 3px;}
+.section-line{border-top:1px solid #999;margin:10px 0 6px;}
+.smallnote{font-size:10px;color:#666;}
+@media print{
+  body{background:#fff;}
+  .toolbar{display:none;}
+  .sheet{box-shadow:none;margin:0;width:auto;min-height:auto;}
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="window.print()">🖨 このページを印刷（A4）</button>
+  <span id="loadingMsg">読み込み中...</span>
+</div>
+<div class="sheet" id="sheet"></div>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+const params=new URLSearchParams(location.search);
+const rowIdx=params.get('id');
+
+function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function mark(list,target){
+  // 選択された項目を強調表示するための◯付きテキストを生成
+  const sel=(list||'').split('|').filter(Boolean);
+  return sel.map(s=>`<span class="hl">${esc(s)}</span>`).join('　') || '（未回答）';
+}
+
+async function load(){
+  if(!rowIdx){ document.getElementById('loadingMsg').textContent='IDが指定されていません'; return; }
+  try{
+    const res=await fetch(GAS+'?action=getMondoshinById&rowIdx='+rowIdx+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ document.getElementById('loadingMsg').textContent='取得に失敗しました：'+(d.error||''); return; }
+    render(d.data);
+    document.getElementById('loadingMsg').textContent='読み込み完了';
+  }catch(e){ document.getElementById('loadingMsg').textContent='通信エラー：'+e.message; }
+}
+
+function render(q){
+  const dobDisp=q.dob?q.dob.replace(/-/g,'/'):'（未入力）';
+  document.getElementById('sheet').innerHTML=`
+    <div class="title">初 診 者 問 診 票</div>
+    <div class="clinic">倉治整骨院</div>
+    <div class="datestamp">Web問診票受信：${esc(q.createdAt)}</div>
+
+    <table class="info">
+      <tr><th>ふりがな</th><td>${esc(q.kana)}</td><th>生年月日</th><td>${dobDisp}</td></tr>
+      <tr><th>氏名</th><td>${esc(q.name)}</td><th>性別</th><td>${esc(q.sex)}</td></tr>
+      <tr><th>職業</th><td>${esc(q.job)}</td><th>携帯番号</th><td>${esc(q.tel)}</td></tr>
+      <tr><th>住所</th><td colspan="3">${esc(q.addr)}</td></tr>
+      <tr><th>自宅電話</th><td>${esc(q.telHome)}</td><th>緊急連絡先</th><td>${esc(q.emergency)}</td></tr>
+    </table>
+
+    <div class="q">現在服用中のお薬</div>
+    <div class="a">${esc(q.medYn)||'（未回答）'}　${q.medDetail?'（'+esc(q.medDetail)+'）':''}</div>
+
+    <div class="q">当院を何でお知りになりましたか</div>
+    <div class="a">${mark(q.know)}</div>
+
+    <div class="q">LINEのお友だち登録</div>
+    <div class="a">${esc(q.lineStatus)||'（未回答）'}</div>
+
+    <div class="section-line"></div>
+
+    <div class="q">現在の主な症状</div>
+    <div class="a">${mark(q.symptom)}</div>
+    <div class="a">最も改善させたい症状：<span class="hl">${esc(q.symptomMain)||'（未入力）'}</span>／いつから：${esc(q.symptomSince)||'（未入力）'}</div>
+
+    <div class="q">病院受診歴</div>
+    <div class="a">病院名：${esc(q.hospital)||'（未入力）'}　診断名：${esc(q.diagnosis)||'（未入力）'}</div>
+    <div class="a">治療内容：${mark(q.treatment)}</div>
+
+    <div class="q">一番つらい症状のために行っていること</div>
+    <div class="a">${esc(q.effort)||'（未入力）'}</div>
+
+    <div class="section-line"></div>
+
+    <div class="q">飲酒・喫煙</div>
+    <div class="a">飲酒：${esc(q.alcohol)||'（未回答）'}　／　喫煙：${esc(q.smoke)||'（未回答）'}</div>
+
+    <div class="q">その他の症状・既往症</div>
+    <div class="a">${mark(q.otherCond)}</div>
+
+    <div class="q">妊娠・手術・事故</div>
+    <div class="a">妊娠：${esc(q.pregnant)||'（該当なし）'}　／　手術・骨折歴：${esc(q.surgery)||'（なし）'}　／　事故歴：${esc(q.accident)||'（なし）'}</div>
+
+    <div class="section-line"></div>
+
+    <div class="q">今回の症状をどのようにしたいか</div>
+    <div class="a">${esc(q.goal)||'（未回答）'}</div>
+
+    <div class="section-line"></div>
+    <p class="smallnote">※本用紙は患者様がWeb問診票にご入力いただいた内容を院内で印刷したものです。個人情報の取り扱いについては、事前にWeb画面上でご同意をいただいております。</p>
+  `;
+}
+load();
+</script>
+</body>
+</html>
