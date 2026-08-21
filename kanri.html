@@ -3109,8 +3109,10 @@ async function loadWebRequests(){
         .filter(c=>c[0]&&c[1])
         .map(c=>`<div style="font-size:0.8rem">${c[2]}希望：${c[0]} ${c[1]}〜</div>`).join('');
       const contactBadge=r.hasLine
-        ?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">💬 LINEで連絡可能</span>'
-        :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">📞 電話'+(r.email?'かメールで連絡':'で連絡')+'</span>';
+        ?`<span onclick="openLineContact('${r.name.replace(/'/g,"")}')" style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;text-decoration:underline">💬 LINEで連絡可能（タップして開く）</span>`
+        :(r.email
+          ?`<span onclick="location.href='mailto:${r.email}?subject=${encodeURIComponent('【倉治整骨院】ご予約について')}'" style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;text-decoration:underline">✉️ メールで連絡（タップして開く）</span>`
+          :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">📞 お電話で連絡</span>');
       return `<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div><b style="font-size:0.9rem">${r.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${r.menu||''}</span></div>
@@ -3125,6 +3127,15 @@ async function loadWebRequests(){
       </div>`;
     }).join('');
   }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+async function openLineContact(name){
+  try{
+    await navigator.clipboard.writeText(name);
+    alert(`📋「${name}」をコピーしました。\n\n次の画面で検索窓に貼り付けて（Cmd+V）探してください。`);
+  }catch(e){
+    alert(`次の画面の検索窓に「${name}」と入力して探してください。`);
+  }
+  window.open('https://chat.line.biz/', '_blank');
 }
 async function markWebRequestDone(rowIdx){
   try{
