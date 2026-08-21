@@ -179,9 +179,19 @@ document.getElementById('q-med-yn').addEventListener('click',()=>{
   document.getElementById('q-med-detail').style.display=chipVal('q-med-yn')==='あり'?'block':'none';
 });
 
-document.getElementById('q-zip').addEventListener('input',function(){
+document.getElementById('q-zip').addEventListener('input',async function(){
   const digits=this.value.replace(/[^0-9]/g,'').slice(0,7);
   this.value=digits.length>3?digits.slice(0,3)+'-'+digits.slice(3):digits;
+  if(digits.length===7){
+    try{
+      const res=await fetch('https://zipcloud.ibsnet.co.jp/api/search?zipcode='+digits);
+      const data=await res.json();
+      if(data.results&&data.results[0]){
+        const r=data.results[0];
+        document.getElementById('q-addr').value=(r.address1||'')+(r.address2||'')+(r.address3||'');
+      }
+    }catch(e){}
+  }
 });
 document.addEventListener('input',checkReady);
 function checkReady(){
