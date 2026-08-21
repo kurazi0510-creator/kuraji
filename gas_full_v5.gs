@@ -1167,7 +1167,7 @@ function saveWebBookingRequest(data){
 // ═══════════════════════════════════════
 // ★Web問診票（患者様が来院前にスマホで記入。院内でA4印刷して使える）★
 // ═══════════════════════════════════════
-var MONDO_HEADERS_=["createdAt","kana","name","dob","sex","job","addr","tel","telHome","emergency",
+var MONDO_HEADERS_=["createdAt","kana","name","dob","sex","job","zip","addr","tel","telHome","emergency",
   "medYn","medDetail","know","lineStatus","symptom","symptomMain","symptomSince","hospital","diagnosis",
   "treatment","effort","alcohol","smoke","otherCond","pregnant","surgery","accident","goal"];
 function saveMondoshin(data){

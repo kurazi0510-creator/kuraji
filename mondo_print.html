@@ -87,7 +87,7 @@ function render(q){
       <tr><th>ふりがな</th><td>${esc(q.kana)}</td><th>生年月日</th><td>${dobDisp}</td></tr>
       <tr><th>氏名</th><td>${esc(q.name)}</td><th>性別</th><td>${mark(q.sex,'sex')}</td></tr>
       <tr><th>職業</th><td>${esc(q.job)}</td><th>携帯番号</th><td>${esc(q.tel)}</td></tr>
-      <tr><th>住所</th><td colspan="3">${esc(q.addr)}</td></tr>
+      <tr><th>住所</th><td colspan="3">${q.zip?'〒'+esc(q.zip)+'　':''}${esc(q.addr)}</td></tr>
       <tr><th>自宅電話</th><td>${esc(q.telHome)}</td><th>緊急連絡先</th><td>${esc(q.emergency)}</td></tr>
     </table>
 

@@ -57,6 +57,8 @@ textarea{resize:none;height:56px;}
     <div class="radio-grp" id="q-sex"></div>
     <label>職業</label>
     <input type="text" id="q-job" placeholder="例：会社員">
+    <label>郵便番号</label>
+    <input type="text" id="q-zip" placeholder="576-0051" inputmode="numeric" maxlength="8">
     <label>ご住所</label>
     <input type="text" id="q-addr" placeholder="交野市〇〇1-2-3">
     <label>携帯電話番号<span class="req">必須</span></label>
@@ -177,6 +179,10 @@ document.getElementById('q-med-yn').addEventListener('click',()=>{
   document.getElementById('q-med-detail').style.display=chipVal('q-med-yn')==='あり'?'block':'none';
 });
 
+document.getElementById('q-zip').addEventListener('input',function(){
+  const digits=this.value.replace(/[^0-9]/g,'').slice(0,7);
+  this.value=digits.length>3?digits.slice(0,3)+'-'+digits.slice(3):digits;
+});
 document.addEventListener('input',checkReady);
 function checkReady(){
   const kana=document.getElementById('q-kana').value.trim();
@@ -200,6 +206,7 @@ async function submitMondo(){
     dob:document.getElementById('q-dob').value,
     sex:chipVal('q-sex'),
     job:document.getElementById('q-job').value.trim(),
+    zip:document.getElementById('q-zip').value.trim(),
     addr:document.getElementById('q-addr').value.trim(),
     tel:document.getElementById('q-tel').value.replace(/[^0-9\-]/g,''),
     telHome:document.getElementById('q-teltel').value.replace(/[^0-9\-]/g,''),
