@@ -44,10 +44,25 @@ const params=new URLSearchParams(location.search);
 const rowIdx=params.get('id');
 
 function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function mark(list,target){
-  // 選択された項目を強調表示するための◯付きテキストを生成
+// mondo.htmlと同じ選択肢一覧（すべての選択肢を表示し、選んだものだけ強調するため）
+const OPTS={
+  sex:['男性','女性'],
+  medYn:['なし','あり'],
+  know:['紹介','ホームページ','LINE','インスタグラム','口コミ','チラシ','看板'],
+  lineStatus:['登録済み','まだ（受付でご案内します）'],
+  symptom:['疲労感','倦怠感','頭痛','眼精疲労','めまい','耳鳴り','不眠','首こり','首痛','肩こり','背中の痛み','腰痛','ぎっくり腰','坐骨神経痛','しびれ','だるさ','産後の骨盤矯正','顔の歪み','顎の歪み','顎の痛み','顎関節症','その他'],
+  treatment:['投薬','湿布','牽引','電気','手術','その他'],
+  alcohol:['しない','時々','毎日'],
+  smoke:['しない','時々','毎日'],
+  otherCond:['椎間板ヘルニア','顎関節症','アレルギー','喘息','気管支炎','肺炎','鼻炎','生理痛','生理不順','子宮筋腫','便秘','下痢','子宮内膜症','高血圧','低血圧','リウマチ','膀胱炎','胃痛','下肢静脈瘤','顔面神経痛','三叉神経痛'],
+  pregnant:['はい','いいえ'],
+  goal:['本日のみの施術を希望','つらい症状が改善すれば良い','定期的に加療したい'],
+};
+function mark(list,key){
+  // 問診票と同じく、選択肢を全て表示し、選ばれたものだけ強調（〇）で示す
   const sel=(list||'').split('|').filter(Boolean);
-  return sel.map(s=>`<span class="hl">${esc(s)}</span>`).join('　') || '（未回答）';
+  const opts=OPTS[key]||[];
+  return opts.map(o=>sel.includes(o)?`<span class="hl">〇${esc(o)}</span>`:esc(o)).join('　');
 }
 
 async function load(){
@@ -70,30 +85,30 @@ function render(q){
 
     <table class="info">
       <tr><th>ふりがな</th><td>${esc(q.kana)}</td><th>生年月日</th><td>${dobDisp}</td></tr>
-      <tr><th>氏名</th><td>${esc(q.name)}</td><th>性別</th><td>${esc(q.sex)}</td></tr>
+      <tr><th>氏名</th><td>${esc(q.name)}</td><th>性別</th><td>${mark(q.sex,'sex')}</td></tr>
       <tr><th>職業</th><td>${esc(q.job)}</td><th>携帯番号</th><td>${esc(q.tel)}</td></tr>
       <tr><th>住所</th><td colspan="3">${esc(q.addr)}</td></tr>
       <tr><th>自宅電話</th><td>${esc(q.telHome)}</td><th>緊急連絡先</th><td>${esc(q.emergency)}</td></tr>
     </table>
 
     <div class="q">現在服用中のお薬</div>
-    <div class="a">${esc(q.medYn)||'（未回答）'}　${q.medDetail?'（'+esc(q.medDetail)+'）':''}</div>
+    <div class="a">${mark(q.medYn,'medYn')}　${q.medDetail?'（'+esc(q.medDetail)+'）':''}</div>
 
     <div class="q">当院を何でお知りになりましたか</div>
-    <div class="a">${mark(q.know)}</div>
+    <div class="a">${mark(q.know,'know')}</div>
 
     <div class="q">LINEのお友だち登録</div>
-    <div class="a">${esc(q.lineStatus)||'（未回答）'}</div>
+    <div class="a">${mark(q.lineStatus,'lineStatus')}</div>
 
     <div class="section-line"></div>
 
     <div class="q">現在の主な症状</div>
-    <div class="a">${mark(q.symptom)}</div>
+    <div class="a">${mark(q.symptom,'symptom')}</div>
     <div class="a">最も改善させたい症状：<span class="hl">${esc(q.symptomMain)||'（未入力）'}</span>／いつから：${esc(q.symptomSince)||'（未入力）'}</div>
 
     <div class="q">病院受診歴</div>
     <div class="a">病院名：${esc(q.hospital)||'（未入力）'}　診断名：${esc(q.diagnosis)||'（未入力）'}</div>
-    <div class="a">治療内容：${mark(q.treatment)}</div>
+    <div class="a">治療内容：${mark(q.treatment,'treatment')}</div>
 
     <div class="q">一番つらい症状のために行っていること</div>
     <div class="a">${esc(q.effort)||'（未入力）'}</div>
@@ -101,18 +116,19 @@ function render(q){
     <div class="section-line"></div>
 
     <div class="q">飲酒・喫煙</div>
-    <div class="a">飲酒：${esc(q.alcohol)||'（未回答）'}　／　喫煙：${esc(q.smoke)||'（未回答）'}</div>
+    <div class="a">飲酒：${mark(q.alcohol,'alcohol')}</div>
+    <div class="a">喫煙：${mark(q.smoke,'smoke')}</div>
 
     <div class="q">その他の症状・既往症</div>
-    <div class="a">${mark(q.otherCond)}</div>
+    <div class="a">${mark(q.otherCond,'otherCond')}</div>
 
     <div class="q">妊娠・手術・事故</div>
-    <div class="a">妊娠：${esc(q.pregnant)||'（該当なし）'}　／　手術・骨折歴：${esc(q.surgery)||'（なし）'}　／　事故歴：${esc(q.accident)||'（なし）'}</div>
+    <div class="a">妊娠：${mark(q.pregnant,'pregnant')}　／　手術・骨折歴：${esc(q.surgery)||'（なし）'}　／　事故歴：${esc(q.accident)||'（なし）'}</div>
 
     <div class="section-line"></div>
 
     <div class="q">今回の症状をどのようにしたいか</div>
-    <div class="a">${esc(q.goal)||'（未回答）'}</div>
+    <div class="a">${mark(q.goal,'goal')}</div>
 
     <div class="section-line"></div>
     <p class="smallnote">※本用紙は患者様がWeb問診票にご入力いただいた内容を院内で印刷したものです。個人情報の取り扱いについては、事前にWeb画面上でご同意をいただいております。</p>
