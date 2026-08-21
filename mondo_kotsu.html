@@ -53,6 +53,10 @@ textarea{resize:none;height:56px;}
     <input type="text" id="q-name" placeholder="山田 太郎">
     <label>生年月日（西暦）</label>
     <input type="date" id="q-dob">
+    <label>郵便番号</label>
+    <input type="text" id="q-zip" placeholder="576-0051" inputmode="numeric" maxlength="8">
+    <label>ご住所</label>
+    <input type="text" id="q-addr" placeholder="交野市〇〇1-2-3">
     <label>携帯電話番号<span class="req">必須</span></label>
     <input type="text" id="q-tel" placeholder="09012345678" inputmode="numeric">
   </div>
@@ -163,6 +167,20 @@ buildChips('q-image',['あり','なし','これから受ける予定']);
 buildChips('q-freq',['毎日','週2〜3回','週1回','症状に応じて','わからない']);
 buildChips('q-work',['休業中','通常勤務','時短勤務','その他']);
 
+document.getElementById('q-zip').addEventListener('input',async function(){
+  const digits=this.value.replace(/[^0-9]/g,'').slice(0,7);
+  this.value=digits.length>3?digits.slice(0,3)+'-'+digits.slice(3):digits;
+  if(digits.length===7){
+    try{
+      const res=await fetch('https://zipcloud.ibsnet.co.jp/api/search?zipcode='+digits);
+      const data=await res.json();
+      if(data.results&&data.results[0]){
+        const r=data.results[0];
+        document.getElementById('q-addr').value=(r.address1||'')+(r.address2||'')+(r.address3||'');
+      }
+    }catch(e){}
+  }
+});
 document.addEventListener('input',checkReady);
 function checkReady(){
   const kana=document.getElementById('q-kana').value.trim();
@@ -184,6 +202,8 @@ async function submitMondo(){
     kana:document.getElementById('q-kana').value.trim(),
     name:document.getElementById('q-name').value.trim(),
     dob:document.getElementById('q-dob').value,
+    zip:document.getElementById('q-zip').value.trim(),
+    addr:document.getElementById('q-addr').value.trim(),
     tel:document.getElementById('q-tel').value.replace(/[^0-9\-]/g,''),
     accDate:document.getElementById('q-accdate').value,
     accTime:document.getElementById('q-acctime').value,

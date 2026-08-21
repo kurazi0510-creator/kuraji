@@ -1225,7 +1225,7 @@ function getMondoshinById(rowIdx){
 // ═══════════════════════════════════════
 // ★交通事故専用Web問診票★
 // ═══════════════════════════════════════
-var MONDO_KOTSU_HEADERS_=["createdAt","kana","name","dob","tel","accDate","accTime","accPlace","accType","role",
+var MONDO_KOTSU_HEADERS_=["createdAt","kana","name","dob","zip","addr","tel","accDate","accTime","accPlace","accType","role",
   "otherParty","police","otherIns","myIns","bengoshi","injury","symptomDetail","onset","otherHosp","otherHospName","image","freq","work"];
 function saveMondoshinKotsu(data){
   try{
