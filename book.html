@@ -189,7 +189,10 @@ function pickMenu(i){
 }
 
 // 週の開始日＝明日を含む週（当日はWeb予約不可）
-function toISO(d){ return d.toISOString().slice(0,10); }
+function toISO(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 let weekStart=(function(){
   const t=new Date(); t.setDate(t.getDate()+1); t.setHours(0,0,0,0);
   return t;
