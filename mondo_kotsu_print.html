@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>交通事故問診票印刷 - 倉治整骨院</title>
 <style>
-@page{ size:A4; margin:13mm 20mm 13mm 12mm; }
+@page{ size:A4; margin:0; }
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}
 body{background:#e5e5e5;color:#222;}
 .toolbar{position:sticky;top:0;background:#1e293b;padding:10px 16px;display:flex;gap:10px;align-items:center;z-index:10;}
 .toolbar button{padding:9px 18px;border:none;border-radius:8px;background:#c9634b;color:#fff;font-weight:bold;font-size:.85rem;cursor:pointer;}
 .toolbar span{color:#cbd5e1;font-size:.8rem;}
-.sheet{background:#fff;width:210mm;min-height:297mm;margin:16px auto;padding:12mm;box-shadow:0 2px 10px rgba(0,0,0,.15);word-break:break-all;overflow-wrap:break-word;}
+.sheet{background:#fff;width:210mm;height:297mm;margin:16px auto;padding:13mm 18mm 13mm 13mm;box-shadow:0 2px 10px rgba(0,0,0,.15);overflow:hidden;}
 .title{text-align:center;font-size:18px;font-weight:bold;letter-spacing:6px;margin-bottom:3px;}
-.clinic{text-align:right;font-size:11px;font-weight:bold;padding-right:1.2mm;}
+.clinic{text-align:right;font-size:11px;font-weight:bold;}
 .datestamp{text-align:right;font-size:9px;color:#555;margin-bottom:6px;}
 table.info{width:100%;table-layout:fixed;border-collapse:collapse;margin-bottom:8px;font-size:11px;}
-table.info th,table.info td{border:1px solid #333;padding:4px 7px;text-align:left;word-break:break-all;overflow-wrap:break-word;}
+table.info th,table.info td{border:1px solid #333;padding:4px 7px;text-align:left;overflow-wrap:break-word;}
 table.info th{background:#f5e5df;width:16%;white-space:nowrap;}
 .sec{background:#f5e5df;color:#8a3d24;font-weight:bold;font-size:11.5px;padding:3px 6px;margin:8px 0 4px;}
 .a{font-size:11px;margin-bottom:2px;padding-left:2px;line-height:1.55;}
@@ -25,7 +25,7 @@ table.info th{background:#f5e5df;width:16%;white-space:nowrap;}
 @media print{
   body{background:#fff;}
   .toolbar{display:none;}
-  .sheet{box-shadow:none;margin:0;width:auto;min-height:auto;padding:0;}
+  .sheet{box-shadow:none;margin:0;}
 }
 </style>
 </head>
@@ -64,7 +64,7 @@ function mark(list,key){
 // 内容が1枚(A4)に収まらない場合、自動的に文字を縮小して必ず1枚に収める
 function fitToOnePage(){
   const sheet=document.getElementById('sheet');
-  const targetHeightMm=297-24;
+  const targetHeightMm=297-26;
   const pxPerMm=96/25.4;
   const targetHeightPx=targetHeightMm*pxPerMm;
   let scale=1;
