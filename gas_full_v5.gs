@@ -979,6 +979,16 @@ function getSlotsForDate_(dateStr){
 }
 
 // 指定日の「空いている時間枠」だけを返す（予約空き状況ジェネレーターとの連動用）
+// 終業間際の延長枠（12:30・12:50・19:40の次の20:00・20:20）を、
+// 実際に予約が入っていなければ「継続枠専用の空き」として追加する
+// （11:50/19:20から3枠、12:10/19:40から2枠まで、通常の営業時間を少し超えて予約できるようにする特例）
+var EXT_SLOTS_=["12:30","12:50","20:00","20:20"];
+function addExtensionSlots_(available, occupied, blocked){
+  EXT_SLOTS_.forEach(function(t){
+    if(!occupied[t] && !blocked[t] && available.indexOf(t)<0) available.push(t);
+  });
+  return available;
+}
 function getAvailableSlots(dateStr){
   try{
     if(!dateStr) return {ok:false, error:"日付を指定してください"};
@@ -1001,6 +1011,7 @@ function getAvailableSlots(dateStr){
     // 院長が手動でブロックした枠も予約不可として扱う
     var blocked=getBlockedSlotsSet_(dateStr);
     var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t];});
+    available=addExtensionSlots_(available, occupied, blocked);
     return {ok:true, closed:false, available:available};
   }catch(err){ return {ok:false, error:err.message}; }
 }
@@ -1045,6 +1056,7 @@ function getAvailableSlotsRange(startDateStr,numDays){
       var occupied=allBooked[dateStr]||{};
       var blocked=getBlockedSlotsSet_(dateStr);
       var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t];});
+      available=addExtensionSlots_(available, occupied, blocked);
       result[dateStr]={closed:false, available:available};
     }
     return {ok:true, days:result};

@@ -161,9 +161,11 @@ const LINE_ADD_URL='https://line.me/R/ti/p/@qin9307o';
 document.getElementById('lineTopBtn').href=LINE_ADD_URL;
 
 const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
-  '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
+  '11:10','11:30','11:50','12:10','12:30','12:50','15:00','15:20','15:40','16:00',
   '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
-  '19:00','19:20','19:40'];
+  '19:00','19:20','19:40','20:00','20:20'];
+// 終業間際の延長枠（11:50/19:20から3枠、12:10/19:40から2枠まで例外的に予約できるようにするための枠）
+const EXT_SLOTS=['12:30','12:50','20:00','20:20'];
 const YOBI=['日','月','火','水','木','金','土'];
 
 const MENUS=[
@@ -243,6 +245,7 @@ function renderWeek(){
 
   let rows='';
   SLOTS.forEach((s,idx)=>{
+    if(EXT_SLOTS.includes(s))return; // 延長枠は独立した行としては表示しない（継続枠専用）
     // 午前の最後(12:10)の後に、見分けやすいよう「休憩」の区切り行を1本入れる
     if(idx>0 && SLOTS[idx-1]<'13:00' && s>='13:00'){
       rows+=`<tr><td colspan="${days.length+1}" style="background:#fdf3e7;color:#c98a4b;font-size:0.7rem;font-weight:bold;text-align:center;padding:4px 0">🍵 お昼休憩（この時間帯は施術をお休みしております）</td></tr>`;
@@ -263,10 +266,15 @@ function renderWeek(){
 }
 // 選択中のメニューに必要な枠数ぶん、指定した開始枠から連続して空いているか判定する
 // （例：60分メニュー＝3枠必要なら、開始枠+次+次の3つ全てが空いていないと選べないようにする）
+// 特定の開始時間（12:10・19:40）は、延長枠を使っても最大2枠(40分)までに制限する
+const MAX_SLOTS_OVERRIDE={'12:10':2, '19:40':2};
 function hasEnoughConsecutiveSlots(dateStr,startIdx){
   const info=weekData[dateStr];
   if(!info || info.closed || !info.available) return false;
-  const need=selMenu ? selMenu.slots : 1;
+  const startTime=SLOTS[startIdx];
+  let need=selMenu ? selMenu.slots : 1;
+  const cap=MAX_SLOTS_OVERRIDE[startTime];
+  if(cap && need>cap) return false; // 上限を超える枠数のメニューはこの開始時間では選べない
   for(let k=0;k<need;k++){
     const i=startIdx+k;
     if(i>=SLOTS.length) return false; // その日の最後の枠を超える
