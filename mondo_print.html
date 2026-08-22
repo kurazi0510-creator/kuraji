@@ -25,9 +25,10 @@ table.info th{background:#eee;width:16%;white-space:nowrap;}
 .section-line{border-top:1px solid #999;margin:10px 0 6px;}
 .smallnote{font-size:10px;color:#666;}
 @media print{
+  html,body{margin:0;padding:0;}
   body{background:#fff;}
   .toolbar{display:none;}
-  .sheet{box-shadow:none;margin:0;width:210mm;min-height:297mm;padding:14mm 15.2mm 14mm 14mm;}
+  .sheet{box-shadow:none;margin:0;width:210mm;padding:14mm 15.2mm 14mm 14mm;page-break-before:avoid;break-before:avoid;}
 }
 </style>
 </head>
