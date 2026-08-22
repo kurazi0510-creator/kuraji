@@ -61,6 +61,23 @@ function mark(list,key){
   return opts.map(o=>sel.includes(o)?`<span class="hl">〇${esc(o)}</span>`:esc(o)).join('　');
 }
 
+// 内容が1枚(A4)に収まらない場合、自動的に文字を縮小して必ず1枚に収める
+function fitToOnePage(){
+  const sheet=document.getElementById('sheet');
+  const targetHeightMm=297-24;
+  const pxPerMm=96/25.4;
+  const targetHeightPx=targetHeightMm*pxPerMm;
+  let scale=1;
+  for(let i=0;i<12;i++){
+    const h=sheet.scrollHeight;
+    if(h<=targetHeightPx || scale<=0.7) break;
+    scale-=0.03;
+    sheet.style.transform=`scale(${scale})`;
+    sheet.style.transformOrigin='top left';
+    sheet.style.width=(100/scale)+'%';
+  }
+}
+
 async function load(){
   if(!rowIdx){ document.getElementById('loadingMsg').textContent='IDが指定されていません'; return; }
   try{
@@ -68,6 +85,7 @@ async function load(){
     const d=await res.json();
     if(!d.ok){ document.getElementById('loadingMsg').textContent='取得に失敗しました：'+(d.error||''); return; }
     render(d.data);
+    fitToOnePage();
     document.getElementById('loadingMsg').textContent='読み込み完了';
   }catch(e){ document.getElementById('loadingMsg').textContent='通信エラー：'+e.message; }
 }
