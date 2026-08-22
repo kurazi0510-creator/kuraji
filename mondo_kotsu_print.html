@@ -25,7 +25,7 @@ table.info th{background:#f5e5df;width:16%;white-space:nowrap;}
 @media print{
   body{background:#fff;}
   .toolbar{display:none;}
-  .sheet{box-shadow:none;margin:0;width:auto;min-height:auto;padding:5mm 14mm 5mm 5mm;}
+  .sheet{box-shadow:none;margin:0;width:auto;min-height:auto;padding:0;}
 }
 </style>
 </head>
@@ -33,7 +33,6 @@ table.info th{background:#f5e5df;width:16%;white-space:nowrap;}
 <div class="toolbar">
   <button onclick="window.print()">🖨 このページを印刷（A4）</button>
   <span id="loadingMsg">読み込み中...</span>
-  <span style="color:#fca5a5;font-size:.78rem;font-weight:bold">⚠️ 印刷画面の「余白」は必ず「最小」を選んでください</span>
 </div>
 <div class="sheet" id="sheet"></div>
 
