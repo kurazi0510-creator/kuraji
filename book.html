@@ -167,14 +167,14 @@ const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
 const YOBI=['日','月','火','水','木','金','土'];
 
 const MENUS=[
-  {key:'sotai_first', label:'整体（初診）', minutes:60},
-  {key:'sotai_repeat',label:'整体（再診）', minutes:40},
-  {key:'raku_first',  label:'楽トレ（初診）', minutes:40},
-  {key:'raku_repeat', label:'楽トレ（再診）', minutes:40},
-  {key:'bigan_first', label:'美顔整顔（初診）', minutes:60},
-  {key:'bigan_repeat',label:'美顔整顔（再診）', minutes:40},
-  {key:'kotsu_first', label:'交通事故（初診）', minutes:60},
-  {key:'kotsu_repeat',label:'交通事故（再診）', minutes:20},
+  {key:'sotai_first', label:'整体（初診）', minutes:60, slots:3},
+  {key:'sotai_repeat',label:'整体（再診）', minutes:40, slots:2},
+  {key:'raku_first',  label:'楽トレ（初診）', minutes:40, slots:2},
+  {key:'raku_repeat', label:'楽トレ（再診）', minutes:40, slots:2},
+  {key:'bigan_first', label:'美顔整顔（初診）', minutes:60, slots:3},
+  {key:'bigan_repeat',label:'美顔整顔（再診）', minutes:40, slots:2},
+  {key:'kotsu_first', label:'交通事故（初診）', minutes:60, slots:3},
+  {key:'kotsu_repeat',label:'交通事故（再診）', minutes:20, slots:1},
 ];
 
 let selMenu=null;
@@ -196,6 +196,9 @@ function pickMenu(i){
   document.getElementById('f-cardid').style.display=isRepeat?'block':'none';
   if(!isFirst) document.getElementById('f-kana').value='';
   if(!isRepeat) document.getElementById('f-cardid').value='';
+  // メニュー(必要枠数)が変わるので、既に選んだ候補は一旦クリアして枠の空き判定を作り直す
+  cand=[];
+  renderWeek();
   checkReady();
 }
 
@@ -247,8 +250,7 @@ function renderWeek(){
     rows+=`<tr><td class="timecol">${s}</td>`;
     days.forEach(d=>{
       const dateStr=toISO(d);
-      const info=weekData[dateStr];
-      const avail=info && !info.closed && info.available && info.available.includes(s);
+      const avail=hasEnoughConsecutiveSlots(dateStr,idx);
       const idx2=cand.findIndex(c=>c.date===dateStr&&c.time===s);
       let cls='wk-cell'+(avail?'':' na')+(idx2>-1?' sel'+(idx2+1):'');
       const mark=idx2>-1?(idx2+1):(avail?'◯':'−');
@@ -258,6 +260,22 @@ function renderWeek(){
   });
   document.getElementById('wkTable').innerHTML=thead+rows;
   renderCandList();
+}
+// 選択中のメニューに必要な枠数ぶん、指定した開始枠から連続して空いているか判定する
+// （例：60分メニュー＝3枠必要なら、開始枠+次+次の3つ全てが空いていないと選べないようにする）
+function hasEnoughConsecutiveSlots(dateStr,startIdx){
+  const info=weekData[dateStr];
+  if(!info || info.closed || !info.available) return false;
+  const need=selMenu ? selMenu.slots : 1;
+  for(let k=0;k<need;k++){
+    const i=startIdx+k;
+    if(i>=SLOTS.length) return false; // その日の最後の枠を超える
+    const t=SLOTS[i];
+    // 2枠目以降が午前→午後をまたぐ場合は不可（12:10の次が15:00に飛んでしまうため）
+    if(k>0 && SLOTS[i-1]<'13:00' && t>='13:00') return false;
+    if(!info.available.includes(t)) return false;
+  }
+  return true;
 }
 function toggleCand(date,time){
   const idx=cand.findIndex(c=>c.date===date&&c.time===time);
