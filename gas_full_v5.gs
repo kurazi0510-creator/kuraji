@@ -538,9 +538,9 @@ function getFollowers(){
 }
 function setupAllTriggers(){
   ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
-  ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(9).create();
-  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(19).create();
-  ScriptApp.newTrigger("sendBirthdayMessages").timeBased().everyDays(1).atHour(9).create();
+  ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(9).nearMinute(0).create();
+  ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(19).nearMinute(0).create();
+  ScriptApp.newTrigger("sendBirthdayMessages").timeBased().everyDays(1).atHour(9).nearMinute(0).create();
   Logger.log("Triggers set OK");
 }
 // 今設定されているトリガーを一覧で確認する（kanri.htmlから呼び出し、重複や設定漏れがないか診断する）
