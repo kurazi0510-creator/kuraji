@@ -525,9 +525,10 @@ function dlImg(){
   a.download=d+'_'+n+'_'+FIG[cur].lbl.replace(/[^\w\u3040-\u9fff]/g,'')+'.png';
   a.href=makeImg().toDataURL();a.click();
 }
+function toLocalDateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function saveRec(){
   const name=document.getElementById('pt-name').value.trim()||'(名前なし)';
-  const date=document.getElementById('pt-date').value||new Date().toISOString().split('T')[0];
+  const date=document.getElementById('pt-date').value||toLocalDateStr(new Date());
   const memo=document.getElementById('memo').value.trim();
   const tmp=document.createElement('canvas');tmp.width=bg.width;tmp.height=bg.height;
   const tc=tmp.getContext('2d');tc.drawImage(bg,0,0);tc.drawImage(dr,0,0);
@@ -554,7 +555,7 @@ function loadRec(i){
 }
 function delRec(i){if(!confirm('削除しますか？'))return;const recs=JSON.parse(localStorage.getItem('kj_sym')||'[]');recs.splice(i,1);localStorage.setItem('kj_sym',JSON.stringify(recs));renderSaved();}
 
-document.getElementById('pt-date').value=new Date().toISOString().split('T')[0];
+document.getElementById('pt-date').value=toLocalDateStr(new Date());
 resize('front');drawBg('front');
 renderSaved();
 </script>

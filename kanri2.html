@@ -1891,7 +1891,8 @@ function load(){
 }
 
 const pad=n=>String(n).padStart(2,'0');
-const today=()=>new Date().toISOString().split('T')[0];
+function toLocalDateStr(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+const today=()=>toLocalDateStr(new Date());
 function fmtDate(v){
   if(!v&&v!==0)return'';
   if(typeof v==='string'){
@@ -3741,7 +3742,7 @@ function onRouteChange(){
     next.setDate(next.getDate()+7);
     const nd=document.getElementById('nb-date');
     const nt=document.getElementById('nb-time');
-    if(nd)nd.value=next.toISOString().split('T')[0];
+    if(nd)nd.value=toLocalDateStr(next);
     if(nt)nt.value='';
     const btn=document.querySelector('#next-book-form button');
     if(btn){btn.textContent='✅ 次回予約を入れる';btn.style.background='#22c55e';}
@@ -5356,7 +5357,7 @@ function renderOps(){
 
   // 実際の予約データから集計（直近30日）
   const today30=new Date(); today30.setDate(today30.getDate()-30);
-  const today30str=today30.toISOString().split('T')[0];
+  const today30str=toLocalDateStr(today30);
   let actualBk=0,cancelCnt=0,cancelReasons={};
   let slotUsed={}; // 時間帯別集計
   let dayUsed={0:0,1:0,2:0,3:0,4:0,5:0,6:0}; // 曜日別
