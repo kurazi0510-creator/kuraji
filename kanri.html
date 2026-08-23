@@ -1071,6 +1071,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
     <p style="font-size:0.75rem;color:#64748b;margin-bottom:8px">タップした時間は、Web予約フォーム上で「予約不可」として表示されます(実際の予約表には影響しません)。</p>
     <input type="date" id="bs-date" class="inp" style="margin-bottom:10px" onchange="loadBlockSlotsForDate()">
+    <button class="btn bp bsm" onclick="showAllBlockedDebug()" style="margin-bottom:10px;background:#7c3aed;color:white;border-color:#7c3aed;width:100%">🔍 保存されている全ブロックデータを確認</button>
     <div id="bs-content" style="max-height:50vh;overflow-y:auto"></div>
   </div>
 </div>
@@ -2986,12 +2987,26 @@ async function sendTestEmail(){
 // ===== Web予約枠 手動ブロック管理 =====
 const BS_SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10',
   '15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+async function showAllBlockedDebug(){
+  const el=document.getElementById('bs-content');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getAllBlockedSlotsDebug&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const rows=d.rows||[];
+    if(!rows.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">保存されているブロックデータは0件です</p>'; return; }
+    el.innerHTML=`<div style="background:#ede9fe;color:#5b21b6;font-weight:bold;padding:8px;border-radius:8px;margin-bottom:8px;text-align:center">現在 ${rows.length}件のブロックデータが保存されています</div>`+
+      rows.map(r=>`<div style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:0.82rem"><b>${r.date}</b>　${r.time}　<span style="color:#94a3b8;font-size:0.72rem">${r.note}</span></div>`).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
 function openBlockSlots(){
   document.getElementById('blockSlotsModal').classList.add('on');
   const dEl=document.getElementById('bs-date');
   if(!dEl.value){
     const t=new Date(); t.setDate(t.getDate()+1);
-    dEl.value=t.toISOString().slice(0,10);
+    // ★タイムゾーンのズレ(1日前後する不具合)を防ぐため、UTC変換を使わず日本時間のまま日付文字列を作る
+    const y=t.getFullYear(), m=String(t.getMonth()+1).padStart(2,'0'), d=String(t.getDate()).padStart(2,'0');
+    dEl.value=`${y}-${m}-${d}`;
   }
   loadBlockSlotsForDate();
 }
@@ -3016,6 +3031,7 @@ function renderBlockSlots(date){
     return `<div onclick="toggleBlockSlot('${date}','${s}')" style="padding:8px 2px;text-align:center;border:1.6px solid ${blocked?'#dc2626':'#e2e8f0'};border-radius:8px;font-size:0.78rem;cursor:pointer;background:${blocked?'#fee2e2':'#f8fafc'};color:${blocked?'#b91c1c':'#334155'};font-weight:${blocked?'bold':'normal'}">${s}${blocked?'<br>🚫':''}</div>`;
   };
   el.innerHTML=`
+    <div style="background:#fef3c7;color:#92400e;font-weight:bold;text-align:center;padding:8px;border-radius:8px;margin-bottom:10px;font-size:0.9rem">📅 今表示している日付：${date}（現在 ${bsBlockedSet.size}件ブロック中）</div>
     <div style="font-size:0.72rem;color:#a08a6d;font-weight:bold;margin:6px 0 4px">午前</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${am.map(cell).join('')}</div>
     <div style="font-size:0.72rem;color:#a08a6d;font-weight:bold;margin:10px 0 4px">午後</div>

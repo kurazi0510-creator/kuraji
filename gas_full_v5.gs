@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getAllBlockedSlotsDebug"){result=getAllBlockedSlotsDebug();}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -1091,6 +1091,15 @@ function toggleBlockedSlot(dateStr,timeStr,block){
 function getBlockedSlotsForDate(dateStr){
   var set=getBlockedSlotsSet_(dateStr);
   return {ok:true, blocked:Object.keys(set)};
+}
+// デバッグ用：blocked_slotsシートの中身を全件そのまま返す（日付ごとの実データを確認するため）
+function getAllBlockedSlotsDebug(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var bs=ss.getSheetByName("blocked_slots");
+  if(!bs) return {ok:true, rows:[]};
+  var data=bs.getDataRange().getValues();
+  var rows=data.slice(1).map(function(r){return {date:String(r[0]||""), time:String(r[1]||""), note:String(r[2]||"")};});
+  return {ok:true, rows:rows};
 }
 // ═══════════════════════════════════════
 // ★Web予約リクエスト方式（第一〜第三希望を受け付け、その場では確定しない）★
