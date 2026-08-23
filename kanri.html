@@ -1070,7 +1070,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button onclick="document.getElementById('blockSlotsModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
     </div>
     <p style="font-size:0.75rem;color:#64748b;margin-bottom:8px">タップした時間は、Web予約フォーム上で「予約不可」として表示されます(実際の予約表には影響しません)。</p>
-    <input type="date" id="bs-date" class="inp" style="margin-bottom:10px" onchange="loadBlockSlotsForDate()">
+    <input type="date" id="blk-date" class="inp" style="margin-bottom:10px" onchange="loadBlockSlotsForDate()" oninput="loadBlockSlotsForDate()">
     <button class="btn bp bsm" onclick="showAllBlockedDebug()" style="margin-bottom:10px;background:#7c3aed;color:white;border-color:#7c3aed;width:100%">🔍 保存されている全ブロックデータを確認</button>
     <div id="bs-content" style="max-height:50vh;overflow-y:auto"></div>
   </div>
@@ -3002,7 +3002,7 @@ async function showAllBlockedDebug(){
 }
 function openBlockSlots(){
   document.getElementById('blockSlotsModal').classList.add('on');
-  const dEl=document.getElementById('bs-date');
+  const dEl=document.getElementById('blk-date');
   if(!dEl.value){
     const t=new Date(); t.setDate(t.getDate()+1);
     // ★タイムゾーンのズレ(1日前後する不具合)を防ぐため、UTC変換を使わず日本時間のまま日付文字列を作る
@@ -3013,7 +3013,7 @@ function openBlockSlots(){
 }
 let bsBlockedSet=new Set();
 async function loadBlockSlotsForDate(){
-  const date=document.getElementById('bs-date').value;
+  const date=document.getElementById('blk-date').value;
   const el=document.getElementById('bs-content');
   if(!date){ el.innerHTML=''; return; }
   el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
