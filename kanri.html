@@ -1278,6 +1278,10 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">販売した商品と数量を入力</div>
       <div id="m-bussan-items"></div>
       <div style="margin-top:8px;padding:8px;background:#f8f6f1;border-radius:8px;font-size:0.8rem">物販合計（定価）：<strong id="m-bussan-total" style="color:var(--primary)">0円</strong></div>
+      <div style="margin-top:10px;padding:8px;background:#fef2f2;border-radius:8px;border:1px dashed #fca5a5">
+        <div style="font-size:0.72rem;color:#b91c1c;font-weight:700;margin-bottom:6px">🎁 無償提供分（施術中に無料で使った分。売上には計上せず在庫だけ減らします）</div>
+        <div id="m-free-given-items"></div>
+      </div>
       <div style="display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px;background:#fef3c7;border-radius:8px">
         <span style="font-size:0.74rem;color:#92400e;white-space:nowrap">💰 割引</span>
         <input class="inp" id="m-bussan-discount" type="number" placeholder="0" min="0" style="width:90px;padding:4px 8px" oninput="updateBussanNet()">
@@ -4367,6 +4371,33 @@ function renderMBussanItems(){
   addBtn.onclick=()=>{window.mBussanFree.push({name:'',price:0,qty:1});renderMBussanItems();};
   freeWrap.appendChild(addBtn);
   area.appendChild(freeWrap);
+  renderFreeGivenItems();
+}
+// ===== 無償提供分（在庫品を施術中に無料で使う分。売上にはならないが在庫は減らす） =====
+function renderFreeGivenItems(){
+  const area=document.getElementById('m-free-given-items');
+  if(!area)return;
+  if(!window.mFreeGiven)window.mFreeGiven=[];
+  area.innerHTML='';
+  window.mFreeGiven.forEach((row,i)=>{
+    const rowDiv=document.createElement('div');
+    rowDiv.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap';
+    const options=stockData.map(s=>`<option value="${s.id}" ${row.stockId===s.id?'selected':''}>${s.name}（在庫${s.qty}${s.unit}）</option>`).join('');
+    rowDiv.innerHTML=`
+      <select style="flex:1;min-width:140px;padding:4px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:0.8rem"
+        onchange="window.mFreeGiven[${i}].stockId=this.value">
+        <option value="">選択してください</option>${options}
+      </select>
+      <input type="number" placeholder="数量" value="${row.qty||1}" min="1" style="width:56px;padding:4px 6px;border:1px solid #fca5a5;border-radius:6px;font-size:0.8rem;text-align:center"
+        oninput="window.mFreeGiven[${i}].qty=parseInt(this.value)||1">
+      <button onclick="window.mFreeGiven.splice(${i},1);renderFreeGivenItems();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 8px;font-size:0.75rem;cursor:pointer">削除</button>`;
+    area.appendChild(rowDiv);
+  });
+  const addBtn2=document.createElement('button');
+  addBtn2.style.cssText='background:#dc2626;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;margin-top:2px';
+  addBtn2.textContent='＋ 無償提供分を追加';
+  addBtn2.onclick=()=>{window.mFreeGiven.push({stockId:'',qty:1});renderFreeGivenItems();};
+  area.appendChild(addBtn2);
 }
 function calcMBussanTotal(){
   let total=0;
@@ -4455,7 +4486,7 @@ function openModal(date,slot){
   document.getElementById('m-patient-list').style.display='none';
   document.getElementById('m-selected-info').style.display='none';
   resetKubun();resetBui();
-  mShochiSel={};mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mBussanPrice={};window.mShochiPrice={};window.mShochiDisc={};renderMShochiBtns();renderMBussanItems();resetMPay();
+  mShochiSel={};mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=[];window.mBussanPrice={};window.mShochiPrice={};window.mShochiDisc={};renderMShochiBtns();renderMBussanItems();resetMPay();
   document.getElementById('hist-btn').style.display='none';
   switchMTab('basic');
   document.getElementById('bmodal').classList.add('on');
@@ -4484,7 +4515,7 @@ function editBk(date,slot){
   mShochiSel={};(bk.shochi||[]).forEach(s=>{mShochiSel[s.id]=(s.qty||1);});renderMShochiBtns();
   if(bk.shochiMemo)document.getElementById('m-shochi-memo').value=bk.shochiMemo;
   else document.getElementById('m-shochi-memo').value='';
-  mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mBussanPrice={};window.mShochiPrice={};(bk.bussan||[]).forEach(b=>{mBussanQty[b.id]=(b.qty||0);});renderMBussanItems();
+  mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=(bk.freeGiven||[]).map(f=>({stockId:f.stockId,qty:f.qty}));window.mBussanPrice={};window.mShochiPrice={};(bk.bussan||[]).forEach(b=>{mBussanQty[b.id]=(b.qty||0);});renderMBussanItems();
   loadMPay(bk.pay||[],bk.payAmount||'');
   setTimeout(()=>{
     initPayItems(bk);
@@ -4718,8 +4749,31 @@ async function saveBk(){
     if(isNewBk) p.last=date;
     p.count=vc;
   }
-  shochiArr.forEach(s=>{if(s.id){const sm=shochiMaster.find(m=>m.id===s.id);if(sm?.stockId){const st=stockData.find(x=>x.id===sm.stockId);if(st)st.qty=Math.max(0,st.qty-s.qty);}}});
-  bussanArr.forEach(b=>{const master=bussanMaster.find(m=>m.id===b.id);if(master?.stockId){const st=stockData.find(x=>x.id===master.stockId);if(st)st.qty=Math.max(0,st.qty-b.qty);}});
+  // ★在庫連動：編集で再保存するたびに二重で減ってしまわないよう、
+  //   前回保存時の数量との「差分」だけを在庫に反映する方式にする
+  function adjustStockByDelta(newArr, prevArr, masterList){
+    const prevQty={}; (prevArr||[]).forEach(x=>{ if(x.id) prevQty[x.id]=(prevQty[x.id]||0)+(x.qty||0); });
+    const newQty={}; (newArr||[]).forEach(x=>{ if(x.id) newQty[x.id]=(newQty[x.id]||0)+(x.qty||0); });
+    const allIds=new Set([...Object.keys(prevQty),...Object.keys(newQty)]);
+    allIds.forEach(id=>{
+      const master=masterList.find(m=>m.id===id);
+      if(!master?.stockId) return;
+      const st=stockData.find(x=>x.id===master.stockId);
+      if(!st) return;
+      const delta=(newQty[id]||0)-(prevQty[id]||0); // 増えた分だけ在庫を減らす、減った分は在庫を戻す
+      st.qty=Math.max(0,st.qty-delta);
+    });
+  }
+  adjustStockByDelta(shochiArr, prevBk?.shochi, shochiMaster);
+  adjustStockByDelta(bussanArr, prevBk?.bussan, bussanMaster);
+  // ★無償提供分（シエラ・クラウドテープなど、施術時に無料で使う分）も在庫だけ差し引く
+  const freeGivenArr=(window.mFreeGiven||[]).filter(f=>f.stockId && f.qty>0);
+  bookings[date][slot].freeGiven=freeGivenArr;
+  adjustStockByDelta(
+    freeGivenArr.map(f=>({id:f.stockId,qty:f.qty})),
+    (prevBk?.freeGiven||[]).map(f=>({id:f.stockId,qty:f.qty})),
+    stockData.map(s=>({id:s.id,stockId:s.id}))
+  );
   const btn=document.getElementById('sbtn');btn.textContent='保存中...';btn.disabled=true;
   save();renderSched();renderPatients();closeModal();
   await pushB();if(p)await pushP();
