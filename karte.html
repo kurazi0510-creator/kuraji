@@ -10,7 +10,16 @@ body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;min-height:100vh;
 .header{background:#1e293b;color:white;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
 .header h1{font-size:0.85rem;font-weight:bold;}
 .back-btn{background:#f97316;color:white;padding:7px 14px;border:none;border-radius:7px;font-size:0.75rem;font-weight:bold;cursor:pointer;}
-.wrap{padding:10px;max-width:680px;margin:0 auto;}
+.wrap{padding:10px;max-width:1400px;margin:0 auto;}
+.main-layout{display:flex;gap:10px;align-items:flex-start;}
+.col-left{flex:0 0 auto;}
+.col-right{flex:1 1 380px;min-width:320px;}
+@media (max-width:900px){.main-layout{flex-direction:column;}.col-left{width:100%;}}
+.phrase-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;}
+.phrase-chip{padding:5px 10px;border:1.5px solid #cbd5e1;border-radius:14px;font-size:0.7rem;background:#f8fafc;color:#374151;cursor:pointer;white-space:nowrap;}
+.phrase-chip:active{background:#1e293b;color:#fff;}
+.phrase-group-lbl{font-size:0.66rem;color:#94a3b8;font-weight:bold;margin:4px 0 2px;}
+.soap-textarea{height:78px;}
 .card{background:white;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
 .patient-bar{display:flex;gap:8px;flex-wrap:wrap;}
 .patient-bar input{border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:0.82rem;flex:1;min-width:110px;}
@@ -54,72 +63,84 @@ textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;fon
   <input type="text" id="pt-cardid" placeholder="診察券No" style="max-width:110px">
   <input type="text" id="pt-name" placeholder="患者名">
   <input type="date" id="pt-date">
+  <button class="btn" style="background:#0891b2;color:white;flex:0 0 auto;padding:9px 14px" onclick="loadHistory()">📖 過去のカルテ</button>
 </div>
-<div class="card" style="padding:8px 10px">
-  <button class="btn" style="background:#0891b2;color:white;width:100%" onclick="loadHistory()">📖 この患者様の過去のカルテを見る</button>
-  <div id="history-list" style="margin-top:8px"></div>
+<div class="card" style="padding:6px 10px" id="history-box">
+  <div id="history-list"></div>
 </div>
 
-<div class="card" style="padding:8px 10px">
-  <div class="fig-tabs">
-    <button class="fig-tab active" onclick="sw('front',this)">正面</button>
-    <button class="fig-tab" onclick="sw('back',this)">背面</button>
-    <button class="fig-tab" onclick="sw('hand-r',this)">右手</button>
-    <button class="fig-tab" onclick="sw('hand-l',this)">左手</button>
-    <button class="fig-tab" onclick="sw('foot-r',this)">右足</button>
-    <button class="fig-tab" onclick="sw('foot-l',this)">左足</button>
-    <button class="fig-tab" onclick="sw('spine',this)">脊椎</button>
+<div class="main-layout">
+  <div class="col-left">
+    <div class="card" style="padding:8px 10px">
+      <div class="fig-tabs">
+        <button class="fig-tab active" onclick="sw('front',this)">正面</button>
+        <button class="fig-tab" onclick="sw('back',this)">背面</button>
+        <button class="fig-tab" onclick="sw('hand-r',this)">右手</button>
+        <button class="fig-tab" onclick="sw('hand-l',this)">左手</button>
+        <button class="fig-tab" onclick="sw('foot-r',this)">右足</button>
+        <button class="fig-tab" onclick="sw('foot-l',this)">左足</button>
+        <button class="fig-tab" onclick="sw('spine',this)">脊椎</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="tool-btn active" id="t-pen"    onclick="setT('pen')">✏️ ペン</button>
+        <button class="tool-btn"        id="t-circle" onclick="setT('circle')">⭕ 丸</button>
+        <button class="tool-btn"        id="t-arrow"  onclick="setT('arrow')">➡️ 矢印</button>
+        <button class="tool-btn"        id="t-erase"  onclick="setT('erase')">🧹 消す</button>
+        <div class="sep"></div>
+        <button class="color-dot on"  id="d-red"    style="background:#e74c3c" onclick="setC('#e74c3c')"></button>
+        <button class="color-dot"     id="d-blue"   style="background:#2980b9" onclick="setC('#2980b9')"></button>
+        <button class="color-dot"     id="d-black"  style="background:#2c3e50" onclick="setC('#2c3e50')"></button>
+        <button class="color-dot"     id="d-green"  style="background:#27ae60" onclick="setC('#27ae60')"></button>
+        <div class="sep"></div>
+        <button class="sz-btn active" id="s-s" onclick="setS(2)">細</button>
+        <button class="sz-btn"        id="s-m" onclick="setS(5)">中</button>
+        <button class="sz-btn"        id="s-l" onclick="setS(12)">太</button>
+      </div>
+    </div>
+
+    <div class="card canvas-box">
+      <div class="canvas-lbl" id="fig-lbl">正面</div>
+      <div class="canvas-wrap" id="cwrap">
+        <canvas id="c-bg"></canvas>
+        <canvas id="c-draw"></canvas>
+      </div>
+    </div>
+
+    <div class="card action-row">
+      <button class="btn b-undo" onclick="undo()">↩️ 戻す</button>
+      <button class="btn b-clr"  onclick="clrDraw()">🗑️ 消去</button>
+      <button class="btn b-dl"   onclick="dlImg()">📥 画像</button>
+    </div>
   </div>
-</div>
 
-<div class="card">
-  <div class="toolbar">
-    <button class="tool-btn active" id="t-pen"    onclick="setT('pen')">✏️ ペン</button>
-    <button class="tool-btn"        id="t-circle" onclick="setT('circle')">⭕ 丸</button>
-    <button class="tool-btn"        id="t-arrow"  onclick="setT('arrow')">➡️ 矢印</button>
-    <button class="tool-btn"        id="t-erase"  onclick="setT('erase')">🧹 消す</button>
-    <div class="sep"></div>
-    <button class="color-dot on"  id="d-red"    style="background:#e74c3c" onclick="setC('#e74c3c')"></button>
-    <button class="color-dot"     id="d-blue"   style="background:#2980b9" onclick="setC('#2980b9')"></button>
-    <button class="color-dot"     id="d-black"  style="background:#2c3e50" onclick="setC('#2c3e50')"></button>
-    <button class="color-dot"     id="d-green"  style="background:#27ae60" onclick="setC('#27ae60')"></button>
-    <div class="sep"></div>
-    <button class="sz-btn active" id="s-s" onclick="setS(2)">細</button>
-    <button class="sz-btn"        id="s-m" onclick="setS(5)">中</button>
-    <button class="sz-btn"        id="s-l" onclick="setS(12)">太</button>
+  <div class="col-right">
+    <div class="card">
+      <div class="memo-lbl">S｜主訴（患者様の訴え・自覚症状）</div>
+      <div class="phrase-chips" id="chips-s"></div>
+      <textarea class="soap-textarea" id="soap-s" placeholder="例：3日前から右肩が上がらない、朝起きた時に腰が痛い　など（上のボタンをタップすると自動で文章に追加されます）"></textarea>
+    </div>
+    <div class="card">
+      <div class="memo-lbl">O｜所見（可動域・圧痛・視診触診など客観的情報）</div>
+      <div class="phrase-chips" id="chips-o"></div>
+      <textarea class="soap-textarea" id="soap-o" placeholder="例：右肩関節屈曲120度で疼痛、L4/5棘突起周囲に圧痛あり　など"></textarea>
+    </div>
+    <div class="card">
+      <div class="memo-lbl">A｜評価（施術者の判断・考えられる原因）</div>
+      <div class="phrase-chips" id="chips-a"></div>
+      <textarea class="soap-textarea" id="soap-a" placeholder="例：筋緊張による可動域制限と考えられる　など"></textarea>
+    </div>
+    <div class="card">
+      <div class="memo-lbl">P｜方針（今後の施術計画・次回への申し送り）</div>
+      <div class="phrase-chips" id="chips-p"></div>
+      <textarea class="soap-textarea" id="soap-p" placeholder="例：週2回のペースで筋緊張緩和、次回は可動域再検査　など"></textarea>
+    </div>
+    <div class="card">
+      <button class="btn b-save" style="width:100%;padding:12px" onclick="saveRec()">💾 このカルテを保存</button>
+    </div>
   </div>
-</div>
-
-<div class="card canvas-box">
-  <div class="canvas-lbl" id="fig-lbl">正面</div>
-  <div class="canvas-wrap" id="cwrap">
-    <canvas id="c-bg"></canvas>
-    <canvas id="c-draw"></canvas>
-  </div>
-</div>
-
-<div class="card action-row">
-  <button class="btn b-undo" onclick="undo()">↩️ 戻す</button>
-  <button class="btn b-clr"  onclick="clrDraw()">🗑️ 消去</button>
-  <button class="btn b-save" onclick="saveRec()">💾 保存</button>
-  <button class="btn b-dl"   onclick="dlImg()">📥 画像</button>
-</div>
-
-<div class="card">
-  <div class="memo-lbl">S｜主訴（患者様の訴え・自覚症状）</div>
-  <textarea id="soap-s" placeholder="例：3日前から右肩が上がらない、朝起きた時に腰が痛い　など"></textarea>
-</div>
-<div class="card">
-  <div class="memo-lbl">O｜所見（可動域・圧痛・視診触診など客観的情報）</div>
-  <textarea id="soap-o" placeholder="例：右肩関節屈曲120度で疼痛、L4/5棘突起周囲に圧痛あり　など"></textarea>
-</div>
-<div class="card">
-  <div class="memo-lbl">A｜評価（施術者の判断・考えられる原因）</div>
-  <textarea id="soap-a" placeholder="例：筋緊張による可動域制限と考えられる　など"></textarea>
-</div>
-<div class="card">
-  <div class="memo-lbl">P｜方針（今後の施術計画・次回への申し送り）</div>
-  <textarea id="soap-p" placeholder="例：週2回のペースで筋緊張緩和、次回は可動域再検査　など"></textarea>
 </div>
 
 </div>
@@ -613,6 +634,33 @@ async function delKarteById(rowIdx){
     loadHistory();
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
+
+// ===== SOAPよく使う単語チップ（整体院向け。タップで自動追加、自由記入とも併用可） =====
+const PHRASES={
+  s:['右肩が痛い','左肩が痛い','首が痛い','腰が痛い','膝が痛い','背中が痛い','肩こり','しびれあり','重だるい',
+     '鋭い痛み','鈍い痛み','可動域制限あり','動かすと痛い','安静時も痛む','朝がつらい','デスクワークで悪化',
+     '立ち仕事で悪化','数日前から','当日から発症','以前からの慢性症状','交通事故による受傷'],
+  o:['圧痛あり','熱感なし','熱感あり','腫脹なし','腫脹あり','可動域制限あり','筋緊張強い','筋緊張中等度',
+     '左右差あり','姿勢：猫背','姿勢：反り腰','骨盤の傾きあり','トリガーポイントあり','SLRテスト陽性',
+     '深呼吸で疼痛増悪','夜間痛あり'],
+  a:['筋緊張による可動域制限','姿勢性による負担','使い過ぎによる炎症','慢性的な筋疲労','改善傾向',
+     '変化なし','悪化傾向','神経症状の関与を疑う','急性期を脱しつつある','安静指導が必要な状態'],
+  p:['週2回のペースで施術','週1回のペースで施術','経過観察','セルフケア指導実施','ストレッチ指導実施',
+     '次回可動域再検査','自費施術へ切替を検討','引き続き保険施術で対応','安静を指導','温熱療法追加を検討'],
+};
+function insertPhrase(key,text){
+  const ta=document.getElementById('soap-'+key);
+  const cur=ta.value.trim();
+  ta.value = cur ? (cur+'、'+text) : text;
+  ta.focus();
+}
+function renderChips(){
+  ['s','o','a','p'].forEach(key=>{
+    const el=document.getElementById('chips-'+key);
+    el.innerHTML=PHRASES[key].map(t=>`<span class="phrase-chip" onclick="insertPhrase('${key}','${t}')">${t}</span>`).join('');
+  });
+}
+renderChips();
 
 document.getElementById('pt-date').value=toLocalDateStr(new Date());
 resize('front');drawBg('front');
