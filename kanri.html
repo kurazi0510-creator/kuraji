@@ -3919,7 +3919,7 @@ function renderSched(){
     const bk=bkDate[s]||null,tr=document.createElement('tr');
     if(bk&&bk.cont){
       tr.className='cont';
-      tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb k-ct">↑継続中</span></td><td><span style="color:var(--muted);font-size:0.75rem">↑${bk.name||''}</span></td><td colspan="7"></td>`;
+      tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb k-ct">↑継続中</span></td><td><span style="color:var(--muted);font-size:0.75rem">↑${bk.name||''}</span></td><td colspan="6"></td><td><button class="btn bd bsm" onclick="delBk('${date}','${s}')">削除</button></td>`;
     }else if(bk&&bk.cancelled){
       tr.className='cancelled';
       const reason=bk.cancelReason||'';
