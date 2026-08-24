@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getAllBlockedSlotsDebug"){result=getAllBlockedSlotsDebug();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getAllBlockedSlotsDebug"){result=getAllBlockedSlotsDebug();}else if(action==="getKarteListByCardId"){result=getKarteListByCardId((e&&e.parameter&&e.parameter.cardId)||"");}else if(action==="getKarteById"){result=getKarteById((e&&e.parameter&&e.parameter.rowIdx)||"");}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -72,6 +72,8 @@ function doPost(e){
       else if(action==="updateWebBookingRequestStatus")result=updateWebBookingRequestStatus(body.rowIdx,body.status);
       else if(action==="toggleBlockedSlot")result=toggleBlockedSlot(body.date,body.time,body.block);
       else if(action==="sendTestEmailTo")result=sendTestEmailTo(body.email);
+      else if(action==="saveKarte")result=saveKarte(body.data);
+      else if(action==="deleteKarte")result=deleteKarte(body.rowIdx);
       else if(action==="saveMondoshin")result=saveMondoshin(body.data);
       else if(action==="saveMondoshinKotsu")result=saveMondoshinKotsu(body.data);
       else if(action==="getMenuMaster")result=getMenuMaster();
@@ -1300,6 +1302,61 @@ function getMondoshinKotsuById(rowIdx){
   var obj={rowIdx:rowIdx};
   MONDO_KOTSU_HEADERS_.forEach(function(h,idx){ obj[h]=String(row[idx]||""); });
   return {ok:true, data:obj};
+}
+// ═══════════════════════════════════════
+// ★電子カルテ（SOAP形式：主訴・所見・評価・方針。全国の整体院向けシステムを参考に設計）★
+// ═══════════════════════════════════════
+var KARTE_HEADERS_=["createdAt","cardId","name","visitDate","subjective","objective","assessment","plan","bodyImage","staffNote"];
+function saveKarte(data){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("karte");
+    if(!s){ s=ss.insertSheet("karte"); s.getRange(1,1,1,KARTE_HEADERS_.length).setValues([KARTE_HEADERS_]); }
+    if(!data.cardId || !data.name) return {ok:false, error:"診察券No・お名前は必須です"};
+    var row=KARTE_HEADERS_.map(function(h){
+      if(h==="createdAt") return Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss");
+      if(h==="visitDate") return data.visitDate||Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd");
+      return data[h]||"";
+    });
+    var newIdx=s.getLastRow()+1;
+    var rng=s.getRange(newIdx,1,1,row.length);
+    rng.setNumberFormat("@");
+    rng.setValues([row]);
+    return {ok:true, rowIdx:newIdx};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+function getKarteListByCardId(cardId){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("karte");
+  if(!s) return {ok:true, list:[]};
+  var data=s.getDataRange().getValues();
+  var list=[];
+  for(var i=1;i<data.length;i++){
+    if(String(data[i][1])!==String(cardId)) continue;
+    var obj={rowIdx:i+1};
+    KARTE_HEADERS_.forEach(function(h,idx){ obj[h]=String(data[i][idx]||""); });
+    list.push(obj);
+  }
+  list.sort(function(a,b){return a.visitDate<b.visitDate?1:-1;});
+  return {ok:true, list:list};
+}
+function getKarteById(rowIdx){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("karte");
+  if(!s) return {ok:false, error:"データがありません"};
+  var row=s.getRange(parseInt(rowIdx),1,1,KARTE_HEADERS_.length).getValues()[0];
+  var obj={rowIdx:rowIdx};
+  KARTE_HEADERS_.forEach(function(h,idx){ obj[h]=String(row[idx]||""); });
+  return {ok:true, data:obj};
+}
+function deleteKarte(rowIdx){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("karte");
+    if(!s) return {ok:false, error:"シートが見つかりません"};
+    s.deleteRow(parseInt(rowIdx));
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
 function getWebBookingRequests(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();

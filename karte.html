@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>電子カルテ - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;min-height:100vh;}
+.header{background:#1e293b;color:white;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.header h1{font-size:0.85rem;font-weight:bold;}
+.back-btn{background:#f97316;color:white;padding:7px 14px;border:none;border-radius:7px;font-size:0.75rem;font-weight:bold;cursor:pointer;}
+.wrap{padding:10px;max-width:680px;margin:0 auto;}
+.card{background:white;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.07);}
+.patient-bar{display:flex;gap:8px;flex-wrap:wrap;}
+.patient-bar input{border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:0.82rem;flex:1;min-width:110px;}
+.fig-tabs{display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+.fig-tab{padding:7px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:0.74rem;font-weight:bold;cursor:pointer;background:white;color:#374151;white-space:nowrap;flex-shrink:0;}
+.fig-tab.active{border-color:#1e293b;background:#1e293b;color:white;}
+.toolbar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.tool-btn{padding:7px 11px;border:2px solid #e2e8f0;border-radius:7px;font-size:0.73rem;font-weight:bold;cursor:pointer;background:white;color:#374151;}
+.tool-btn.active{border-color:#ef4444;background:#fef2f2;color:#dc2626;}
+.color-dot{width:28px;height:28px;border-radius:50%;border:3px solid white;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.25);flex-shrink:0;}
+.color-dot.on{box-shadow:0 0 0 3px #1e293b;}
+.sz-btn{padding:5px 10px;border:2px solid #e2e8f0;border-radius:6px;font-size:0.72rem;cursor:pointer;background:white;}
+.sz-btn.active{border-color:#1e293b;background:#1e293b;color:white;}
+.sep{width:1px;height:24px;background:#e2e8f0;flex-shrink:0;}
+.canvas-box{text-align:center;position:relative;}
+.canvas-lbl{font-size:0.8rem;color:#374151;font-weight:bold;margin-bottom:8px;}
+.canvas-wrap{position:relative;display:inline-block;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:white;}
+#c-bg{display:block;}
+#c-draw{position:absolute;top:0;left:0;touch-action:none;cursor:crosshair;}
+.action-row{display:flex;gap:6px;flex-wrap:wrap;}
+.btn{padding:9px 12px;border:none;border-radius:8px;font-size:0.78rem;font-weight:bold;cursor:pointer;flex:1;min-width:60px;}
+.b-undo{background:#e2e8f0;color:#374151;}
+.b-clr{background:#fef3c7;color:#92400e;}
+.b-save{background:#1e293b;color:white;}
+.b-dl{background:#16a34a;color:white;}
+.memo-lbl{font-size:0.75rem;color:#64748b;font-weight:bold;margin-bottom:4px;}
+textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;font-size:0.82rem;resize:none;height:64px;}
+.saved-hd{font-size:0.76rem;color:#64748b;font-weight:bold;margin-bottom:6px;}
+.saved-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:0.76rem;}
+.mb{padding:4px 10px;border:none;border-radius:5px;font-size:0.7rem;font-weight:bold;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📋 電子カルテ｜倉治整骨院</h1>
+  <button class="back-btn" onclick="location.href='kanri.html'">← 戻る</button>
+</div>
+<div class="wrap">
+
+<div class="card patient-bar">
+  <input type="text" id="pt-cardid" placeholder="診察券No" style="max-width:110px">
+  <input type="text" id="pt-name" placeholder="患者名">
+  <input type="date" id="pt-date">
+</div>
+<div class="card" style="padding:8px 10px">
+  <button class="btn" style="background:#0891b2;color:white;width:100%" onclick="loadHistory()">📖 この患者様の過去のカルテを見る</button>
+  <div id="history-list" style="margin-top:8px"></div>
+</div>
+
+<div class="card" style="padding:8px 10px">
+  <div class="fig-tabs">
+    <button class="fig-tab active" onclick="sw('front',this)">正面</button>
+    <button class="fig-tab" onclick="sw('back',this)">背面</button>
+    <button class="fig-tab" onclick="sw('hand-r',this)">右手</button>
+    <button class="fig-tab" onclick="sw('hand-l',this)">左手</button>
+    <button class="fig-tab" onclick="sw('foot-r',this)">右足</button>
+    <button class="fig-tab" onclick="sw('foot-l',this)">左足</button>
+    <button class="fig-tab" onclick="sw('spine',this)">脊椎</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="toolbar">
+    <button class="tool-btn active" id="t-pen"    onclick="setT('pen')">✏️ ペン</button>
+    <button class="tool-btn"        id="t-circle" onclick="setT('circle')">⭕ 丸</button>
+    <button class="tool-btn"        id="t-arrow"  onclick="setT('arrow')">➡️ 矢印</button>
+    <button class="tool-btn"        id="t-erase"  onclick="setT('erase')">🧹 消す</button>
+    <div class="sep"></div>
+    <button class="color-dot on"  id="d-red"    style="background:#e74c3c" onclick="setC('#e74c3c')"></button>
+    <button class="color-dot"     id="d-blue"   style="background:#2980b9" onclick="setC('#2980b9')"></button>
+    <button class="color-dot"     id="d-black"  style="background:#2c3e50" onclick="setC('#2c3e50')"></button>
+    <button class="color-dot"     id="d-green"  style="background:#27ae60" onclick="setC('#27ae60')"></button>
+    <div class="sep"></div>
+    <button class="sz-btn active" id="s-s" onclick="setS(2)">細</button>
+    <button class="sz-btn"        id="s-m" onclick="setS(5)">中</button>
+    <button class="sz-btn"        id="s-l" onclick="setS(12)">太</button>
+  </div>
+</div>
+
+<div class="card canvas-box">
+  <div class="canvas-lbl" id="fig-lbl">正面</div>
+  <div class="canvas-wrap" id="cwrap">
+    <canvas id="c-bg"></canvas>
+    <canvas id="c-draw"></canvas>
+  </div>
+</div>
+
+<div class="card action-row">
+  <button class="btn b-undo" onclick="undo()">↩️ 戻す</button>
+  <button class="btn b-clr"  onclick="clrDraw()">🗑️ 消去</button>
+  <button class="btn b-save" onclick="saveRec()">💾 保存</button>
+  <button class="btn b-dl"   onclick="dlImg()">📥 画像</button>
+</div>
+
+<div class="card">
+  <div class="memo-lbl">S｜主訴（患者様の訴え・自覚症状）</div>
+  <textarea id="soap-s" placeholder="例：3日前から右肩が上がらない、朝起きた時に腰が痛い　など"></textarea>
+</div>
+<div class="card">
+  <div class="memo-lbl">O｜所見（可動域・圧痛・視診触診など客観的情報）</div>
+  <textarea id="soap-o" placeholder="例：右肩関節屈曲120度で疼痛、L4/5棘突起周囲に圧痛あり　など"></textarea>
+</div>
+<div class="card">
+  <div class="memo-lbl">A｜評価（施術者の判断・考えられる原因）</div>
+  <textarea id="soap-a" placeholder="例：筋緊張による可動域制限と考えられる　など"></textarea>
+</div>
+<div class="card">
+  <div class="memo-lbl">P｜方針（今後の施術計画・次回への申し送り）</div>
+  <textarea id="soap-p" placeholder="例：週2回のペースで筋緊張緩和、次回は可動域再検査　など"></textarea>
+</div>
+
+</div>
+
+<script>
+// ===== 設定 =====
+const FIG={
+  front:  {lbl:'正面（前面）',w:220,h:420},
+  back:   {lbl:'背面（後面）',w:220,h:420},
+  'hand-r':{lbl:'右手（手のひら）',w:200,h:300},
+  'hand-l':{lbl:'左手（手のひら）',w:200,h:300},
+  'foot-r':{lbl:'右足（足裏）',w:180,h:340},
+  'foot-l':{lbl:'左足（足裏）',w:180,h:340},
+  spine:  {lbl:'脊椎（後面）',w:160,h:420},
+};
+let tool='pen',color='#e74c3c',sz=2;
+let drawing=false,sx=0,sy=0,lx=0,ly=0;
+let cur='front';
+const stacks={};
+
+const bg=document.getElementById('c-bg');
+const dr=document.getElementById('c-draw');
+const bx=bg.getContext('2d');
+const dx=dr.getContext('2d');
+
+function sw(key,btn){
+  saveSnap();cur=key;
+  document.querySelectorAll('.fig-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('fig-lbl').textContent=FIG[key].lbl;
+  resize(key);drawBg(key);restoreDraw(key);
+}
+function resize(key){
+  const f=FIG[key];
+  bg.width=dr.width=f.w;bg.height=dr.height=f.h;
+  bg.style.width=dr.style.width=f.w+'px';
+  bg.style.height=dr.style.height=f.h+'px';
+  document.getElementById('cwrap').style.cssText=`width:${f.w}px;height:${f.h}px`;
+}
+function saveSnap(){
+  const f=FIG[cur];if(!stacks[cur])stacks[cur]=[];
+  stacks[cur].push(dx.getImageData(0,0,f.w,f.h));
+  if(stacks[cur].length>60)stacks[cur].shift();
+}
+function restoreDraw(key){
+  dx.clearRect(0,0,dr.width,dr.height);
+  const st=stacks[key];
+  if(st&&st.length>0)dx.putImageData(st[st.length-1],0,0);
+}
+
+// ===== SVGベースの人体図 =====
+function drawBg(key){
+  const f=FIG[key];
+  bx.fillStyle='#fff';bx.fillRect(0,0,f.w,f.h);
+
+  // SVGをImageとして描画
+  const svg=getSVG(key,f.w,f.h);
+  const blob=new Blob([svg],{type:'image/svg+xml'});
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+  img.onload=()=>{bx.drawImage(img,0,0,f.w,f.h);URL.revokeObjectURL(url);};
+  img.src=url;
+}
+
+function getSVG(key,w,h){
+  const cx=w/2;
+  let body='';
+
+  if(key==='front'){
+    body=`
+    <!-- 右左ラベル -->
+    <text x="18" y="16" font-size="11" fill="#999" font-family="sans-serif">右</text>
+    <text x="${w-28}" y="16" font-size="11" fill="#999" font-family="sans-serif">左</text>
+
+    <!-- 頭部 -->
+    <ellipse cx="${cx}" cy="30" rx="22" ry="26" fill="#f5f0eb" stroke="#555" stroke-width="1.5"/>
+    <!-- 耳 -->
+    <ellipse cx="${cx-23}" cy="30" rx="4" ry="7" fill="#f5f0eb" stroke="#666" stroke-width="1.2"/>
+    <ellipse cx="${cx+23}" cy="30" rx="4" ry="7" fill="#f5f0eb" stroke="#666" stroke-width="1.2"/>
+    <!-- 顔のパーツ -->
+    <ellipse cx="${cx-8}" cy="25" rx="3" ry="2" fill="#888"/>
+    <ellipse cx="${cx+8}" cy="25" rx="3" ry="2" fill="#888"/>
+    <line x1="${cx-3}" y1="30" x2="${cx}" y2="33" stroke="#888" stroke-width="1"/>
+    <line x1="${cx+3}" y1="30" x2="${cx}" y2="33" stroke="#888" stroke-width="1"/>
+    <path d="M${cx-5} 38 Q${cx} 42 ${cx+5} 38" stroke="#888" stroke-width="1" fill="none"/>
+    <!-- 首 -->
+    <rect x="${cx-8}" y="55" width="16" height="16" rx="3" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+    <!-- 鎖骨 -->
+    <path d="M${cx-8} 71 Q${cx-22} 69 ${cx-38} 76" stroke="#777" stroke-width="1.5" fill="none"/>
+    <path d="M${cx+8} 71 Q${cx+22} 69 ${cx+38} 76" stroke="#777" stroke-width="1.5" fill="none"/>
+    <!-- 胴体輪郭 -->
+    <path d="M${cx-38} 74 
+             L${cx+38} 74
+             C${cx+42} 90 ${cx+40} 120 ${cx+36} 150
+             C${cx+33} 170 ${cx+31} 185 ${cx+30} 198
+             L${cx-30} 198
+             C${cx-31} 185 ${cx-33} 170 ${cx-36} 150
+             C${cx-40} 120 ${cx-42} 90 ${cx-38} 74Z"
+          fill="#f5f0eb" stroke="#555" stroke-width="1.5"/>
+    <!-- 胸部ライン -->
+    <line x1="${cx}" y1="78" x2="${cx}" y2="140" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,4"/>
+    <!-- 肋骨 -->
+    <path d="M${cx-7} 100 Q${cx-20} 107 ${cx-35} 110" stroke="#bbb" stroke-width="1" fill="none"/>
+    <path d="M${cx+7} 100 Q${cx+20} 107 ${cx+35} 110" stroke="#bbb" stroke-width="1" fill="none"/>
+    <path d="M${cx-7} 115 Q${cx-20} 122 ${cx-35} 125" stroke="#bbb" stroke-width="1" fill="none"/>
+    <path d="M${cx+7} 115 Q${cx+20} 122 ${cx+35} 125" stroke="#bbb" stroke-width="1" fill="none"/>
+    <path d="M${cx-7} 130 Q${cx-22} 137 ${cx-35} 138" stroke="#bbb" stroke-width="1" fill="none"/>
+    <path d="M${cx+7} 130 Q${cx+22} 137 ${cx+35} 138" stroke="#bbb" stroke-width="1" fill="none"/>
+    <!-- 骨盤 -->
+    <path d="M${cx-30} 198 Q${cx-36} 206 ${cx-34} 215 Q${cx-20} 222 ${cx} 222 Q${cx+20} 222 ${cx+34} 215 Q${cx+36} 206 ${cx+30} 198Z"
+          fill="#ede8e0" stroke="#555" stroke-width="1.4"/>
+    <!-- 左腕（右表示） -->
+    <path d="M${cx-38} 78 C${cx-52} 82 ${cx-58} 100 ${cx-58} 120 C${cx-58} 145 ${cx-54} 168 ${cx-52} 185"
+          stroke="#555" stroke-width="10" stroke-linecap="round" fill="none" stroke-linejoin="round"/>
+    <path d="M${cx-38} 78 C${cx-52} 82 ${cx-58} 100 ${cx-58} 120 C${cx-58} 145 ${cx-54} 168 ${cx-52} 185"
+          stroke="#f5f0eb" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <!-- 左前腕 -->
+    <path d="M${cx-52} 185 C${cx-52} 198 ${cx-50} 215 ${cx-48} 232"
+          stroke="#555" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-52} 185 C${cx-52} 198 ${cx-50} 215 ${cx-48} 232"
+          stroke="#f5f0eb" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <!-- 左手 -->
+    <ellipse cx="${cx-46}" cy="238" rx="10" ry="8" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+    <!-- 右腕 -->
+    <path d="M${cx+38} 78 C${cx+52} 82 ${cx+58} 100 ${cx+58} 120 C${cx+58} 145 ${cx+54} 168 ${cx+52} 185"
+          stroke="#555" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+38} 78 C${cx+52} 82 ${cx+58} 100 ${cx+58} 120 C${cx+58} 145 ${cx+54} 168 ${cx+52} 185"
+          stroke="#f5f0eb" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+52} 185 C${cx+52} 198 ${cx+50} 215 ${cx+48} 232"
+          stroke="#555" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+52} 185 C${cx+50} 198 ${cx+50} 215 ${cx+48} 232"
+          stroke="#f5f0eb" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <ellipse cx="${cx+46}" cy="238" rx="10" ry="8" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+    <!-- 左大腿 -->
+    <path d="M${cx-8} 222 C${cx-16} 230 ${cx-22} 260 ${cx-20} 300 C${cx-19} 316 ${cx-18} 326 ${cx-17} 336"
+          stroke="#555" stroke-width="13" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-8} 222 C${cx-16} 230 ${cx-22} 260 ${cx-20} 300 C${cx-19} 316 ${cx-18} 326 ${cx-17} 336"
+          stroke="#f5f0eb" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <!-- 左膝 -->
+    <circle cx="${cx-17}" cy="340" r="12" fill="#ede8e0" stroke="#555" stroke-width="1.3"/>
+    <!-- 左下腿 -->
+    <path d="M${cx-17} 352 C${cx-18} 368 ${cx-17} 388 ${cx-15} 410"
+          stroke="#555" stroke-width="11" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-17} 352 C${cx-18} 368 ${cx-17} 388 ${cx-15} 410"
+          stroke="#f5f0eb" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <!-- 左足首・足 -->
+    <ellipse cx="${cx-14}" cy="416" rx="7" ry="5" fill="#f5f0eb" stroke="#555" stroke-width="1.2"/>
+    <path d="M${cx-22} 418 Q${cx-26} 420 ${cx-10} 420 Q${cx+2} 420 ${cx} 418" stroke="#555" stroke-width="1.5" fill="#f5f0eb"/>
+    <!-- 右大腿 -->
+    <path d="M${cx+8} 222 C${cx+16} 230 ${cx+22} 260 ${cx+20} 300 C${cx+19} 316 ${cx+18} 326 ${cx+17} 336"
+          stroke="#555" stroke-width="13" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+8} 222 C${cx+16} 230 ${cx+22} 260 ${cx+20} 300 C${cx+19} 316 ${cx+18} 326 ${cx+17} 336"
+          stroke="#f5f0eb" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <circle cx="${cx+17}" cy="340" r="12" fill="#ede8e0" stroke="#555" stroke-width="1.3"/>
+    <path d="M${cx+17} 352 C${cx+18} 368 ${cx+17} 388 ${cx+15} 410"
+          stroke="#555" stroke-width="11" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+17} 352 C${cx+18} 368 ${cx+17} 388 ${cx+15} 410"
+          stroke="#f5f0eb" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <ellipse cx="${cx+14}" cy="416" rx="7" ry="5" fill="#f5f0eb" stroke="#555" stroke-width="1.2"/>
+    <path d="M${cx+22} 418 Q${cx+26} 420 ${cx+10} 420 Q${cx-2} 420 ${cx} 418" stroke="#555" stroke-width="1.5" fill="#f5f0eb"/>
+    `;
+  } else if(key==='back'){
+    body=`
+    <text x="18" y="16" font-size="11" fill="#999" font-family="sans-serif">右</text>
+    <text x="${w-28}" y="16" font-size="11" fill="#999" font-family="sans-serif">左</text>
+    <!-- 頭部（後面） -->
+    <ellipse cx="${cx}" cy="30" rx="22" ry="26" fill="#f5f0eb" stroke="#555" stroke-width="1.5"/>
+    <ellipse cx="${cx-23}" cy="30" rx="4" ry="7" fill="#f5f0eb" stroke="#666" stroke-width="1.2"/>
+    <ellipse cx="${cx+23}" cy="30" rx="4" ry="7" fill="#f5f0eb" stroke="#666" stroke-width="1.2"/>
+    <!-- 後頭部正中線 -->
+    <line x1="${cx}" y1="8" x2="${cx}" y2="54" stroke="#aaa" stroke-width="0.8" stroke-dasharray="3,4"/>
+    <!-- 首 -->
+    <rect x="${cx-8}" y="55" width="16" height="16" rx="3" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+    <!-- 胴体（背面） -->
+    <path d="M${cx-38} 74 L${cx+38} 74
+             C${cx+42} 90 ${cx+40} 120 ${cx+36} 150
+             C${cx+33} 170 ${cx+31} 185 ${cx+30} 198
+             L${cx-30} 198
+             C${cx-31} 185 ${cx-33} 170 ${cx-36} 150
+             C${cx-40} 120 ${cx-42} 90 ${cx-38} 74Z"
+          fill="#f5f0eb" stroke="#555" stroke-width="1.5"/>
+    <!-- 脊柱 -->
+    <line x1="${cx}" y1="74" x2="${cx}" y2="198" stroke="#888" stroke-width="1.5" stroke-dasharray="5,4"/>
+    <!-- 肩甲骨（右） -->
+    <path d="M${cx-15} 82 L${cx-36} 86 L${cx-40} 136 L${cx-20} 144 Z"
+          fill="#ede8e0" stroke="#666" stroke-width="1.3"/>
+    <!-- 肩甲棘（右） -->
+    <line x1="${cx-15}" y1="96" x2="${cx-40}" y2="94" stroke="#777" stroke-width="1.4"/>
+    <!-- 肩甲骨（左） -->
+    <path d="M${cx+15} 82 L${cx+36} 86 L${cx+40} 136 L${cx+20} 144 Z"
+          fill="#ede8e0" stroke="#666" stroke-width="1.3"/>
+    <line x1="${cx+15}" y1="96" x2="${cx+40}" y2="94" stroke="#777" stroke-width="1.4"/>
+    <!-- 骨盤（背面） -->
+    <path d="M${cx-30} 198 Q${cx-36} 206 ${cx-34} 215 Q${cx-20} 222 ${cx} 222 Q${cx+20} 222 ${cx+34} 215 Q${cx+36} 206 ${cx+30} 198Z"
+          fill="#ede8e0" stroke="#555" stroke-width="1.4"/>
+    <!-- 臀部割れ目 -->
+    <line x1="${cx}" y1="200" x2="${cx}" y2="222" stroke="#aaa" stroke-width="1"/>
+    <!-- 腕（背面） -->
+    <path d="M${cx-38} 78 C${cx-52} 82 ${cx-58} 100 ${cx-58} 120 C${cx-58} 145 ${cx-54} 168 ${cx-52} 185"
+          stroke="#555" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-38} 78 C${cx-52} 82 ${cx-58} 100 ${cx-58} 120 C${cx-58} 145 ${cx-54} 168 ${cx-52} 185"
+          stroke="#f5f0eb" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-52} 185 C${cx-52} 198 ${cx-50} 215 ${cx-48} 232"
+          stroke="#555" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-52} 185 C${cx-52} 198 ${cx-50} 215 ${cx-48} 232"
+          stroke="#f5f0eb" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <ellipse cx="${cx-46}" cy="238" rx="10" ry="8" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+    <path d="M${cx+38} 78 C${cx+52} 82 ${cx+58} 100 ${cx+58} 120 C${cx+58} 145 ${cx+54} 168 ${cx+52} 185"
+          stroke="#555" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+38} 78 C${cx+52} 82 ${cx+58} 100 ${cx+58} 120 C${cx+58} 145 ${cx+54} 168 ${cx+52} 185"
+          stroke="#f5f0eb" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+52} 185 C${cx+52} 198 ${cx+50} 215 ${cx+48} 232"
+          stroke="#555" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+52} 185 C${cx+50} 198 ${cx+50} 215 ${cx+48} 232"
+          stroke="#f5f0eb" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <ellipse cx="${cx+46}" cy="238" rx="10" ry="8" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+    <!-- 脚（背面） -->
+    <path d="M${cx-8} 222 C${cx-16} 230 ${cx-22} 260 ${cx-20} 300 C${cx-19} 316 ${cx-18} 326 ${cx-17} 336"
+          stroke="#555" stroke-width="13" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-8} 222 C${cx-16} 230 ${cx-22} 260 ${cx-20} 300 C${cx-19} 316 ${cx-18} 326 ${cx-17} 336"
+          stroke="#f5f0eb" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <circle cx="${cx-17}" cy="340" r="12" fill="#ede8e0" stroke="#555" stroke-width="1.3"/>
+    <path d="M${cx-17} 352 C${cx-18} 368 ${cx-17} 388 ${cx-15} 410"
+          stroke="#555" stroke-width="11" stroke-linecap="round" fill="none"/>
+    <path d="M${cx-17} 352 C${cx-18} 368 ${cx-17} 388 ${cx-15} 410"
+          stroke="#f5f0eb" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <ellipse cx="${cx-14}" cy="416" rx="7" ry="5" fill="#f5f0eb" stroke="#555" stroke-width="1.2"/>
+    <path d="M${cx-22} 418 Q${cx-26} 420 ${cx-10} 420 Q${cx+2} 420 ${cx} 418" stroke="#555" stroke-width="1.5" fill="#f5f0eb"/>
+    <path d="M${cx+8} 222 C${cx+16} 230 ${cx+22} 260 ${cx+20} 300 C${cx+19} 316 ${cx+18} 326 ${cx+17} 336"
+          stroke="#555" stroke-width="13" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+8} 222 C${cx+16} 230 ${cx+22} 260 ${cx+20} 300 C${cx+19} 316 ${cx+18} 326 ${cx+17} 336"
+          stroke="#f5f0eb" stroke-width="10" stroke-linecap="round" fill="none"/>
+    <circle cx="${cx+17}" cy="340" r="12" fill="#ede8e0" stroke="#555" stroke-width="1.3"/>
+    <path d="M${cx+17} 352 C${cx+18} 368 ${cx+17} 388 ${cx+15} 410"
+          stroke="#555" stroke-width="11" stroke-linecap="round" fill="none"/>
+    <path d="M${cx+17} 352 C${cx+18} 368 ${cx+17} 388 ${cx+15} 410"
+          stroke="#f5f0eb" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <ellipse cx="${cx+14}" cy="416" rx="7" ry="5" fill="#f5f0eb" stroke="#555" stroke-width="1.2"/>
+    <path d="M${cx+22} 418 Q${cx+26} 420 ${cx+10} 420 Q${cx-2} 420 ${cx} 418" stroke="#555" stroke-width="1.5" fill="#f5f0eb"/>
+    `;
+  } else if(key==='hand-r'||key==='hand-l'){
+    const s=key==='hand-r'?-1:1;
+    body=`
+    <!-- 手首 -->
+    <rect x="${cx-34}" y="${h-48}" width="68" height="30" rx="8" fill="#f5f0eb" stroke="#555" stroke-width="1.4"/>
+    <!-- 手のひら -->
+    <path d="M${cx-34} ${h-48} C${cx-38} ${h-100} ${cx-36} ${h-158} ${cx-30} ${h-168}
+             Q${cx} ${h-175} ${cx+30} ${h-168}
+             C${cx+36} ${h-158} ${cx+38} ${h-100} ${cx+34} ${h-48}Z"
+          fill="#f5f0eb" stroke="#555" stroke-width="1.5"/>
+    <!-- 掌の内側線 -->
+    <path d="M${cx-10} ${h-50} C${cx-12} ${h-100} ${cx-10} ${h-140} ${cx-8} ${h-165}" stroke="#ddd" stroke-width="0.8" fill="none"/>
+    <path d="M${cx+5} ${h-50} C${cx+3} ${h-100} ${cx+5} ${h-140} ${cx+8} ${h-165}" stroke="#ddd" stroke-width="0.8" fill="none"/>
+    <!-- 4本指 -->
+    ${[-28,-12,4,20].map((fx,i)=>{
+      const fh=[62,76,72,62][i];
+      return `<rect x="${cx+fx}" y="${h-168-fh}" width="14" height="${fh}" rx="7" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+      <line x1="${cx+fx+1}" y1="${h-168-fh*0.65}" x2="${cx+fx+13}" y2="${h-168-fh*0.65}" stroke="#ddd" stroke-width="0.8"/>
+      <line x1="${cx+fx+1}" y1="${h-168-fh*0.35}" x2="${cx+fx+13}" y2="${h-168-fh*0.35}" stroke="#ddd" stroke-width="0.8"/>`;
+    }).join('')}
+    <!-- 親指 -->
+    <g transform="translate(${cx+s*40} ${h-130}) rotate(${s*50})">
+      <rect x="-7" y="-52" width="14" height="52" rx="7" fill="#f5f0eb" stroke="#555" stroke-width="1.3"/>
+      <line x1="-6" y1="-30" x2="6" y2="-30" stroke="#ddd" stroke-width="0.8"/>
+    </g>
+    <!-- ラベル -->
+    <text x="${cx}" y="${h-6}" font-size="10" fill="#999" text-anchor="middle" font-family="sans-serif">${key==='hand-r'?'右手（手のひら）':'左手（手のひら）'}</text>
+    ${key==='hand-r'?
+      `<text x="${cx-21}" y="${h-245}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">小</text>
+       <text x="${cx-7}" y="${h-248}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">薬</text>
+       <text x="${cx+7}" y="${h-245}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">中</text>
+       <text x="${cx+21}" y="${h-238}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">人</text>
+       <text x="${cx+54}" y="${h-178}" font-size="8" fill="#bbb" font-family="sans-serif">親</text>`:
+      `<text x="${cx-21}" y="${h-238}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">人</text>
+       <text x="${cx-7}" y="${h-245}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">中</text>
+       <text x="${cx+7}" y="${h-248}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">薬</text>
+       <text x="${cx+21}" y="${h-245}" font-size="8" fill="#bbb" text-anchor="middle" font-family="sans-serif">小</text>
+       <text x="${cx-62}" y="${h-178}" font-size="8" fill="#bbb" font-family="sans-serif">親</text>`}
+    `;
+  } else if(key==='foot-r'||key==='foot-l'){
+    const s=key==='foot-r'?-1:1;
+    body=`
+    <!-- かかと -->
+    <ellipse cx="${cx}" cy="${h-30}" rx="30" ry="22" fill="#f5f0eb" stroke="#555" stroke-width="1.5"/>
+    <text x="${cx}" y="${h-26}" font-size="8" fill="#aaa" text-anchor="middle" font-family="sans-serif">かかと</text>
+    <!-- 足の本体 -->
+    <path d="M${cx-28} ${h-44}
+             C${cx-32} ${h-100} ${cx+s*12} ${h-188} ${cx+s*16} ${h-270}
+             C${cx+s*18} ${h-296} ${cx+s*14} ${h-310} ${cx+s*6} ${h-314}
+             L${cx-s*20} ${h-312}
+             C${cx-s*26} ${h-290} ${cx-s*28} ${h-260} ${cx-s*24} ${h-240}
+             C${cx-s*18} ${h-180} ${cx+28} ${h-90} ${cx+28} ${h-44}Z"
+          fill="#f5f0eb" stroke="#555" stroke-width="1.5"/>
+    <!-- 土踏まず -->
+    <path d="M${cx-s*22} ${h-80} C${cx-s*6} ${h-160} ${cx-s*4} ${h-230} ${cx-s*6} ${h-300}"
+          stroke="#ddd" stroke-width="1" fill="none" stroke-dasharray="3,4"/>
+    <!-- 5本の足趾 -->
+    ${[
+      {dx:-s*20,fw:16,fh:34},{dx:-s*6,fw:16,fh:42},{dx:s*8,fw:16,fh:40},
+      {dx:s*22,fw:13,fh:33},{dx:s*34,fw:11,fh:26}
+    ].map((t,i)=>`
+      <rect x="${cx+t.dx}" y="${h-316-t.fh}" width="${t.fw}" height="${t.fh}" rx="${t.fw/2}" fill="#f5f0eb" stroke="#555" stroke-width="1.2"/>
+      <text x="${cx+t.dx+t.fw/2}" y="${h-320-t.fh}" font-size="7" fill="#bbb" text-anchor="middle" font-family="sans-serif">${i+1}趾</text>
+    `).join('')}
+    <text x="${cx}" y="${h-6}" font-size="10" fill="#999" text-anchor="middle" font-family="sans-serif">${key==='foot-r'?'右足（足裏）':'左足（足裏）'}</text>
+    `;
+  } else if(key==='spine'){
+    const secs=[
+      {n:'C',lbl:'頸椎',cnt:7,c:'#dbeafe',y:42,gh:20,gw:46},
+      {n:'T',lbl:'胸椎',cnt:12,c:'#dcfce7',y:186,gh:14,gw:42},
+      {n:'L',lbl:'腰椎',cnt:5,c:'#fef9c3',y:366,gh:20,gw:50},
+      {n:'S',lbl:'仙椎',cnt:1,c:'#fce7f3',y:468,gh:34,gw:56},
+      {n:'Co',lbl:'尾骨',cnt:1,c:'#f3e8ff',y:508,gh:16,gw:36},
+    ];
+    body=`
+    <!-- 頭蓋骨 -->
+    <ellipse cx="${cx}" cy="20" rx="16" ry="18" fill="#ede8e0" stroke="#555" stroke-width="1.4"/>
+    <!-- 中心線 -->
+    <line x1="${cx}" y1="38" x2="${cx}" y2="${h-10}" stroke="#93c5fd" stroke-width="1" stroke-dasharray="4,4"/>
+    ${secs.map(s=>
+      Array.from({length:s.cnt},(_,i)=>{
+        const y=s.y+i*(s.gh+2);
+        return `<rect x="${cx-s.gw/2}" y="${y}" width="${s.gw}" height="${s.gh}" rx="4" fill="${s.c}" stroke="#888" stroke-width="1.2"/>
+        <line x1="${cx-s.gw/2}" y1="${y+s.gh/2}" x2="${cx-s.gw/2-9}" y2="${y+s.gh/2+2}" stroke="#aaa" stroke-width="1"/>
+        <line x1="${cx+s.gw/2}" y1="${y+s.gh/2}" x2="${cx+s.gw/2+9}" y2="${y+s.gh/2+2}" stroke="#aaa" stroke-width="1"/>
+        <text x="${cx}" y="${y+s.gh-4}" font-size="8" fill="#374151" text-anchor="middle" font-family="sans-serif" font-weight="bold">${s.n}${i+1}</text>`;
+      }).join('')
+    ).join('')}
+    ${secs.map(s=>`<text x="${cx-s.gw/2-12}" y="${s.y+s.gh/2+4}" font-size="9" fill="#555" text-anchor="end" font-family="sans-serif" font-weight="bold">${s.lbl}</text>`).join('')}
+    <text x="${cx}" y="${h-4}" font-size="9" fill="#999" text-anchor="middle" font-family="sans-serif">脊椎（後面）</text>
+    `;
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <rect width="${w}" height="${h}" fill="white"/>
+    ${body}
+  </svg>`;
+}
+
+// ===== イベント =====
+function getP(e){
+  const r=dr.getBoundingClientRect();
+  const sx2=dr.width/r.width,sy2=dr.height/r.height;
+  const s2=e.touches?e.touches[0]:e;
+  return{x:(s2.clientX-r.left)*sx2,y:(s2.clientY-r.top)*sy2};
+}
+dr.addEventListener('mousedown',onS);dr.addEventListener('touchstart',onS,{passive:false});
+dr.addEventListener('mousemove',onM);dr.addEventListener('touchmove',onM,{passive:false});
+dr.addEventListener('mouseup',onE);dr.addEventListener('touchend',onE,{passive:false});
+
+function onS(e){
+  e.preventDefault();drawing=true;
+  const p=getP(e);sx=lx=p.x;sy=ly=p.y;
+  if(!stacks[cur])stacks[cur]=[];
+  stacks[cur].push(dx.getImageData(0,0,dr.width,dr.height));
+  if(stacks[cur].length>60)stacks[cur].shift();
+  dx.globalCompositeOperation='source-over';
+}
+function onM(e){
+  e.preventDefault();if(!drawing)return;
+  const p=getP(e);
+  if(tool==='pen'){
+    dx.globalCompositeOperation='source-over';
+    dx.strokeStyle=color;dx.lineWidth=sz;dx.lineCap='round';dx.lineJoin='round';
+    dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();
+    lx=p.x;ly=p.y;
+  }else if(tool==='erase'){
+    dx.globalCompositeOperation='destination-out';
+    dx.lineWidth=sz*6;dx.lineCap='round';
+    dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();
+    lx=p.x;ly=p.y;
+  }else{
+    const st=stacks[cur];
+    dx.globalCompositeOperation='source-over';
+    dx.clearRect(0,0,dr.width,dr.height);
+    if(st&&st.length>0)dx.putImageData(st[st.length-1],0,0);
+    dx.strokeStyle=color;dx.lineWidth=sz;dx.lineCap='round';
+    if(tool==='circle'){
+      const r=Math.hypot(p.x-sx,p.y-sy);
+      dx.beginPath();dx.arc(sx,sy,r,0,Math.PI*2);dx.stroke();
+    }else{
+      const ang=Math.atan2(p.y-sy,p.x-sx),len=Math.min(22,Math.hypot(p.x-sx,p.y-sy)*0.35);
+      dx.beginPath();dx.moveTo(sx,sy);dx.lineTo(p.x,p.y);dx.stroke();
+      dx.beginPath();dx.moveTo(p.x,p.y);dx.lineTo(p.x-len*Math.cos(ang-0.45),p.y-len*Math.sin(ang-0.45));dx.lineTo(p.x-len*Math.cos(ang+0.45),p.y-len*Math.sin(ang+0.45));dx.closePath();dx.fillStyle=color;dx.fill();
+    }
+  }
+}
+function onE(e){e.preventDefault();drawing=false;dx.globalCompositeOperation='source-over';}
+
+function setT(t){tool=t;document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));document.getElementById('t-'+t).classList.add('active');}
+function setC(c){color=c;document.querySelectorAll('.color-dot').forEach(b=>b.classList.remove('on'));const m={'#e74c3c':'d-red','#2980b9':'d-blue','#2c3e50':'d-black','#27ae60':'d-green'};if(m[c])document.getElementById(m[c]).classList.add('on');}
+function setS(s){sz=s;document.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('active'));const m={2:'s-s',5:'s-m',12:'s-l'};if(m[s])document.getElementById(m[s]).classList.add('active');}
+function undo(){const st=stacks[cur];if(!st||!st.length)return;const p=st.pop();dx.globalCompositeOperation='source-over';dx.clearRect(0,0,dr.width,dr.height);dx.putImageData(p,0,0);}
+function clrDraw(){if(!confirm('書き込みを消去しますか？'))return;saveSnap();dx.clearRect(0,0,dr.width,dr.height);}
+
+function makeImg(){
+  const tmp=document.createElement('canvas');tmp.width=bg.width+40;tmp.height=bg.height+52;
+  const tc=tmp.getContext('2d');
+  tc.fillStyle='#fff';tc.fillRect(0,0,tmp.width,tmp.height);
+  const name=document.getElementById('pt-name').value||'患者名';
+  const date=document.getElementById('pt-date').value||'';
+  tc.fillStyle='#1e293b';tc.font='bold 13px sans-serif';tc.textAlign='left';
+  tc.fillText('倉治整骨院 症状記入シート',20,18);
+  tc.font='11px sans-serif';tc.fillStyle='#374151';
+  tc.fillText(date+'  '+name+'  '+FIG[cur].lbl,20,34);
+  tc.drawImage(bg,20,44);tc.drawImage(dr,20,44);
+  const memo=document.getElementById('memo').value;
+  if(memo){tc.font='10px sans-serif';tc.fillStyle='#374151';tc.fillText('症状：'+memo.slice(0,60),20,tmp.height-5);}
+  return tmp;
+}
+function dlImg(){
+  const a=document.createElement('a');
+  const n=document.getElementById('pt-name').value||'症状図';
+  const d=document.getElementById('pt-date').value||'';
+  a.download=d+'_'+n+'_'+FIG[cur].lbl.replace(/[^\w\u3040-\u9fff]/g,'')+'.png';
+  a.href=makeImg().toDataURL();a.click();
+}
+function toLocalDateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+
+async function saveRec(){
+  const cardId=document.getElementById('pt-cardid').value.trim();
+  const name=document.getElementById('pt-name').value.trim();
+  if(!cardId||!name){ alert('診察券No・患者名は必須です'); return; }
+  const visitDate=document.getElementById('pt-date').value||toLocalDateStr(new Date());
+  const tmp=document.createElement('canvas');tmp.width=bg.width;tmp.height=bg.height;
+  const tc=tmp.getContext('2d');tc.drawImage(bg,0,0);tc.drawImage(dr,0,0);
+  const bodyImage=tmp.toDataURL('image/jpeg',0.7);
+  const data={
+    cardId, name, visitDate,
+    subjective:document.getElementById('soap-s').value.trim(),
+    objective:document.getElementById('soap-o').value.trim(),
+    assessment:document.getElementById('soap-a').value.trim(),
+    plan:document.getElementById('soap-p').value.trim(),
+    bodyImage,
+    staffNote:cur, // どの部位図を使ったかも記録
+  };
+  const btn=event?.target; if(btn){btn.disabled=true;btn.textContent='保存中...';}
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveKarte',data})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 保存に失敗しました：'+(d.error||'')); }
+    else{ alert('✅ カルテを保存しました'); loadHistory(); }
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+  if(btn){btn.disabled=false;btn.textContent='💾 保存';}
+}
+
+async function loadHistory(){
+  const cardId=document.getElementById('pt-cardid').value.trim();
+  const box=document.getElementById('history-list');
+  if(!cardId){ alert('診察券Noを入力してください'); return; }
+  box.innerHTML='<p style="color:#94a3b8;font-size:0.78rem;text-align:center;padding:10px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getKarteListByCardId&cardId='+encodeURIComponent(cardId)+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ box.innerHTML='<p style="color:#94a3b8;font-size:0.78rem;text-align:center;padding:10px">過去のカルテはまだありません</p>'; return; }
+    box.innerHTML=list.map(k=>`<div class="saved-row"><span style="flex:1">${k.visitDate} <b>${k.name}</b>${k.subjective?'<br><small style="color:#64748b">S: '+k.subjective.slice(0,26)+'</small>':''}</span><button class="mb" style="background:#eff6ff;color:#1d4ed8;margin-right:4px" onclick="loadKarteById(${k.rowIdx})">表示</button><button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delKarteById(${k.rowIdx})">削除</button></div>`).join('');
+  }catch(e){ box.innerHTML='<p style="color:#dc2626;font-size:0.78rem">通信エラー：'+e.message+'</p>'; }
+}
+
+async function loadKarteById(rowIdx){
+  try{
+    const res=await fetch(GAS+'?action=getKarteById&rowIdx='+rowIdx+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 取得に失敗しました'); return; }
+    const k=d.data;
+    document.getElementById('pt-cardid').value=k.cardId;
+    document.getElementById('pt-name').value=k.name;
+    document.getElementById('pt-date').value=k.visitDate;
+    document.getElementById('soap-s').value=k.subjective||'';
+    document.getElementById('soap-o').value=k.objective||'';
+    document.getElementById('soap-a').value=k.assessment||'';
+    document.getElementById('soap-p').value=k.plan||'';
+    const figKey=(k.staffNote&&FIG[k.staffNote])?k.staffNote:'front';
+    const keys=Object.keys(FIG),idx=keys.indexOf(figKey);
+    if(idx>=0)sw(figKey,document.querySelectorAll('.fig-tab')[idx]);
+    if(k.bodyImage){
+      const img=new Image();img.onload=()=>{dx.clearRect(0,0,dr.width,dr.height);dx.drawImage(img,0,0,dr.width,dr.height);};img.src=k.bodyImage;
+    }
+    window.scrollTo(0,0);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+async function delKarteById(rowIdx){
+  if(!confirm('このカルテを削除しますか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteKarte',rowIdx})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました'); return; }
+    loadHistory();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+document.getElementById('pt-date').value=toLocalDateStr(new Date());
+resize('front');drawBg('front');
+
+// URLパラメータ(?cardId=xxx&name=xxx)があれば自動入力し、履歴も自動表示する
+(function(){
+  const params=new URLSearchParams(location.search);
+  const cid=params.get('cardId'), nm=params.get('name');
+  if(cid){ document.getElementById('pt-cardid').value=cid; }
+  if(nm){ document.getElementById('pt-name').value=nm; }
+  if(cid){ loadHistory(); }
+})();
+</script>
+</body>
+</html>
