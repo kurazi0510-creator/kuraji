@@ -448,8 +448,8 @@ function dailyLineAlert(){
     if(!tid){
       tid=lu[v.name]||null;
       if(!tid){
-        var ln=v.name.split(" ")[0];
-        var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});
+        var ln=v.name.split(" ")[0].split("　")[0];
+        var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});
         if(fk)tid=lu[fk];
       }
     }
@@ -562,7 +562,7 @@ function sendDayBeforeReminders(){
     if(tel) tid=findLineUidByPhone_(tel);
     if(!tid){
       tid=lu[name];
-      if(!tid){var ln=name.split(" ")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/ /g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){var ln=name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
     }
     if(!tid){skip.push(name);return;}
     var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
