@@ -597,17 +597,19 @@ function sendBirthdayMessages(){
     return;
   }
 
-  var targets=[];
+  // ★除外された「非対象者」も分かるよう、対象と非対象の両方を記録する
+  var targets=[], excludedList=[];
   for(var i=1;i<data.length;i++){
     var dob=String(data[i][dobI]||"").trim();
     var m=dob.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if(!m) continue; // 生年月日が正しい形式で入っていない行は対象外（誤爆防止）
     if(parseInt(m[2])===mm && parseInt(m[3])===dd){
-      if(String(data[i][bsI]||"").toUpperCase()==="FALSE") continue; // 対象外の患者はスキップ
-      targets.push({id:String(data[i][idI]||""), name:String(data[i][nameI]||"").trim(), tel:String(data[i][telI]||"")});
+      var nm=String(data[i][nameI]||"").trim();
+      if(String(data[i][bsI]||"").toUpperCase()==="FALSE"){ excludedList.push(nm); continue; } // 対象外の患者は非対象リストへ
+      targets.push({id:String(data[i][idI]||""), name:nm, tel:String(data[i][telI]||"")});
     }
   }
-  if(!targets.length) return;
+  if(!targets.length && !excludedList.length) return;
 
   var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
   var todayDisp=Utilities.formatDate(today,"Asia/Tokyo","M月d日");
@@ -617,6 +619,40 @@ function sendBirthdayMessages(){
   // 送信履歴シート（無ければ作成）
   var log=ss.getSheetByName("birthday_log");
   if(!log){ log=ss.insertSheet("birthday_log"); log.getRange(1,1,1,5).setValues([["date","id","name","result","expireUntil"]]); }
+
+  // ★現在は検証期間中：患者様には一切送らず、「本来送るはずだったメッセージ」を
+  //   丸ごと院長のLINEにだけ転送する。除外された非対象者もあわせて報告する。
+  //   問題なければ院長の判断でこの検証モードを解除し、実際の送信に戻す。
+  if(ownerId){
+    var report="[倉治整骨院] 🎂 誕生日メッセージ 検証結果 "+todayDisp+nl+"（現在は検証中のため、患者様には送信されていません）"+nl;
+    if(targets.length){
+      report+=nl+"■ 本来メッセージが届くはずだった方（"+targets.length+"名）"+nl;
+      targets.forEach(function(t){
+        report+="・"+t.name+nl;
+      });
+      report+=nl+"【送るはずだった文面】"+nl+"🎂 お誕生日おめでとうございます！"+nl+nl+"（お名前）様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+todayDisp+"〜"+expireStr+"まで"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
+    }
+    if(excludedList.length){
+      report+=nl+nl+"■ 対象外設定により除外された方（"+excludedList.length+"名）"+nl;
+      excludedList.forEach(function(nm){ report+="・"+nm+nl; });
+    }
+    sendLineMessagingAPI(token,ownerId,report);
+  }
+  // 履歴シートには「検証のみ・患者には未送信」として記録する
+  targets.forEach(function(t){
+    var newIdx=log.getLastRow()+1;
+    var rng=log.getRange(newIdx,1,1,5);
+    rng.setNumberFormat("@");
+    rng.setValues([[todayStr, t.id, t.name, "検証送信(院長のみ・患者未送信)", expireStr]]);
+  });
+  excludedList.forEach(function(nm){
+    var newIdx=log.getLastRow()+1;
+    var rng=log.getRange(newIdx,1,1,5);
+    rng.setNumberFormat("@");
+    rng.setValues([[todayStr, "", nm, "対象外設定によりスキップ", ""]]);
+  });
+  return;
+  // ↓↓↓ 検証モードが解除されたら、以下の実送信コードが有効になる ↓↓↓
 
   var sentNames=[], skip=[];
   targets.forEach(function(t){
