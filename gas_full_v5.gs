@@ -60,7 +60,7 @@ function doPost(e){
       var result;
       if(action==="getAll")result=getAllData();
       else if(action==="saveBookings"){saveSheet("予約表",JSON.parse(body.rows));result={ok:true};}
-      else if(action==="saveCustomers"){saveSheet("患者",JSON.parse(body.rows));result={ok:true};}
+      else if(action==="saveCustomers"){saveCustomersSafe(JSON.parse(body.rows));result={ok:true};}
       else if(action==="saveUriage"){saveSheet("売上",JSON.parse(body.rows));result={ok:true};}
       else if(action==="resetBookings"){resetBookings();result={ok:true};}
       else if(action==="lineNotifyV2")result=sendLineMessagingAPI(body.token,body.userId,body.message);
@@ -76,6 +76,8 @@ function doPost(e){
       else if(action==="deleteKarte")result=deleteKarte(body.rowIdx);
       else if(action==="runDormantOutreachNow"){sendDormantPatientOutreach();result={ok:true};}
       else if(action==="runPointsMilestoneNow"){sendPointsMilestone();result={ok:true};}
+      else if(action==="sendDormantOutreachTestTo")result=sendDormantOutreachTestTo(body.name);
+      else if(action==="sendPointsMilestoneTestTo")result=sendPointsMilestoneTestTo(body.name);
       else if(action==="saveMondoshin")result=saveMondoshin(body.data);
       else if(action==="saveMondoshinKotsu")result=saveMondoshinKotsu(body.data);
       else if(action==="getMenuMaster")result=getMenuMaster();
@@ -301,6 +303,42 @@ function saveSheet(name,rows){
   var rng=s.getRange(1,1,san.length,san[0].length);
   rng.setNumberFormats(san.map(function(r){return r.map(function(){return"@";});}));
   rng.setValues(san);
+}
+// ★患者データ専用：安全な差分マージ保存★
+// 「空欄で送られてきた項目で、既存データを上書きして消してしまう」事故を防ぐため、
+// 診察券No(1列目)をキーに、送られてきた値が空の項目は既存のサーバー側の値を残す方式にする。
+// また、今回の同期に含まれていなかった患者（別端末でまだ読み込み中など）も削除せず残す。
+function saveCustomersSafe(rows){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("患者");
+  var existing=s?s.getDataRange().getValues():[];
+  var header=(existing.length?existing[0]:(rows.length?rows[0]:[]));
+  var existingById={};
+  for(var i=1;i<existing.length;i++){
+    var id=String(existing[i][0]||"").trim();
+    if(id) existingById[id]=existing[i];
+  }
+  var merged=[header];
+  var seenIds={};
+  for(var j=1;j<rows.length;j++){
+    var incoming=rows[j];
+    var id=String(incoming[0]||"").trim();
+    if(!id) continue;
+    seenIds[id]=true;
+    var base=existingById[id];
+    var mergedRow=incoming.map(function(val,colIdx){
+      var v=(val===null||val===undefined)?"":String(val).trim();
+      if(v!=="") return val; // 新しい値が入っていればそちらを優先
+      if(base && base[colIdx]!==undefined && String(base[colIdx]).trim()!=="") return base[colIdx]; // 空なら既存データを残す（消さない）
+      return val;
+    });
+    merged.push(mergedRow);
+  }
+  // 今回の同期に含まれなかった既存患者はそのまま保持する（削除しない）
+  Object.keys(existingById).forEach(function(id){
+    if(!seenIds[id]) merged.push(existingById[id]);
+  });
+  saveSheet("患者", merged);
 }
 function resetBookings(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -963,6 +1001,31 @@ function sendDormantPatientOutreach(){
     sendLineMessagingAPI(token,ownerId,s);
   }
 }
+// 指定した名前に、休眠促進メッセージのプレビューを送信する（文面確認用）
+function sendDormantOutreachTestTo(name){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var nl=String.fromCharCode(10);
+  var target=String(name||"").trim();
+  if(!target) return {ok:false, error:"名前を指定してください"};
+  var tel=getTelByPatientName_(target);
+  var tid=tel?findLineUidByPhone_(tel):"";
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=lu[target];
+      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
+  }
+  if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
+  var msg="【プレビュー送信】"+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+target+"様"+nl+nl+"しばらくご来院がないようですが、その後お体の調子はいかがでしょうか？"+nl+nl+"また気になる症状がございましたら、いつでもお気軽にお越しください。"+nl+"皆様のご来院をお待ちしております。"+nl+nl+"ご予約はこのLINEでどうぞ。"+nl+"(自動送信のため返信不要です)";
+  var r=sendLineMessagingAPI(token,tid,msg);
+  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+}
 function getDormantLog(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var log=ss.getSheetByName("dormant_log");
@@ -977,6 +1040,31 @@ function getDormantLog(){
 // ★簡易ポイントカード（通院回数が節目に達したらLINEでお祝い＋割引特典。
 //   まだ自動送信トリガーには含めていません。kanri.htmlから手動テストのみ可能）★
 // ═══════════════════════════════════════
+// 指定した名前に、ポイント特典メッセージのプレビューを送信する（文面確認用）
+function sendPointsMilestoneTestTo(name){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var nl=String.fromCharCode(10);
+  var target=String(name||"").trim();
+  if(!target) return {ok:false, error:"名前を指定してください"};
+  var tel=getTelByPatientName_(target);
+  var tid=tel?findLineUidByPhone_(tel):"";
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=lu[target];
+      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
+  }
+  if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
+  var msg="【プレビュー送信】"+nl+"🎉 ご来院10回目、誠にありがとうございます！"+nl+nl+target+"様"+nl+nl+"日頃のご愛顧に感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"これからも倉治整骨院をよろしくお願いいたします。"+nl+nl+"倉治整骨院";
+  var r=sendLineMessagingAPI(token,tid,msg);
+  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+}
 function sendPointsMilestone(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");

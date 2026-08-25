@@ -247,7 +247,9 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="setupReviewUrl()" style="margin-top:16px;background:#0f766e;color:white;border-color:#0f766e">⚙️ GoogleクチコミURLを設定</button>
       <button class="btn bp bsm" onclick="sendReviewPreview()" style="margin-top:16px;background:#0d9488;color:white;border-color:#0d9488">👀 口コミ依頼のプレビューを指定の人に送る</button>
       <button class="btn bp bsm" onclick="runDormantOutreachNow()" style="margin-top:16px;background:#7e22ce;color:white;border-color:#7e22ce">🌙 休眠患者への再来促進配信を今すぐ実行(まだ試験運用)</button>
+      <button class="btn bp bsm" onclick="sendDormantPreview()" style="margin-top:16px;background:#a78bfa;color:white;border-color:#a78bfa">👀 休眠促進メッセージのプレビューを指定の人に送る</button>
       <button class="btn bp bsm" onclick="runPointsMilestoneNow()" style="margin-top:16px;background:#ca8a04;color:white;border-color:#ca8a04">🎁 通院回数ポイント特典を今すぐ実行(まだ試験運用)</button>
+      <button class="btn bp bsm" onclick="sendPointsPreview()" style="margin-top:16px;background:#fbbf24;color:white;border-color:#fbbf24">👀 ポイント特典メッセージのプレビューを指定の人に送る</button>
       <button class="btn bp bsm" onclick="checkTriggers()" style="margin-top:16px;background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
       <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
@@ -3336,6 +3338,24 @@ async function checkTriggers(){
     });
     msg += `\n※実際の時刻（19時など）はここでは確認できません。Apps Scriptの左メニューの時計アイコン「トリガー」から目視で確認してください。\n\n重複や未設定がある場合は「setupAllTriggers」をもう一度実行してください。`;
     alert(msg);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendDormantPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendDormantOutreachTestTo',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendPointsPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendPointsMilestoneTestTo',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 async function sendBirthdayPreview(){
