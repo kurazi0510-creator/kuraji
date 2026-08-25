@@ -35,6 +35,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px;}
 .btn{padding:7px 14px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:700;transition:all 0.2s;}
 .btn:disabled{opacity:0.6;cursor:not-allowed;}
+.btn-section{margin-top:18px;padding-top:14px;border-top:2px solid #f1f5f9;}
+.btn-section:first-of-type{margin-top:14px;border-top:none;padding-top:0;}
+.btn-section-title{font-size:0.78rem;font-weight:800;color:#64748b;margin-bottom:8px;display:flex;align-items:center;gap:6px;letter-spacing:0.02em;}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;}
+.btn-row .btn{margin-top:0 !important;}
 .bp{background:var(--primary);color:white;} .ba{background:var(--accent);color:white;}
 .bd{background:var(--accent2);color:white;} .bc{background:#e5e7eb;color:#374151;}
 .bg{background:var(--gold);color:white;} .bsm{padding:3px 9px;font-size:0.72rem;}
@@ -230,42 +235,82 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         </div>
       </div>
       <button class="btn bp bsm" onclick="syncAll()" style="margin-top:16px">🔄 最新データ取得</button>
-      <button class="btn bp bsm" onclick="fixAllVisitCounts()" style="margin-top:16px;background:#22c55e;color:white;border-color:#22c55e">🔢 来院回数を正確に再計算</button>
-      <button class="btn bp bsm" onclick="showFutureBookings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
-      <button class="btn bp bsm" onclick="toggleDayMemo()" style="margin-top:16px;background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
-      <button class="btn bp bsm" onclick="showSymptomList()" style="margin-top:16px;background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
-      <button class="btn bp bsm" onclick="location.href='karte.html'" style="margin-top:16px;background:#0f766e;color:white;border-color:#0f766e">📋 電子カルテ</button>
-      <button class="btn bp bsm" onclick="window.open('consent.html','_blank')" style="margin-top:16px;background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
-      <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
-      <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="margin-top:16px;background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
-      <button class="btn bp bsm" onclick="deleteBookingsByNamePrompt()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626">🗑 名前でテスト予約を一括削除</button>
-      <button class="btn bp bsm" onclick="openLineUsersModal()" style="margin-top:16px;background:#06c755;color:white;border-color:#06c755">📱 LINE電話番号 登録状況一覧</button>
-      <button class="btn bp bsm" onclick="openTestModeSettings()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">🧪 前日リマインド テスト設定</button>
-      <button class="btn bp bsm" onclick="runReminderTestNow()" style="margin-top:16px;background:#f59e0b;color:white;border-color:#f59e0b">▶ 前日リマインドを今すぐテスト送信</button>
-      <button class="btn bp bsm" onclick="runBirthdayTestNow()" style="margin-top:16px;background:#ec4899;color:white;border-color:#ec4899">🎂 誕生日メッセージを今すぐテスト送信</button>
-      <button class="btn bp bsm" onclick="sendBirthdayPreview()" style="margin-top:16px;background:#a21caf;color:white;border-color:#a21caf">👀 誕生日メッセージのプレビューを指定の人に送る</button>
-      <button class="btn bp bsm" onclick="setupReviewUrl()" style="margin-top:16px;background:#0f766e;color:white;border-color:#0f766e">⚙️ GoogleクチコミURLを設定</button>
-      <button class="btn bp bsm" onclick="sendReviewPreview()" style="margin-top:16px;background:#0d9488;color:white;border-color:#0d9488">👀 口コミ依頼のプレビューを指定の人に送る</button>
-      <button class="btn bp bsm" onclick="runDormantOutreachNow()" style="margin-top:16px;background:#7e22ce;color:white;border-color:#7e22ce">🌙 休眠患者への再来促進配信を今すぐ実行(まだ試験運用)</button>
-      <button class="btn bp bsm" onclick="sendDormantPreview()" style="margin-top:16px;background:#a78bfa;color:white;border-color:#a78bfa">👀 休眠促進メッセージのプレビューを指定の人に送る</button>
-      <button class="btn bp bsm" onclick="runPointsMilestoneNow()" style="margin-top:16px;background:#ca8a04;color:white;border-color:#ca8a04">🎁 通院回数ポイント特典を今すぐ実行(まだ試験運用)</button>
-      <button class="btn bp bsm" onclick="sendPointsPreview()" style="margin-top:16px;background:#fbbf24;color:white;border-color:#fbbf24">👀 ポイント特典メッセージのプレビューを指定の人に送る</button>
-      <button class="btn bp bsm" onclick="checkTriggers()" style="margin-top:16px;background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
-      <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
-      <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
-      <button class="btn bp bsm" onclick="openWebRequests()" style="margin-top:16px;background:#c98a4b;color:white;border-color:#c98a4b;position:relative">📩 Web予約リクエスト一覧(未対応の確認・確定)<span id="webReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
-      <button class="btn bp bsm" onclick="openMondoList()" style="margin-top:16px;background:#b45309;color:white;border-color:#b45309">📋 Web問診票一覧(内容確認・A4印刷)</button>
-      <button class="btn bp bsm" onclick="openBlockSlots()" style="margin-top:16px;background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
-      <button class="btn bp bsm" onclick="setNotifyVolume()" style="margin-top:16px;background:#7c3aed;color:white;border-color:#7c3aed">🔊 新着通知の音量を設定</button>
-      <button class="btn bp bsm" onclick="sendTestEmail()" style="margin-top:16px;background:#475569;color:white;border-color:#475569">✉️ テストメールを送信(到達確認)</button>
-      <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
-      <button class="btn bp bsm" onclick="openReminderLog()" style="margin-top:16px;background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
-      <button class="btn bp bsm" onclick="sendReminderToOnePrompt()" style="margin-top:16px;background:#0284c7;color:white;border-color:#0284c7">🔔 前日リマインドを個別に送る</button>
-      <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
-      <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
-      <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
-      <button class="btn ba bsm" onclick="forcePushBookings()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626" title="このデバイスの予約データをGASに送信して復元">📤 予約データ復元送信</button>
     </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+
+    <div class="btn-section">
+      <div class="btn-section-title">📊 データ管理・全体表示</div>
+      <div class="btn-row">
+        <button class="btn bp bsm" onclick="fixAllVisitCounts()" style="background:#22c55e;color:white;border-color:#22c55e">🔢 来院回数を正確に再計算</button>
+        <button class="btn bp bsm" onclick="showFutureBookings()" style="background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
+        <button class="btn bp bsm" onclick="toggleDayMemo()" style="background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
+        <button class="btn ba bsm" onclick="forcePushPatients()" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
+        <button class="btn ba bsm" onclick="forcePushBookings()" style="background:#dc2626;color:white;border-color:#dc2626" title="このデバイスの予約データをGASに送信して復元">📤 予約データ復元送信</button>
+        <button class="btn bp bsm" onclick="deleteBookingsByNamePrompt()" style="background:#dc2626;color:white;border-color:#dc2626">🗑 名前でテスト予約を一括削除</button>
+      </div>
+    </div>
+
+    <div class="btn-section">
+      <div class="btn-section-title">📋 記録・カルテ</div>
+      <div class="btn-row">
+        <button class="btn bp bsm" onclick="showSymptomList()" style="background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
+        <button class="btn bp bsm" onclick="location.href='karte.html'" style="background:#0f766e;color:white;border-color:#0f766e">📋 電子カルテ</button>
+        <button class="btn bp bsm" onclick="window.open('consent.html','_blank')" style="background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
+        <button class="btn bp bsm" onclick="openMondoList()" style="background:#b45309;color:white;border-color:#b45309">📋 Web問診票一覧(内容確認・A4印刷)</button>
+      </div>
+    </div>
+
+    <div class="btn-section">
+      <div class="btn-section-title">🌐 Web予約管理</div>
+      <div class="btn-row">
+        <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
+        <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
+        <button class="btn bp bsm" onclick="openWebRequests()" style="background:#c98a4b;color:white;border-color:#c98a4b;position:relative">📩 Web予約リクエスト一覧(未対応の確認・確定)<span id="webReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
+        <button class="btn bp bsm" onclick="openBlockSlots()" style="background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
+        <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
+        <button class="btn bp bsm" onclick="openBizHoursModal()" style="background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
+      </div>
+    </div>
+
+    <div class="btn-section">
+      <div class="btn-section-title">📱 LINE自動配信・テスト送信</div>
+      <div class="btn-row">
+        <button class="btn bp bsm" onclick="openLineUsersModal()" style="background:#06c755;color:white;border-color:#06c755">📱 LINE電話番号 登録状況一覧</button>
+        <button class="btn bp bsm" onclick="openTestModeSettings()" style="background:#7c3aed;color:white;border-color:#7c3aed">🧪 前日リマインド テスト設定</button>
+        <button class="btn bp bsm" onclick="runReminderTestNow()" style="background:#f59e0b;color:white;border-color:#f59e0b">▶ 前日リマインドを今すぐテスト送信</button>
+        <button class="btn bp bsm" onclick="sendReminderToOnePrompt()" style="background:#0284c7;color:white;border-color:#0284c7">🔔 前日リマインドを個別に送る</button>
+        <button class="btn bp bsm" onclick="runBirthdayTestNow()" style="background:#ec4899;color:white;border-color:#ec4899">🎂 誕生日メッセージを今すぐテスト送信</button>
+        <button class="btn bp bsm" onclick="sendBirthdayPreview()" style="background:#a21caf;color:white;border-color:#a21caf">👀 誕生日メッセージのプレビューを指定の人に送る</button>
+        <button class="btn bp bsm" onclick="setupReviewUrl()" style="background:#0f766e;color:white;border-color:#0f766e">⚙️ GoogleクチコミURLを設定</button>
+        <button class="btn bp bsm" onclick="sendReviewPreview()" style="background:#0d9488;color:white;border-color:#0d9488">👀 口コミ依頼のプレビューを指定の人に送る</button>
+        <button class="btn bp bsm" onclick="runDormantOutreachNow()" style="background:#7e22ce;color:white;border-color:#7e22ce">🌙 休眠患者への再来促進配信を今すぐ実行(まだ試験運用)</button>
+        <button class="btn bp bsm" onclick="sendDormantPreview()" style="background:#a78bfa;color:white;border-color:#a78bfa">👀 休眠促進メッセージのプレビューを指定の人に送る</button>
+        <button class="btn bp bsm" onclick="runPointsMilestoneNow()" style="background:#ca8a04;color:white;border-color:#ca8a04">🎁 通院回数ポイント特典を今すぐ実行(まだ試験運用)</button>
+        <button class="btn bp bsm" onclick="sendPointsPreview()" style="background:#fbbf24;color:white;border-color:#fbbf24">👀 ポイント特典メッセージのプレビューを指定の人に送る</button>
+        <button class="btn bp bsm" onclick="setNotifyVolume()" style="background:#7c3aed;color:white;border-color:#7c3aed">🔊 新着通知の音量を設定</button>
+        <button class="btn bp bsm" onclick="sendTestEmail()" style="background:#475569;color:white;border-color:#475569">✉️ テストメールを送信(到達確認)</button>
+      </div>
+    </div>
+
+    <div class="btn-section">
+      <div class="btn-section-title">📖 履歴・確認</div>
+      <div class="btn-row">
+        <button class="btn bp bsm" onclick="checkTriggers()" style="background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
+        <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
+        <button class="btn bp bsm" onclick="openAlertLog()" style="background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
+        <button class="btn bp bsm" onclick="openReminderLog()" style="background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
+      </div>
+    </div>
+
+    <div class="btn-section">
+      <div class="btn-section-title">🚨 緊急停止</div>
+      <div class="btn-row">
+        <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
+      </div>
+    </div>
+
   </div>
   <div class="stats">
     <div class="sbox" onclick="editStat(0)" title="タップで編集"><div class="n" id="s0">0</div><div class="l">予約数</div><div style="font-size:0.55rem;color:var(--accent);opacity:0.7">✏️</div></div>
