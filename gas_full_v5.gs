@@ -90,6 +90,7 @@ function doPost(e){
       else if(action==="setTestMode")result=setTestMode(body.name);
       else if(action==="getTestMode")result=getTestMode();
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
+      else if(action==="sendReminderToOne")result=sendReminderToOne(body.name,body.dateStr);
       else if(action==="runBirthdayMessagesNow"){sendBirthdayMessages();result={ok:true};}
       else if(action==="getBirthdayLog")result=getBirthdayLog();
       else if(action==="sendBirthdayMessageTestTo")result=sendBirthdayMessageTestTo(body.name);
@@ -462,6 +463,63 @@ function dailyLineAlert(){
   });
   */
   Logger.log("Alert done");
+}
+// 指定した名前・日付の患者様に、個別に前日リマインドを手動で送る
+// （自動送信が何らかの理由で漏れてしまった時、その場で個別にフォローするための機能）
+function sendReminderToOne(name, dateStr){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var target=String(name||"").trim();
+  if(!target || !dateStr) return {ok:false, error:"名前・日付を指定してください"};
+
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var bs=ss.getSheetByName("予約表");
+  if(!bs) return {ok:false, error:"予約表シートが見つかりません"};
+  var bd=bs.getDataRange().getValues(),bh=bd[0];
+  var di=bh.indexOf("日付"),ti=bh.indexOf("時間"),ni=bh.indexOf("患者名"),ki=bh.indexOf("区分");
+  var times=[];
+  bd.slice(1).forEach(function(r){
+    var rawDate=r[di];
+    var dv=(rawDate instanceof Date)?Utilities.formatDate(rawDate,"Asia/Tokyo","yyyy-MM-dd"):String(rawDate||"").trim();
+    var k=String(r[ki]||"");
+    if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1||dv!==dateStr)return;
+    var n=String(r[ni]||"").trim();
+    if(n.replace(/[\s　]+/g,"")!==target.replace(/[\s　]+/g,""))return;
+    var t=String(r[ti]||"").trim();
+    if(t)times.push(t);
+  });
+  if(!times.length) return {ok:false, error:target+"様の"+dateStr+"のご予約が見つかりませんでした"};
+
+  var tid="";
+  var tel=getTelByPatientName_(target);
+  if(tel) tid=findLineUidByPhone_(tel);
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=lu[target];
+      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
+  }
+  if(!tid) return {ok:false, error:target+"様のLINE連携が見つかりませんでした（電話番号登録がお済みでない可能性があります）"};
+
+  var nl=String.fromCharCode(10);
+  var dispDate=Utilities.formatDate(new Date(dateStr+"T00:00:00"),"Asia/Tokyo","M月d日(E)");
+  var msg="🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+dispDate+nl+"⏰ "+times.join("・")+nl+"━━━━━━━━━━"+nl+nl+"ご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
+  var r=sendLineMessagingAPI(token,tid,msg);
+  if(!r.ok) return {ok:false, error:"送信に失敗しました"};
+
+  var log=ss.getSheetByName("reminder_log");
+  if(!log){ log=ss.insertSheet("reminder_log"); log.getRange(1,1,1,6).setValues([["date","time","name","targetDate","result","note"]]); }
+  var nowStr=Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss");
+  var todayStr4=Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd");
+  var newIdx=log.getLastRow()+1;
+  var rng=log.getRange(newIdx,1,1,6);
+  rng.setNumberFormat("@");
+  rng.setValues([[todayStr4, nowStr, target, dateStr, "送信済み(個別手動送信)", times.join("・")]]);
+  return {ok:true};
 }
 function sendDayBeforeReminders(){
   var p=PropertiesService.getScriptProperties();

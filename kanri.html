@@ -260,6 +260,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="sendTestEmail()" style="margin-top:16px;background:#475569;color:white;border-color:#475569">✉️ テストメールを送信(到達確認)</button>
       <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="margin-top:16px;background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
       <button class="btn bp bsm" onclick="openReminderLog()" style="margin-top:16px;background:#0369a1;color:white;border-color:#0369a1">📋 前日リマインド送信履歴(誰に送ったか確認)</button>
+      <button class="btn bp bsm" onclick="sendReminderToOnePrompt()" style="margin-top:16px;background:#0284c7;color:white;border-color:#0284c7">🔔 前日リマインドを個別に送る</button>
       <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="margin-top:16px;background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
       <button class="btn bp bsm" onclick="openBizHoursModal()" style="margin-top:16px;background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
       <button class="btn ba bsm" onclick="forcePushPatients()" style="margin-top:16px" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
@@ -3235,6 +3236,17 @@ async function markWebRequestDone(rowIdx){
 }
 
 // ===== 前日リマインド送信履歴 =====
+async function sendReminderToOnePrompt(){
+  const name=prompt('前日リマインドを送りたい患者様のお名前を入力してください');
+  if(!name)return;
+  const dateStr=prompt('ご予約日を入力してください（例：2026-08-26）', toLocalDateStr(new Date(Date.now()+86400000)));
+  if(!dateStr)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendReminderToOne',name,dateStr})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}様に${dateStr}の前日リマインドを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 async function openReminderLog(){
   document.getElementById('reminderLogModal').classList.add('on');
   const el=document.getElementById('reminderLogContent');
