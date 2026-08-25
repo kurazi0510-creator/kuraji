@@ -51,9 +51,16 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 .date-inp{padding:7px 10px;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;font-family:inherit;}
 .day-b{padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;}
 .d-hei{background:#dbeafe;color:#1e40af;} .d-moku{background:#fef3c7;color:#92400e;} .d-nichi{background:#fee2e2;color:#991b1b;} .d-gogo{background:#fef3c7;color:#92400e;}
-.tbl{width:100%;border-collapse:collapse;font-size:0.78rem;}
-.tbl th{background:var(--primary);color:white;padding:6px 7px;text-align:left;font-size:0.73rem;}
-.tbl td{padding:4px 6px;border-bottom:1px solid #f0ece4;vertical-align:middle;}
+.tbl{width:100%;border-collapse:collapse;font-size:0.92rem;}
+.tbl th{background:var(--primary);color:white;padding:8px 9px;text-align:left;font-size:0.85rem;}
+.tbl td{padding:7px 8px;border-bottom:1px solid #f0ece4;vertical-align:middle;font-size:0.9rem;}
+/* 左右2分割レイアウト（画面の広いデスクトップのみ。狭い画面・iPhoneでは今まで通り縦積み） */
+@media (min-width:1300px){
+  .yoyaku-split{display:flex;gap:16px;align-items:flex-start;}
+  .yoyaku-split-left{flex:0 0 500px;}
+  .yoyaku-split-right{flex:1 1 auto;min-width:0;position:sticky;top:10px;}
+}
+.btn-section-title{font-size:0.9rem !important;}
 .tbl tr:hover td{background:#f8f6f1;}
 .tbl tr.brk td{background:#f0ece4;text-align:center;color:var(--muted);font-size:0.7rem;font-style:italic;}
 .tbl tr.cont td{background:#f0fdf4;}
@@ -238,6 +245,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
   </div>
 
+  <div class="yoyaku-split">
+  <div class="yoyaku-split-left">
   <div class="card" style="margin-top:14px">
 
     <div class="btn-section">
@@ -312,6 +321,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
   </div>
+  </div>
+  <div class="yoyaku-split-right">
   <div class="stats">
     <div class="sbox" onclick="editStat(0)" title="タップで編集"><div class="n" id="s0">0</div><div class="l">予約数</div><div style="font-size:0.55rem;color:var(--accent);opacity:0.7">✏️</div></div>
     <div class="sbox" onclick="editStat(1)" title="タップで編集"><div class="n" id="s1">0</div><div class="l">保険</div><div style="font-size:0.55rem;color:var(--accent);opacity:0.7">✏️</div></div>
@@ -337,6 +348,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <th style="min-width:32px">経過</th><th style="min-width:80px">処置・物販</th>
       <th style="min-width:70px">支払</th><th style="min-width:70px"></th>
     </tr></thead><tbody id="sbody"></tbody></table></div>
+  </div>
+  </div>
   </div>
 </div>
 
