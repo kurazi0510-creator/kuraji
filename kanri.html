@@ -5088,12 +5088,16 @@ function closeSymptomList(){document.getElementById('symptomListModal').style.di
 function showFutureBookings(){
   const w=['日','月','火','水','木','金','土'];
   const td=today();
+  const now=new Date();
+  const nowHHMM=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   const rows=[];
   Object.keys(bookings).sort().forEach(d=>{
     if(d<td)return;
     Object.keys(bookings[d]).sort().forEach(s=>{
       const bk=bookings[d][s];
       if(!bk||bk.cont||bk.cancelled)return;
+      // ★今日の予約については、現在時刻より前(もう終わっている・始まっている枠)は表示しない
+      if(d===td && s<=nowHHMM)return;
       const dt=new Date(d);
       rows.push({date:d,slot:s,bk,dow:w[dt.getDay()]});
     });
@@ -5122,7 +5126,7 @@ function showFutureBookings(){
       </div>`).join('');
   }
   const countEl=document.getElementById('future-count');
-  if(countEl)countEl.textContent='今日以降 '+rows.length+'件の予約';
+  if(countEl)countEl.textContent='今から '+rows.length+'件の予約';
   document.getElementById('futureModal').style.display='block';
 }
 // ===== 来院回数を予約データから正確に計算 =====
