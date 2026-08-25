@@ -35,10 +35,14 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px;}
 .btn{padding:7px 14px;border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:700;transition:all 0.2s;}
 .btn:disabled{opacity:0.6;cursor:not-allowed;}
-.btn-section{margin-top:18px;padding-top:14px;border-top:2px solid #f1f5f9;}
-.btn-section:first-of-type{margin-top:14px;border-top:none;padding-top:0;}
-.btn-section-title{font-size:0.78rem;font-weight:800;color:#64748b;margin-bottom:8px;display:flex;align-items:center;gap:6px;letter-spacing:0.02em;}
-.btn-row{display:flex;flex-wrap:wrap;gap:8px;}
+.btn-section{margin-top:10px;padding-top:10px;border-top:1.5px solid #f1f5f9;}
+.btn-section:first-of-type{margin-top:0;border-top:none;padding-top:0;}
+.btn-section-title{font-size:0.83rem;font-weight:800;color:#374151;margin-bottom:0;display:flex;align-items:center;gap:6px;letter-spacing:0.02em;cursor:pointer;user-select:none;padding:8px 6px;border-radius:8px;justify-content:space-between;}
+.btn-section-title:hover{background:#f8fafc;}
+.btn-section-title .chev{margin-left:auto;font-size:0.7rem;color:#94a3b8;transition:transform 0.2s;}
+.btn-section-title.closed .chev{transform:rotate(-90deg);}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;}
+.btn-row.closed{display:none;}
 .btn-row .btn{margin-top:0 !important;}
 .bp{background:var(--primary);color:white;} .ba{background:var(--accent);color:white;}
 .bd{background:var(--accent2);color:white;} .bc{background:#e5e7eb;color:#374151;}
@@ -51,9 +55,9 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 .date-inp{padding:7px 10px;border:2px solid var(--border);border-radius:8px;font-size:0.9rem;font-family:inherit;}
 .day-b{padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;}
 .d-hei{background:#dbeafe;color:#1e40af;} .d-moku{background:#fef3c7;color:#92400e;} .d-nichi{background:#fee2e2;color:#991b1b;} .d-gogo{background:#fef3c7;color:#92400e;}
-.tbl{width:100%;border-collapse:collapse;font-size:0.92rem;}
-.tbl th{background:var(--primary);color:white;padding:8px 9px;text-align:left;font-size:0.85rem;}
-.tbl td{padding:7px 8px;border-bottom:1px solid #f0ece4;vertical-align:middle;font-size:0.9rem;}
+.tbl{width:100%;border-collapse:collapse;font-size:0.78rem;}
+.tbl th{background:var(--primary);color:white;padding:6px 7px;text-align:left;font-size:0.73rem;}
+.tbl td{padding:4px 6px;border-bottom:1px solid #f0ece4;vertical-align:middle;}
 /* 左右2分割レイアウト（画面の広いデスクトップのみ。狭い画面・iPhoneでは今まで通り縦積み） */
 @media (min-width:1300px){
   .yoyaku-split{display:flex;gap:16px;align-items:flex-start;}
@@ -250,8 +254,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
   <div class="card" style="margin-top:14px">
 
     <div class="btn-section">
-      <div class="btn-section-title">📊 データ管理・全体表示</div>
-      <div class="btn-row">
+      <div class="btn-section-title" id="sec1-t" onclick="toggleBtnSection('sec1')">📊 データ管理・全体表示<span class="chev">▼</span></div>
+      <div class="btn-row" id="sec1-r">
         <button class="btn bp bsm" onclick="fixAllVisitCounts()" style="background:#22c55e;color:white;border-color:#22c55e">🔢 来院回数を正確に再計算</button>
         <button class="btn bp bsm" onclick="showFutureBookings()" style="background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
         <button class="btn bp bsm" onclick="toggleDayMemo()" style="background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
@@ -262,8 +266,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="btn-section">
-      <div class="btn-section-title">📋 記録・カルテ</div>
-      <div class="btn-row">
+      <div class="btn-section-title" id="sec2-t" onclick="toggleBtnSection('sec2')">📋 記録・カルテ<span class="chev">▼</span></div>
+      <div class="btn-row" id="sec2-r">
         <button class="btn bp bsm" onclick="showSymptomList()" style="background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
         <button class="btn bp bsm" onclick="location.href='karte.html'" style="background:#0f766e;color:white;border-color:#0f766e">📋 電子カルテ</button>
         <button class="btn bp bsm" onclick="window.open('consent.html','_blank')" style="background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
@@ -272,8 +276,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="btn-section">
-      <div class="btn-section-title">🌐 Web予約管理</div>
-      <div class="btn-row">
+      <div class="btn-section-title closed" id="sec3-t" onclick="toggleBtnSection('sec3')">🌐 Web予約管理<span class="chev">▼</span></div>
+      <div class="btn-row closed" id="sec3-r">
         <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
         <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
         <button class="btn bp bsm" onclick="openWebRequests()" style="background:#c98a4b;color:white;border-color:#c98a4b;position:relative">📩 Web予約リクエスト一覧(未対応の確認・確定)<span id="webReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
@@ -284,8 +288,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="btn-section">
-      <div class="btn-section-title">📱 LINE自動配信・テスト送信</div>
-      <div class="btn-row">
+      <div class="btn-section-title closed" id="sec4-t" onclick="toggleBtnSection('sec4')">📱 LINE自動配信・テスト送信<span class="chev">▼</span></div>
+      <div class="btn-row closed" id="sec4-r">
         <button class="btn bp bsm" onclick="openLineUsersModal()" style="background:#06c755;color:white;border-color:#06c755">📱 LINE電話番号 登録状況一覧</button>
         <button class="btn bp bsm" onclick="openTestModeSettings()" style="background:#7c3aed;color:white;border-color:#7c3aed">🧪 前日リマインド テスト設定</button>
         <button class="btn bp bsm" onclick="runReminderTestNow()" style="background:#f59e0b;color:white;border-color:#f59e0b">▶ 前日リマインドを今すぐテスト送信</button>
@@ -304,8 +308,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="btn-section">
-      <div class="btn-section-title">📖 履歴・確認</div>
-      <div class="btn-row">
+      <div class="btn-section-title closed" id="sec5-t" onclick="toggleBtnSection('sec5')">📖 履歴・確認<span class="chev">▼</span></div>
+      <div class="btn-row closed" id="sec5-r">
         <button class="btn bp bsm" onclick="checkTriggers()" style="background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
         <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
         <button class="btn bp bsm" onclick="openAlertLog()" style="background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
@@ -314,8 +318,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="btn-section">
-      <div class="btn-section-title">🚨 緊急停止</div>
-      <div class="btn-row">
+      <div class="btn-section-title" id="sec6-t" onclick="toggleBtnSection('sec6')">🚨 緊急停止<span class="chev">▼</span></div>
+      <div class="btn-row" id="sec6-r">
         <button class="btn bp bsm" onclick="emergencyStopDailyAlert()" style="background:#dc2626;color:white;border-color:#dc2626;font-weight:bold;font-size:1rem;padding:14px">🛑 17日/20日アラートを今すぐ強制停止</button>
       </div>
     </div>
@@ -3946,6 +3950,12 @@ async function testPatientLine(){
     const d=JSON.parse(await res.text());
     alert(d.ok?'✅ 送信成功！'+name+'様のLINEを確認してください':'❌ 送信失敗：'+JSON.stringify(d));
   }catch(e){alert('❌ エラー：'+e.message);}
+}
+function toggleBtnSection(id){
+  const t=document.getElementById(id+'-t'), r=document.getElementById(id+'-r');
+  if(!t||!r)return;
+  t.classList.toggle('closed');
+  r.classList.toggle('closed');
 }
 function toggleDayMemo(){
   const area=document.getElementById('day-memo-area');
