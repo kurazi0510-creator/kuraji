@@ -246,6 +246,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="sendBirthdayPreview()" style="margin-top:16px;background:#a21caf;color:white;border-color:#a21caf">👀 誕生日メッセージのプレビューを指定の人に送る</button>
       <button class="btn bp bsm" onclick="setupReviewUrl()" style="margin-top:16px;background:#0f766e;color:white;border-color:#0f766e">⚙️ GoogleクチコミURLを設定</button>
       <button class="btn bp bsm" onclick="sendReviewPreview()" style="margin-top:16px;background:#0d9488;color:white;border-color:#0d9488">👀 口コミ依頼のプレビューを指定の人に送る</button>
+      <button class="btn bp bsm" onclick="runDormantOutreachNow()" style="margin-top:16px;background:#7e22ce;color:white;border-color:#7e22ce">🌙 休眠患者への再来促進配信を今すぐ実行(まだ試験運用)</button>
+      <button class="btn bp bsm" onclick="runPointsMilestoneNow()" style="margin-top:16px;background:#ca8a04;color:white;border-color:#ca8a04">🎁 通院回数ポイント特典を今すぐ実行(まだ試験運用)</button>
       <button class="btn bp bsm" onclick="checkTriggers()" style="margin-top:16px;background:#334155;color:white;border-color:#334155">🔍 自動送信の設定状況を確認</button>
       <button class="btn bp bsm" onclick="openBirthdayMgmt()" style="margin-top:16px;background:#db2777;color:white;border-color:#db2777">🎂 誕生日クーポン管理(対象外・履歴)</button>
       <button class="btn bp bsm" onclick="openAlertLog()" style="margin-top:16px;background:#7c2d12;color:white;border-color:#7c2d12">📋 17日/20日アラート履歴(誰が対象か確認)</button>
@@ -1464,6 +1466,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <div class="modal-ov" id="histModal">
   <div class="modal-wide">
     <div class="mtitle" id="hist-title">過去履歴</div>
+    <div id="visit-stats-summary" style="margin-bottom:10px"></div>
     <div id="hist-content" style="max-height:60vh;overflow-y:auto;"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:12px">
       <button class="btn bc" onclick="closeHistModal()">閉じる</button>
@@ -3367,6 +3370,22 @@ async function setupReviewUrl(){
     alert(d.ok?'✅ 設定しました':'❌ 設定に失敗：'+(d.error||''));
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
+async function runDormantOutreachNow(){
+  if(!confirm('休眠患者への再来促進配信を今すぐ実行します。対象者に実際にLINEが送られます。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'runDormantOutreachNow'})});
+    const d=await res.json();
+    alert(d.ok?'✅ 実行しました。結果は院長のLINEに届きます':'❌ 失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function runPointsMilestoneNow(){
+  if(!confirm('通院回数ポイント特典を今すぐ実行します。対象者に実際にLINEが送られます。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'runPointsMilestoneNow'})});
+    const d=await res.json();
+    alert(d.ok?'✅ 実行しました。結果は院長のLINEに届きます':'❌ 失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 async function sendReviewPreview(){
   const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
   if(!name)return;
@@ -4633,12 +4652,27 @@ function openKarteFromModal(){
   if(!cardId&&!name){alert('診察券Noまたは患者名が入力されていません');return;}
   window.open('karte.html?cardId='+encodeURIComponent(cardId)+'&name='+encodeURIComponent(name),'_blank');
 }
+async function loadVisitStatsSummary(cardId,name){
+  const el=document.getElementById('visit-stats-summary');
+  el.innerHTML='<p style="font-size:0.72rem;color:#94a3b8">来店周期を計算中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getPatientVisitStats&cardId='+encodeURIComponent(cardId)+'&name='+encodeURIComponent(name)+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ el.innerHTML=''; return; }
+    el.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="background:#eff6ff;color:#1d4ed8;padding:6px 12px;border-radius:8px;font-size:0.76rem;font-weight:bold">来院回数：${d.visits}回</div>
+      <div style="background:#f0fdf4;color:#166534;padding:6px 12px;border-radius:8px;font-size:0.76rem;font-weight:bold">平均来店周期：${d.avgIntervalDays!==null?d.avgIntervalDays+'日おき':'算出不可（来院1回のみ）'}</div>
+      <div style="background:#fef2f2;color:#b91c1c;padding:6px 12px;border-radius:8px;font-size:0.76rem;font-weight:bold">キャンセル率：${d.cancelRate}%（${d.cancelCount}件）</div>
+    </div>`;
+  }catch(e){ el.innerHTML=''; }
+}
 function openHistModal(){
   const btn=document.getElementById('hist-btn');
   const cardId=btn.getAttribute('data-cardid');
   const name=btn.getAttribute('data-name');
   if(!cardId)return;
   document.getElementById('hist-title').textContent='📋 '+name+'様の過去履歴';
+  loadVisitStatsSummary(cardId,name);
   // 予約データから履歴収集
   const hist=[];
   Object.entries(bookings).forEach(([date,slots])=>{

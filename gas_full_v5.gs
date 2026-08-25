@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getAllBlockedSlotsDebug"){result=getAllBlockedSlotsDebug();}else if(action==="getKarteListByCardId"){result=getKarteListByCardId((e&&e.parameter&&e.parameter.cardId)||"");}else if(action==="getKarteById"){result=getKarteById((e&&e.parameter&&e.parameter.rowIdx)||"");}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getAllBlockedSlotsDebug"){result=getAllBlockedSlotsDebug();}else if(action==="getKarteListByCardId"){result=getKarteListByCardId((e&&e.parameter&&e.parameter.cardId)||"");}else if(action==="getKarteById"){result=getKarteById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getDormantLog"){result=getDormantLog();}else if(action==="getPatientVisitStats"){result=getPatientVisitStats((e&&e.parameter&&e.parameter.cardId)||"",(e&&e.parameter&&e.parameter.name)||"");}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -74,6 +74,8 @@ function doPost(e){
       else if(action==="sendTestEmailTo")result=sendTestEmailTo(body.email);
       else if(action==="saveKarte")result=saveKarte(body.data);
       else if(action==="deleteKarte")result=deleteKarte(body.rowIdx);
+      else if(action==="runDormantOutreachNow"){sendDormantPatientOutreach();result={ok:true};}
+      else if(action==="runPointsMilestoneNow"){sendPointsMilestone();result={ok:true};}
       else if(action==="saveMondoshin")result=saveMondoshin(body.data);
       else if(action==="saveMondoshinKotsu")result=saveMondoshinKotsu(body.data);
       else if(action==="getMenuMaster")result=getMenuMaster();
@@ -582,10 +584,14 @@ function sendBirthdayMessages(){
   var headers=data[0].map(function(h){return String(h||"").trim();});
   var idI=0, nameI=1, telI=headers.indexOf("電話番号"), dobI=headers.indexOf("生年月日");
   var bsI=headers.indexOf("誕生日クーポン送信");
-  if(telI<0)telI=4; if(dobI<0)dobI=13;
+  if(telI<0)telI=4;
 
-  // ★安全装置：「誕生日クーポン送信」列が見つからない場合は、対象外の判定ができないため
-  //   誰にも送らず、院長に不具合を通知して終了する（列がない＝全員に送ってしまう、を防ぐ）
+  // ★安全装置：「生年月日」「誕生日クーポン送信」の列が見つからない場合は、
+  //   誤った列を見てしまう危険を避けるため、誰にも送らず院長に不具合を通知して終了する
+  if(dobI<0){
+    if(ownerId)sendLineMessagingAPI(token,ownerId,"[倉治整骨院] 誕生日メッセージを送ろうとしましたが、「生年月日」の列が見つからないため、安全のため送信を中止しました。管理システムの同期状態を確認してください。");
+    return;
+  }
   if(bsI<0){
     if(ownerId)sendLineMessagingAPI(token,ownerId,"[倉治整骨院] 誕生日メッセージを送ろうとしましたが、「誕生日クーポン送信」の列が見つからないため、安全のため送信を中止しました。管理システムの同期状態を確認してください。");
     return;
@@ -595,21 +601,13 @@ function sendBirthdayMessages(){
   for(var i=1;i<data.length;i++){
     var dob=String(data[i][dobI]||"").trim();
     var m=dob.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if(!m) continue;
+    if(!m) continue; // 生年月日が正しい形式で入っていない行は対象外（誤爆防止）
     if(parseInt(m[2])===mm && parseInt(m[3])===dd){
       if(String(data[i][bsI]||"").toUpperCase()==="FALSE") continue; // 対象外の患者はスキップ
       targets.push({id:String(data[i][idI]||""), name:String(data[i][nameI]||"").trim(), tel:String(data[i][telI]||"")});
     }
   }
   if(!targets.length) return;
-
-  // ★現在、原因調査のため誕生日メッセージの実際の送信を一時停止中★
-  // （院長に対象者を報告するのみ。原因が解消されたらこのreturnを削除してください）
-  if(ownerId){
-    var namesForCheck=targets.map(function(t){return t.name;}).join(", ");
-    sendLineMessagingAPI(token,ownerId,"[倉治整骨院] 本日誕生日の患者様："+namesForCheck+nl+"※現在、除外設定の不具合調査のため誕生日メッセージの送信を一時停止しています。");
-  }
-  return;
 
   var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
   var todayDisp=Utilities.formatDate(today,"Asia/Tokyo","M月d日");
@@ -808,6 +806,234 @@ function sendReviewRequestTestTo(name){
   var msg="【プレビュー送信】"+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+target+"様には3回目のご来院をいただきました。"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
   var r=sendLineMessagingAPI(token,tid,msg);
   return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+}
+// GoogleクチコミのURLを設定する（Apps Scriptエディタから手動で1回だけ実行）
+// 例: setReviewUrlの中のURLを実際のクチコミURLに書き換えてから実行してください
+// ═══════════════════════════════════════
+// ★休眠患者への再来促進配信（まだ自動送信トリガーには含めていません。
+//   kanri.htmlから手動テスト実行のみ可能な状態です）★
+// ═══════════════════════════════════════
+// 前回来院から一定期間（デフォルト90日）経った患者様に、再来を促すLINEを送る
+// 同じ人に何度も送らないよう、直近60日以内に送信済みの場合はスキップする
+function sendDormantPatientOutreach(){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+  if(!token)return;
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var today=new Date();today.setHours(0,0,0,0);
+  var nl=String.fromCharCode(10);
+  var DORMANT_DAYS=90; // 何日来院がなければ「休眠」とみなすか
+  var COOLDOWN_DAYS=60; // 一度送ったら何日は再送しないか
+
+  // 患者ごとの除外設定を確認
+  var ps=ss.getSheetByName("患者");
+  var offIds={}, offNames={};
+  if(ps){
+    var pd=ps.getDataRange().getValues(), ph=pd[0].map(function(h){return String(h||"").trim();});
+    var offI=ph.indexOf("休眠促進送信");
+    if(offI>-1){
+      pd.slice(1).forEach(function(r){
+        if(String(r[offI]||"").toUpperCase()==="FALSE"){
+          if(r[0])offIds[String(r[0]).trim()]=true;
+          if(r[1])offNames[String(r[1]).trim().replace(/[\s　]+/g,"")]=true;
+        }
+      });
+    }
+  }
+
+  // 患者ごとの最終来院日を計算（17日/20日アラートと同じロジック）
+  var bs=ss.getSheetByName("予約表");
+  if(!bs)return;
+  var bd=bs.getDataRange().getValues(),bh=bd[0];
+  var di=bh.indexOf("日付"),ni=bh.indexOf("患者名"),ii=bh.indexOf("診察券No"),ki=bh.indexOf("区分");
+  if(di<0)return;
+  var lv={};
+  bd.slice(1).forEach(function(r){
+    var k=String(r[ki]||"");
+    if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1)return;
+    var dv=r[di];if(!dv)return;
+    var d=dv instanceof Date?new Date(dv):new Date(String(dv));
+    if(isNaN(d.getTime()))return;
+    d.setHours(0,0,0,0);if(d>today)return;
+    var nm=String(r[ni]||"").trim();
+    if(!nm)return;
+    var key=nm.replace(/[\s　]+/g,"");
+    var idVal=String(r[ii]||"").trim();
+    if(!lv[key] || d>lv[key].date){
+      lv[key]={date:d, name:nm, id:idVal||(lv[key]?lv[key].id:"")};
+    }else if(!lv[key].id && idVal){
+      lv[key].id=idVal;
+    }
+  });
+
+  // 直近送信履歴（クールダウン判定用）
+  var log=ss.getSheetByName("dormant_log");
+  if(!log){ log=ss.insertSheet("dormant_log"); log.getRange(1,1,1,4).setValues([["date","id","name","result"]]); }
+  var logData=log.getDataRange().getValues();
+  var lastSentByKey={};
+  for(var li=1;li<logData.length;li++){
+    var lname=String(logData[li][2]||"").replace(/[\s　]+/g,"");
+    var ldate=new Date(String(logData[li][0]));
+    if(isNaN(ldate.getTime()))continue;
+    if(!lastSentByKey[lname]||ldate>lastSentByKey[lname]) lastSentByKey[lname]=ldate;
+  }
+
+  var targets=[];
+  Object.values(lv).forEach(function(v){
+    var key=String(v.name).replace(/[\s　]+/g,"");
+    if(offIds[v.id]||offNames[key])return; // 除外設定の患者はスキップ
+    var diff=Math.floor((today-v.date)/(1000*60*60*24));
+    if(diff<DORMANT_DAYS)return;
+    var lastSent=lastSentByKey[key];
+    if(lastSent){
+      var sinceSent=Math.floor((today-lastSent)/(1000*60*60*24));
+      if(sinceSent<COOLDOWN_DAYS)return; // クールダウン期間中はスキップ
+    }
+    targets.push(v);
+  });
+  if(!targets.length)return;
+
+  var todayStr=Utilities.formatDate(today,"Asia/Tokyo","yyyy-MM-dd");
+  var sentNames=[], skip=[];
+  targets.forEach(function(v){
+    var tid="";
+    var tel=getTelByPatientName_(v.name);
+    if(tel) tid=findLineUidByPhone_(tel);
+    if(!tid){
+      var ls=ss.getSheetByName("LINE_IDs");
+      if(ls){
+        var lu={};
+        ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+        tid=lu[v.name];
+        if(!tid){var ln=v.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      }
+    }
+    var result;
+    if(!tid){skip.push(v.name);result="未登録";}
+    else{
+      var msg="いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+v.name+"様"+nl+nl+"しばらくご来院がないようですが、その後お体の調子はいかがでしょうか？"+nl+nl+"また気になる症状がございましたら、いつでもお気軽にお越しください。"+nl+"皆様のご来院をお待ちしております。"+nl+nl+"ご予約はこのLINEでどうぞ。"+nl+"(自動送信のため返信不要です)";
+      if(sendLineMessagingAPI(token,tid,msg).ok){sentNames.push(v.name);result="送信済み";}else{skip.push(v.name);result="送信失敗";}
+    }
+    var newIdx=log.getLastRow()+1;
+    var rng=log.getRange(newIdx,1,1,4);
+    rng.setNumberFormat("@");
+    rng.setValues([[todayStr, v.id, v.name, result]]);
+  });
+
+  if(ownerId){
+    var s="[倉治整骨院] 休眠患者への再来促進配信"+nl+"送信:"+sentNames.length+"件";
+    if(sentNames.length)s+=nl+"送信した人: "+sentNames.join(", ");
+    if(skip.length)s+=nl+"未登録: "+skip.join(", ");
+    sendLineMessagingAPI(token,ownerId,s);
+  }
+}
+function getDormantLog(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var log=ss.getSheetByName("dormant_log");
+  if(!log) return {ok:true, list:[]};
+  var data=log.getDataRange().getValues().slice(1);
+  var list=data.map(function(r){return{date:String(r[0]||""), id:String(r[1]||""), name:String(r[2]||""), result:String(r[3]||"")};});
+  list.sort(function(a,b){return a.date<b.date?1:-1;});
+  return {ok:true, list:list};
+}
+// 患者ごとの来店周期（平均何日おきに来ているか）・キャンセル率を計算する
+// ═══════════════════════════════════════
+// ★簡易ポイントカード（通院回数が節目に達したらLINEでお祝い＋割引特典。
+//   まだ自動送信トリガーには含めていません。kanri.htmlから手動テストのみ可能）★
+// ═══════════════════════════════════════
+function sendPointsMilestone(){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+  if(!token)return;
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ps=ss.getSheetByName("患者");
+  if(!ps)return;
+  var nl=String.fromCharCode(10);
+  var MILESTONES=[10,20,30,50,100]; // 何回目で特典を送るか
+
+  var data=ps.getDataRange().getValues();
+  var headers=data[0].map(function(h){return String(h||"").trim();});
+  var idI=0, nameI=1, telI=headers.indexOf("電話番号"), countI=headers.indexOf("通院回数");
+  var offI=headers.indexOf("ポイント特典送信"), reqI=headers.indexOf("ポイント特典送信済み回数");
+  if(telI<0)telI=4; if(countI<0)countI=12;
+
+  var targets=[];
+  for(var i=1;i<data.length;i++){
+    var cnt=parseInt(data[i][countI])||0;
+    if(MILESTONES.indexOf(cnt)<0) continue; // 節目の回数ちょうどの日だけ対象
+    if(offI>-1 && String(data[i][offI]||"").toUpperCase()==="FALSE") continue;
+    var sentAt=reqI>-1?String(data[i][reqI]||""):"";
+    if(sentAt.indexOf(String(cnt))>-1) continue; // この回数では送信済み
+    targets.push({rowIdx:i+1, id:String(data[i][idI]||""), name:String(data[i][nameI]||"").trim(), tel:String(data[i][telI]||""), count:cnt, sentAt:sentAt});
+  }
+  if(!targets.length) return;
+  if(reqI<0){ reqI=headers.length; ps.getRange(1, reqI+1).setValue("ポイント特典送信済み回数"); }
+
+  var sentNames=[], skip=[];
+  targets.forEach(function(t){
+    var tid="";
+    if(t.tel) tid=findLineUidByPhone_(t.tel);
+    if(!tid){
+      var ls=ss.getSheetByName("LINE_IDs");
+      if(ls){
+        var lu={};
+        ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+        tid=lu[t.name];
+        if(!tid){var ln=t.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      }
+    }
+    if(!tid){skip.push(t.name);return;}
+    var msg="🎉 ご来院"+t.count+"回目、誠にありがとうございます！"+nl+nl+t.name+"様"+nl+nl+"日頃のご愛顧に感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"これからも倉治整骨院をよろしくお願いいたします。"+nl+nl+"倉治整骨院";
+    if(sendLineMessagingAPI(token,tid,msg).ok){
+      sentNames.push(t.name+"("+t.count+"回目)");
+      var newSentAt=(t.sentAt?t.sentAt+",":"")+t.count;
+      var rng=ps.getRange(t.rowIdx, reqI+1);
+      rng.setNumberFormat("@");
+      rng.setValue(newSentAt);
+    }else{skip.push(t.name);}
+  });
+
+  if(ownerId){
+    var s="[倉治整骨院] ポイント特典（通院回数マイルストーン）送信結果"+nl+"送信:"+sentNames.length+"件";
+    if(sentNames.length)s+=nl+"送信した人: "+sentNames.join(", ");
+    if(skip.length)s+=nl+"未登録: "+skip.join(", ");
+    sendLineMessagingAPI(token,ownerId,s);
+  }
+}
+function getPatientVisitStats(cardId, name){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var bs=ss.getSheetByName("予約表");
+    if(!bs) return {ok:true, visits:0, avgIntervalDays:null, cancelCount:0, cancelRate:0};
+    var bd=bs.getDataRange().getValues(),bh=bd[0];
+    var di=bh.indexOf("日付"),ni=bh.indexOf("患者名"),ii=bh.indexOf("診察券No"),ki=bh.indexOf("区分");
+    var target=String(name||"").trim().replace(/[\s　]+/g,"");
+    var targetId=String(cardId||"").trim();
+    var dates=[], cancelCount=0, totalCount=0;
+    bd.slice(1).forEach(function(r){
+      var rid=String(r[ii]||"").trim();
+      var rname=String(r[ni]||"").trim().replace(/[\s　]+/g,"");
+      var match=(targetId&&rid===targetId)||(!targetId&&rname===target)||(rname===target);
+      if(!match)return;
+      var k=String(r[ki]||"");
+      if(k.indexOf("継続")>-1)return; // 継続枠は同じ来院なのでカウントしない
+      totalCount++;
+      if(k.indexOf("キャンセル")>-1){cancelCount++;return;}
+      var dv=r[di];if(!dv)return;
+      var d=dv instanceof Date?new Date(dv):new Date(String(dv));
+      if(isNaN(d.getTime()))return;
+      dates.push(d);
+    });
+    dates.sort(function(a,b){return a-b;});
+    var avgIntervalDays=null;
+    if(dates.length>=2){
+      var totalGap=0;
+      for(var i=1;i<dates.length;i++){ totalGap+=(dates[i]-dates[i-1])/(1000*60*60*24); }
+      avgIntervalDays=Math.round(totalGap/(dates.length-1));
+    }
+    var cancelRate=totalCount>0?Math.round(cancelCount/totalCount*1000)/10:0;
+    return {ok:true, visits:dates.length, avgIntervalDays:avgIntervalDays, cancelCount:cancelCount, cancelRate:cancelRate};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
 // GoogleクチコミのURLを設定する（Apps Scriptエディタから手動で1回だけ実行）
 // 例: setReviewUrlの中のURLを実際のクチコミURLに書き換えてから実行してください
