@@ -23,7 +23,7 @@ function doPost(e){
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
             var tok0=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
             if(tok0){
-              sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"ご予約のお知らせ・前日リマインドをこちらのLINEでお受け取りいただくために、お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、お電話番号での確認をお願いしております）");
+              sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"今後の空き状況などのご案内のため、以下のいずれかをお送りください。"+String.fromCharCode(10)+String.fromCharCode(10)+"【通常の方】"+String.fromCharCode(10)+"お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"【すでにWeb予約フォームからご希望を送っていただいた方】"+String.fromCharCode(10)+"お名前（フルネーム）だけお送りください。ご希望を確認し、ご予約確定のご連絡をいたします。"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、確認のためのお願いです）");
               markPromptSent_(ev.source.userId);
             }
           }
@@ -45,8 +45,21 @@ function doPost(e){
               if(tok)sendLineMessagingAPI(tok,uid,"📱 お電話番号を登録しました！"+String.fromCharCode(10)+"今後、ご予約確認・前日リマインドをこちらのLINEにお送りします。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
             }else{
               saveLineUserId(uid,dname,msgText);
-              // 案内メッセージは友だち1人につき1回だけ送信（すでに送信済み・登録済みの方には送らない）
-              if(tok && !hasPromptSent_(uid) && !findPhoneByUid_(uid)){
+              // ★送られてきた文章が、Web予約リクエスト(未対応)の名前と一致するか確認する
+              //   （Webフォームから送った方が、そのままフルネームだけ送ってきた場合の専用案内）
+              var matchedReq=findPendingWebRequestByName_(msgText);
+              if(matchedReq){
+                // ★見つかったリクエストの電話番号を、このLINEアカウントに自動で紐付ける
+                //   （これにより、前日リマインド等が電話番号経由で正しく届くようになる）
+                if(matchedReq.tel) saveLinePhone_(uid,matchedReq.tel,dname||matchedReq.name);
+                if(tok){
+                  sendLineMessagingAPI(tok,uid,matchedReq.name+"様、お名前を確認いたしました😊"+String.fromCharCode(10)+String.fromCharCode(10)+"いただいたご希望日時を確認のうえ、改めてご予約確定のご連絡をこちらのLINEにお送りいたします。"+String.fromCharCode(10)+"今しばらくお待ちください。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
+                  var ownerId2=PropertiesService.getScriptProperties().getProperty("LINE_USER_ID");
+                  if(ownerId2)sendLineMessagingAPI(tok,ownerId2,"[倉治整骨院] 📩 Web予約リクエスト済みの"+matchedReq.name+"様が、LINEでお名前を送ってこられました。予約確定のご連絡をお願いします。");
+                }
+                markPromptSent_(uid);
+              }else if(tok && !hasPromptSent_(uid) && !findPhoneByUid_(uid)){
+                // 案内メッセージは友だち1人につき1回だけ送信（すでに送信済み・登録済みの方には送らない）
                 sendLineMessagingAPI(tok,uid,"いつもありがとうございます😊"+String.fromCharCode(10)+"ご予約のお知らせを受け取るには、お電話番号を数字のみで送ってください。"+String.fromCharCode(10)+"例）09012345678");
                 markPromptSent_(uid);
               }
@@ -127,6 +140,32 @@ function saveLineUserId(userId,displayName,message){
   s.appendRow([userId,displayName,message,now,""]);
 }
 // 電話番号でLINE友だちを紐付け（表示名があだ名でも確実に照合できる）
+// ★LINE登録時、送られてきたメッセージがWeb予約リクエスト(未対応)のお名前と一致するか探す★
+// 一致した場合、そのリクエストに書かれていた電話番号をこのLINEアカウントに自動で紐付ける
+// （フルネームを送るだけで、電話番号を別途送らなくても前日リマインド等が届くようにするため）
+function findPendingWebRequestByName_(msgText){
+  try{
+    var target=String(msgText||"").trim().replace(/[\s　]+/g,"");
+    if(!target) return null;
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("web_yoyaku_requests");
+    if(!s) return null;
+    var data=s.getDataRange().getValues();
+    // 直近7日以内・未対応のリクエストの中から、名前が完全一致するものを探す
+    var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-7);
+    for(var i=data.length-1;i>=1;i--){
+      var status=String(data[i][11]||"未対応");
+      if(status!=="未対応") continue;
+      var createdAt=new Date(String(data[i][12]||""));
+      if(!isNaN(createdAt.getTime()) && createdAt<cutoff) continue;
+      var name=String(data[i][6]||"").trim().replace(/[\s　]+/g,"");
+      if(name && name===target){
+        return {rowIdx:i+1, name:String(data[i][6]||"").trim(), tel:String(data[i][7]||"")};
+      }
+    }
+    return null;
+  }catch(err){ return null; }
+}
 function saveLinePhone_(userId,phoneDigits,displayName){
   // ★念のための多層防御：9〜11桁以外の明らかにおかしいデータは保存しない
   var pd=String(phoneDigits||"").replace(/[^0-9]/g,"");

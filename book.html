@@ -159,9 +159,6 @@ const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2gu
 const LINE_ADD_URL='https://line.me/R/ti/p/@qin9307o';
 // ▲▲▲ ここまで ▲▲▲
 
-// ★体感速度を最優先：空き状況の取得は、メニュー選択を待たず他の準備より先に開始する
-loadWeek();
-
 document.getElementById('lineTopBtn').href=LINE_ADD_URL;
 
 const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
@@ -187,7 +184,7 @@ let selMenu=null;
 let cand=[]; // [{date,time}, ...] 最大3件、順番が第一〜第三希望
 
 document.getElementById('menuArea').innerHTML=MENUS.map((m,i)=>
-  `<label class="menu-item" id="mi-${i}"><input type="radio" name="menu" onchange="pickMenu(${i})"> ${m.label}<span class="time">${m.minutes}分${m.price?'　￥'+m.price.toLocaleString():''}</span></label>`
+  `<label class="menu-item" id="mi-${i}"><input type="radio" name="menu" onchange="pickMenu(${i})"> ${m.label}<span class="time">${m.minutes}分　￥${m.price.toLocaleString()}</span></label>`
 ).join('');
 function pickMenu(i){
   selMenu=MENUS[i];
@@ -219,7 +216,10 @@ let weekStart=(function(){
 })();
 let weekData={}; // date -> {closed, available:[...]}
 const WEEK_CACHE_KEY='kj_book_week_cache';
-const WEEK_CACHE_TTL=45000; // 45秒以内なら再利用（同じ通信を繰り返さない）
+const WEEK_CACHE_TTL=15000; // 15秒以内なら再利用（同じ通信を繰り返さない）
+
+// ★体感速度優先：ここで空き状況の取得を開始する（weekStart宣言直後＝可能な限り早いタイミング）
+loadWeek();
 
 async function loadWeek(){
   const startStr=toISO(weekStart);
