@@ -152,9 +152,16 @@ function saveLineUserId(userId,displayName,message){
 // ★LINE登録時、送られてきたメッセージがWeb予約リクエスト(未対応)のお名前と一致するか探す★
 // 一致した場合、そのリクエストに書かれていた電話番号をこのLINEアカウントに自動で紐付ける
 // （フルネームを送るだけで、電話番号を別途送らなくても前日リマインド等が届くようにするため）
+// 名前の表記ゆれ（スペースの有無・全角半角・大文字小文字）を吸収して比較できるようにする
+function normalizeName_(s){
+  return String(s||"").trim()
+    .normalize("NFKC") // 全角英数字→半角、半角カナ→全角カナ 等に統一
+    .replace(/[\s　]+/g,"") // 半角・全角スペースを全て除去
+    .toLowerCase(); // 大文字小文字を統一
+}
 function findPendingWebRequestByName_(msgText){
   try{
-    var target=String(msgText||"").trim().replace(/[\s　]+/g,"");
+    var target=normalizeName_(msgText);
     if(!target) return null;
     var ss=SpreadsheetApp.getActiveSpreadsheet();
     var s=ss.getSheetByName("web_yoyaku_requests");
@@ -167,7 +174,7 @@ function findPendingWebRequestByName_(msgText){
       if(status!=="未対応") continue;
       var createdAt=new Date(String(data[i][12]||""));
       if(!isNaN(createdAt.getTime()) && createdAt<cutoff) continue;
-      var name=String(data[i][6]||"").trim().replace(/[\s　]+/g,"");
+      var name=normalizeName_(data[i][6]);
       if(name && name===target){
         return {rowIdx:i+1, name:String(data[i][6]||"").trim(), tel:String(data[i][7]||"")};
       }
