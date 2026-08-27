@@ -889,6 +889,10 @@ function sendWebLineGreetingPreviewTo(name){
       if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
     }
   }
+  // ★「郡」宛てで名前が見つからない場合は、必ず届く院長のLINE(オーナーID)に送る
+  if(!tid && (target==="郡"||target==="郡雄一朗")){
+    tid=p.getProperty("LINE_USER_ID")||"";
+  }
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
   var webMsg="【プレビュー送信：Web予約経由の方への返信文】"+nl+nl+
     target+"様、お名前を確認いたしました😊"+nl+nl+

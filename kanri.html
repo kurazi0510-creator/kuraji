@@ -257,12 +257,12 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="btn-section">
-      <div class="btn-section-title" id="sec2-t" onclick="toggleBtnSection('sec2')">📋 記録・カルテ<span class="chev">▼</span></div>
+      <div class="btn-section-title" id="sec2-t" onclick="toggleBtnSection('sec2')">📋 記録・カルテ<span id="sec2-dot" style="display:none;width:10px;height:10px;background:#dc2626;border-radius:50%;margin-left:4px;animation:notifyPulse 1.4s infinite"></span><span class="chev">▼</span></div>
       <div class="btn-row" id="sec2-r">
         <button class="btn bp bsm" onclick="showSymptomList()" style="background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
         <button class="btn bp bsm" onclick="location.href='karte.html'" style="background:#0f766e;color:white;border-color:#0f766e">📋 電子カルテ</button>
         <button class="btn bp bsm" onclick="window.open('consent.html','_blank')" style="background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
-        <button class="btn bp bsm" onclick="openMondoList()" style="background:#b45309;color:white;border-color:#b45309">📋 Web問診票一覧(内容確認・A4印刷)</button>
+        <button class="btn bp bsm" onclick="openMondoList()" style="background:#b45309;color:white;border-color:#b45309;position:relative">📋 Web問診票一覧(内容確認・A4印刷)<span id="mondoReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
       </div>
     </div>
 
@@ -3119,6 +3119,7 @@ async function toggleBlockSlot(date,time){
 // ===== Web予約リクエスト一覧 =====
 // ===== Web予約リクエストの新着通知（音＋バッジ。個人スマホを使わずデスクトップだけで気づけるように） =====
 let webReqKnownIds=new Set(); // これまでに確認済みの未対応リクエスト（rowIdx）
+let lastPendingBookingCount=0; // 直近チェック時点の未対応Web予約件数（問診票を開いた時の即時再計算に使う）
 let webReqFirstCheck=true;
 function getNotifyVolume(){
   const v=parseFloat(localStorage.getItem('kj_notify_vol'));
@@ -3160,6 +3161,7 @@ async function setNotifyVolume(){
   alert(`✅ 音量を${num}に設定しました（今、その音量で鳴らしてみました）`);
 }
 let mondoKnownIds=new Set(), mondoKotsuKnownIds=new Set(), mondoFirstCheck=true;
+let mondoUnseenCount=parseInt(localStorage.getItem('kj_mondo_unseen')||'0')||0;
 async function checkNewWebRequests(){
   try{
     const [res,mres,mkres]=await Promise.all([
@@ -3184,6 +3186,7 @@ async function checkNewWebRequests(){
     }
     webReqKnownIds=new Set(pending.map(r=>r.rowIdx));
     webReqFirstCheck=false;
+    lastPendingBookingCount=pending.length;
 
     // ★Web問診票（通常・交通事故）の新着も同様にチェックする
     const mondoList=md.list||[], mondoKotsuList=mkd.list||[];
@@ -3192,13 +3195,26 @@ async function checkNewWebRequests(){
       const newMK=mondoKotsuList.filter(r=>!mondoKotsuKnownIds.has(r.rowIdx));
       newCount+=newM.length+newMK.length;
       newNames.push(...newM.map(r=>r.name+'様（問診票）'), ...newMK.map(r=>r.name+'様（交通事故問診票）'));
+      if(newM.length+newMK.length>0){
+        mondoUnseenCount+=newM.length+newMK.length;
+        localStorage.setItem('kj_mondo_unseen', String(mondoUnseenCount));
+      }
     }
     mondoKnownIds=new Set(mondoList.map(r=>r.rowIdx));
     mondoKotsuKnownIds=new Set(mondoKotsuList.map(r=>r.rowIdx));
     mondoFirstCheck=false;
 
+    // Web問診票一覧ボタンのバッジ・「記録・カルテ」見出しの赤丸
+    const mondoBadge=document.getElementById('mondoReqBadge');
+    if(mondoBadge){
+      if(mondoUnseenCount>0){ mondoBadge.textContent=mondoUnseenCount>99?'99+':mondoUnseenCount; mondoBadge.style.display='flex'; }
+      else{ mondoBadge.style.display='none'; }
+    }
+    const sec2Dot=document.getElementById('sec2-dot');
+    if(sec2Dot) sec2Dot.style.display = mondoUnseenCount>0?'inline-block':'none';
+
     // フローティング通知バッジ（画面の隅に常時表示。折りたたんでいても見える）
-    updateFloatingNotifyBadge(pending.length);
+    updateFloatingNotifyBadge(pending.length, mondoUnseenCount);
     // セクション見出しの赤丸（🌐Web予約管理、折りたたんでいても見える）
     const sec3Dot=document.getElementById('sec3-dot');
     if(sec3Dot) sec3Dot.style.display = pending.length>0?'inline-block':'none';
@@ -3216,20 +3232,24 @@ async function checkNewWebRequests(){
 }
 // ★フローティング通知バッジ：画面右下に常時固定表示。ボタン群を折りたたんでいても、
 //   スタッフがパソコンの前に来れば必ず目に入る位置に、点滅する赤丸で知らせる
-function updateFloatingNotifyBadge(count){
+function updateFloatingNotifyBadge(bookingCount, mondoCount){
   let el=document.getElementById('floatingNotifyBadge');
   if(!el){
     el=document.createElement('div');
     el.id='floatingNotifyBadge';
     el.style.cssText='position:fixed;right:18px;bottom:18px;z-index:9998;background:#dc2626;color:white;border-radius:999px;padding:14px 20px;font-weight:bold;font-size:1rem;box-shadow:0 4px 16px rgba(220,38,38,.5);cursor:pointer;display:none;align-items:center;gap:8px;animation:notifyPulse 1.4s infinite;';
-    el.onclick=()=>{ openWebRequests(); };
+    el.onclick=()=>{ if(bookingCount>0){openWebRequests();}else{openMondoList();} };
     document.body.appendChild(el);
     const style=document.createElement('style');
     style.textContent='@keyframes notifyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}';
     document.head.appendChild(style);
   }
-  if(count>0){
-    el.innerHTML=`🔔 未対応のWeb予約が ${count}件`;
+  const total=(bookingCount||0)+(mondoCount||0);
+  if(total>0){
+    const parts=[];
+    if(bookingCount>0)parts.push(`未対応Web予約 ${bookingCount}件`);
+    if(mondoCount>0)parts.push(`未確認の問診票 ${mondoCount}件`);
+    el.innerHTML=`🔔 ${parts.join('／')}`;
     el.style.display='flex';
   }else{
     el.style.display='none';
@@ -3243,6 +3263,12 @@ let mondoCurrentTab='normal';
 function openMondoList(){
   document.getElementById('mondoListModal').classList.add('on');
   switchMondoTab('normal');
+  // 一覧を開いたことで確認済みとみなし、バッジ・見出しの赤丸をリセットする
+  mondoUnseenCount=0;
+  localStorage.setItem('kj_mondo_unseen','0');
+  const mondoBadge=document.getElementById('mondoReqBadge'); if(mondoBadge)mondoBadge.style.display='none';
+  const sec2Dot=document.getElementById('sec2-dot'); if(sec2Dot)sec2Dot.style.display='none';
+  updateFloatingNotifyBadge(lastPendingBookingCount, 0);
 }
 function switchMondoTab(tab){
   mondoCurrentTab=tab;
