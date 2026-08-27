@@ -3163,97 +3163,114 @@ async function setNotifyVolume(){
 let mondoKnownIds=new Set(), mondoKotsuKnownIds=new Set(), mondoFirstCheck=true;
 let mondoUnseenCount=parseInt(localStorage.getItem('kj_mondo_unseen')||'0')||0;
 async function checkNewWebRequests(){
+  // ★Web予約とWeb問診票、それぞれ個別に取得する（片方が失敗してももう片方は動くように）
+  let pending=[], mondoList=[], mondoKotsuList=[];
   try{
-    const [res,mres,mkres]=await Promise.all([
-      fetch(GAS+'?action=getWebBookingRequests&t='+Date.now(),{cache:'no-store'}),
-      fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'}),
-      fetch(GAS+'?action=getMondoshinKotsuList&t='+Date.now(),{cache:'no-store'}),
-    ]);
-    const d=await res.json(), md=await mres.json(), mkd=await mkres.json();
-    const pending=(d.list||[]).filter(r=>r.status==='未対応');
-    const badge=document.getElementById('webReqBadge');
-    if(pending.length>0){
-      badge.textContent=pending.length>99?'99+':pending.length;
-      badge.style.display='flex';
-    }else{
-      badge.style.display='none';
-    }
+    const res=await fetch(GAS+'?action=getWebBookingRequests&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(d.ok) pending=(d.list||[]).filter(r=>r.status==='未対応');
+  }catch(e){}
+  try{
+    const mres=await fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'});
+    const md=await mres.json();
+    if(md.ok) mondoList=md.list||[];
+  }catch(e){}
+  try{
+    const mkres=await fetch(GAS+'?action=getMondoshinKotsuList&t='+Date.now(),{cache:'no-store'});
+    const mkd=await mkres.json();
+    if(mkd.ok) mondoKotsuList=mkd.list||[];
+  }catch(e){}
 
-    let newCount=0, newNames=[];
-    if(!webReqFirstCheck){
-      const newOnes=pending.filter(r=>!webReqKnownIds.has(r.rowIdx));
-      newCount+=newOnes.length; newNames.push(...newOnes.map(r=>r.name+'様（Web予約）'));
-    }
-    webReqKnownIds=new Set(pending.map(r=>r.rowIdx));
-    webReqFirstCheck=false;
-    lastPendingBookingCount=pending.length;
+  // ---- Web予約リクエスト（オレンジ系） ----
+  const badge=document.getElementById('webReqBadge');
+  if(badge){
+    if(pending.length>0){ badge.textContent=pending.length>99?'99+':pending.length; badge.style.display='flex'; }
+    else{ badge.style.display='none'; }
+  }
+  let bookingNames=[];
+  if(!webReqFirstCheck){
+    bookingNames=pending.filter(r=>!webReqKnownIds.has(r.rowIdx)).map(r=>r.name+'様');
+  }
+  webReqKnownIds=new Set(pending.map(r=>r.rowIdx));
+  webReqFirstCheck=false;
+  lastPendingBookingCount=pending.length;
+  const sec3Dot=document.getElementById('sec3-dot');
+  if(sec3Dot) sec3Dot.style.display = pending.length>0?'inline-block':'none';
 
-    // ★Web問診票（通常・交通事故）の新着も同様にチェックする
-    const mondoList=md.list||[], mondoKotsuList=mkd.list||[];
-    if(!mondoFirstCheck){
-      const newM=mondoList.filter(r=>!mondoKnownIds.has(r.rowIdx));
-      const newMK=mondoKotsuList.filter(r=>!mondoKotsuKnownIds.has(r.rowIdx));
-      newCount+=newM.length+newMK.length;
-      newNames.push(...newM.map(r=>r.name+'様（問診票）'), ...newMK.map(r=>r.name+'様（交通事故問診票）'));
-      if(newM.length+newMK.length>0){
-        mondoUnseenCount+=newM.length+newMK.length;
-        localStorage.setItem('kj_mondo_unseen', String(mondoUnseenCount));
-      }
+  // ---- Web問診票（青系。通常・交通事故） ----
+  let mondoNames=[];
+  if(!mondoFirstCheck){
+    const newM=mondoList.filter(r=>!mondoKnownIds.has(r.rowIdx));
+    const newMK=mondoKotsuList.filter(r=>!mondoKotsuKnownIds.has(r.rowIdx));
+    mondoNames=[...newM.map(r=>r.name+'様（問診票）'), ...newMK.map(r=>r.name+'様（交通事故問診票）')];
+    if(mondoNames.length>0){
+      mondoUnseenCount+=mondoNames.length;
+      localStorage.setItem('kj_mondo_unseen', String(mondoUnseenCount));
     }
-    mondoKnownIds=new Set(mondoList.map(r=>r.rowIdx));
-    mondoKotsuKnownIds=new Set(mondoKotsuList.map(r=>r.rowIdx));
-    mondoFirstCheck=false;
+  }
+  mondoKnownIds=new Set(mondoList.map(r=>r.rowIdx));
+  mondoKotsuKnownIds=new Set(mondoKotsuList.map(r=>r.rowIdx));
+  mondoFirstCheck=false;
 
-    // Web問診票一覧ボタンのバッジ・「記録・カルテ」見出しの赤丸
-    const mondoBadge=document.getElementById('mondoReqBadge');
-    if(mondoBadge){
-      if(mondoUnseenCount>0){ mondoBadge.textContent=mondoUnseenCount>99?'99+':mondoUnseenCount; mondoBadge.style.display='flex'; }
-      else{ mondoBadge.style.display='none'; }
-    }
-    const sec2Dot=document.getElementById('sec2-dot');
-    if(sec2Dot) sec2Dot.style.display = mondoUnseenCount>0?'inline-block':'none';
+  const mondoBadge=document.getElementById('mondoReqBadge');
+  if(mondoBadge){
+    if(mondoUnseenCount>0){ mondoBadge.textContent=mondoUnseenCount>99?'99+':mondoUnseenCount; mondoBadge.style.display='flex'; }
+    else{ mondoBadge.style.display='none'; }
+  }
+  const sec2Dot=document.getElementById('sec2-dot');
+  if(sec2Dot) sec2Dot.style.display = mondoUnseenCount>0?'inline-block':'none';
 
-    // フローティング通知バッジ（画面の隅に常時表示。折りたたんでいても見える）
-    updateFloatingNotifyBadge(pending.length, mondoUnseenCount);
-    // セクション見出しの赤丸（🌐Web予約管理、折りたたんでいても見える）
-    const sec3Dot=document.getElementById('sec3-dot');
-    if(sec3Dot) sec3Dot.style.display = pending.length>0?'inline-block':'none';
+  // ---- フローティング通知バッジ（画面右下。オレンジ＝Web予約／青＝Web問診票を分けて表示） ----
+  updateFloatingNotifyBadge(pending.length, mondoUnseenCount);
 
-    if(newCount>0){
-      beepNotify();
-      const banner=document.createElement('div');
-      banner.textContent=`📩 新着：${newNames.join('、')}`;
-      banner.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#c98a4b;color:white;padding:12px 20px;border-radius:10px;font-weight:bold;font-size:0.9rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer;max-width:90vw;text-align:center';
-      banner.onclick=()=>{ openWebRequests(); banner.remove(); };
-      document.body.appendChild(banner);
-      setTimeout(()=>banner.remove(),15000);
-    }
-  }catch(e){ /* 通信エラー時は静かに次回リトライ */ }
+  // ---- 新着があれば、色分けした通知バナー＋音で知らせる ----
+  if(bookingNames.length>0){
+    beepNotify();
+    showNotifyBanner(`📩 新しいWeb予約リクエスト：${bookingNames.join('、')}`, '#c98a4b', openWebRequests);
+  }
+  if(mondoNames.length>0){
+    beepNotify();
+    showNotifyBanner(`📋 新しいWeb問診票：${mondoNames.join('、')}`, '#0891b2', openMondoList);
+  }
 }
-// ★フローティング通知バッジ：画面右下に常時固定表示。ボタン群を折りたたんでいても、
-//   スタッフがパソコンの前に来れば必ず目に入る位置に、点滅する赤丸で知らせる
+function showNotifyBanner(text, color, onClickFn){
+  const banner=document.createElement('div');
+  banner.textContent=text;
+  banner.style.cssText=`position:fixed;top:12px;left:50%;transform:translateX(-50%);background:${color};color:white;padding:12px 20px;border-radius:10px;font-weight:bold;font-size:0.9rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer;max-width:90vw;text-align:center`;
+  banner.onclick=()=>{ onClickFn(); banner.remove(); };
+  document.body.appendChild(banner);
+  setTimeout(()=>banner.remove(),15000);
+}
+// ★フローティング通知バッジ：画面右下に常時固定表示。Web予約(オレンジ)とWeb問診票(青)を分けて表示する
 function updateFloatingNotifyBadge(bookingCount, mondoCount){
-  let el=document.getElementById('floatingNotifyBadge');
-  if(!el){
-    el=document.createElement('div');
-    el.id='floatingNotifyBadge';
-    el.style.cssText='position:fixed;right:18px;bottom:18px;z-index:9998;background:#dc2626;color:white;border-radius:999px;padding:14px 20px;font-weight:bold;font-size:1rem;box-shadow:0 4px 16px rgba(220,38,38,.5);cursor:pointer;display:none;align-items:center;gap:8px;animation:notifyPulse 1.4s infinite;';
-    el.onclick=()=>{ if(bookingCount>0){openWebRequests();}else{openMondoList();} };
-    document.body.appendChild(el);
+  let wrap=document.getElementById('floatingNotifyWrap');
+  if(!wrap){
+    wrap=document.createElement('div');
+    wrap.id='floatingNotifyWrap';
+    wrap.style.cssText='position:fixed;right:18px;bottom:18px;z-index:9998;display:flex;flex-direction:column;gap:8px;align-items:flex-end;';
+    document.body.appendChild(wrap);
     const style=document.createElement('style');
     style.textContent='@keyframes notifyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}';
     document.head.appendChild(style);
   }
-  const total=(bookingCount||0)+(mondoCount||0);
-  if(total>0){
-    const parts=[];
-    if(bookingCount>0)parts.push(`未対応Web予約 ${bookingCount}件`);
-    if(mondoCount>0)parts.push(`未確認の問診票 ${mondoCount}件`);
-    el.innerHTML=`🔔 ${parts.join('／')}`;
-    el.style.display='flex';
-  }else{
-    el.style.display='none';
+  function makeBadge(id,color,onClick){
+    let el=document.getElementById(id);
+    if(!el){
+      el=document.createElement('div');
+      el.id=id;
+      el.style.cssText=`background:${color};color:white;border-radius:999px;padding:12px 18px;font-weight:bold;font-size:0.92rem;box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer;display:none;align-items:center;gap:8px;animation:notifyPulse 1.4s infinite;`;
+      el.onclick=onClick;
+      wrap.appendChild(el);
+    }
+    return el;
   }
+  const bEl=makeBadge('floatingBookingBadge','#c98a4b',openWebRequests);
+  if(bookingCount>0){ bEl.innerHTML=`📩 未対応のWeb予約 ${bookingCount}件`; bEl.style.display='flex'; }
+  else{ bEl.style.display='none'; }
+
+  const mEl=makeBadge('floatingMondoBadge','#0891b2',openMondoList);
+  if(mondoCount>0){ mEl.innerHTML=`📋 未確認の問診票 ${mondoCount}件`; mEl.style.display='flex'; }
+  else{ mEl.style.display='none'; }
 }
 checkNewWebRequests();
 setInterval(checkNewWebRequests, 600000); // 10分ごとに自動チェック
