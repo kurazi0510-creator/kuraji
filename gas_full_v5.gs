@@ -21,11 +21,9 @@ function doPost(e){
       body.events.forEach(function(ev){
         try{
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
-            var tok0=PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
-            if(tok0){
-              sendLineMessagingAPI(tok0,ev.source.userId,"友だち追加ありがとうございます😊"+String.fromCharCode(10)+String.fromCharCode(10)+"今後の空き状況などのご案内のため、以下のいずれかをお送りください。"+String.fromCharCode(10)+String.fromCharCode(10)+"【通常の方】"+String.fromCharCode(10)+"お電話番号を数字のみで送信してください。"+String.fromCharCode(10)+"例）09012345678"+String.fromCharCode(10)+String.fromCharCode(10)+"【すでにWeb予約フォームからご希望を送っていただいた方】"+String.fromCharCode(10)+"お名前（フルネーム）だけお送りください。ご希望を確認し、ご予約確定のご連絡をいたします。"+String.fromCharCode(10)+String.fromCharCode(10)+"（LINEの表示名を本名以外にされている方が多いため、確認のためのお願いです）");
-              markPromptSent_(ev.source.userId);
-            }
+            // ★LINE公式アカウントマネージャー側の「あいさつメッセージ」を使用しているため、
+            //   ここでの自動送信はしない（重複して2通届いてしまうのを防ぐ）。
+            //   Web予約経由の方への専用メッセージは、下の「message」イベント（お名前送信時）で対応する。
           }
           if(ev.type==="message"&&ev.source&&ev.source.userId){
             var uid=ev.source.userId;
@@ -53,7 +51,18 @@ function doPost(e){
                 //   （これにより、前日リマインド等が電話番号経由で正しく届くようになる）
                 if(matchedReq.tel) saveLinePhone_(uid,matchedReq.tel,dname||matchedReq.name);
                 if(tok){
-                  sendLineMessagingAPI(tok,uid,matchedReq.name+"様、お名前を確認いたしました😊"+String.fromCharCode(10)+String.fromCharCode(10)+"いただいたご希望日時を確認のうえ、改めてご予約確定のご連絡をこちらのLINEにお送りいたします。"+String.fromCharCode(10)+"今しばらくお待ちください。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
+                  var nl2=String.fromCharCode(10);
+                  var webMsg=matchedReq.name+"様、お名前を確認いたしました😊"+nl2+nl2+
+                    "Web予約フォームからいただいたご希望内容をもとに、確定のご連絡を改めてこちらのLINEにお送りいたします。今しばらくお待ちください。"+nl2+nl2+
+                    "🔶ご予約の変更・キャンセルについて"+nl2+
+                    "ご予約の変更・キャンセルは、前日の診療時間内（20時）までにご連絡をお願いいたします。"+nl2+
+                    "当日キャンセルやご連絡のないキャンセルが続いてしまった場合、次回以降のご予約を控えさせていただくことがございます。多くの方に気持ちよくご利用いただくため、ご理解・ご協力をお願いいたします🌿"+nl2+nl2+
+                    "◆ご連絡方法"+nl2+
+                    "📞 お電話：072-892-3223"+nl2+
+                    "💬 このLINE公式アカウント"+nl2+nl2+
+                    "ご不明な点がございましたら、お気軽にスタッフまでお声がけください🌿"+nl2+nl2+
+                    "倉治整骨院";
+                  sendLineMessagingAPI(tok,uid,webMsg);
                   var ownerId2=PropertiesService.getScriptProperties().getProperty("LINE_USER_ID");
                   if(ownerId2)sendLineMessagingAPI(tok,ownerId2,"[倉治整骨院] 📩 Web予約リクエスト済みの"+matchedReq.name+"様が、LINEでお名前を送ってこられました。予約確定のご連絡をお願いします。");
                 }
