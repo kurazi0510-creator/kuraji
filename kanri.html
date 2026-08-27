@@ -267,7 +267,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
 
     <div class="btn-section">
-      <div class="btn-section-title closed" id="sec3-t" onclick="toggleBtnSection('sec3')">🌐 Web予約管理<span class="chev">▼</span></div>
+      <div class="btn-section-title closed" id="sec3-t" onclick="toggleBtnSection('sec3')">🌐 Web予約管理<span id="sec3-dot" style="display:none;width:10px;height:10px;background:#dc2626;border-radius:50%;margin-left:4px;animation:notifyPulse 1.4s infinite"></span><span class="chev">▼</span></div>
       <div class="btn-row closed" id="sec3-r">
         <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
         <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
@@ -3121,38 +3121,52 @@ let webReqKnownIds=new Set(); // これまでに確認済みの未対応リク�
 let webReqFirstCheck=true;
 function getNotifyVolume(){
   const v=parseFloat(localStorage.getItem('kj_notify_vol'));
-  return isNaN(v)?0.25:v; // デフォルト音量
+  return isNaN(v)?0.25:v; // デフォルト音量（内部値。1.0=100%、最大3.0=300%まで設定可能）
 }
 function beepNotify(){
   try{
     const vol=getNotifyVolume();
     if(vol<=0)return; // 0＝ミュート
     const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    [0,0.18,0.36].forEach(t=>{
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.type='sine'; o.frequency.value=880;
-      o.connect(g); g.connect(ctx.destination);
-      g.gain.setValueAtTime(0.0001,ctx.currentTime+t);
-      g.gain.exponentialRampToValueAtTime(vol,ctx.currentTime+t+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+t+0.16);
-      o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.18);
+    // ★音割れを防ぎつつ大音量でも聞き取りやすくするコンプレッサーを挟む
+    const comp=ctx.createDynamicsCompressor();
+    comp.threshold.value=-16; comp.knee.value=12; comp.ratio.value=8;
+    comp.attack.value=0.003; comp.release.value=0.15;
+    comp.connect(ctx.destination);
+    // ★sine単体より遠くまで聞こえやすいsquare波を使い、複数の音を重ねて厚みのある音にする
+    [0,0.22,0.44].forEach(t=>{
+      [880,1320].forEach((freq,fi)=>{
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type='square'; o.frequency.value=freq;
+        o.connect(g); g.connect(comp);
+        const peak=Math.min(vol,3)*(fi===0?0.5:0.28); // 倍音を少し弱めに重ねる
+        g.gain.setValueAtTime(0.0001,ctx.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(peak,ctx.currentTime+t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+t+0.2);
+        o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.22);
+      });
     });
   }catch(e){}
 }
 async function setNotifyVolume(){
   const cur=Math.round(getNotifyVolume()*100);
-  const input=prompt('新着通知の音量を0〜100で入力してください（大きいほど音が大きくなります。0でミュート）', cur);
+  const input=prompt('新着通知の音量を0〜300で入力してください（100が今までの最大、それ以上でさらに大きくなります。0でミュート）', cur);
   if(input===null)return;
   const num=parseInt(input);
-  if(isNaN(num)||num<0||num>100){ alert('0〜100の数字で入力してください'); return; }
+  if(isNaN(num)||num<0||num>300){ alert('0〜300の数字で入力してください'); return; }
   localStorage.setItem('kj_notify_vol', String(num/100));
   beepNotify(); // 設定した音量ですぐ試し鳴らし
   alert(`✅ 音量を${num}に設定しました（今、その音量で鳴らしてみました）`);
 }
+let mondoKnownIds=new Set(), mondoKotsuKnownIds=new Set(), mondoFirstCheck=true;
 async function checkNewWebRequests(){
   try{
-    const res=await fetch(GAS+'?action=getWebBookingRequests&t='+Date.now(),{cache:'no-store'});
-    const d=await res.json();
+    const [res,mres,mkres]=await Promise.all([
+      fetch(GAS+'?action=getWebBookingRequests&t='+Date.now(),{cache:'no-store'}),
+      fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'}),
+      fetch(GAS+'?action=getMondoshinKotsuList&t='+Date.now(),{cache:'no-store'}),
+    ]);
+    const d=await res.json(), md=await mres.json(), mkd=await mkres.json();
     const pending=(d.list||[]).filter(r=>r.status==='未対応');
     const badge=document.getElementById('webReqBadge');
     if(pending.length>0){
@@ -3161,23 +3175,64 @@ async function checkNewWebRequests(){
     }else{
       badge.style.display='none';
     }
+
+    let newCount=0, newNames=[];
     if(!webReqFirstCheck){
       const newOnes=pending.filter(r=>!webReqKnownIds.has(r.rowIdx));
-      if(newOnes.length>0){
-        beepNotify();
-        const names=newOnes.map(r=>r.name).join('、');
-        // ページ内にも目立つ通知を出す（音に気づかなくても後から見える）
-        const banner=document.createElement('div');
-        banner.textContent=`📩 新しいWeb予約リクエスト：${names} 様`;
-        banner.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#c98a4b;color:white;padding:12px 20px;border-radius:10px;font-weight:bold;font-size:0.9rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer';
-        banner.onclick=()=>{ openWebRequests(); banner.remove(); };
-        document.body.appendChild(banner);
-        setTimeout(()=>banner.remove(),15000);
-      }
+      newCount+=newOnes.length; newNames.push(...newOnes.map(r=>r.name+'様（Web予約）'));
     }
     webReqKnownIds=new Set(pending.map(r=>r.rowIdx));
     webReqFirstCheck=false;
+
+    // ★Web問診票（通常・交通事故）の新着も同様にチェックする
+    const mondoList=md.list||[], mondoKotsuList=mkd.list||[];
+    if(!mondoFirstCheck){
+      const newM=mondoList.filter(r=>!mondoKnownIds.has(r.rowIdx));
+      const newMK=mondoKotsuList.filter(r=>!mondoKotsuKnownIds.has(r.rowIdx));
+      newCount+=newM.length+newMK.length;
+      newNames.push(...newM.map(r=>r.name+'様（問診票）'), ...newMK.map(r=>r.name+'様（交通事故問診票）'));
+    }
+    mondoKnownIds=new Set(mondoList.map(r=>r.rowIdx));
+    mondoKotsuKnownIds=new Set(mondoKotsuList.map(r=>r.rowIdx));
+    mondoFirstCheck=false;
+
+    // フローティング通知バッジ（画面の隅に常時表示。折りたたんでいても見える）
+    updateFloatingNotifyBadge(pending.length);
+    // セクション見出しの赤丸（🌐Web予約管理、折りたたんでいても見える）
+    const sec3Dot=document.getElementById('sec3-dot');
+    if(sec3Dot) sec3Dot.style.display = pending.length>0?'inline-block':'none';
+
+    if(newCount>0){
+      beepNotify();
+      const banner=document.createElement('div');
+      banner.textContent=`📩 新着：${newNames.join('、')}`;
+      banner.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#c98a4b;color:white;padding:12px 20px;border-radius:10px;font-weight:bold;font-size:0.9rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer;max-width:90vw;text-align:center';
+      banner.onclick=()=>{ openWebRequests(); banner.remove(); };
+      document.body.appendChild(banner);
+      setTimeout(()=>banner.remove(),15000);
+    }
   }catch(e){ /* 通信エラー時は静かに次回リトライ */ }
+}
+// ★フローティング通知バッジ：画面右下に常時固定表示。ボタン群を折りたたんでいても、
+//   スタッフがパソコンの前に来れば必ず目に入る位置に、点滅する赤丸で知らせる
+function updateFloatingNotifyBadge(count){
+  let el=document.getElementById('floatingNotifyBadge');
+  if(!el){
+    el=document.createElement('div');
+    el.id='floatingNotifyBadge';
+    el.style.cssText='position:fixed;right:18px;bottom:18px;z-index:9998;background:#dc2626;color:white;border-radius:999px;padding:14px 20px;font-weight:bold;font-size:1rem;box-shadow:0 4px 16px rgba(220,38,38,.5);cursor:pointer;display:none;align-items:center;gap:8px;animation:notifyPulse 1.4s infinite;';
+    el.onclick=()=>{ openWebRequests(); };
+    document.body.appendChild(el);
+    const style=document.createElement('style');
+    style.textContent='@keyframes notifyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}';
+    document.head.appendChild(style);
+  }
+  if(count>0){
+    el.innerHTML=`🔔 未対応のWeb予約が ${count}件`;
+    el.style.display='flex';
+  }else{
+    el.style.display='none';
+  }
 }
 checkNewWebRequests();
 setInterval(checkNewWebRequests, 600000); // 10分ごとに自動チェック

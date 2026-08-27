@@ -97,6 +97,7 @@ textarea{resize:none;height:64px;}
   <div class="card">
     <h2><span class="step-num">1</span>ご希望メニュー</h2>
     <div class="menu-list" id="menuArea"></div>
+    <p class="note" style="margin-top:10px">💡 初めての方は、現金でのお支払いで割引がございます。ぜひご利用ください。</p>
   </div>
 
   <div class="card" id="calCard" style="display:none">
@@ -172,12 +173,12 @@ const EXT_SLOTS=['12:30','12:50','20:00','20:20'];
 const YOBI=['日','月','火','水','木','金','土'];
 
 const MENUS=[
-  {key:'sotai_first', label:'整体（初診）', minutes:60, slots:3, price:5500},
-  {key:'sotai_repeat',label:'整体（再診）', minutes:40, slots:2, price:3500},
-  {key:'raku_first',  label:'楽トレ（初診）', minutes:40, slots:2, price:3500},
-  {key:'raku_repeat', label:'楽トレ（再診）', minutes:40, slots:2, price:2500},
-  {key:'bigan_first', label:'美顔整顔（初診）', minutes:60, slots:3, price:6500},
-  {key:'bigan_repeat',label:'美顔整顔（再診）', minutes:40, slots:2, price:4500},
+  {key:'sotai_first', label:'整体（初診）', minutes:60, slots:3, price:3980},
+  {key:'sotai_repeat',label:'整体（再診）', minutes:40, slots:2, price:5500},
+  {key:'raku_first',  label:'楽トレ（初診）', minutes:40, slots:2, price:2150},
+  {key:'raku_repeat', label:'楽トレ（再診）', minutes:40, slots:2, price:3300},
+  {key:'bigan_first', label:'美顔整顔（初診）', minutes:60, slots:3, price:4480},
+  {key:'bigan_repeat',label:'美顔整顔（再診）', minutes:40, slots:2, price:6600},
   {key:'kotsu_first', label:'交通事故（初診）', minutes:60, slots:3, price:0},
   {key:'kotsu_repeat',label:'交通事故（再診）', minutes:20, slots:1, price:0},
 ];
@@ -284,9 +285,22 @@ function renderWeek(){
 // （例：60分メニュー＝3枠必要なら、開始枠+次+次の3つ全てが空いていないと選べないようにする）
 // 特定の開始時間（12:10・19:40）は、延長枠を使っても最大2枠(40分)までに制限する
 const MAX_SLOTS_OVERRIDE={'12:10':2, '19:40':2};
+// ★体感速度優先：サーバーからの空き状況データがまだ届いていない場合は、
+//   標準の営業時間ルールだけで「開いているものとして」即座に仮表示する（楽観的レンダリング）。
+//   データが届き次第、renderWeek()が再実行されて実際に埋まっている枠は自動で正しく反映される。
+function defaultOpenSlots(dateStr){
+  const dow=new Date(dateStr+'T00:00:00').getDay();
+  if(dow===0) return []; // 日曜休診
+  if(dow===4||dow===6) return SLOTS.filter(s=>s<'13:00'); // 木・土は午前のみ
+  return SLOTS.slice();
+}
 function hasEnoughConsecutiveSlots(dateStr,startIdx){
-  const info=weekData[dateStr];
-  if(!info || info.closed || !info.available) return false;
+  let info=weekData[dateStr];
+  if(!info){
+    // まだデータ未到着 → 標準ルールで仮判定（読み込み中もタップして選べるようにする）
+    info={closed:false, available:defaultOpenSlots(dateStr)};
+  }
+  if(info.closed || !info.available) return false;
   const startTime=SLOTS[startIdx];
   let need=selMenu ? selMenu.slots : 1;
   const cap=MAX_SLOTS_OVERRIDE[startTime];
