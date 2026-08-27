@@ -906,7 +906,7 @@ function sendWebLineGreetingPreviewTo(name){
     "ご不明な点がございましたら、お気軽にスタッフまでお声がけください🌿"+nl+nl+
     "倉治整骨院";
   var r=sendLineMessagingAPI(token,tid,webMsg);
-  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+  return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 function sendBirthdayMessageTestTo(name){
   var p=PropertiesService.getScriptProperties();
@@ -935,7 +935,7 @@ function sendBirthdayMessageTestTo(name){
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
   var msg="【プレビュー送信】"+nl+"🎂 お誕生日おめでとうございます！"+nl+nl+target+"様"+nl+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます。"+nl+nl+"日頃の感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"有効期限："+todayDisp+"〜"+expireStr+"まで"+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"素敵な1年になりますように😊"+nl+nl+"倉治整骨院";
   var r=sendLineMessagingAPI(token,tid,msg);
-  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+  return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 
 // ═══════════════════════════════════════
@@ -1032,7 +1032,7 @@ function sendReviewRequestTestTo(name){
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
   var msg="【プレビュー送信】"+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+target+"様には3回目のご来院をいただきました。"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
   var r=sendLineMessagingAPI(token,tid,msg);
-  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+  return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 // GoogleクチコミのURLを設定する（Apps Scriptエディタから手動で1回だけ実行）
 // 例: setReviewUrlの中のURLを実際のクチコミURLに書き換えてから実行してください
@@ -1177,7 +1177,7 @@ function sendDormantOutreachTestTo(name){
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
   var msg="【プレビュー送信】"+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+target+"様"+nl+nl+"しばらくご来院がないようですが、その後お体の調子はいかがでしょうか？"+nl+nl+"また気になる症状がございましたら、いつでもお気軽にお越しください。"+nl+"皆様のご来院をお待ちしております。"+nl+nl+"ご予約はこのLINEでどうぞ。"+nl+"(自動送信のため返信不要です)";
   var r=sendLineMessagingAPI(token,tid,msg);
-  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+  return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 function getDormantLog(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -1216,7 +1216,7 @@ function sendPointsMilestoneTestTo(name){
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
   var msg="【プレビュー送信】"+nl+"🎉 ご来院10回目、誠にありがとうございます！"+nl+nl+target+"様"+nl+nl+"日頃のご愛顧に感謝を込めて、次回ご来院時に使える"+nl+"【500円引きクーポン】をプレゼントいたします🎁"+nl+nl+"(受付でこのメッセージをご提示ください)"+nl+nl+"これからも倉治整骨院をよろしくお願いいたします。"+nl+nl+"倉治整骨院";
   var r=sendLineMessagingAPI(token,tid,msg);
-  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+  return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 function sendPointsMilestone(){
   var p=PropertiesService.getScriptProperties();
@@ -1330,15 +1330,18 @@ function getGoogleReviewUrl(){
   return {ok:true, url:url};
 }
 function sendLineMessagingAPI(token,userId,message){
-  if(!token||!userId||!message)return{ok:false};
+  if(!token||!userId||!message)return{ok:false,error:"token/userId/messageのいずれかが空です"};
   try{
     var res=UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push",{
       method:"post",
       headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},
-      payload:JSON.stringify({to:userId,messages:[{type:"text",text:message}]})
+      payload:JSON.stringify({to:userId,messages:[{type:"text",text:message}]}),
+      muteHttpExceptions:true
     });
-    return{ok:res.getResponseCode()===200};
-  }catch(e){return{ok:false};}
+    var code=res.getResponseCode();
+    if(code===200) return {ok:true};
+    return {ok:false, error:"LINE API エラー(コード"+code+"): "+res.getContentText()};
+  }catch(e){return{ok:false,error:"例外: "+e.message};}
 }
 
 // ═══════════════════════════════════════
