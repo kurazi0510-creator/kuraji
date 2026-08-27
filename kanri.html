@@ -289,6 +289,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <button class="btn bp bsm" onclick="sendBirthdayPreview()" style="background:#a21caf;color:white;border-color:#a21caf">👀 誕生日メッセージのプレビューを指定の人に送る</button>
         <button class="btn bp bsm" onclick="setupReviewUrl()" style="background:#0f766e;color:white;border-color:#0f766e">⚙️ GoogleクチコミURLを設定</button>
         <button class="btn bp bsm" onclick="sendReviewPreview()" style="background:#0d9488;color:white;border-color:#0d9488">👀 口コミ依頼のプレビューを指定の人に送る</button>
+        <button class="btn bp bsm" onclick="sendWebLineGreetingPreview()" style="background:#06c755;color:white;border-color:#06c755">👀 Web予約経由の方への返信文プレビューを送る</button>
         <button class="btn bp bsm" onclick="runDormantOutreachNow()" style="background:#7e22ce;color:white;border-color:#7e22ce">🌙 休眠患者への再来促進配信を今すぐ実行(まだ試験運用)</button>
         <button class="btn bp bsm" onclick="sendDormantPreview()" style="background:#a78bfa;color:white;border-color:#a78bfa">👀 休眠促進メッセージのプレビューを指定の人に送る</button>
         <button class="btn bp bsm" onclick="runPointsMilestoneNow()" style="background:#ca8a04;color:white;border-color:#ca8a04">🎁 通院回数ポイント特典を今すぐ実行(まだ試験運用)</button>
@@ -3520,6 +3521,15 @@ async function runPointsMilestoneNow(){
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'runPointsMilestoneNow'})});
     const d=await res.json();
     alert(d.ok?'✅ 実行しました。結果は院長のLINEに届きます':'❌ 失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendWebLineGreetingPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendWebLineGreetingPreviewTo',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 async function sendReviewPreview(){

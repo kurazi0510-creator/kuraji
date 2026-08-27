@@ -100,6 +100,7 @@ function doPost(e){
       else if(action==="runPointsMilestoneNow"){sendPointsMilestone();result={ok:true};}
       else if(action==="sendDormantOutreachTestTo")result=sendDormantOutreachTestTo(body.name);
       else if(action==="sendPointsMilestoneTestTo")result=sendPointsMilestoneTestTo(body.name);
+      else if(action==="sendWebLineGreetingPreviewTo")result=sendWebLineGreetingPreviewTo(body.name);
       else if(action==="saveMondoshin")result=saveMondoshin(body.data);
       else if(action==="saveMondoshinKotsu")result=saveMondoshinKotsu(body.data);
       else if(action==="getMenuMaster")result=getMenuMaster();
@@ -868,6 +869,41 @@ function getBirthdayLog(){
   return {ok:true, list:list};
 }
 // 指定した名前の患者に、実際の誕生日に関係なく誕生日メッセージのプレビューを送信する（文面確認用）
+// 「Web予約経由の方向け」返信メッセージのプレビューを、指定した相手（通常は院長）に送る
+function sendWebLineGreetingPreviewTo(name){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var nl=String.fromCharCode(10);
+  var target=String(name||"").trim();
+  if(!target) return {ok:false, error:"名前を指定してください"};
+  var tel=getTelByPatientName_(target);
+  var tid=tel?findLineUidByPhone_(tel):"";
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=lu[target];
+      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
+  }
+  if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
+  var webMsg="【プレビュー送信：Web予約経由の方への返信文】"+nl+nl+
+    target+"様、お名前を確認いたしました😊"+nl+nl+
+    "Web予約フォームからいただいたご希望内容をもとに、確定のご連絡を改めてこちらのLINEにお送りいたします。今しばらくお待ちください。"+nl+nl+
+    "🔶ご予約の変更・キャンセルについて"+nl+
+    "ご予約の変更・キャンセルは、前日の診療時間内（20時）までにご連絡をお願いいたします。"+nl+
+    "当日キャンセルやご連絡のないキャンセルが続いてしまった場合、次回以降のご予約を控えさせていただくことがございます。多くの方に気持ちよくご利用いただくため、ご理解・ご協力をお願いいたします🌿"+nl+nl+
+    "◆ご連絡方法"+nl+
+    "📞 お電話：072-892-3223"+nl+
+    "💬 このLINE公式アカウント"+nl+nl+
+    "ご不明な点がございましたら、お気軽にスタッフまでお声がけください🌿"+nl+nl+
+    "倉治整骨院";
+  var r=sendLineMessagingAPI(token,tid,webMsg);
+  return r.ok ? {ok:true} : {ok:false, error:"送信に失敗しました"};
+}
 function sendBirthdayMessageTestTo(name){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
