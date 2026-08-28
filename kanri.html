@@ -3168,7 +3168,8 @@ let mondoUnseenCount=parseInt(localStorage.getItem('kj_mondo_unseen')||'0')||0;
 // ★テスト用：今ある問診票を「全部新着」として扱い、通知(バッジ・音・フローティング)を強制的に発火させる★
 // これで実際に見た目・音が動くかを、新規データを待たずにその場で確認できる
 async function forceMondoNotifyTest(){
-  if(!confirm('今ある問診票を全て「新着」として扱い、通知をテスト表示します。よろしいですか？'))return;
+  if(!confirm('「最後に確認した時刻」を大昔にリセットして、今ある問診票を全て「未確認」として扱い、通知をテスト表示します。よろしいですか？'))return;
+  localStorage.setItem('kj_mondo_last_seen','2000-01-01 00:00:00');
   mondoKnownIds=new Set();
   mondoKotsuKnownIds=new Set();
   mondoFirstCheck=false;
@@ -3236,16 +3237,20 @@ async function checkNewWebRequests(){
   const sec3Dot=document.getElementById('sec3-dot');
   if(sec3Dot) sec3Dot.style.display = pending.length>0?'inline-block':'none';
 
-  // ---- Web問診票（青系。通常・交通事故） ----
+  // ---- Web問診票（青系。通常・交通事故）----
+  // ★ページの再読み込みに左右されない、確実な仕組みに変更。
+  //   「最後に一覧を開いて確認した時刻」をlocalStorageに保存しておき、
+  //   それより後に届いた問診票の件数を毎回計算する（Web予約の「未対応」件数と同じ考え方）
+  const lastSeenMondo=localStorage.getItem('kj_mondo_last_seen')||'2000-01-01 00:00:00';
+  const unseenM=mondoList.filter(r=>r.createdAt>lastSeenMondo);
+  const unseenMK=mondoKotsuList.filter(r=>r.createdAt>lastSeenMondo);
+  mondoUnseenCount=unseenM.length+unseenMK.length;
+
   let mondoNames=[];
   if(!mondoFirstCheck){
     const newM=mondoList.filter(r=>!mondoKnownIds.has(r.rowIdx));
     const newMK=mondoKotsuList.filter(r=>!mondoKotsuKnownIds.has(r.rowIdx));
     mondoNames=[...newM.map(r=>r.name+'様（問診票）'), ...newMK.map(r=>r.name+'様（交通事故問診票）')];
-    if(mondoNames.length>0){
-      mondoUnseenCount+=mondoNames.length;
-      localStorage.setItem('kj_mondo_unseen', String(mondoUnseenCount));
-    }
   }
   mondoKnownIds=new Set(mondoList.map(r=>r.rowIdx));
   mondoKotsuKnownIds=new Set(mondoKotsuList.map(r=>r.rowIdx));
@@ -3312,16 +3317,22 @@ function updateFloatingNotifyBadge(bookingCount, mondoCount){
   else{ mEl.style.display='none'; }
 }
 checkNewWebRequests();
-setInterval(checkNewWebRequests, 600000); // 10分ごとに自動チェック
+setInterval(checkNewWebRequests, 120000); // 2分ごとに自動チェック
+// ★画面(タブ)が裏に回っている間はブラウザがタイマーを遅らせることがあるため、
+//   タブがまた表に戻ってきた瞬間にも必ず1回チェックする
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible') checkNewWebRequests();
+});
 
 // ===== Web問診票一覧 =====
 let mondoCurrentTab='normal';
 function openMondoList(){
   document.getElementById('mondoListModal').classList.add('on');
   switchMondoTab('normal');
-  // 一覧を開いたことで確認済みとみなし、バッジ・見出しの赤丸をリセットする
+  // 一覧を開いたことで確認済みとみなし、「最後に確認した時刻」を今の時刻で保存する
+  const nowStr=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0')+'-'+String(new Date().getDate()).padStart(2,'0')+' '+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+':'+String(new Date().getSeconds()).padStart(2,'0');
+  localStorage.setItem('kj_mondo_last_seen', nowStr);
   mondoUnseenCount=0;
-  localStorage.setItem('kj_mondo_unseen','0');
   const mondoBadge=document.getElementById('mondoReqBadge'); if(mondoBadge)mondoBadge.style.display='none';
   const sec2Dot=document.getElementById('sec2-dot'); if(sec2Dot)sec2Dot.style.display='none';
   updateFloatingNotifyBadge(lastPendingBookingCount, 0);
