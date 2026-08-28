@@ -3394,7 +3394,7 @@ async function loadWebRequests(){
       const contactBadge=r.hasLine
         ?`<span onclick="openLineContact('${r.name.replace(/'/g,"")}')" style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;text-decoration:underline">💬 LINEで連絡可能（タップして開く）</span>`
         :(r.email
-          ?`<span onclick="location.href='mailto:${r.email}?subject=${encodeURIComponent('【倉治整骨院】ご予約について')}'" style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;text-decoration:underline">✉️ メールで連絡（タップして開く）</span>`
+          ?`<span onclick="window.open('https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(r.email)}&su=${encodeURIComponent('【倉治整骨院】ご予約について')}&authuser=kurazi0510@gmail.com','_blank')" style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;text-decoration:underline">✉️ メールで連絡（タップして開く）</span>`
           :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">📞 お電話で連絡</span>');
       return `<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
