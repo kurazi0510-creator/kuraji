@@ -295,6 +295,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <button class="btn bp bsm" onclick="runPointsMilestoneNow()" style="background:#ca8a04;color:white;border-color:#ca8a04">🎁 通院回数ポイント特典を今すぐ実行(まだ試験運用)</button>
         <button class="btn bp bsm" onclick="sendPointsPreview()" style="background:#fbbf24;color:white;border-color:#fbbf24">👀 ポイント特典メッセージのプレビューを指定の人に送る</button>
         <button class="btn bp bsm" onclick="setNotifyVolume()" style="background:#7c3aed;color:white;border-color:#7c3aed">🔊 新着通知の音量を設定</button>
+        <button class="btn bp bsm" onclick="debugCheckMondoNotify()" style="background:#0891b2;color:white;border-color:#0891b2">🔍 問診票の通知動作を今すぐ診断</button>
         <button class="btn bp bsm" onclick="sendTestEmail()" style="background:#475569;color:white;border-color:#475569">✉️ テストメールを送信(到達確認)</button>
       </div>
     </div>
@@ -664,7 +665,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <div class="page" id="page-stock">
   <div style="margin-top:14px">
     <div class="card">
-      <div class="ctitle">在庫管理 <button class="btn bp bsm" onclick="openStockAdd()">＋ 商品追加</button></div>
+      <div class="ctitle">在庫管理 <button class="btn bp bsm" onclick="openStockAdd()">＋ 商品追加</button> <button class="btn bp bsm" onclick="openStockAdjust()" style="background:#7c3aed;border-color:#7c3aed">🔧 在庫を手動で調整(院長使用など)</button></div>
       <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;">物販・処置で使用すると在庫が自動で減算されます</div>
       <div id="stock-list"></div>
       <div style="margin-top:14px;padding:10px;background:#f8f6f1;border-radius:8px;display:flex;gap:16px;justify-content:center">
@@ -3162,6 +3163,24 @@ async function setNotifyVolume(){
 }
 let mondoKnownIds=new Set(), mondoKotsuKnownIds=new Set(), mondoFirstCheck=true;
 let mondoUnseenCount=parseInt(localStorage.getItem('kj_mondo_unseen')||'0')||0;
+// ★診断用：問診票の通知が正しく動いているか、その場で確認できるボタン★
+async function debugCheckMondoNotify(){
+  let msg='【診断結果】\n\n';
+  try{
+    const mres=await fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'});
+    const md=await mres.json();
+    msg+=`通常問診票：ok=${md.ok}, 件数=${(md.list||[]).length}\n`;
+  }catch(e){ msg+=`通常問診票：通信エラー(${e.message})\n`; }
+  try{
+    const mkres=await fetch(GAS+'?action=getMondoshinKotsuList&t='+Date.now(),{cache:'no-store'});
+    const mkd=await mkres.json();
+    msg+=`交通事故問診票：ok=${mkd.ok}, 件数=${(mkd.list||[]).length}\n`;
+  }catch(e){ msg+=`交通事故問診票：通信エラー(${e.message})\n`; }
+  msg+=`\n現在の未確認件数（画面上）：${mondoUnseenCount}件\n`;
+  msg+=`現在の音量設定：${Math.round(getNotifyVolume()*100)}\n`;
+  alert(msg);
+  beepNotify();
+}
 async function checkNewWebRequests(){
   // ★Web予約とWeb問診票、それぞれ個別に取得する（片方が失敗してももう片方は動くように）
   let pending=[], mondoList=[], mondoKotsuList=[];
@@ -6726,6 +6745,28 @@ function setStock(i,v){stockData[i].qty=Math.max(0,parseInt(v)||0);save();}
 function setStockAlert(i,v){stockData[i].alert=Math.max(0,parseInt(v)||0);save();}
 function delStock(i){if(!confirm('削除しますか？'))return;stockData.splice(i,1);save();renderStock();}
 function openStockAdd(){document.getElementById('stockAddModal').classList.add('on');}
+// 院長自身が使用した分など、患者様への提供以外で在庫が減る場合に手動で記録・調整する
+async function openStockAdjust(){
+  if(!stockData.length){ alert('在庫データがまだありません'); return; }
+  const list=stockData.map((s,i)=>`${i+1}. ${s.name}（現在の在庫：${s.qty}${s.unit||''}）`).join('\n');
+  const idxStr=prompt('どの商品を調整しますか？番号を入力してください\n\n'+list);
+  if(idxStr===null)return;
+  const idx=parseInt(idxStr)-1;
+  if(isNaN(idx)||idx<0||idx>=stockData.length){ alert('番号が正しくありません'); return; }
+  const target=stockData[idx];
+  const qtyStr=prompt(`「${target.name}」を何個減らしますか？（院長使用・破損など。増やす場合はマイナスの数字を入力）`, '1');
+  if(qtyStr===null)return;
+  const qty=parseInt(qtyStr);
+  if(isNaN(qty)){ alert('数字を入力してください'); return; }
+  const reason=prompt('理由を入力してください（例：院長使用・破損・棚卸し修正）', '院長使用') || '院長使用';
+  target.qty=Math.max(0, target.qty-qty);
+  // 調整履歴を記録（何がいつ・誰の判断で減ったか後から追えるようにする）
+  if(!window.stockAdjustLog) window.stockAdjustLog=JSON.parse(localStorage.getItem('kj_stock_adjust_log')||'[]');
+  window.stockAdjustLog.unshift({date:new Date().toLocaleString('ja-JP'), name:target.name, qty, reason});
+  localStorage.setItem('kj_stock_adjust_log', JSON.stringify(window.stockAdjustLog.slice(0,200)));
+  save(); renderStock();
+  alert(`✅ ${target.name}を${qty}個減らしました（残り${target.qty}${target.unit||''}）\n理由：${reason}`);
+}
 function closeStockAdd(){document.getElementById('stockAddModal').classList.remove('on');}
 function saveStockAdd(){
   const name=document.getElementById('sa-name').value.trim();if(!name){alert('商品名を入力してください');return;}
