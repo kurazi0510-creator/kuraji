@@ -3171,9 +3171,18 @@ async function forceMondoNotifyTest(){
   if(!confirm('今ある問診票を全て「新着」として扱い、通知をテスト表示します。よろしいですか？'))return;
   mondoKnownIds=new Set();
   mondoKotsuKnownIds=new Set();
-  mondoFirstCheck=false; // ★これを先にfalseにしておくことで、次のチェックで「新着扱い」になる
+  mondoFirstCheck=false;
   await checkNewWebRequests();
-  alert('テスト通知を発火させました。画面右下の青いバッジ・上部のお知らせ・音が出ているか確認してください。');
+  // ★実際にJavaScriptが設定した値を、そのまま数値で報告する（見た目の不具合か、値そのものの不具合かを切り分けるため）
+  const mondoBadgeEl=document.getElementById('mondoReqBadge');
+  const sec2DotEl=document.getElementById('sec2-dot');
+  const floatEl=document.getElementById('floatingMondoBadge');
+  let report='【実際に設定された値】\n\n';
+  report+=`mondoUnseenCount = ${mondoUnseenCount}\n\n`;
+  report+=`①一覧ボタンの赤丸：display=${mondoBadgeEl?mondoBadgeEl.style.display:'要素が見つかりません'}, 中身=${mondoBadgeEl?mondoBadgeEl.textContent:'-'}\n\n`;
+  report+=`②見出しの赤丸：display=${sec2DotEl?sec2DotEl.style.display:'要素が見つかりません'}\n\n`;
+  report+=`③右下フローティング：${floatEl?('display='+floatEl.style.display+', 中身='+floatEl.textContent):'要素がまだ作られていません'}`;
+  alert(report);
 }
 async function debugCheckMondoNotify(){
   let msg='【診断結果】\n\n';
