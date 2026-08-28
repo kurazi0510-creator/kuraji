@@ -296,6 +296,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <button class="btn bp bsm" onclick="sendPointsPreview()" style="background:#fbbf24;color:white;border-color:#fbbf24">👀 ポイント特典メッセージのプレビューを指定の人に送る</button>
         <button class="btn bp bsm" onclick="setNotifyVolume()" style="background:#7c3aed;color:white;border-color:#7c3aed">🔊 新着通知の音量を設定</button>
         <button class="btn bp bsm" onclick="debugCheckMondoNotify()" style="background:#0891b2;color:white;border-color:#0891b2">🔍 問診票の通知動作を今すぐ診断</button>
+        <button class="btn bp bsm" onclick="forceMondoNotifyTest()" style="background:#dc2626;color:white;border-color:#dc2626">🧪 問診票の通知を今すぐ強制テスト</button>
         <button class="btn bp bsm" onclick="sendTestEmail()" style="background:#475569;color:white;border-color:#475569">✉️ テストメールを送信(到達確認)</button>
       </div>
     </div>
@@ -3164,6 +3165,16 @@ async function setNotifyVolume(){
 let mondoKnownIds=new Set(), mondoKotsuKnownIds=new Set(), mondoFirstCheck=true;
 let mondoUnseenCount=parseInt(localStorage.getItem('kj_mondo_unseen')||'0')||0;
 // ★診断用：問診票の通知が正しく動いているか、その場で確認できるボタン★
+// ★テスト用：今ある問診票を「全部新着」として扱い、通知(バッジ・音・フローティング)を強制的に発火させる★
+// これで実際に見た目・音が動くかを、新規データを待たずにその場で確認できる
+async function forceMondoNotifyTest(){
+  if(!confirm('今ある問診票を全て「新着」として扱い、通知をテスト表示します。よろしいですか？'))return;
+  mondoKnownIds=new Set();
+  mondoKotsuKnownIds=new Set();
+  mondoFirstCheck=false; // ★これを先にfalseにしておくことで、次のチェックで「新着扱い」になる
+  await checkNewWebRequests();
+  alert('テスト通知を発火させました。画面右下の青いバッジ・上部のお知らせ・音が出ているか確認してください。');
+}
 async function debugCheckMondoNotify(){
   let msg='【診断結果】\n\n';
   try{
