@@ -3349,13 +3349,25 @@ async function loadMondoList(){
     el.innerHTML=list.map(q=>`<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><b style="font-size:0.9rem">${q.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:6px">（${q.kana}）</span></div>
-        <button class="btn be bsm" onclick="window.open('${printPage}?id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn be bsm" onclick="window.open('${printPage}?id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
+          <button class="btn be bsm" onclick="deleteMondoEntry(${q.rowIdx},${isKotsu})" style="background:#fee2e2;color:#dc2626;border-color:#fee2e2">🗑 削除</button>
+        </div>
       </div>
       <div style="font-size:0.72rem;color:#64748b;margin-top:4px">📞 ${q.tel}</div>
       <div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 ${(isKotsu?q.symptomDetail:q.symptom.split('|').join('、'))||'（未記入）'}</div>
       <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${q.createdAt}</div>
     </div>`).join('');
   }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+async function deleteMondoEntry(rowIdx, isKotsu){
+  if(!confirm('この問診票を削除しますか？（元に戻せません）'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:isKotsu?'deleteMondoshinKotsu':'deleteMondoshin',rowIdx})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました：'+(d.error||'')); return; }
+    loadMondoList();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 
 function openWebRequests(){
@@ -3394,10 +3406,23 @@ async function loadWebRequests(){
         <div style="margin-top:4px">${contactBadge}</div>
         ${r.symptom?'<div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 '+r.symptom+'</div>':''}
         <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${r.createdAt}</div>
-        ${r.status==='未対応'?`<button class="btn be bsm" onclick="markWebRequestDone(${r.rowIdx})" style="margin-top:6px;background:#16a34a;color:white;border-color:#16a34a">✅ 対応済みにする</button>`:''}
+        <div style="display:flex;gap:6px;margin-top:6px">
+          ${r.status==='未対応'?`<button class="btn be bsm" onclick="markWebRequestDone(${r.rowIdx})" style="background:#16a34a;color:white;border-color:#16a34a">✅ 対応済みにする</button>`:''}
+          <button class="btn be bsm" onclick="deleteWebRequestEntry(${r.rowIdx})" style="background:#fee2e2;color:#dc2626;border-color:#fee2e2">🗑 削除</button>
+        </div>
       </div>`;
     }).join('');
   }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+async function deleteWebRequestEntry(rowIdx){
+  if(!confirm('このWeb予約リクエストを削除しますか？（元に戻せません）'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteWebBookingRequest',rowIdx})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました：'+(d.error||'')); return; }
+    loadWebRequests();
+    checkNewWebRequests();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 async function openLineContact(name){
   try{
