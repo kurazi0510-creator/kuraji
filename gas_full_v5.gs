@@ -95,9 +95,6 @@ function doPost(e){
       else if(action==="deleteWebBookingRequest")result=deleteWebBookingRequest(body.rowIdx);
       else if(action==="deleteMondoshin")result=deleteMondoshin(body.rowIdx);
       else if(action==="deleteMondoshinKotsu")result=deleteMondoshinKotsu(body.rowIdx);
-      else if(action==="deleteWebBookingRequest")result=deleteWebBookingRequest(body.rowIdx);
-      else if(action==="deleteMondoshin")result=deleteMondoshin(body.rowIdx);
-      else if(action==="deleteMondoshinKotsu")result=deleteMondoshinKotsu(body.rowIdx);
       else if(action==="toggleBlockedSlot")result=toggleBlockedSlot(body.date,body.time,body.block);
       else if(action==="sendTestEmailTo")result=sendTestEmailTo(body.email);
       else if(action==="saveKarte")result=saveKarte(body.data);
@@ -1767,14 +1764,6 @@ function getMondoshinById(rowIdx){
   MONDO_HEADERS_.forEach(function(h,idx){ obj[h]=String(row[idx]||""); });
   return {ok:true, data:obj};
 }
-// 通常問診票を削除する（テストデータの削除用）
-function deleteMondoshin(rowIdx){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var s=ss.getSheetByName("web_mondoshin");
-  if(!s) return {ok:false, error:"シートが見つかりません"};
-  s.deleteRow(parseInt(rowIdx));
-  return {ok:true};
-}
 // ═══════════════════════════════════════
 // ★交通事故専用Web問診票★
 // ═══════════════════════════════════════
@@ -1841,14 +1830,6 @@ function getMondoshinKotsuById(rowIdx){
   var obj={rowIdx:rowIdx};
   MONDO_KOTSU_HEADERS_.forEach(function(h,idx){ obj[h]=String(row[idx]||""); });
   return {ok:true, data:obj};
-}
-// 交通事故問診票を削除する（テストデータの削除用）
-function deleteMondoshinKotsu(rowIdx){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var s=ss.getSheetByName("web_mondoshin_kotsu");
-  if(!s) return {ok:false, error:"シートが見つかりません"};
-  s.deleteRow(parseInt(rowIdx));
-  return {ok:true};
 }
 // ═══════════════════════════════════════
 // ★電子カルテ（SOAP形式：主訴・所見・評価・方針。全国の整体院向けシステムを参考に設計）★
@@ -1926,14 +1907,6 @@ function getWebBookingRequests(){
   return {ok:true, list:list};
 }
 // リクエストの対応状況を更新する（対応済みにする等）
-// リクエストを削除する（テストデータの削除用）
-function deleteWebBookingRequest(rowIdx){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var s=ss.getSheetByName("web_yoyaku_requests");
-  if(!s) return {ok:false, error:"シートが見つかりません"};
-  s.deleteRow(parseInt(rowIdx));
-  return {ok:true};
-}
 // テスト送信したWeb予約リクエストなどを削除する（一覧の整理用）
 function deleteWebBookingRequest(rowIdx){
   try{
