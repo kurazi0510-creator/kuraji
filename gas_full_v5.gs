@@ -95,6 +95,9 @@ function doPost(e){
       else if(action==="deleteWebBookingRequest")result=deleteWebBookingRequest(body.rowIdx);
       else if(action==="deleteMondoshin")result=deleteMondoshin(body.rowIdx);
       else if(action==="deleteMondoshinKotsu")result=deleteMondoshinKotsu(body.rowIdx);
+      else if(action==="deleteWebBookingRequest")result=deleteWebBookingRequest(body.rowIdx);
+      else if(action==="deleteMondoshin")result=deleteMondoshin(body.rowIdx);
+      else if(action==="deleteMondoshinKotsu")result=deleteMondoshinKotsu(body.rowIdx);
       else if(action==="toggleBlockedSlot")result=toggleBlockedSlot(body.date,body.time,body.block);
       else if(action==="sendTestEmailTo")result=sendTestEmailTo(body.email);
       else if(action==="saveKarte")result=saveKarte(body.data);
@@ -1745,6 +1748,16 @@ function getMondoshinList(){
   list.sort(function(a,b){return a.createdAt<b.createdAt?1:-1;});
   return {ok:true, list:list};
 }
+// テスト送信した問診票などを削除する（内容確認・A4印刷が済んだ後の整理用）
+function deleteMondoshin(rowIdx){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("web_mondoshin");
+    if(!s) return {ok:false, error:"シートが見つかりません"};
+    s.deleteRow(parseInt(rowIdx));
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
 function getMondoshinById(rowIdx){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("web_mondoshin");
@@ -1810,6 +1823,15 @@ function getMondoshinKotsuList(){
   }
   list.sort(function(a,b){return a.createdAt<b.createdAt?1:-1;});
   return {ok:true, list:list};
+}
+function deleteMondoshinKotsu(rowIdx){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("web_mondoshin_kotsu");
+    if(!s) return {ok:false, error:"シートが見つかりません"};
+    s.deleteRow(parseInt(rowIdx));
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
 function getMondoshinKotsuById(rowIdx){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -1911,6 +1933,16 @@ function deleteWebBookingRequest(rowIdx){
   if(!s) return {ok:false, error:"シートが見つかりません"};
   s.deleteRow(parseInt(rowIdx));
   return {ok:true};
+}
+// テスト送信したWeb予約リクエストなどを削除する（一覧の整理用）
+function deleteWebBookingRequest(rowIdx){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("web_yoyaku_requests");
+    if(!s) return {ok:false, error:"シートが見つかりません"};
+    s.deleteRow(parseInt(rowIdx));
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
 function updateWebBookingRequestStatus(rowIdx,status){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
