@@ -4808,7 +4808,16 @@ function editBk(date,slot){
   mShochiSel={};(bk.shochi||[]).forEach(s=>{mShochiSel[s.id]=(s.qty||1);});renderMShochiBtns();
   if(bk.shochiMemo)document.getElementById('m-shochi-memo').value=bk.shochiMemo;
   else document.getElementById('m-shochi-memo').value='';
-  mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=(bk.freeGiven||[]).map(f=>({stockId:f.stockId,qty:f.qty}));window.mBussanPrice={};window.mShochiPrice={};(bk.bussan||[]).forEach(b=>{mBussanQty[b.id]=(b.qty||0);});renderMBussanItems();
+  mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=(bk.freeGiven||[]).map(f=>({stockId:f.stockId,qty:f.qty}));window.mBussanPrice={};window.mShochiPrice={};
+  (bk.bussan||[]).forEach(b=>{
+    if(String(b.id||'').startsWith('free_')){
+      // 自由入力（サポーターなど、商品マスターに無い物販）は、編集画面を開いた時にちゃんと復元する
+      window.mBussanFree.push({name:b.name, price:b.price, qty:b.qty||1});
+    }else{
+      mBussanQty[b.id]=(b.qty||0);
+    }
+  });
+  renderMBussanItems();
   loadMPay(bk.pay||[],bk.payAmount||'');
   setTimeout(()=>{
     initPayItems(bk);
