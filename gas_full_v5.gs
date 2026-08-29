@@ -98,6 +98,7 @@ function doPost(e){
       else if(action==="toggleBlockedSlot")result=toggleBlockedSlot(body.date,body.time,body.block);
       else if(action==="sendTestEmailTo")result=sendTestEmailTo(body.email);
       else if(action==="saveKarte")result=saveKarte(body.data);
+      else if(action==="updateKarte")result=updateKarte(body.rowIdx,body.data);
       else if(action==="deleteKarte")result=deleteKarte(body.rowIdx);
       else if(action==="runDormantOutreachNow"){sendDormantPatientOutreach();result={ok:true};}
       else if(action==="runPointsMilestoneNow"){sendPointsMilestone();result={ok:true};}
@@ -1852,6 +1853,25 @@ function saveKarte(data){
     rng.setNumberFormat("@");
     rng.setValues([row]);
     return {ok:true, rowIdx:newIdx};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+// 既存のカルテを上書き保存する（新規追加ではなく、同じ行を更新する）
+function updateKarte(rowIdx, data){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("karte");
+    if(!s) return {ok:false, error:"シートが見つかりません"};
+    if(!data.cardId || !data.name) return {ok:false, error:"診察券No・お名前は必須です"};
+    var existing=s.getRange(parseInt(rowIdx),1,1,KARTE_HEADERS_.length).getValues()[0];
+    var row=KARTE_HEADERS_.map(function(h,idx){
+      if(h==="createdAt") return existing[idx]; // 作成日時は変えない
+      if(h==="visitDate") return data.visitDate||existing[idx];
+      return (data[h]!==undefined && data[h]!==null) ? data[h] : existing[idx];
+    });
+    var rng=s.getRange(parseInt(rowIdx),1,1,row.length);
+    rng.setNumberFormat("@");
+    rng.setValues([row]);
+    return {ok:true, rowIdx:parseInt(rowIdx)};
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getKarteListByCardId(cardId){

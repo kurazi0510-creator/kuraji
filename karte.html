@@ -139,6 +139,7 @@ textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;fon
     </div>
     <div class="card">
       <button class="btn b-save" style="width:100%;padding:12px" onclick="saveRec()">💾 このカルテを保存</button>
+      <button class="btn" style="width:100%;padding:10px;margin-top:6px;background:#f1f5f9;color:#475569" onclick="startNewKarte()">📄 新規カルテとして入力し直す</button>
     </div>
   </div>
 </div>
@@ -561,6 +562,7 @@ function dlImg(){
 function toLocalDateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
 
+let editingKarteRowIdx=null; // 表示中のカルテのrowIdx（nullなら新規、値があれば上書き保存の対象）
 async function saveRec(){
   const cardId=document.getElementById('pt-cardid').value.trim();
   const name=document.getElementById('pt-name').value.trim();
@@ -580,12 +582,29 @@ async function saveRec(){
   };
   const btn=event?.target; if(btn){btn.disabled=true;btn.textContent='保存中...';}
   try{
-    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveKarte',data})});
+    const isUpdate=!!editingKarteRowIdx;
+    const body=isUpdate
+      ? {action:'updateKarte', rowIdx:editingKarteRowIdx, data}
+      : {action:'saveKarte', data};
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});
     const d=await res.json();
     if(!d.ok){ alert('❌ 保存に失敗しました：'+(d.error||'')); }
-    else{ alert('✅ カルテを保存しました'); loadHistory(); }
+    else{
+      if(!isUpdate && d.rowIdx) editingKarteRowIdx=d.rowIdx; // 新規保存後は、以降そのカルテへの上書き保存に切り替える
+      alert(isUpdate?'✅ カルテを上書き保存しました':'✅ カルテを新規保存しました');
+      loadHistory();
+    }
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
   if(btn){btn.disabled=false;btn.textContent='💾 保存';}
+}
+function startNewKarte(){
+  editingKarteRowIdx=null;
+  document.getElementById('soap-s').value='';
+  document.getElementById('soap-o').value='';
+  document.getElementById('soap-a').value='';
+  document.getElementById('soap-p').value='';
+  document.getElementById('pt-date').value=toLocalDateStr(new Date());
+  dx.clearRect(0,0,dr.width,dr.height);
 }
 
 async function loadHistory(){
@@ -608,6 +627,7 @@ async function loadKarteById(rowIdx){
     const d=await res.json();
     if(!d.ok){ alert('❌ 取得に失敗しました'); return; }
     const k=d.data;
+    editingKarteRowIdx=rowIdx; // ★このカルテを開いた状態にする（次の保存は上書き保存になる）
     document.getElementById('pt-cardid').value=k.cardId;
     document.getElementById('pt-name').value=k.name;
     document.getElementById('pt-date').value=k.visitDate;
@@ -640,7 +660,7 @@ const PHRASES={
   s:[
     // 部位
     '首','頚部','腰','右肩','左肩','右肩甲間部','左肩甲間部','背中',
-    '右肘','左肘','右手首','左手首','右膝','左膝','右足首','左足首',
+    '右肘','左肘','右手首','左手首','右膝','左膝','右足首','左足首','右臀部','左臀部',
     // 症状（頻度の高いもの）
     '肩こり','しびれあり','重だるい','鋭い痛み','鈍い痛み','可動域制限あり','動かすと痛い','安静時も痛む',
     '頭痛','めまい','不眠',
@@ -653,10 +673,10 @@ const PHRASES={
     // 左右・体位
     '左','右','仰向け左膝倒し','仰向け右膝倒し',
     // 可動域・動作用語
-    '伸展','屈曲','内旋','外旋','回旋','可動域制限あり',
+    '伸展','屈曲','内旋','外旋','回旋','前屈','後屈','可動域制限あり',
     // 触診・視診所見
     '圧痛あり','熱感なし','熱感あり','腫脹なし','腫脹あり','筋緊張強い','筋緊張中等度','左右差あり',
-    'トリガーポイントあり','SLRテスト陽性','深呼吸で疼痛増悪','夜間痛あり',
+    'トリガーポイントあり','陽性','陰性','－','SLRテスト陽性','深呼吸で疼痛増悪','夜間痛あり',
     // 姿勢
     '姿勢：猫背','姿勢：反り腰','骨盤の傾きあり',
   ],
