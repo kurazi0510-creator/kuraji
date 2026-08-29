@@ -666,7 +666,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <div class="page" id="page-stock">
   <div style="margin-top:14px">
     <div class="card">
-      <div class="ctitle">在庫管理 <button class="btn bp bsm" onclick="openStockAdd()">＋ 商品追加</button> <button class="btn bp bsm" onclick="openStockAdjust()" style="background:#7c3aed;border-color:#7c3aed">🔧 在庫を手動で調整(院長使用など)</button></div>
+      <div class="ctitle">在庫管理 <button class="btn bp bsm" onclick="openStockAdd()">＋ 商品追加</button> <button class="btn bp bsm" onclick="openStockAdjust()" style="background:#7c3aed;border-color:#7c3aed">🔧 在庫を手動で調整(院長使用など)</button> <button class="btn bp bsm" onclick="forcePushStockNow()" style="background:#dc2626;border-color:#dc2626">📤 この端末の在庫数を正として全端末に送信</button></div>
       <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;">物販・処置で使用すると在庫が自動で減算されます</div>
       <div id="stock-list"></div>
       <div style="margin-top:14px;padding:10px;background:#f8f6f1;border-radius:8px;display:flex;gap:16px;justify-content:center">
@@ -2537,6 +2537,7 @@ async function syncAll(){
   }finally{
     renderSched();
     renderPatients();
+    pullStock(); // 在庫データもGASから最新を取得して各端末を統一する
   }
 }
 
@@ -5091,6 +5092,7 @@ async function saveBk(){
   const btn=document.getElementById('sbtn');btn.textContent='保存中...';btn.disabled=true;
   save();renderSched();renderPatients();closeModal();
   await pushB();if(p)await pushP();
+  pushStock();
   btn.textContent='予約を登録';btn.disabled=false;
 }
 
@@ -6444,7 +6446,7 @@ function saveBsRecord(){
   });
   if(!items.length){alert('商品を選択してください');return;}
   bussanLog.push({id:'id'+Date.now(),date,patientId:bsSelectedPatient?.id||'',patientName:bsSelectedPatient?.name||'',items,pay:bsPaySel.slice(),total:items.reduce((a,b)=>a+b.price*b.qty,0)});
-  save();alert('保存しました！');
+  save();pushStock();alert('保存しました！');
   document.querySelectorAll('#bs-product-list .bussan-qty').forEach(inp=>inp.value='0');
   document.getElementById('bs-total').textContent='0円';
   bsPaySel=[];document.querySelectorAll('#bs-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
@@ -6796,10 +6798,34 @@ function renderStock(){
   document.getElementById('stock-total-val').textContent=yen(totalVal);
   document.getElementById('stock-total-qty').textContent=totalQty+'点';
 }
-function changeStock(i,delta){stockData[i].qty=Math.max(0,stockData[i].qty+delta);save();renderStock();}
-function setStock(i,v){stockData[i].qty=Math.max(0,parseInt(v)||0);save();}
-function setStockAlert(i,v){stockData[i].alert=Math.max(0,parseInt(v)||0);save();}
-function delStock(i){if(!confirm('削除しますか？'))return;stockData.splice(i,1);save();renderStock();}
+function changeStock(i,delta){stockData[i].qty=Math.max(0,stockData[i].qty+delta);save();renderStock();pushStock();}
+function setStock(i,v){stockData[i].qty=Math.max(0,parseInt(v)||0);save();pushStock();}
+function setStockAlert(i,v){stockData[i].alert=Math.max(0,parseInt(v)||0);save();pushStock();}
+function delStock(i){if(!confirm('削除しますか？'))return;stockData.splice(i,1);save();renderStock();pushStock();}
+// ★在庫データをGASに送信し、他の端末とも同期する（以前はlocalStorageのみで端末ごとにバラバラだった不具合の対策）
+let pushStockTimer=null;
+function pushStock(){
+  // 連続で何度も呼ばれても通信は1回にまとめる（少し待ってからまとめて送信）
+  clearTimeout(pushStockTimer);
+  pushStockTimer=setTimeout(async ()=>{
+    try{
+      const rows=stockData.map(s=>[s.id, s.name, s.price, s.unit, s.qty, s.alert]);
+      await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveStock',rows})});
+    }catch(e){}
+  }, 800);
+}
+// 起動時、GASに保存されている最新の在庫データを取得して反映する（他の端末での変更を取り込む）
+async function pullStock(){
+  try{
+    const res=await fetch(GAS+'?action=getStock&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(d.ok && d.rows && d.rows.length){
+      stockData=d.rows.map(r=>({id:String(r[0]||''), name:String(r[1]||''), price:parseInt(r[2])||0, unit:String(r[3]||''), qty:parseInt(r[4])||0, alert:parseInt(r[5])||5}));
+      save();
+      renderStock();
+    }
+  }catch(e){}
+}
 function openStockAdd(){document.getElementById('stockAddModal').classList.add('on');}
 // 院長自身が使用した分など、患者様への提供以外で在庫が減る場合に手動で記録・調整する
 async function openStockAdjust(){
@@ -6820,14 +6846,24 @@ async function openStockAdjust(){
   if(!window.stockAdjustLog) window.stockAdjustLog=JSON.parse(localStorage.getItem('kj_stock_adjust_log')||'[]');
   window.stockAdjustLog.unshift({date:new Date().toLocaleString('ja-JP'), name:target.name, qty, reason});
   localStorage.setItem('kj_stock_adjust_log', JSON.stringify(window.stockAdjustLog.slice(0,200)));
-  save(); renderStock();
+  save(); renderStock(); pushStock();
   alert(`✅ ${target.name}を${qty}個減らしました（残り${target.qty}${target.unit||''}）\n理由：${reason}`);
+}
+// この端末の在庫数を「正しい基準」として、即座にGASへ送信する（最初の統一・食い違い修正用）
+async function forcePushStockNow(){
+  if(!confirm('この端末に表示されている在庫数を「正しい数」として、他の端末にも反映させます。よろしいですか？'))return;
+  try{
+    const rows=stockData.map(s=>[s.id, s.name, s.price, s.unit, s.qty, s.alert]);
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveStock',rows})});
+    const d=await res.json();
+    alert(d.ok?'✅ この端末の在庫数を送信しました。他の端末は次回開いた時に自動で反映されます':'❌ 送信に失敗しました：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 function closeStockAdd(){document.getElementById('stockAddModal').classList.remove('on');}
 function saveStockAdd(){
   const name=document.getElementById('sa-name').value.trim();if(!name){alert('商品名を入力してください');return;}
   stockData.push({id:'st'+Date.now(),name,price:parseInt(document.getElementById('sa-price').value)||0,unit:document.getElementById('sa-unit').value||'個',qty:parseInt(document.getElementById('sa-qty').value)||0,alert:parseInt(document.getElementById('sa-alert').value)||5});
-  save();renderStock();closeStockAdd();['sa-name','sa-price','sa-unit','sa-qty','sa-alert'].forEach(id=>document.getElementById(id).value='');
+  save();renderStock();pushStock();closeStockAdd();['sa-name','sa-price','sa-unit','sa-qty','sa-alert'].forEach(id=>document.getElementById(id).value='');
 }
 
 // ===== LTV & 分析 =====
