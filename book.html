@@ -363,8 +363,11 @@ function pickWlMenu(i){
 }
 function renderWlTimeOptions(){
   const sel=document.getElementById('wl-time');
+  // ★キャンセル待ちの時間選択では、延長枠(12:30・12:50・20:00・20:20)は選べないようにする
+  //   （これらは複数枠メニューの続きとしてのみ使う特殊な枠のため、通常の開始時間としては不適切）
+  const wlSlots=SLOTS.filter(t=>t<='12:10'||( t>='15:00'&&t<='19:40'));
   sel.innerHTML='<option value="">-- ご希望の時間を選択 --</option>'+
-    SLOTS.map(t=>`<option value="${t}">${t}</option>`).join('');
+    wlSlots.map(t=>`<option value="${t}">${t}</option>`).join('');
 }
 renderWlMenuTabs();
 renderWlTimeOptions();

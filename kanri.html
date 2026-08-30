@@ -3472,8 +3472,17 @@ async function loadWaitlist(){
     const d=await res.json();
     const list=d.list||[];
     if(!list.length){ box.innerHTML='<p style="color:#94a3b8;font-size:0.78rem;text-align:center;padding:10px">キャンセル待ちの登録はありません</p>'; return; }
-    box.innerHTML=list.map(w=>`<div class="saved-row"><span style="flex:1">${w.date} ${w.time||''} <b>${w.name}</b>様（${w.tel}）${w.menu?'<br><small style="color:#64748b">'+w.menu+'</small>':''}<br><small style="color:${w.status==='待機中'?'#7e22ce':'#16a34a'}">${w.status}</small></span><button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delWaitlistEntry(${w.rowIdx})">削除</button></div>`).join('');
+    box.innerHTML=list.map(w=>`<div class="saved-row"><span style="flex:1">${w.date} ${w.time||''} <b>${w.name}</b>様（${w.tel}）${w.menu?'<br><small style="color:#64748b">'+w.menu+'</small>':''}<br><small style="color:${w.status==='待機中'?'#7e22ce':'#16a34a'}">${w.status}</small></span>${w.status==='待機中'?`<button class="mb" style="background:#ede9fe;color:#7e22ce;margin-right:4px" onclick="notifyWaitlistNow('${w.date}')">今すぐ通知</button>`:''}<button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delWaitlistEntry(${w.rowIdx})">削除</button></div>`).join('');
   }catch(e){ box.innerHTML='<p style="color:#dc2626;font-size:0.78rem">通信エラー：'+e.message+'</p>'; }
+}
+async function notifyWaitlistNow(date){
+  if(!confirm(date+'のキャンセル待ちに、今すぐ「空きが出ました」の通知を送ります。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'notifyWaitlistForDate',date})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${d.notified||0}件に通知しました${d.skipped&&d.skipped.length?'\n送れなかった方：'+d.skipped.join('、'):''}`:'❌ 失敗しました');
+    loadWaitlist();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 async function delWaitlistEntry(rowIdx){
   if(!confirm('このキャンセル待ちを削除しますか？'))return;

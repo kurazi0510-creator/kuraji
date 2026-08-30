@@ -1683,21 +1683,32 @@ function notifyWaitlistForDate(dateStr){
     var token=p.getProperty("LINE_TOKEN");
     if(!token) return {ok:true, notified:0};
     var nl=String.fromCharCode(10);
-    var notified=0;
+    var notified=0, skipped=[];
     for(var i=1;i<data.length;i++){
       if(String(data[i][0])!==String(dateStr)) continue;
       if(String(data[i][7])!=="待機中") continue;
       var name=String(data[i][2]||""), tel=String(data[i][3]||"");
       var tid=tel?findLineUidByPhone_(tel):"";
       if(tid){
-        sendLineMessagingAPI(token,tid,"[倉治整骨院] 🔔 空きのお知らせ"+nl+nl+name+"様"+nl+nl+"ご登録いただいていた"+dateStr+"に空きが出ました！"+nl+"先着順のご案内となりますので、お早めにお電話（072-892-3223）またはLINEでご連絡ください。"+nl+nl+"(このメッセージは複数の方に同時にお送りしています。すでにご予約が埋まっていた場合はご容赦ください)");
-        notified++;
+        var r=sendLineMessagingAPI(token,tid,"[倉治整骨院] 🔔 空きのお知らせ"+nl+nl+name+"様"+nl+nl+"ご登録いただいていた"+dateStr+"に空きが出ました！"+nl+"先着順のご案内となりますので、お早めにお電話（072-892-3223）またはLINEでご連絡ください。"+nl+nl+"(このメッセージは複数の方に同時にお送りしています。すでにご予約が埋まっていた場合はご容赦ください)");
+        if(r.ok){
+          notified++;
+          var rng=s.getRange(i+1,8);
+          rng.setNumberFormat("@");
+          rng.setValue("通知済み");
+        }else{
+          skipped.push(name+"(送信失敗)");
+        }
+      }else{
+        // ★LINE連携が見つからない場合は「待機中」のまま残す（勝手に通知済み扱いにしない。後でLINE連携が判明すれば次回のキャンセル時に再度通知できる）
+        skipped.push(name+"(LINE連携なし)");
       }
-      var rng=s.getRange(i+1,8);
-      rng.setNumberFormat("@");
-      rng.setValue("通知済み");
     }
-    return {ok:true, notified:notified};
+    var ownerId=p.getProperty("LINE_USER_ID");
+    if(ownerId && skipped.length){
+      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] ⚠️ キャンセル待ち通知で送れなかった方がいます"+nl+dateStr+nl+skipped.join(", "));
+    }
+    return {ok:true, notified:notified, skipped:skipped};
   }catch(err){ return {ok:false, error:err.message}; }
 }
 // ═══════════════════════════════════════
