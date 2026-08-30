@@ -111,6 +111,7 @@ function doPost(e){
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
       else if(action==="saveStock")result=saveStock(body.rows);
       else if(action==="registerWaitlist")result=registerWaitlist(body.data);
+      else if(action==="sendWaitlistPreviewTo")result=sendWaitlistPreviewTo(body.name,body.date,body.time,body.menu);
       else if(action==="deleteWaitlistEntry")result=deleteWaitlistEntry(body.rowIdx);
       else if(action==="notifyWaitlistForDate")result=notifyWaitlistForDate(body.date);
       else if(action==="saveTicketMaster")result=saveTicketMaster(body.rows);
@@ -1591,10 +1592,10 @@ function registerWaitlist(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
     var s=ss.getSheetByName("waitlist");
-    if(!s){ s=ss.insertSheet("waitlist"); s.getRange(1,1,1,8).setValues([["date","name","tel","menu","kana","cardId","status","createdAt"]]); }
-    if(!data.name || !data.tel || !data.date) return {ok:false, error:"お名前・お電話番号・希望日は必須です"};
+    if(!s){ s=ss.insertSheet("waitlist"); s.getRange(1,1,1,9).setValues([["date","time","name","tel","menu","kana","cardId","status","createdAt"]]); }
+    if(!data.name || !data.tel || !data.date || !data.time) return {ok:false, error:"お名前・お電話番号・希望日時は必須です"};
     var newRow=[
-      data.date, data.name||"", data.tel||"", data.menu||"", data.kana||"", data.cardId||"",
+      data.date, data.time||"", data.name||"", data.tel||"", data.menu||"", data.kana||"", data.cardId||"",
       "待機中", Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss")
     ];
     var newIdx=s.getLastRow()+1;
@@ -1605,16 +1606,49 @@ function registerWaitlist(data){
     var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
     var nl=String.fromCharCode(10);
     if(token&&ownerId){
-      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] ⏳ キャンセル待ちの登録がありました"+nl+nl+"お名前："+(data.name||"")+" 様"+nl+"ご希望日："+(data.date||"")+nl+"メニュー："+(data.menu||"")+nl+"電話："+(data.tel||""));
+      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] ⏳ キャンセル待ちの登録がありました"+nl+nl+"お名前："+(data.name||"")+" 様"+nl+"ご希望日時："+(data.date||"")+" "+(data.time||"")+"〜"+nl+"メニュー："+(data.menu||"")+nl+"電話："+(data.tel||""));
     }
     if(token){
       var tid=data.tel?findLineUidByPhone_(data.tel):"";
       if(tid){
-        sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"キャンセル待ちの登録を受け付けました。"+nl+"ご希望日："+(data.date||"")+nl+nl+"この日にキャンセルが出た場合、このLINEに自動でお知らせいたします。先着順のご案内となりますので、通知が届きましたらお早めにご予約ください。"+nl+nl+"(自動送信のため返信不要です)");
+        sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"キャンセル待ちの登録を受け付けました。"+nl+"ご希望日時："+(data.date||"")+" "+(data.time||"")+"〜"+nl+"メニュー："+(data.menu||"")+nl+nl+"この日時にキャンセルが出た場合、このLINEに自動でお知らせいたします。先着順のご案内となりますので、通知が届きましたらお早めにご予約ください。"+nl+nl+"(自動送信のため返信不要です)");
       }
     }
     return {ok:true, rowIdx:newIdx};
   }catch(err){ return {ok:false, error:err.message}; }
+}
+// 「キャンセル待ち登録を受け付けました」の患者様向けメッセージを、指定した相手(通常は院長)にプレビュー送信する
+function sendWaitlistPreviewTo(name, date, time, menu){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var nl=String.fromCharCode(10);
+  var target=String(name||"").trim();
+  if(!target) return {ok:false, error:"名前を指定してください"};
+  var tel=getTelByPatientName_(target);
+  var tid=tel?findLineUidByPhone_(tel):"";
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=lu[target];
+      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+    }
+  }
+  if(!tid && (target==="郡"||target==="郡雄一朗")){ tid=p.getProperty("LINE_USER_ID")||""; }
+  if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
+  var d=date||"2026-09-05", t=time||"15:00", m=menu||"整体（再診）";
+  var msg="【プレビュー送信：キャンセル待ち登録メッセージ】"+nl+nl+
+    "[倉治整骨院]"+nl+nl+target+"様"+nl+nl+
+    "キャンセル待ちの登録を受け付けました。"+nl+
+    "ご希望日時："+d+" "+t+"〜"+nl+
+    "メニュー："+m+nl+nl+
+    "この日時にキャンセルが出た場合、このLINEに自動でお知らせいたします。先着順のご案内となりますので、通知が届きましたらお早めにご予約ください。"+nl+nl+
+    "(自動送信のため返信不要です)";
+  var r=sendLineMessagingAPI(token,tid,msg);
+  return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 function getWaitlist(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -1623,9 +1657,9 @@ function getWaitlist(){
   var data=s.getDataRange().getValues();
   var list=[];
   for(var i=1;i<data.length;i++){
-    list.push({rowIdx:i+1, date:String(data[i][0]||""), name:String(data[i][1]||""), tel:String(data[i][2]||""), menu:String(data[i][3]||""), kana:String(data[i][4]||""), cardId:String(data[i][5]||""), status:String(data[i][6]||"待機中"), createdAt:String(data[i][7]||"")});
+    list.push({rowIdx:i+1, date:String(data[i][0]||""), time:String(data[i][1]||""), name:String(data[i][2]||""), tel:String(data[i][3]||""), menu:String(data[i][4]||""), kana:String(data[i][5]||""), cardId:String(data[i][6]||""), status:String(data[i][7]||"待機中"), createdAt:String(data[i][8]||"")});
   }
-  list.sort(function(a,b){return a.date<b.date?-1:1;});
+  list.sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1;});
   return {ok:true, list:list};
 }
 function deleteWaitlistEntry(rowIdx){
@@ -1652,14 +1686,14 @@ function notifyWaitlistForDate(dateStr){
     var notified=0;
     for(var i=1;i<data.length;i++){
       if(String(data[i][0])!==String(dateStr)) continue;
-      if(String(data[i][6])!=="待機中") continue;
-      var name=String(data[i][1]||""), tel=String(data[i][2]||"");
+      if(String(data[i][7])!=="待機中") continue;
+      var name=String(data[i][2]||""), tel=String(data[i][3]||"");
       var tid=tel?findLineUidByPhone_(tel):"";
       if(tid){
         sendLineMessagingAPI(token,tid,"[倉治整骨院] 🔔 空きのお知らせ"+nl+nl+name+"様"+nl+nl+"ご登録いただいていた"+dateStr+"に空きが出ました！"+nl+"先着順のご案内となりますので、お早めにお電話（072-892-3223）またはLINEでご連絡ください。"+nl+nl+"(このメッセージは複数の方に同時にお送りしています。すでにご予約が埋まっていた場合はご容赦ください)");
         notified++;
       }
-      var rng=s.getRange(i+1,7);
+      var rng=s.getRange(i+1,8);
       rng.setNumberFormat("@");
       rng.setValue("通知済み");
     }
