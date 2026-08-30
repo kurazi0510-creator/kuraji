@@ -2,7 +2,7 @@ function doGet(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
-  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getAllBlockedSlotsDebug"){result=getAllBlockedSlotsDebug();}else if(action==="getKarteListByCardId"){result=getKarteListByCardId((e&&e.parameter&&e.parameter.cardId)||"");}else if(action==="getKarteById"){result=getKarteById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getDormantLog"){result=getDormantLog();}else if(action==="getPatientVisitStats"){result=getPatientVisitStats((e&&e.parameter&&e.parameter.cardId)||"",(e&&e.parameter&&e.parameter.name)||"");}else if(action==="getStock"){result=getStock();}else{result={ok:true};}}
+  try{if(action==="getAll"){result=getAllData();}else if(action==="getMenuMaster"){result=getMenuMaster();}else if(action==="lookupBooking"){result=lookupBooking((e&&e.parameter&&e.parameter.tel)||"");}else if(action==="getBizHours"){result=getBizHours();}else if(action==="getLineUsers"){result=getLineUsers();}else if(action==="getBirthdayLog"){result=getBirthdayLog();}else if(action==="getTriggerInfo"){result=getTriggerInfo();}else if(action==="getAvailableSlots"){result=getAvailableSlots((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getDailyAlertLog"){result=getDailyAlertLog();}else if(action==="getReminderLog"){result=getReminderLog();}else if(action==="getWebBookingRequests"){result=getWebBookingRequests();}else if(action==="getAvailableSlotsRange"){result=getAvailableSlotsRange((e&&e.parameter&&e.parameter.startDate)||"",(e&&e.parameter&&e.parameter.numDays)||7);}else if(action==="getBlockedSlotsForDate"){result=getBlockedSlotsForDate((e&&e.parameter&&e.parameter.date)||"");}else if(action==="getMondoshinList"){result=getMondoshinList();}else if(action==="getMondoshinById"){result=getMondoshinById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getMondoshinKotsuList"){result=getMondoshinKotsuList();}else if(action==="getMondoshinKotsuById"){result=getMondoshinKotsuById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getAllBlockedSlotsDebug"){result=getAllBlockedSlotsDebug();}else if(action==="getKarteListByCardId"){result=getKarteListByCardId((e&&e.parameter&&e.parameter.cardId)||"");}else if(action==="getKarteById"){result=getKarteById((e&&e.parameter&&e.parameter.rowIdx)||"");}else if(action==="getDormantLog"){result=getDormantLog();}else if(action==="getPatientVisitStats"){result=getPatientVisitStats((e&&e.parameter&&e.parameter.cardId)||"",(e&&e.parameter&&e.parameter.name)||"");}else if(action==="getStock"){result=getStock();}else if(action==="getWaitlist"){result=getWaitlist();}else if(action==="getTicketMaster"){result=getTicketMaster();}else if(action==="getPatientTickets"){result=getPatientTickets();}else if(action==="getIntervalSetting"){result=getIntervalSetting();}else{result={ok:true};}}
   catch(err){result={ok:false,error:err.message};}
   var json=JSON.stringify(result);
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -110,6 +110,12 @@ function doPost(e){
       else if(action==="getMenuMaster")result=getMenuMaster();
       else if(action==="saveMenuMaster")result=saveMenuMaster(body.rows);
       else if(action==="saveStock")result=saveStock(body.rows);
+      else if(action==="registerWaitlist")result=registerWaitlist(body.data);
+      else if(action==="deleteWaitlistEntry")result=deleteWaitlistEntry(body.rowIdx);
+      else if(action==="notifyWaitlistForDate")result=notifyWaitlistForDate(body.date);
+      else if(action==="saveTicketMaster")result=saveTicketMaster(body.rows);
+      else if(action==="savePatientTickets")result=savePatientTickets(body.rows);
+      else if(action==="saveIntervalSetting")result=saveIntervalSetting(body.minutes);
       else if(action==="saveBizHoursWeekly")result=saveBizHoursWeekly(body.rows);
       else if(action==="saveBizHoursOverride")result=saveBizHoursOverride(body.rows);
       else if(action==="getBizHours")result=getBizHours();
@@ -1576,6 +1582,151 @@ function getAvailableSlotsRange(startDateStr,numDays){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 // 院長が手動で予約枠を潰す／解除する（kanri.htmlから使用）
+// ═══════════════════════════════════════
+// ★キャンセル待ち機能★
+// 満員の日時に「空きが出たら知らせてほしい」と登録でき、
+// キャンセルが出た時に自動でLINE通知する
+// ═══════════════════════════════════════
+function registerWaitlist(data){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("waitlist");
+    if(!s){ s=ss.insertSheet("waitlist"); s.getRange(1,1,1,8).setValues([["date","name","tel","menu","kana","cardId","status","createdAt"]]); }
+    if(!data.name || !data.tel || !data.date) return {ok:false, error:"お名前・お電話番号・希望日は必須です"};
+    var newRow=[
+      data.date, data.name||"", data.tel||"", data.menu||"", data.kana||"", data.cardId||"",
+      "待機中", Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss")
+    ];
+    var newIdx=s.getLastRow()+1;
+    var rng=s.getRange(newIdx,1,1,newRow.length);
+    rng.setNumberFormat("@");
+    rng.setValues([newRow]);
+    var p=PropertiesService.getScriptProperties();
+    var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+    var nl=String.fromCharCode(10);
+    if(token&&ownerId){
+      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] ⏳ キャンセル待ちの登録がありました"+nl+nl+"お名前："+(data.name||"")+" 様"+nl+"ご希望日："+(data.date||"")+nl+"メニュー："+(data.menu||"")+nl+"電話："+(data.tel||""));
+    }
+    if(token){
+      var tid=data.tel?findLineUidByPhone_(data.tel):"";
+      if(tid){
+        sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"キャンセル待ちの登録を受け付けました。"+nl+"ご希望日："+(data.date||"")+nl+nl+"この日にキャンセルが出た場合、このLINEに自動でお知らせいたします。先着順のご案内となりますので、通知が届きましたらお早めにご予約ください。"+nl+nl+"(自動送信のため返信不要です)");
+      }
+    }
+    return {ok:true, rowIdx:newIdx};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+function getWaitlist(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("waitlist");
+  if(!s) return {ok:true, list:[]};
+  var data=s.getDataRange().getValues();
+  var list=[];
+  for(var i=1;i<data.length;i++){
+    list.push({rowIdx:i+1, date:String(data[i][0]||""), name:String(data[i][1]||""), tel:String(data[i][2]||""), menu:String(data[i][3]||""), kana:String(data[i][4]||""), cardId:String(data[i][5]||""), status:String(data[i][6]||"待機中"), createdAt:String(data[i][7]||"")});
+  }
+  list.sort(function(a,b){return a.date<b.date?-1:1;});
+  return {ok:true, list:list};
+}
+function deleteWaitlistEntry(rowIdx){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("waitlist");
+    if(!s) return {ok:false, error:"シートが見つかりません"};
+    s.deleteRow(parseInt(rowIdx));
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+// 指定した日付にキャンセルが出た時、その日で「待機中」のキャンセル待ちがいれば全員にLINEで知らせる
+// （院長がkanri.htmlで予約をキャンセルにした時に呼び出す）
+function notifyWaitlistForDate(dateStr){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("waitlist");
+    if(!s) return {ok:true, notified:0};
+    var data=s.getDataRange().getValues();
+    var p=PropertiesService.getScriptProperties();
+    var token=p.getProperty("LINE_TOKEN");
+    if(!token) return {ok:true, notified:0};
+    var nl=String.fromCharCode(10);
+    var notified=0;
+    for(var i=1;i<data.length;i++){
+      if(String(data[i][0])!==String(dateStr)) continue;
+      if(String(data[i][6])!=="待機中") continue;
+      var name=String(data[i][1]||""), tel=String(data[i][2]||"");
+      var tid=tel?findLineUidByPhone_(tel):"";
+      if(tid){
+        sendLineMessagingAPI(token,tid,"[倉治整骨院] 🔔 空きのお知らせ"+nl+nl+name+"様"+nl+nl+"ご登録いただいていた"+dateStr+"に空きが出ました！"+nl+"先着順のご案内となりますので、お早めにお電話（072-892-3223）またはLINEでご連絡ください。"+nl+nl+"(このメッセージは複数の方に同時にお送りしています。すでにご予約が埋まっていた場合はご容赦ください)");
+        notified++;
+      }
+      var rng=s.getRange(i+1,7);
+      rng.setNumberFormat("@");
+      rng.setValue("通知済み");
+    }
+    return {ok:true, notified:notified};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+// ═══════════════════════════════════════
+// ★回数券・パック管理★
+// 「10回パック」など、任意の回数・料金で回数券を設定でき、
+// 患者ごとに購入・残数管理ができる
+// ═══════════════════════════════════════
+function saveTicketMaster(rows){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("ticket_master");
+    if(!s) s=ss.insertSheet("ticket_master");
+    s.clearContents();
+    s.getRange(1,1,1,4).setValues([["id","name","count","price"]]);
+    if(rows && rows.length){
+      var rng=s.getRange(2,1,rows.length,4);
+      rng.setNumberFormats(rows.map(function(){return ["@","@","@","@"];}));
+      rng.setValues(rows);
+    }
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+function getTicketMaster(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("ticket_master");
+  if(!s) return {ok:true, rows:[]};
+  var data=s.getDataRange().getValues();
+  return {ok:true, rows:data.slice(1)};
+}
+function savePatientTickets(rows){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("patient_tickets");
+    if(!s) s=ss.insertSheet("patient_tickets");
+    s.clearContents();
+    s.getRange(1,1,1,7).setValues([["id","cardId","patientName","ticketName","totalCount","remainingCount","purchaseDate"]]);
+    if(rows && rows.length){
+      var rng=s.getRange(2,1,rows.length,7);
+      rng.setNumberFormats(rows.map(function(){return ["@","@","@","@","@","@","@"];}));
+      rng.setValues(rows);
+    }
+    return {ok:true};
+  }catch(err){ return {ok:false, error:err.message}; }
+}
+function getPatientTickets(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("patient_tickets");
+  if(!s) return {ok:true, rows:[]};
+  var data=s.getDataRange().getValues();
+  return {ok:true, rows:data.slice(1)};
+}
+// ═══════════════════════════════════════
+// ★予約と予約の間の準備時間（インターバル）設定★
+// まだ実際の空き状況判定には反映していない（試験運用・設定を保存できるだけの段階）
+// ═══════════════════════════════════════
+function saveIntervalSetting(minutes){
+  PropertiesService.getScriptProperties().setProperty("INTERVAL_MINUTES", String(parseInt(minutes)||0));
+  return {ok:true};
+}
+function getIntervalSetting(){
+  var v=PropertiesService.getScriptProperties().getProperty("INTERVAL_MINUTES")||"0";
+  return {ok:true, minutes: parseInt(v)||0};
+}
 function toggleBlockedSlot(dateStr,timeStr,block){
   try{
     if(!dateStr||!timeStr) return {ok:false, error:"日付・時間を指定してください"};

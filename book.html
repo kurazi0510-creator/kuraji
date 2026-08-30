@@ -112,6 +112,20 @@ textarea{resize:none;height:64px;}
     <div class="cand-list" id="candList"></div>
   </div>
 
+  <div class="card" id="waitlistCard">
+    <h2>⏳ ご希望の日が満員の場合</h2>
+    <p class="note" style="margin-top:0">キャンセル待ちに登録しておくと、空きが出た際にLINEで自動でお知らせいたします（先着順のご案内です）。</p>
+    <label>キャンセル待ちしたい日付</label>
+    <input type="date" id="wl-date">
+    <label>お名前</label>
+    <input type="text" id="wl-name" placeholder="山田 太郎">
+    <label>お電話番号</label>
+    <input type="tel" id="wl-tel" placeholder="09012345678" inputmode="numeric">
+    <label>ご希望メニュー（任意）</label>
+    <input type="text" id="wl-menu" placeholder="整体（再診）など">
+    <button class="btn btn-main" onclick="submitWaitlist()">この内容でキャンセル待ちに登録する</button>
+  </div>
+
   <div class="card" id="infoCard" style="display:none">
     <h2><span class="step-num">3</span>お客様情報</h2>
     <label>お名前<span class="req">必須</span></label>
@@ -335,6 +349,25 @@ function checkReady(){
   if(btn) btn.disabled=!ok;
 }
 
+async function submitWaitlist(){
+  const date=document.getElementById('wl-date').value;
+  const name=document.getElementById('wl-name').value.trim();
+  const tel=document.getElementById('wl-tel').value.trim();
+  const menu=document.getElementById('wl-menu').value.trim();
+  if(!date){ alert('ご希望日を入力してください'); return; }
+  if(!name){ alert('お名前を入力してください'); return; }
+  if(!/^0\d{9,10}$/.test(tel.replace(/[^0-9]/g,''))){ alert('お電話番号を正しく入力してください'); return; }
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'registerWaitlist',data:{date,name,tel,menu}})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 登録に失敗しました：'+(d.error||'')); return; }
+    alert('✅ キャンセル待ちに登録しました。空きが出ましたらLINEでお知らせいたします。');
+    document.getElementById('wl-date').value='';
+    document.getElementById('wl-name').value='';
+    document.getElementById('wl-tel').value='';
+    document.getElementById('wl-menu').value='';
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 async function submitRequest(){
   const btn=document.getElementById('submitBtn');
   const name=document.getElementById('f-name').value.trim();

@@ -272,9 +272,12 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
         <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
         <button class="btn bp bsm" onclick="openWebRequests()" style="background:#c98a4b;color:white;border-color:#c98a4b;position:relative">📩 Web予約リクエスト一覧(未対応の確認・確定)<span id="webReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
+        <button class="btn bp bsm" onclick="openWaitlist()" style="background:#7e22ce;color:white;border-color:#7e22ce">⏳ キャンセル待ち一覧</button>
         <button class="btn bp bsm" onclick="openBlockSlots()" style="background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
         <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
         <button class="btn bp bsm" onclick="openBizHoursModal()" style="background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
+        <button class="btn bp bsm" onclick="openIntervalModal()" style="background:#64748b;color:white;border-color:#64748b">🧪 インターバル設定(試験運用・まだ未反映)</button>
+        <button class="btn bp bsm" onclick="window.open('today_split.html','_blank')" style="background:#0f766e;color:white;border-color:#0f766e">🧪 本日の施術画面プレビュー(予約×カルテ 左右分割)</button>
       </div>
     </div>
 
@@ -949,6 +952,11 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="ctitle">🩺 処置マスター <button class="btn bp bsm" onclick="addShochiMaster()">＋ 追加</button></div>
       <div id="shochi-master-list"></div>
     </div>
+    <div class="card">
+      <div class="ctitle">🎫 回数券・パックマスター <button class="btn bp bsm" onclick="addTicketMaster()" style="background:#7e22ce;border-color:#7e22ce">＋ 回数券の種類を追加</button></div>
+      <div style="font-size:0.76rem;color:var(--muted);margin-bottom:10px">「10回パック」など、好きな回数・料金で回数券を作成できます。作った回数券は患者様の詳細画面から購入登録できます。</div>
+      <div id="ticket-master-list"></div>
+    </div>
   </div>
 </div>
 
@@ -972,6 +980,31 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div style="font-size:0.8rem;opacity:0.8">🎉 おめでとうございます！</div>
       <div class="wname" id="wname">---</div>
       <div style="font-size:0.8rem;opacity:0.8">様が当選されました！</div>
+    </div>
+  </div>
+</div>
+
+<!-- インターバル設定モーダル（試験運用：保存はできるが、まだ空き状況の判定には反映されない） -->
+<div class="modal-ov" id="intervalModal">
+  <div class="modal" style="max-width:420px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="font-size:1rem">🧪 インターバル設定(試験運用)</h3>
+      <button onclick="document.getElementById('intervalModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="background:#fef3c7;color:#92400e;font-size:0.76rem;padding:10px;border-radius:8px;margin-bottom:14px">
+      ⚠️ これはまだ「試験運用」の画面です。ここで設定を保存しても、<b>実際のWeb予約の空き状況にはまだ反映されません</b>。画面の使い勝手を確認するためのプレビューです。気に入ったら、実際に反映する作業を追加でお願いします。
+    </div>
+    <label>予約と予約の間に空ける準備時間</label>
+    <select class="sel" id="interval-minutes" style="font-size:0.9rem">
+      <option value="0">設定しない（今まで通り）</option>
+      <option value="5">5分</option>
+      <option value="10">10分</option>
+      <option value="15">15分</option>
+      <option value="20">20分（1枠ぶん）</option>
+    </select>
+    <p style="font-size:0.74rem;color:var(--muted);margin-top:8px">例えば「10分」に設定すると、将来的には施術の後、次のご予約が入るまでに10分の余裕を自動で確保できるようになる予定です。</p>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button class="btn bp" onclick="saveIntervalSettingUI()">💾 この設定を保存する（試験運用）</button>
     </div>
   </div>
 </div>
@@ -1101,6 +1134,20 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <button class="btn bp bsm" onclick="loadWebRequests()" style="background:#0891b2;color:white;border-color:#0891b2">🔄 最新の状態を取得</button>
     </div>
     <div id="webReqContent" style="max-height:60vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- キャンセル待ち一覧モーダル -->
+<div class="modal-ov" id="waitlistModal">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem">⏳ キャンセル待ち一覧</h3>
+      <button onclick="document.getElementById('waitlistModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn bp bsm" onclick="loadWaitlist()" style="background:#7e22ce;color:white;border-color:#7e22ce">🔄 最新の状態を取得</button>
+    </div>
+    <div id="waitlistContent" style="max-height:60vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -1942,6 +1989,14 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
           </div>
           <div id="pe-coupon-status" style="font-size:0.78rem;margin-top:6px;padding:6px 8px;border-radius:6px;display:none"></div>
         </div>
+
+        <!-- 回数券・パック購入履歴（好きな回数・料金で作れる新しい仕組み） -->
+        <div class="fg" style="grid-column:1/-1;background:#f5f3ff;border-radius:10px;padding:12px;border:1.5px solid #c4b5fd;margin-top:8px">
+          <label style="color:#5b21b6;font-weight:bold;font-size:0.82rem">🎫 回数券・パック購入履歴</label>
+          <div id="pe-ticket-list" style="margin-top:8px"></div>
+          <select class="sel" id="pe-ticket-select" style="font-size:0.82rem;margin-top:8px"></select>
+          <button class="btn bp bsm" style="width:100%;margin-top:6px;background:#7e22ce;border-color:#7e22ce" onclick="purchaseTicketForPatient()">＋ この回数券を購入登録する</button>
+        </div>
       </div>
     <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px;padding-top:10px;border-top:1px solid #e2e8f0">
       <button class="btn bd bsm" onclick="deletePatientFromModal()">🗑 削除</button>
@@ -2090,6 +2145,7 @@ const DEFAULT_STOCK=[
 
 let patients=[], bookings={}, uriage={}, bussanLog=[], lp=[];
 let bussanMaster=[], shochiMaster=[], stockData=[];
+let ticketMaster=[], patientTickets=[]; // 回数券・パックマスター、患者ごとの購入・残数データ
 let mBussanDisc={}; // 物販個別割引 {id: 割引額}
 let mBussanPrice={}; // 物販個別金額上書き {id: 金額}
 let editDate=null, editSlot=null;
@@ -2107,6 +2163,8 @@ function save(){
     localStorage.setItem('kj_bm',JSON.stringify(bussanMaster));
     localStorage.setItem('kj_sm',JSON.stringify(shochiMaster));
     localStorage.setItem('kj_st',JSON.stringify(stockData));
+    localStorage.setItem('kj_tm',JSON.stringify(ticketMaster));
+    localStorage.setItem('kj_pt',JSON.stringify(patientTickets));
     // 予約データのバックアップ（GASで上書きされた時の復元用）
     localStorage.setItem('kj_b_bak',JSON.stringify(bookings));
     localStorage.setItem('kj_b_bak_ts',Date.now().toString());
@@ -2143,10 +2201,13 @@ function load(){
     if(!hasNewMenus&&sm)localStorage.setItem('kj_sm',JSON.stringify(DEFAULT_SHOCHI_MASTER));
     const st=JSON.parse(localStorage.getItem('kj_st')||'null');
     stockData=st||DEFAULT_STOCK;
+    ticketMaster=JSON.parse(localStorage.getItem('kj_tm')||'[]');
+    patientTickets=JSON.parse(localStorage.getItem('kj_pt')||'[]');
   }catch(e){
     console.error('load error:',e);
     patients=[];bookings={};uriage={};bussanLog=[];
     bussanMaster=DEFAULT_BUSSAN_MASTER;shochiMaster=DEFAULT_SHOCHI_MASTER;stockData=DEFAULT_STOCK;
+    ticketMaster=[];patientTickets=[];
   }
 }
 
@@ -3386,6 +3447,30 @@ function openWebRequests(){
   document.getElementById('webReqModal').classList.add('on');
   loadWebRequests();
 }
+function openWaitlist(){
+  document.getElementById('waitlistModal').classList.add('on');
+  loadWaitlist();
+}
+async function loadWaitlist(){
+  const box=document.getElementById('waitlistContent');
+  box.innerHTML='<p style="color:#94a3b8;font-size:0.78rem;text-align:center;padding:10px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getWaitlist&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ box.innerHTML='<p style="color:#94a3b8;font-size:0.78rem;text-align:center;padding:10px">キャンセル待ちの登録はありません</p>'; return; }
+    box.innerHTML=list.map(w=>`<div class="saved-row"><span style="flex:1">${w.date} <b>${w.name}</b>様（${w.tel}）${w.menu?'<br><small style="color:#64748b">'+w.menu+'</small>':''}<br><small style="color:${w.status==='待機中'?'#7e22ce':'#16a34a'}">${w.status}</small></span><button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delWaitlistEntry(${w.rowIdx})">削除</button></div>`).join('');
+  }catch(e){ box.innerHTML='<p style="color:#dc2626;font-size:0.78rem">通信エラー：'+e.message+'</p>'; }
+}
+async function delWaitlistEntry(rowIdx){
+  if(!confirm('このキャンセル待ちを削除しますか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteWaitlistEntry',rowIdx})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました'); return; }
+    loadWaitlist();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 async function loadWebRequests(){
   const el=document.getElementById('webReqContent');
   el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
@@ -3850,6 +3935,22 @@ let bizHours=JSON.parse(localStorage.getItem('kj_biz_hours')||'null')||{
   },
   overrides:{}
 };
+async function openIntervalModal(){
+  document.getElementById('intervalModal').classList.add('on');
+  try{
+    const res=await fetch(GAS+'?action=getIntervalSetting&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    document.getElementById('interval-minutes').value=String(d.minutes||0);
+  }catch(e){}
+}
+async function saveIntervalSettingUI(){
+  const minutes=document.getElementById('interval-minutes').value;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveIntervalSetting',minutes})});
+    const d=await res.json();
+    alert(d.ok?'✅ 設定を保存しました（※まだ試験運用のため、実際の空き状況には反映されません）':'❌ 保存に失敗しました');
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 function openBizHoursModal(){
   renderBizWeekly();
   renderBizOverrides();
@@ -4359,6 +4460,10 @@ async function execCancel(){
   // キャンセル記録に変換（空き枠として再利用可能にする）
   bookings[cancelDate][cancelSlot]={cancelled:true,name,cardId,cancelReason:reason,reBookedBy:''};
   save();closeCancelModal();renderSched();await pushB();
+  // ★このキャンセル日にキャンセル待ちの方がいれば、自動でLINE通知する
+  try{
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'notifyWaitlistForDate',date:cancelDate})});
+  }catch(e){}
   // LINE Notify送信
   const token=getLineToken();
   if(token){
@@ -6117,6 +6222,7 @@ function openPEdit(id){
   if(document.getElementById('pe-coupon-expiry'))document.getElementById('pe-coupon-expiry').value=p.couponExpiry||'';
   if(document.getElementById('pe-coupon-session'))document.getElementById('pe-coupon-session').value=p.couponNextSession||'';
   updatePeCouponStatus();
+  renderPeTicketList(id);
   document.getElementById('pe-city').value=p.city||'';
   document.getElementById('pe-job').value=p.job||'';
   document.getElementById('pe-src').value=p.src||'-';
@@ -6170,6 +6276,47 @@ async function calcCouponExpiry(){
   const el = document.getElementById('pe-coupon-expiry');
   if(el) el.value = expiryStr;
   updatePeCouponStatus();
+}
+// 回数券・パック：患者の詳細画面に、保有中の回数券一覧＋購入用プルダウンを表示する
+function renderPeTicketList(cardId){
+  const listEl=document.getElementById('pe-ticket-list');
+  const selEl=document.getElementById('pe-ticket-select');
+  if(!listEl||!selEl)return;
+  const owned=patientTickets.filter(t=>t.cardId===String(cardId));
+  listEl.innerHTML=owned.length?owned.map(t=>{
+    const idx=patientTickets.indexOf(t);
+    return `<div class="saved-row"><span style="flex:1">${t.ticketName}<br><small style="color:${t.remainingCount>0?'#5b21b6':'#dc2626'}">残り${t.remainingCount}/${t.totalCount}回（購入日：${t.purchaseDate}）</small></span>${t.remainingCount>0?`<button class="mb" style="background:#f5f3ff;color:#5b21b6;margin-right:4px" onclick="useTicketForPatient(${idx})">1回消化</button>`:''}<button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delPatientTicket(${idx})">削除</button></div>`;
+  }).join(''):'<p style="color:var(--muted);font-size:0.76rem">まだ回数券の購入はありません</p>';
+  selEl.innerHTML=ticketMaster.length
+    ?ticketMaster.map(t=>`<option value="${t.id}">${t.name}（${t.count}回・${(t.price||0).toLocaleString()}円）</option>`).join('')
+    :'<option value="">先にマスター画面で回数券を作成してください</option>';
+}
+async function purchaseTicketForPatient(){
+  const cardId=document.getElementById('pe-id').value;
+  const patientName=document.getElementById('pe-nm').value.trim();
+  const selId=document.getElementById('pe-ticket-select').value;
+  const tm=ticketMaster.find(t=>t.id===selId);
+  if(!tm){ alert('回数券を選択してください（先にマスター画面で作成が必要です）'); return; }
+  if(!confirm(`「${tm.name}」（${tm.count}回・${(tm.price||0).toLocaleString()}円）を購入登録します。よろしいですか？`))return;
+  patientTickets.push({
+    id:'pt'+Date.now(), cardId, patientName, ticketName:tm.name,
+    totalCount:tm.count, remainingCount:tm.count, purchaseDate:toLocalDateStr(new Date())
+  });
+  save(); renderPeTicketList(cardId); await pushPatientTickets();
+  alert('✅ 購入登録しました');
+}
+async function useTicketForPatient(idx){
+  const t=patientTickets[idx]; if(!t)return;
+  if(t.remainingCount<=0){ alert('この回数券は残りがありません'); return; }
+  if(!confirm(`「${t.ticketName}」を1回消化します。よろしいですか？`))return;
+  t.remainingCount--;
+  save(); renderPeTicketList(t.cardId); await pushPatientTickets();
+}
+async function delPatientTicket(idx){
+  if(!confirm('この回数券の履歴を削除しますか？'))return;
+  const t=patientTickets[idx];
+  patientTickets.splice(idx,1);
+  save(); renderPeTicketList(t?.cardId); await pushPatientTickets();
 }
 function updatePeCouponStatus(){
   const expiry = document.getElementById('pe-coupon-expiry')?.value;
@@ -7466,6 +7613,25 @@ function renderLtvAlert(){
 function renderMasterList(){
   document.getElementById('bussan-master-list').innerHTML=bussanMaster.map((b,i)=>`<div class="master-item"><input class="master-name-inp" value="${b.name}" onchange="bussanMaster[${i}].name=this.value;save()"><input class="master-price-inp" type="number" value="${b.price}" onchange="bussanMaster[${i}].price=parseInt(this.value)||0;save()"><input class="master-unit-inp" value="${b.unit||''}" onchange="bussanMaster[${i}].unit=this.value;save()"><button class="btn bd bsm" onclick="delBussanMaster(${i})">削除</button></div>`).join('');
   document.getElementById('shochi-master-list').innerHTML=shochiMaster.map((s,i)=>`<div class="master-item"><input class="master-name-inp" value="${s.name}" onchange="shochiMaster[${i}].name=this.value;save()"><input class="master-price-inp" type="number" value="${s.price}" onchange="shochiMaster[${i}].price=parseInt(this.value)||0;save()"><input class="master-unit-inp" value="${s.unit||''}" onchange="shochiMaster[${i}].unit=this.value;save()"><button class="btn bd bsm" onclick="delShochiMaster(${i})">削除</button></div>`).join('');
+  const tel=document.getElementById('ticket-master-list');
+  if(tel){
+    tel.innerHTML=ticketMaster.length?ticketMaster.map((t,i)=>`<div class="master-item"><input class="master-name-inp" value="${t.name}" placeholder="例：整体10回パック" onchange="ticketMaster[${i}].name=this.value;save();pushTicketMaster()"><input class="master-price-inp" type="number" value="${t.count}" placeholder="回数" style="max-width:70px" onchange="ticketMaster[${i}].count=parseInt(this.value)||0;save();pushTicketMaster()"><input class="master-price-inp" type="number" value="${t.price}" placeholder="料金" onchange="ticketMaster[${i}].price=parseInt(this.value)||0;save();pushTicketMaster()"><button class="btn bd bsm" onclick="delTicketMaster(${i})">削除</button></div>`).join('')
+      :'<p style="color:var(--muted);font-size:0.78rem">まだ回数券が登録されていません</p>';
+  }
+}
+function addTicketMaster(){ticketMaster.push({id:'tk'+Date.now(),name:'新しい回数券',count:10,price:0});save();renderMasterList();pushTicketMaster();}
+function delTicketMaster(i){if(!confirm('削除しますか？'))return;ticketMaster.splice(i,1);save();renderMasterList();pushTicketMaster();}
+async function pushTicketMaster(){
+  try{
+    const rows=ticketMaster.map(t=>[t.id,t.name,t.count,t.price]);
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveTicketMaster',rows})});
+  }catch(e){}
+}
+async function pushPatientTickets(){
+  try{
+    const rows=patientTickets.map(t=>[t.id,t.cardId,t.patientName,t.ticketName,t.totalCount,t.remainingCount,t.purchaseDate]);
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'savePatientTickets',rows})});
+  }catch(e){}
 }
 function addBussanMaster(){bussanMaster.push({id:'bs'+Date.now(),name:'新商品',price:0,unit:'個',stockId:''});save();renderMasterList();}
 function addShochiMaster(){shochiMaster.push({id:'sh'+Date.now(),name:'新処置',price:0,unit:'回',stockId:''});save();renderMasterList();}

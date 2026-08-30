@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本日の施術画面（左右分割プレビュー）｜倉治整骨院</title>
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#f4f1ea;}
+  .banner{background:#fef3c7;color:#92400e;font-size:0.8rem;padding:10px 16px;text-align:center;font-weight:bold;}
+  .header{background:#1a2b45;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;}
+  .header h1{font-size:1rem;margin:0;}
+  .back-btn{background:#334155;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;}
+  .split{display:flex;height:calc(100vh - 84px);}
+  .left{flex:0 0 340px;background:#fff;border-right:2px solid #e5e0d5;overflow-y:auto;padding:10px;}
+  .right{flex:1 1 auto;position:relative;}
+  .right iframe{width:100%;height:100%;border:none;}
+  .date-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .date-row input{flex:1;padding:8px;border-radius:6px;border:1px solid #ddd;font-size:0.85rem;}
+  .bk-item{background:#f8f6f1;border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;border:2px solid transparent;transition:all .15s;}
+  .bk-item:hover{background:#efe9d8;}
+  .bk-item.active{border-color:#0f766e;background:#e6f4f1;}
+  .bk-time{font-weight:bold;color:#0f766e;font-size:0.9rem;}
+  .bk-name{font-weight:bold;font-size:0.95rem;margin-top:2px;}
+  .bk-sub{font-size:0.72rem;color:#7c6f5a;margin-top:4px;}
+  .empty{color:#a08a6d;font-size:0.8rem;text-align:center;padding:30px 10px;}
+  @media (max-width:820px){
+    .split{flex-direction:column;height:auto;}
+    .left{flex:0 0 auto;max-height:40vh;border-right:none;border-bottom:2px solid #e5e0d5;}
+    .right{height:60vh;}
+  }
+</style>
+</head>
+<body>
+
+<div class="banner">🧪 これは「試験プレビュー」画面です。気に入ったら本採用（メイン画面への組み込み）をご検討ください</div>
+<div class="header">
+  <h1>📋 本日の施術画面（左：予約内容／右：電子カルテ）</h1>
+  <button class="back-btn" onclick="location.href='kanri.html'">← 管理システムに戻る</button>
+</div>
+
+<div class="split">
+  <div class="left">
+    <div class="date-row">
+      <label style="font-size:0.78rem;color:#7c6f5a">表示する日付：</label>
+      <input type="date" id="target-date">
+    </div>
+    <div id="bk-list"></div>
+  </div>
+  <div class="right">
+    <iframe id="karte-frame" src="karte.html"></iframe>
+  </div>
+</div>
+
+<script>
+function toLocalDateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+function loadBookingsForDate(dateStr){
+  const box=document.getElementById('bk-list');
+  let bookings={};
+  try{ bookings=JSON.parse(localStorage.getItem('kj_b')||'{}'); }catch(e){}
+  const dayData=bookings[dateStr]||{};
+  const times=Object.keys(dayData).sort();
+  const rows=times.map(t=>{
+    const bk=dayData[t];
+    if(!bk||bk.cont||bk.cancelled||!bk.name)return null;
+    return {time:t, bk};
+  }).filter(Boolean);
+
+  if(!rows.length){
+    box.innerHTML='<div class="empty">この日の予約はありません<br>（この画面は今開いている端末のブラウザに保存された予約データを見ています。他の端末で見る場合は、その端末でも一度kanri.htmlを開いてデータを同期してから開いてください）</div>';
+    return;
+  }
+  box.innerHTML=rows.map(r=>{
+    const bk=r.bk;
+    const sub=[bk.kubun||'', bk.cardId?('診察券'+bk.cardId):'', bk.symptom||''].filter(Boolean).join(' / ');
+    return `<div class="bk-item" data-cardid="${bk.cardId||''}" data-name="${bk.name}" onclick="selectBooking(this)">
+      <div class="bk-time">⏰ ${r.time}</div>
+      <div class="bk-name">${bk.name} 様</div>
+      <div class="bk-sub">${sub||'（詳細情報なし）'}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectBooking(el){
+  document.querySelectorAll('.bk-item').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+  const cardId=el.getAttribute('data-cardid');
+  const name=el.getAttribute('data-name');
+  const frame=document.getElementById('karte-frame');
+  frame.src='karte.html?cardId='+encodeURIComponent(cardId)+'&name='+encodeURIComponent(name);
+}
+
+const dateInput=document.getElementById('target-date');
+dateInput.value=toLocalDateStr(new Date());
+dateInput.addEventListener('change', ()=>loadBookingsForDate(dateInput.value));
+loadBookingsForDate(dateInput.value);
+</script>
+
+</body>
+</html>
