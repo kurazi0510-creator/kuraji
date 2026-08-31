@@ -234,7 +234,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <!-- 日付入力 -->
         <div style="display:flex;align-items:center;gap:8px">
           <div><label style="font-size:0.7rem;color:var(--muted);display:block;margin-bottom:3px">日付</label>
-          <input type="date" class="date-inp" id="selDate" onchange="renderSched();renderWeekDayTabs()"></div>
+          <input type="date" class="date-inp" id="selDate" onchange="loadExtraSlotsThenRender();renderWeekDayTabs()"></div>
           <div id="daybadge" class="day-b" style="margin-top:16px"></div>
         </div>
       </div>
@@ -275,6 +275,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
         <button class="btn bp bsm" onclick="openWaitlist()" style="background:#7e22ce;color:white;border-color:#7e22ce;position:relative">⏳ キャンセル待ち一覧<span id="waitlistBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
         <button class="btn bp bsm" onclick="sendWaitlistPreview()" style="background:#a78bfa;color:white;border-color:#a78bfa">👀 キャンセル待ちメッセージのプレビューを送る</button>
         <button class="btn bp bsm" onclick="openBlockSlots()" style="background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
+        <button class="btn bp bsm" onclick="openExtraSlotModal()" style="background:#0f766e;color:white;border-color:#0f766e">🍚 特別枠を追加/削除(昼休みなど・今表示中の日付だけ)</button>
         <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
         <button class="btn bp bsm" onclick="openBizHoursModal()" style="background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
         <button class="btn bp bsm" onclick="openIntervalModal()" style="background:#64748b;color:white;border-color:#64748b">🧪 インターバル設定(試験運用・まだ未反映)</button>
@@ -1179,6 +1180,19 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <input type="date" id="blk-date" class="inp" style="margin-bottom:10px" onchange="loadBlockSlotsForDate()" oninput="loadBlockSlotsForDate()">
     <button class="btn bp bsm" onclick="showAllBlockedDebug()" style="margin-bottom:10px;background:#7c3aed;color:white;border-color:#7c3aed;width:100%">🔍 保存されている全ブロックデータを確認</button>
     <div id="bs-content" style="max-height:50vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- 特別枠(昼休みなど)追加モーダル -->
+<div class="modal-ov" id="extraSlotModal">
+  <div class="modal" style="max-width:480px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:1rem">🍚 特別枠を追加/削除</h3>
+      <button onclick="closeExtraSlotModal()" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:0.75rem;color:#64748b;margin-bottom:4px">対象の日付：<b id="extraSlotDateLabel"></b></p>
+    <p style="font-size:0.75rem;color:#64748b;margin-bottom:8px">タップした時間を、<b>この日だけ</b>予約可能な枠として追加します。もう一度タップすると解除できます。追加した枠は予約表にも表示され、通常の枠と同じように予約を入れられます。</p>
+    <div id="extraSlotButtons" style="display:flex;flex-wrap:wrap;gap:8px"></div>
   </div>
 </div>
 
@@ -2145,6 +2159,7 @@ const DEFAULT_STOCK=[
 ];
 
 let patients=[], bookings={}, uriage={}, bussanLog=[], lp=[];
+let extraSlotsForCurrentDate=[]; // 表示中の日付に追加されている特別枠（GASから取得）
 let bussanMaster=[], shochiMaster=[], stockData=[];
 let ticketMaster=[], patientTickets=[]; // 回数券・パックマスター、患者ごとの購入・残数データ
 let mBussanDisc={}; // 物販個別割引 {id: 割引額}
@@ -4314,23 +4329,73 @@ function dayType(d){
 }
 function getSlots(dt,d){
   const cfg=d?getBizDayConfig(d):null;
+  let mo,af;
   if(cfg){
     if(cfg.closed) return [];
-    const mo=genSlotsFromRange(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
-    const af=genSlotsFromRange(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
-    if(mo.length&&af.length) return [...mo,'BREAK',...af];
-    if(mo.length) return mo;
+    mo=genSlotsFromRange(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
+    af=genSlotsFromRange(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
+  }else{
+    // フォールバック（従来ロジック・dのみ渡された旧呼び出しへの互換用）
+    if(dt==='nichi')return[];
+    mo=[];let h=8,m=30;while(!(h===12&&m===30)){mo.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
+    if(dt==='moku')return mo;
+    af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
+  }
+  // ★院長がその日だけ手動で追加した特別枠（昼休みなど）を、時系列順の正しい位置に挿入する
+  const extra=(d===document.getElementById('selDate')?.value)?extraSlotsForCurrentDate:[];
+  if(extra && extra.length){
+    const moPlusExtra=[...new Set([...mo, ...extra])].sort();
+    if(moPlusExtra.length&&af.length) return [...moPlusExtra,'BREAK',...af];
+    if(moPlusExtra.length) return moPlusExtra;
     if(af.length) return af;
     return [];
   }
-  // フォールバック（従来ロジック・dのみ渡された旧呼び出しへの互換用）
-  if(dt==='nichi')return[];
-  const mo=[];let h=8,m=30;while(!(h===12&&m===30)){mo.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
-  if(dt==='moku')return mo;
-  const af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
-  return[...mo,'BREAK',...af];
+  if(mo.length&&af.length) return [...mo,'BREAK',...af];
+  if(mo.length) return mo;
+  if(af.length) return af;
+  return [];
 }
 
+// ★その日に追加されている特別枠（昼休みなど）をGASから取得してから予約表を再描画する
+async function loadExtraSlotsThenRender(){
+  const date=document.getElementById('selDate').value;
+  renderSched(); // まず今ある情報で即座に表示（体感速度優先）
+  if(!date)return;
+  try{
+    const res=await fetch(GAS+'?action=getExtraSlotsForDate&date='+date+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    extraSlotsForCurrentDate=d.ok?(d.extra||[]):[];
+  }catch(e){ extraSlotsForCurrentDate=[]; }
+  renderSched(); // 特別枠が届いたら反映して再描画
+}
+// 昼休みの時間帯として選べる候補（20分刻み・12:30〜14:50）
+const LUNCH_CANDIDATE_SLOTS=['12:30','12:50','13:10','13:30','13:50','14:10','14:30','14:50'];
+function openExtraSlotModal(){
+  const date=document.getElementById('selDate').value;
+  if(!date){ alert('先に日付を選んでください'); return; }
+  document.getElementById('extraSlotDateLabel').textContent=date;
+  renderExtraSlotButtons();
+  document.getElementById('extraSlotModal').classList.add('on');
+}
+function renderExtraSlotButtons(){
+  const box=document.getElementById('extraSlotButtons');
+  box.innerHTML=LUNCH_CANDIDATE_SLOTS.map(t=>{
+    const on=extraSlotsForCurrentDate.includes(t);
+    return `<button class="btn bsm" style="background:${on?'#0f766e':'#f1f5f9'};color:${on?'white':'#475569'};border-color:${on?'#0f766e':'#e2e8f0'}" onclick="toggleExtraSlotUI('${t}')">${t}${on?' ✓':''}</button>`;
+  }).join('');
+}
+async function toggleExtraSlotUI(time){
+  const date=document.getElementById('selDate').value;
+  const isOn=extraSlotsForCurrentDate.includes(time);
+  try{
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'toggleExtraSlot',date,time,add:!isOn})});
+    if(isOn) extraSlotsForCurrentDate=extraSlotsForCurrentDate.filter(t=>t!==time);
+    else extraSlotsForCurrentDate.push(time);
+    renderExtraSlotButtons();
+    renderSched();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+function closeExtraSlotModal(){ document.getElementById('extraSlotModal').classList.remove('on'); }
 function renderSched(){
   const date=document.getElementById('selDate').value;if(!date)return;
   statOverride={}; // 日付が変わったら手動入力をリセット
@@ -7710,11 +7775,11 @@ function moveDate(days){
     base.setDate(base.getDate()+days);
     el.value=base.getFullYear()+'-'+String(base.getMonth()+1).padStart(2,'0')+'-'+String(base.getDate()).padStart(2,'0');
   }
-  renderSched();renderWeekDayTabs();
+  loadExtraSlotsThenRender();renderWeekDayTabs();
 }
 function selectDate(dateStr){
   const el=document.getElementById('selDate');
-  if(el){el.value=dateStr;renderSched();renderWeekDayTabs();}
+  if(el){el.value=dateStr;loadExtraSlotsThenRender();renderWeekDayTabs();}
 }
 function renderWeekDayTabs(){
   const container=document.getElementById('week-day-tabs');
