@@ -81,7 +81,7 @@ function doPost(e){
       var action=body.action||"";
       var result;
       if(action==="getAll")result=getAllData();
-      else if(action==="saveBookings"){saveSheet("予約表",JSON.parse(body.rows));result={ok:true};}
+      else if(action==="saveBookings"){saveBookingsSafe(JSON.parse(body.rows));result={ok:true};}
       else if(action==="saveCustomers"){saveCustomersSafe(JSON.parse(body.rows));result={ok:true};}
       else if(action==="saveUriage"){saveSheet("売上",JSON.parse(body.rows));result={ok:true};}
       else if(action==="resetBookings"){resetBookings();result={ok:true};}
@@ -378,6 +378,38 @@ function saveSheet(name,rows){
 // 「空欄で送られてきた項目で、既存データを上書きして消してしまう」事故を防ぐため、
 // 診察券No(1列目)をキーに、送られてきた値が空の項目は既存のサーバー側の値を残す方式にする。
 // また、今回の同期に含まれていなかった患者（別端末でまだ読み込み中など）も削除せず残す。
+// ★予約データ専用：安全な差分マージ保存★
+// 「ある端末のローカルデータが古い・不完全な状態のまま送信されて、
+// 他の端末が入力した支払い情報などが空欄で上書きされて消えてしまう」事故を防ぐ。
+// 日付＋時間をキーに、送られてきた値が空の項目は既存のサーバー側の値を残す方式にする。
+// （行そのものが送られてこなかった場合＝意図的な削除の可能性があるため、行の削除自体は妨げない）
+function saveBookingsSafe(rows){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("予約表");
+  var existing=s?s.getDataRange().getValues():[];
+  var header=(existing.length?existing[0]:(rows.length?rows[0]:[]));
+  var existingByKey={};
+  for(var i=1;i<existing.length;i++){
+    var key=String(existing[i][0]||"")+"|"+String(existing[i][1]||"");
+    if(key==="|") continue;
+    existingByKey[key]=existing[i];
+  }
+  var merged=[header];
+  for(var j=1;j<rows.length;j++){
+    var incoming=rows[j];
+    var key=String(incoming[0]||"")+"|"+String(incoming[1]||"");
+    if(key==="|") continue;
+    var base=existingByKey[key];
+    var mergedRow=incoming.map(function(val,colIdx){
+      var v=(val===null||val===undefined)?"":String(val).trim();
+      if(v!=="") return val; // 新しい値が入っていればそちらを優先
+      if(base && base[colIdx]!==undefined && String(base[colIdx]).trim()!=="") return base[colIdx]; // 空なら既存データを残す（消さない）
+      return val;
+    });
+    merged.push(mergedRow);
+  }
+  saveSheet("予約表", merged);
+}
 function saveCustomersSafe(rows){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("患者");
