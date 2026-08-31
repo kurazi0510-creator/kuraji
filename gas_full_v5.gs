@@ -1426,6 +1426,32 @@ var SLOTS_LIST_=["08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50"
   "11:10","11:30","11:50","12:10","15:00","15:20","15:40","16:00",
   "16:20","16:40","17:00","17:20","17:40","18:00","18:20","18:40",
   "19:00","19:20","19:40"];
+// Web予約フォーム(book.html)のMENUS配列と必ず一致させる：メニューごとの必要枠数
+var MENU_SLOTS_MAP_={
+  "整体（初診）":3, "整体（再診）":2,
+  "楽トレ（初診）":2, "楽トレ（再診）":2,
+  "美顔整顔（初診）":3, "美顔整顔（再診）":2,
+  "交通事故（初診）":3, "交通事故（再診）":1
+};
+// 指定日時から、指定した枠数ぶん連続して本当に空いているかを判定する
+// （キャンセル待ちの「空きが出ました」通知が、必要な枠数が揃っていないのに誤って送られるのを防ぐため）
+function hasEnoughConsecutiveSlotsForWaitlist_(dateStr, timeStr, need){
+  var avail=getAvailableSlots(dateStr);
+  if(!avail.ok || avail.closed) return false;
+  var availSet={};
+  (avail.available||[]).forEach(function(t){ availSet[t]=true; });
+  var startIdx=SLOTS_LIST_.indexOf(timeStr);
+  if(startIdx<0) return false;
+  for(var k=0;k<need;k++){
+    var idx=startIdx+k;
+    if(idx>=SLOTS_LIST_.length) return false;
+    var t=SLOTS_LIST_[idx];
+    // 午前→午後をまたぐ場合は不可（12:10の次が15:00に飛んでしまうため）
+    if(k>0 && SLOTS_LIST_[idx-1]<"13:00" && t>="13:00") return false;
+    if(!availSet[t]) return false;
+  }
+  return true;
+}
 // 20分刻みのスロット配列を生成（開始〜終了時刻から）
 function genSlots_(startStr,endStr){
   if(!startStr||!endStr) return [];
@@ -1700,6 +1726,13 @@ function notifyWaitlistForDate(dateStr){
       if(String(data[i][7])!=="待機中") continue;
       var name=String(data[i][2]||""), tel=String(data[i][3]||"");
       var wlTime=String(data[i][1]||"");
+      var wlMenu=String(data[i][4]||"");
+      // ★このキャンセル待ちのメニューに必要な枠数ぶん、実際に連続して空いているか確認する。
+      //   揃っていなければ、まだ通知しない（「待機中」のまま残し、次のキャンセル時に再チェックされる）
+      var need=MENU_SLOTS_MAP_[wlMenu]||1;
+      if(wlTime && !hasEnoughConsecutiveSlotsForWaitlist_(dateStr, wlTime, need)){
+        continue;
+      }
       var dispDateTime=dispDate+(wlTime?" "+wlTime+"〜":"");
       var tid=tel?findLineUidByPhone_(tel):"";
       if(tid){
