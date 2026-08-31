@@ -1588,6 +1588,15 @@ function getAvailableSlotsRange(startDateStr,numDays){
 // 満員の日時に「空きが出たら知らせてほしい」と登録でき、
 // キャンセルが出た時に自動でLINE通知する
 // ═══════════════════════════════════════
+// 日付文字列(YYYY-MM-DD)に曜日を付けて表示用に整形する（キャンセル待ち関連メッセージの共通処理）
+function formatDateWithYobi_(dateStr){
+  var yobi=["日","月","火","水","木","金","土"];
+  try{
+    var dd=new Date(dateStr+"T00:00:00");
+    if(!isNaN(dd.getTime())) return dateStr+"（"+yobi[dd.getDay()]+"）";
+  }catch(e){}
+  return dateStr;
+}
 function registerWaitlist(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -1605,13 +1614,14 @@ function registerWaitlist(data){
     var p=PropertiesService.getScriptProperties();
     var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
     var nl=String.fromCharCode(10);
+    var dispDateTime=formatDateWithYobi_(data.date)+" "+(data.time||"")+"〜";
     if(token&&ownerId){
-      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] ⏳ キャンセル待ちの登録がありました"+nl+nl+"お名前："+(data.name||"")+" 様"+nl+"ご希望日時："+(data.date||"")+" "+(data.time||"")+"〜"+nl+"メニュー："+(data.menu||"")+nl+"電話："+(data.tel||""));
+      sendLineMessagingAPI(token,ownerId,"[倉治整骨院] ⏳ キャンセル待ちの登録がありました"+nl+nl+"お名前："+(data.name||"")+" 様"+nl+"ご希望日時："+dispDateTime+nl+"メニュー："+(data.menu||"")+nl+"電話："+(data.tel||""));
     }
     if(token){
       var tid=data.tel?findLineUidByPhone_(data.tel):"";
       if(tid){
-        sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"キャンセル待ちの登録を受け付けました。"+nl+"ご希望日時："+(data.date||"")+" "+(data.time||"")+"〜"+nl+"メニュー："+(data.menu||"")+nl+nl+"この日時にキャンセルが出た場合、このLINEに自動でお知らせいたします。先着順のご案内となりますので、通知が届きましたらお早めにご予約ください。"+nl+nl+"(自動送信のため返信不要です)");
+        sendLineMessagingAPI(token,tid,"[倉治整骨院]"+nl+nl+(data.name||"")+"様"+nl+nl+"キャンセル待ちの登録を受け付けました。"+nl+"ご希望日時："+dispDateTime+nl+"メニュー："+(data.menu||"")+nl+nl+"この日時にキャンセルが出た場合、このLINEに自動でお知らせいたします。先着順のご案内となりますので、通知が届きましたらお早めにご予約ください。"+nl+nl+"(自動送信のため返信不要です)");
       }
     }
     return {ok:true, rowIdx:newIdx};
@@ -1684,13 +1694,16 @@ function notifyWaitlistForDate(dateStr){
     if(!token) return {ok:true, notified:0};
     var nl=String.fromCharCode(10);
     var notified=0, skipped=[];
+    var dispDate=formatDateWithYobi_(dateStr);
     for(var i=1;i<data.length;i++){
       if(String(data[i][0])!==String(dateStr)) continue;
       if(String(data[i][7])!=="待機中") continue;
       var name=String(data[i][2]||""), tel=String(data[i][3]||"");
+      var wlTime=String(data[i][1]||"");
+      var dispDateTime=dispDate+(wlTime?" "+wlTime+"〜":"");
       var tid=tel?findLineUidByPhone_(tel):"";
       if(tid){
-        var r=sendLineMessagingAPI(token,tid,"[倉治整骨院] 🔔 空きのお知らせ"+nl+nl+name+"様"+nl+nl+"ご登録いただいていた"+dateStr+"に空きが出ました！"+nl+"先着順のご案内となりますので、お早めにお電話（072-892-3223）またはLINEでご連絡ください。"+nl+nl+"(このメッセージは複数の方に同時にお送りしています。すでにご予約が埋まっていた場合はご容赦ください)");
+        var r=sendLineMessagingAPI(token,tid,"[倉治整骨院] 🔔 空きのお知らせ"+nl+nl+name+"様"+nl+nl+"ご登録いただいていた"+dispDateTime+"に空きが出ました！"+nl+"先着順のご案内となりますので、お早めにお電話（072-892-3223）またはLINEでご連絡ください。"+nl+nl+"(このメッセージは複数の方に同時にお送りしています。すでにご予約が埋まっていた場合はご容赦ください)");
         if(r.ok){
           notified++;
           var rng=s.getRange(i+1,8);
