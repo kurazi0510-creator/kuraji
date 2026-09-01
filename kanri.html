@@ -194,7 +194,27 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
   .nav-t{padding:7px 8px;font-size:0.65rem;}
   .stats{grid-template-columns:repeat(3,1fr);}
 }
+/* ★印刷用スタイル：印刷時はナビ・ボタン類を隠し、今表示中の画面の中身だけをきれいに印刷する */
+@media print{
+  header, .nav, .stats, .btn-section, .card .btn, .pay-btn, .utab, .fgrid, #u-day .card:first-child,
+  #bs-add .card, .print-hide{ display:none !important; }
+  .page{ display:none !important; }
+  .page.printing{ display:block !important; }
+  body{ background:#fff !important; }
+  .card{ box-shadow:none !important; border:1px solid #ccc !important; }
+  table{ font-size:11px !important; }
+  @page{ size:A4; margin:12mm; }
+}
 </style>
+<script>
+// ★どのページからでも呼べる共通の印刷関数：印刷したい画面にだけ"printing"クラスを付けて印刷する
+function printThisPage(pageId){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('printing'));
+  const el=document.getElementById(pageId);
+  if(el) el.classList.add('printing');
+  window.print();
+}
+</script>
 </head>
 <body>
 <header>
@@ -344,7 +364,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     </div>
   </div>
   <div class="card">
-    <div class="ctitle">予約表（20分枠）</div>
+    <div class="ctitle">予約表（20分枠） <button class="btn bsm" onclick="printThisPage('page-yoyaku')" style="margin-left:8px;padding:4px 10px;background:#475569;color:white;border:none;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer">🖨 印刷する</button></div>
     <div class="scroll"><table class="tbl" id="schedTbl"><thead><tr>
       <th style="min-width:46px">時間</th><th style="min-width:52px">区分</th>
       <th style="min-width:80px">患者名</th><th style="min-width:36px">券No</th>
@@ -519,7 +539,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <button class="btn bp" onclick="addPatient()">＋ 登録</button>
   </div>
   <div class="card">
-    <div class="ctitle">患者一覧 <span style="font-size:0.72rem;color:var(--muted);font-weight:400" id="pcnt"></span><button onclick="matchLineIdsFromGAS()" style="margin-left:8px;padding:4px 10px;background:#06C755;color:white;border:none;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer">🔗 LINE ID自動照合</button><span id="line-match-result" style="font-size:0.7rem;margin-left:6px;color:var(--muted)"></span></div>
+    <div class="ctitle">患者一覧 <span style="font-size:0.72rem;color:var(--muted);font-weight:400" id="pcnt"></span><button onclick="matchLineIdsFromGAS()" style="margin-left:8px;padding:4px 10px;background:#06C755;color:white;border:none;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer">🔗 LINE ID自動照合</button><button onclick="printThisPage('page-patients')" style="margin-left:6px;padding:4px 10px;background:#475569;color:white;border:none;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer">🖨 印刷する</button><span id="line-match-result" style="font-size:0.7rem;margin-left:6px;color:var(--muted)"></span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
       <input class="inp" id="psearch" placeholder="🔍 名前・券No・電話・住所・症状・職業・年齢・和暦・流入元で検索" oninput="renderPatients()" style="flex:1;min-width:160px">
       <select class="sel" id="psort" onchange="renderPatients()" style="width:150px">
@@ -550,6 +570,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
       <div class="utab" onclick="switchU('paydetail')">🧾 支払明細</div>
       <button class="btn bsm" onclick="syncUriageFromBookings()" style="margin-left:8px;padding:6px 12px;background:#22c55e;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">🔄 予約から集計</button>
       <button class="btn bsm" onclick="forcePushU()" style="margin-left:4px;padding:6px 12px;background:#dc2626;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">📤 GAS保存</button>
+      <button class="btn bsm" onclick="printThisPage('page-uriage')" style="margin-left:4px;padding:6px 12px;background:#475569;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">🖨 印刷する</button>
     </div>
     <div id="u-day">
       <div class="card">
@@ -637,6 +658,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <div class="utabs">
       <div class="utab on" onclick="switchBussan('add')">➕ 直接追加</div>
       <div class="utab" onclick="switchBussan('rank')">📊 売れ筋</div>
+      <button class="btn bsm" onclick="printThisPage('page-bussan')" style="margin-left:8px;padding:6px 12px;background:#475569;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">🖨 印刷する</button>
     </div>
     <div id="bs-add">
       <div class="card">
@@ -674,7 +696,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <div class="page" id="page-stock">
   <div style="margin-top:14px">
     <div class="card">
-      <div class="ctitle">在庫管理 <button class="btn bp bsm" onclick="openStockAdd()">＋ 商品追加</button> <button class="btn bp bsm" onclick="openStockAdjust()" style="background:#7c3aed;border-color:#7c3aed">🔧 在庫を手動で調整(院長使用など)</button> <button class="btn bp bsm" onclick="forcePushStockNow()" style="background:#dc2626;border-color:#dc2626">📤 この端末の在庫数を正として全端末に送信</button></div>
+      <div class="ctitle">在庫管理 <button class="btn bp bsm" onclick="openStockAdd()">＋ 商品追加</button> <button class="btn bp bsm" onclick="openStockAdjust()" style="background:#7c3aed;border-color:#7c3aed">🔧 在庫を手動で調整(院長使用など)</button> <button class="btn bp bsm" onclick="forcePushStockNow()" style="background:#dc2626;border-color:#dc2626">📤 この端末の在庫数を正として全端末に送信</button> <button class="btn bp bsm" onclick="printThisPage('page-stock')" style="background:#475569;border-color:#475569">🖨 印刷する</button></div>
       <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;">物販・処置で使用すると在庫が自動で減算されます</div>
       <div id="stock-list"></div>
       <div style="margin-top:14px;padding:10px;background:#f8f6f1;border-radius:8px;display:flex;gap:16px;justify-content:center">
@@ -691,6 +713,7 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
     <!-- タブ切替 -->
     <div class="utabs" id="ltvTabsArea" style="flex-wrap:wrap">
       <div class="utab on" onclick="switchLtv('ltv_main')">💎 LTV分析</div>
+      <button class="btn bsm" onclick="printThisPage('page-ltv')" style="margin-left:4px;padding:6px 12px;background:#475569;color:white;border:none;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap">🖨 印刷する</button>
       <div class="utab" onclick="switchLtv('ops')">⏱ 経営指標</div>
       <div class="utab" onclick="switchLtv('overview')">📊 KPI概要</div>
       <div class="utab" onclick="switchLtv('age')">👥 年代別</div>
