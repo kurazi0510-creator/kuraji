@@ -6428,7 +6428,11 @@ function renderPeTicketList(cardId){
   const owned=patientTickets.filter(t=>t.cardId===String(cardId));
   listEl.innerHTML=owned.length?owned.map(t=>{
     const idx=patientTickets.indexOf(t);
-    return `<div class="saved-row"><span style="flex:1">${t.ticketName}<br><small style="color:${t.remainingCount>0?'#5b21b6':'#dc2626'}">残り${t.remainingCount}/${t.totalCount}回（購入日：${t.purchaseDate}）</small></span>${t.remainingCount>0?`<button class="mb" style="background:#f5f3ff;color:#5b21b6;margin-right:4px" onclick="useTicketForPatient(${idx})">1回消化</button>`:''}<button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delPatientTicket(${idx})">削除</button></div>`;
+    const hist=t.usageHistory||[];
+    const histHtml=hist.length
+      ?`<div style="font-size:0.7rem;color:#7c6f5a;margin-top:4px">使用履歴：${hist.map((h,i)=>`${i+1}回目:${h}`).join('　')}</div>`
+      :'';
+    return `<div class="saved-row" style="flex-direction:column;align-items:flex-start"><div style="display:flex;width:100%;align-items:center"><span style="flex:1">${t.ticketName}<br><small style="color:${t.remainingCount>0?'#5b21b6':'#dc2626'}">残り${t.remainingCount}/${t.totalCount}回（購入日：${t.purchaseDate}）</small></span>${t.remainingCount>0?`<button class="mb" style="background:#f5f3ff;color:#5b21b6;margin-right:4px" onclick="useTicketForPatient(${idx})">1回消化</button>`:''}<button class="mb" style="background:#eff6ff;color:#1d4ed8;margin-right:4px" onclick="printTicketCard(${idx})">🖨 カード印刷</button><button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delPatientTicket(${idx})">削除</button></div>${histHtml}</div>`;
   }).join(''):'<p style="color:var(--muted);font-size:0.76rem">まだ回数券の購入はありません</p>';
   selEl.innerHTML=ticketMaster.length
     ?ticketMaster.map(t=>`<option value="${t.id}">${t.name}（${t.count}回・${(t.price||0).toLocaleString()}円）</option>`).join('')
@@ -6443,7 +6447,7 @@ async function purchaseTicketForPatient(){
   if(!confirm(`「${tm.name}」（${tm.count}回・${(tm.price||0).toLocaleString()}円）を購入登録します。よろしいですか？`))return;
   patientTickets.push({
     id:'pt'+Date.now(), cardId, patientName, ticketName:tm.name,
-    totalCount:tm.count, remainingCount:tm.count, purchaseDate:toLocalDateStr(new Date())
+    totalCount:tm.count, remainingCount:tm.count, purchaseDate:toLocalDateStr(new Date()), usageHistory:[]
   });
   save(); renderPeTicketList(cardId); await pushPatientTickets();
   alert('✅ 購入登録しました');
@@ -6453,6 +6457,8 @@ async function useTicketForPatient(idx){
   if(t.remainingCount<=0){ alert('この回数券は残りがありません'); return; }
   if(!confirm(`「${t.ticketName}」を1回消化します。よろしいですか？`))return;
   t.remainingCount--;
+  if(!t.usageHistory)t.usageHistory=[];
+  t.usageHistory.push(toLocalDateStr(new Date())); // ★いつ使ったかを記録する（消費履歴）
   save(); renderPeTicketList(t.cardId); await pushPatientTickets();
 }
 async function delPatientTicket(idx){
@@ -6460,6 +6466,35 @@ async function delPatientTicket(idx){
   const t=patientTickets[idx];
   patientTickets.splice(idx,1);
   save(); renderPeTicketList(t?.cardId); await pushPatientTickets();
+}
+// ★患者様にお渡しする回数券カードを印刷する
+function printTicketCard(idx){
+  const t=patientTickets[idx]; if(!t)return;
+  let area=document.getElementById('ticketCardPrintArea');
+  if(!area){
+    area=document.createElement('div');
+    area.id='ticketCardPrintArea';
+    area.className='page';
+    document.body.appendChild(area);
+  }
+  const circles=Array.from({length:t.totalCount},(_,i)=>{
+    const used=i<(t.totalCount-t.remainingCount);
+    return `<div style="width:34px;height:34px;border-radius:50%;border:2px solid #0f766e;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.9rem;margin:3px;${used?'background:#0f766e;color:#fff':'background:#fff;color:#0f766e'}">${i+1}</div>`;
+  }).join('');
+  area.innerHTML=`
+    <div style="max-width:480px;margin:40px auto;border:3px solid #0f766e;border-radius:16px;padding:24px;font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;text-align:center">
+      <div style="font-size:1.3rem;font-weight:bold;color:#0f766e;margin-bottom:4px">倉治整骨院</div>
+      <div style="font-size:0.8rem;color:#666;margin-bottom:16px">〒576-0051 大阪府交野市倉治1丁目22-15　TEL：072-892-3223</div>
+      <div style="font-size:1.1rem;font-weight:bold;border-top:2px dashed #ccc;border-bottom:2px dashed #ccc;padding:10px 0;margin-bottom:16px">${t.ticketName}</div>
+      <div style="text-align:left;font-size:0.9rem;margin-bottom:14px">
+        <div>お名前：<b>${t.patientName}</b> 様</div>
+        <div>購入日：${t.purchaseDate}</div>
+        <div>回数：${t.totalCount}回（残り ${t.remainingCount}回）</div>
+      </div>
+      <div style="margin-bottom:10px;font-size:0.85rem;color:#666">来院のたびに1つずつチェックしてください</div>
+      <div>${circles}</div>
+    </div>`;
+  printThisPage('ticketCardPrintArea');
 }
 function updatePeCouponStatus(){
   const expiry = document.getElementById('pe-coupon-expiry')?.value;
