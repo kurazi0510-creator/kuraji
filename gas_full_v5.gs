@@ -1582,6 +1582,9 @@ function getAvailableSlots(dateStr){
     if(s){
       var rows=s.getDataRange().getValues();
       for(var i=1;i<rows.length;i++){
+        var kubun=String(rows[i][2]||"");
+        // ★キャンセルになった枠は、患者名の欄が残っていても「空き」として扱う
+        if(kubun.indexOf("キャンセル")>-1) continue;
         if(String(rows[i][0])===String(dateStr) && String(rows[i][3]||"").trim()!==""){
           occupied[String(rows[i][1])]=true;
         }
@@ -1636,6 +1639,9 @@ function getAvailableSlotsRange(startDateStr,numDays){
     if(bs){
       var rows=bs.getDataRange().getValues();
       for(var i=1;i<rows.length;i++){
+        var kubun2=String(rows[i][2]||"");
+        // ★キャンセルになった枠は、患者名の欄が残っていても「空き」として扱う
+        if(kubun2.indexOf("キャンセル")>-1){continue;}
         if(String(rows[i][3]||"").trim()===""){continue;}
         var dd=String(rows[i][0]);
         if(!allBooked[dd])allBooked[dd]={};
@@ -2314,6 +2320,8 @@ function saveWebBooking(data){
 
     var rows=s.getDataRange().getValues();
     for(var i=1;i<rows.length;i++){
+      var rowKubun=String(rows[i][2]||"");
+      if(rowKubun.indexOf("キャンセル")>-1) continue; // キャンセル済みの枠は空きとして扱う
       if(String(rows[i][0])===String(data.date) && slotsToUse.indexOf(String(rows[i][1]))>-1){
         if(String(rows[i][3]||"").trim()!==""){
           return {ok:false, error:"ご指定の時間帯は既にご予約が入っています。別の時間をお選びください。"};
