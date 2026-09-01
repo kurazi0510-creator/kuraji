@@ -2577,18 +2577,21 @@ async function syncAll(){
         // ★予約マージルール（localStorage保護版）
         // GASにあってlocalStorageにない日付 → GASから追加
         // localStorageにある日付 → localStorageを優先（消えない）
-        // GASが空・少ない場合でもlocalStorageのデータは絶対に消えない
+        // GASが空の場合のみlocalStorageを維持（初回同期前などの保険）
         if(Object.keys(newB).length === 0){
-          // GASに予約データが1件もない場合は何もしない（localStorageを保持）
           console.warn('GAS予約データが空のためlocalStorageを維持します');
         } else {
-          // ★スロット単位の安全マージ
-          // ・GASにあってlocalStorageに無い「予約枠」→ 追加（Web予約など新規分を確実に反映）
-          // ・両方にある予約枠 → localStorageを優先（消えない・上書きされない）
+          // ★スロット単位のマージ（2026年版・修正）
+          // これまでは「両方にある予約枠はlocalStorageを優先」としていたが、
+          // これだと一度その端末が知った予約枠は二度とサーバーの新しい内容を反映できず、
+          // 他の端末での変更（キャンセル・再予約・支払い入力など）が永久に届かないという重大な不具合の原因になっていた。
+          // サーバー側(GAS)は既に安全な差分マージで保存されており信頼できるため、
+          // 「サーバーにある予約枠は常にサーバーの内容で上書きする」方式に変更する。
+          // （まだサーバーにpushされていない、たった今この端末で入力した分だけはローカルの方を残す）
           Object.keys(newB).forEach(d=>{
             if(!bookings[d]){ bookings[d]=newB[d]; return; }
             Object.keys(newB[d]).forEach(slot=>{
-              if(!bookings[d][slot]) bookings[d][slot]=newB[d][slot];
+              bookings[d][slot]=newB[d][slot]; // サーバーの内容を正として反映する
             });
           });
         }
