@@ -274,6 +274,7 @@ function printThisPage(pageId){
         <button class="btn bp bsm" onclick="showFutureBookings()" style="background:#7c3aed;color:white;border-color:#7c3aed">📋 未来の予約一覧</button>
         <button class="btn bp bsm" onclick="toggleDayMemo()" style="background:#fef3c7;color:#92400e;border-color:#fbbf24">📝 本日メモ</button>
         <button class="btn ba bsm" onclick="forcePushPatients()" title="GASのデータがおかしい時に押す">🔧 患者データ修復</button>
+        <button class="btn ba bsm" onclick="deletePatientByIdPrompt()" style="background:#dc2626" title="削除しても復活してしまう患者を、診察券Noを指定して確実に消す">🗑 診察券Noを指定して確実に削除</button>
         <button class="btn ba bsm" onclick="forcePushBookings()" style="background:#dc2626;color:white;border-color:#dc2626" title="このデバイスの予約データをGASに送信して復元">📤 予約データ復元送信</button>
         <button class="btn bp bsm" onclick="deleteBookingsByNamePrompt()" style="background:#dc2626;color:white;border-color:#dc2626">🗑 名前でテスト予約を一括削除</button>
       </div>
@@ -2699,6 +2700,21 @@ async function pushP(){
 }
 
 // GASのカラムがずれていた時に正しい形式で上書きする
+async function deletePatientByIdPrompt(){
+  const cardId=prompt('確実に削除したい患者の診察券Noを入力してください（例：1400）');
+  if(!cardId)return;
+  const target=patients.find(p=>p.id===cardId.trim());
+  const nameInfo=target?`（${target.name}様）`:'（現在ローカルには見当たりませんが、サーバー側は削除します）';
+  if(!confirm(`診察券No「${cardId}」${nameInfo}を完全に削除します。よろしいですか？`))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deletePatientByCardId',cardId:cardId.trim()})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました：'+(d.error||'')); return; }
+    patients=patients.filter(p=>p.id!==cardId.trim());
+    save(); renderPatients();
+    alert(`✅ 診察券No「${cardId}」を削除しました（${d.deleted||0}件）`);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 async function forcePushPatients(){
   if(!patients.length){alert('患者データがありません。先に「最新データ取得」を押してください。');return;}
   if(!confirm('GASスプレッドシートの患者データを現在のデータで上書きします。よろしいですか？'))return;
@@ -6233,7 +6249,7 @@ async function addPatient(){
   const name=document.getElementById('c-nm').value.trim();
   if(!id||!name){alert('診察券Noと患者名は必須です');return;}
   if(patients.find(p=>p.id===id)){alert('この診察券Noは既に登録されています');return;}
-  patients.push({id,name,kana:document.getElementById('c-kana').value.trim(),sex:document.getElementById('c-sex').value,tel:normTel(document.getElementById('c-tel').value.trim()),line:document.getElementById('c-line').value,city:document.getElementById('c-city').value.trim(),job:document.getElementById('c-job').value.trim(),src:document.getElementById('c-src').value,dob:document.getElementById('c-dob').value,symptom:document.getElementById('c-sym').value.trim(),note:document.getElementById('c-note').value.trim(),last:'',count:0});
+  patients.push({id,name,kana:document.getElementById('c-kana').value.trim(),sex:document.getElementById('c-sex').value,tel:normTel(document.getElementById('c-tel').value.trim()),line:document.getElementById('c-line').value,zip:document.getElementById('c-postal').value.trim(),city:document.getElementById('c-city').value.trim(),job:document.getElementById('c-job').value.trim(),src:document.getElementById('c-src').value,dob:document.getElementById('c-dob').value,symptom:document.getElementById('c-sym').value.trim(),note:document.getElementById('c-note').value.trim(),last:'',count:0});
   save();renderPatients();await pushP();
   ['c-id','c-nm','c-kana','c-tel','c-city','c-job','c-sym','c-note','c-postal'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('c-dob').value='';document.getElementById('c-dob-wareki').value='';
@@ -6366,6 +6382,7 @@ function openPEdit(id){
   if(document.getElementById('pe-coupon-session'))document.getElementById('pe-coupon-session').value=p.couponNextSession||'';
   updatePeCouponStatus();
   renderPeTicketList(id);
+  document.getElementById('pe-postal').value=p.zip||'';
   document.getElementById('pe-city').value=p.city||'';
   document.getElementById('pe-job').value=p.job||'';
   document.getElementById('pe-src').value=p.src||'-';
@@ -6429,10 +6446,24 @@ function renderPeTicketList(cardId){
   listEl.innerHTML=owned.length?owned.map(t=>{
     const idx=patientTickets.indexOf(t);
     const hist=t.usageHistory||[];
-    const histHtml=hist.length
-      ?`<div style="font-size:0.7rem;color:#7c6f5a;margin-top:4px">使用履歴：${hist.map((h,i)=>`${i+1}回目:${h}`).join('　')}</div>`
+    // ★丸のスタンプで視覚的に進み具合が分かるようにする
+    const dots=Array.from({length:t.totalCount},(_,i)=>{
+      const used=i<hist.length;
+      return `<span title="${used?(i+1)+'回目：'+hist[i]:'未使用'}" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:0.65rem;font-weight:bold;margin:2px;${used?'background:#5b21b6;color:#fff':'background:#f1f5f9;color:#94a3b8;border:1.5px solid #cbd5e1'}">${i+1}</span>`;
+    }).join('');
+    const histList=hist.length
+      ?`<div style="font-size:0.7rem;color:#7c6f5a;margin-top:6px;background:#faf9f7;border-radius:6px;padding:6px 8px">${hist.map((h,i)=>`<div>${i+1}回目：${h}</div>`).join('')}</div>`
       :'';
-    return `<div class="saved-row" style="flex-direction:column;align-items:flex-start"><div style="display:flex;width:100%;align-items:center"><span style="flex:1">${t.ticketName}<br><small style="color:${t.remainingCount>0?'#5b21b6':'#dc2626'}">残り${t.remainingCount}/${t.totalCount}回（購入日：${t.purchaseDate}）</small></span>${t.remainingCount>0?`<button class="mb" style="background:#f5f3ff;color:#5b21b6;margin-right:4px" onclick="useTicketForPatient(${idx})">1回消化</button>`:''}<button class="mb" style="background:#eff6ff;color:#1d4ed8;margin-right:4px" onclick="printTicketCard(${idx})">🖨 カード印刷</button><button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delPatientTicket(${idx})">削除</button></div>${histHtml}</div>`;
+    return `<div class="saved-row" style="flex-direction:column;align-items:flex-start;border:1px solid #e5e0d5;border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;width:100%;align-items:center">
+        <span style="flex:1;font-weight:bold">${t.ticketName}<br><small style="color:${t.remainingCount>0?'#5b21b6':'#dc2626'};font-weight:normal">残り${t.remainingCount}/${t.totalCount}回（購入日：${t.purchaseDate}）</small></span>
+        ${t.remainingCount>0?`<button class="mb" style="background:#f5f3ff;color:#5b21b6;margin-right:4px" onclick="useTicketForPatient(${idx})">1回消化</button>`:''}
+        <button class="mb" style="background:#eff6ff;color:#1d4ed8;margin-right:4px" onclick="printTicketCard(${idx})">🖨 カード印刷</button>
+        <button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delPatientTicket(${idx})">削除</button>
+      </div>
+      <div style="margin-top:8px">${dots}</div>
+      ${histList}
+    </div>`;
   }).join(''):'<p style="color:var(--muted);font-size:0.76rem">まだ回数券の購入はありません</p>';
   selEl.innerHTML=ticketMaster.length
     ?ticketMaster.map(t=>`<option value="${t.id}">${t.name}（${t.count}回・${(t.price||0).toLocaleString()}円）</option>`).join('')
@@ -6477,22 +6508,29 @@ function printTicketCard(idx){
     area.className='page';
     document.body.appendChild(area);
   }
-  const circles=Array.from({length:t.totalCount},(_,i)=>{
-    const used=i<(t.totalCount-t.remainingCount);
-    return `<div style="width:34px;height:34px;border-radius:50%;border:2px solid #0f766e;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.9rem;margin:3px;${used?'background:#0f766e;color:#fff':'background:#fff;color:#0f766e'}">${i+1}</div>`;
+  // ★財布に入るサイズ（縦5.5cm×横8cm＝標準的な診察券・名刺サイズ）。倉治整骨院の診察券デザイン（オレンジ×白文字）をベースにする
+  const hist=t.usageHistory||[];
+  const dots=Array.from({length:t.totalCount},(_,i)=>{
+    const used=i<hist.length;
+    return `<div style="width:15px;height:15px;border-radius:50%;border:1.3px solid #fff;display:inline-flex;align-items:center;justify-content:center;font-size:7px;font-weight:bold;margin:1.2px;${used?'background:#fff;color:#c9781a':'background:transparent;color:#fff'}">${i+1}</div>`;
   }).join('');
   area.innerHTML=`
-    <div style="max-width:480px;margin:40px auto;border:3px solid #0f766e;border-radius:16px;padding:24px;font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;text-align:center">
-      <div style="font-size:1.3rem;font-weight:bold;color:#0f766e;margin-bottom:4px">倉治整骨院</div>
-      <div style="font-size:0.8rem;color:#666;margin-bottom:16px">〒576-0051 大阪府交野市倉治1丁目22-15　TEL：072-892-3223</div>
-      <div style="font-size:1.1rem;font-weight:bold;border-top:2px dashed #ccc;border-bottom:2px dashed #ccc;padding:10px 0;margin-bottom:16px">${t.ticketName}</div>
-      <div style="text-align:left;font-size:0.9rem;margin-bottom:14px">
-        <div>お名前：<b>${t.patientName}</b> 様</div>
-        <div>購入日：${t.purchaseDate}</div>
-        <div>回数：${t.totalCount}回（残り ${t.remainingCount}回）</div>
+    <div style="width:8cm;height:5.5cm;margin:20px auto;background:linear-gradient(135deg,#f5a623,#e8912a);border-radius:10px;padding:0.35cm 0.4cm;font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;color:#fff;box-sizing:border-box;position:relative;box-shadow:0 2px 6px rgba(0,0,0,.15)">
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:13px">🍀</span>
+        <span style="font-size:12px;font-weight:bold;letter-spacing:1px">回数券</span>
+        <span style="margin-left:auto;font-size:8.5px;opacity:0.9">倉治整骨院</span>
       </div>
-      <div style="margin-bottom:10px;font-size:0.85rem;color:#666">来院のたびに1つずつチェックしてください</div>
-      <div>${circles}</div>
+      <div style="border-top:1px dashed rgba(255,255,255,.6);margin:4px 0"></div>
+      <div style="font-size:10.5px;font-weight:bold">${t.ticketName}</div>
+      <div style="font-size:9px;margin-top:2px">
+        <span>${t.patientName} 様</span>　<span style="opacity:0.85">購入日：${t.purchaseDate}</span>
+      </div>
+      <div style="font-size:8px;margin-top:3px;opacity:0.9">来院のたびに1つずつ塗りつぶします（残り ${t.remainingCount}/${t.totalCount}回）</div>
+      <div style="margin-top:4px;line-height:1.5">${dots}</div>
+      <div style="position:absolute;bottom:0.3cm;left:0.4cm;right:0.4cm;font-size:7px;opacity:0.85;border-top:1px dashed rgba(255,255,255,.6);padding-top:3px">
+        〒576-0051 大阪府交野市倉治1丁目22-15　TEL：072-892-3223
+      </div>
     </div>`;
   printThisPage('ticketCardPrintArea');
 }
@@ -6556,6 +6594,7 @@ async function savePEdit(){
   const _uid1=document.getElementById('pe-line-uid')?.value.trim()||'';
   const _uid2=document.getElementById('pe-line-uid2')?.value.trim()||'';
   p.lineUid=_uid2||_uid1||p.lineUid||'';
+  p.zip=document.getElementById('pe-postal').value.trim();
   p.city=document.getElementById('pe-city').value.trim();
   p.job=document.getElementById('pe-job').value.trim();
   p.src=document.getElementById('pe-src').value;
@@ -6626,8 +6665,14 @@ async function savePEdit(){
 }
 async function deletePatientFromModal(){
   if(!confirm('この患者を削除しますか？'))return;
-  patients=patients.filter(p=>p.id!==editPatientId);
-  save();renderPatients();closePEdit();await pushP();
+  const targetId=editPatientId;
+  patients=patients.filter(p=>p.id!==targetId);
+  save();renderPatients();closePEdit();
+  // ★確実にサーバー側からも削除する（従来のpushPだけだと安全マージにより復活してしまうため）
+  try{
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deletePatientByCardId',cardId:targetId})});
+  }catch(e){}
+  await pushP();
 }
 
 function sortPatients(list,sort){

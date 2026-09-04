@@ -83,6 +83,7 @@ function doPost(e){
       if(action==="getAll")result=getAllData();
       else if(action==="saveBookings"){saveBookingsSafe(JSON.parse(body.rows));result={ok:true};}
       else if(action==="saveCustomers"){saveCustomersSafe(JSON.parse(body.rows));result={ok:true};}
+      else if(action==="deletePatientByCardId")result=deletePatientByCardId(body.cardId);
       else if(action==="saveUriage"){saveSheet("売上",JSON.parse(body.rows));result={ok:true};}
       else if(action==="resetBookings"){resetBookings();result={ok:true};}
       else if(action==="lineNotifyV2")result=sendLineMessagingAPI(body.token,body.userId,body.message);
@@ -409,6 +410,26 @@ function saveBookingsSafe(rows){
     merged.push(mergedRow);
   }
   saveSheet("予約表", merged);
+}
+// ★患者を確実に削除する専用関数★
+// saveCustomersSafeの「送られてこなかった患者は保持する」という安全設計のせいで、
+// 通常の削除（全件pushからの差分）では削除が反映されず「何回消しても復活する」原因になっていた。
+// この関数は該当の診察券Noの行を直接シートから削除するため、確実に消える。
+function deletePatientByCardId(cardId){
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("患者");
+    if(!s) return {ok:false, error:"シートが見つかりません"};
+    var data=s.getDataRange().getValues();
+    var deleted=0;
+    for(var i=data.length-1;i>=1;i--){
+      if(String(data[i][0]||"").trim()===String(cardId).trim()){
+        s.deleteRow(i+1);
+        deleted++;
+      }
+    }
+    return {ok:true, deleted:deleted};
+  }catch(err){ return {ok:false, error:err.message}; }
 }
 function saveCustomersSafe(rows){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
