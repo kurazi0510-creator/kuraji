@@ -302,7 +302,7 @@ function printThisPage(pageId){
         <button class="btn bp bsm" onclick="openExtraSlotModal()" style="background:#0f766e;color:white;border-color:#0f766e">🍚 特別枠を追加/削除(昼休みなど・今表示中の日付だけ)</button>
         <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
         <button class="btn bp bsm" onclick="openBizHoursModal()" style="background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
-        <button class="btn bp bsm" onclick="openIntervalModal()" style="background:#64748b;color:white;border-color:#64748b">🧪 インターバル設定(試験運用・まだ未反映)</button>
+        <button class="btn bp bsm" onclick="openIntervalModal()" style="background:#0369a1;color:white;border-color:#0369a1">⏱ インターバル設定(施術の準備時間)</button>
         <button class="btn bp bsm" onclick="window.open('today_split.html','_blank')" style="background:#0f766e;color:white;border-color:#0f766e">🧪 本日の施術画面プレビュー(予約×カルテ 左右分割)</button>
       </div>
     </div>
@@ -1017,11 +1017,11 @@ function printThisPage(pageId){
 <div class="modal-ov" id="intervalModal">
   <div class="modal" style="max-width:420px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="font-size:1rem">🧪 インターバル設定(試験運用)</h3>
+      <h3 style="font-size:1rem">⏱ インターバル設定</h3>
       <button onclick="document.getElementById('intervalModal').classList.remove('on')" style="background:none;border:none;font-size:1.3rem;cursor:pointer">✕</button>
     </div>
-    <div style="background:#fef3c7;color:#92400e;font-size:0.76rem;padding:10px;border-radius:8px;margin-bottom:14px">
-      ⚠️ これはまだ「試験運用」の画面です。ここで設定を保存しても、<b>実際のWeb予約の空き状況にはまだ反映されません</b>。画面の使い勝手を確認するためのプレビューです。気に入ったら、実際に反映する作業を追加でお願いします。
+    <div style="background:#eaf7ee;color:#166534;font-size:0.76rem;padding:10px;border-radius:8px;margin-bottom:14px">
+      ✅ この設定は<b>Web予約フォーム・投稿画像ジェネレーターの空き状況の両方に、実際に反映されます</b>。設定した分数だけ、施術終了直後の枠が自動で「予約不可」として扱われます。
     </div>
     <label>予約と予約の間に空ける準備時間</label>
     <select class="sel" id="interval-minutes" style="font-size:0.9rem">
@@ -1031,9 +1031,11 @@ function printThisPage(pageId){
       <option value="15">15分</option>
       <option value="20">20分（1枠ぶん）</option>
     </select>
-    <p style="font-size:0.74rem;color:var(--muted);margin-top:8px">例えば「10分」に設定すると、将来的には施術の後、次のご予約が入るまでに10分の余裕を自動で確保できるようになる予定です。</p>
+    <p style="font-size:0.74rem;color:var(--muted);margin-top:8px">
+      例えば「20分」に設定した場合：10:10〜10:30のご予約が入ると、次の10:30の枠は自動的に予約不可になり、次に予約できるのは10:50からになります（施術の続き＝連続する枠には影響しません。あくまで「予約の終わり」の直後だけに適用されます）。
+    </p>
     <div style="display:flex;justify-content:flex-end;margin-top:14px">
-      <button class="btn bp" onclick="saveIntervalSettingUI()">💾 この設定を保存する（試験運用）</button>
+      <button class="btn bp" onclick="saveIntervalSettingUI()">💾 この設定を保存する</button>
     </div>
   </div>
 </div>

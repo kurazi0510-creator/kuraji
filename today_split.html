@@ -23,6 +23,17 @@
   .bk-time{font-weight:bold;color:#0f766e;font-size:0.9rem;}
   .bk-name{font-weight:bold;font-size:0.95rem;margin-top:2px;}
   .bk-sub{font-size:0.72rem;color:#7c6f5a;margin-top:4px;}
+  .bk-cardid{font-size:0.68rem;color:#94a3b8;font-weight:normal;}
+  .bk-menu{font-size:0.74rem;color:#0f766e;font-weight:bold;margin-top:3px;}
+  .bk-tags{margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;}
+  .tag{display:inline-block;font-size:0.62rem;font-weight:bold;padding:2px 6px;border-radius:5px;line-height:1.4;}
+  .tag-kubun{background:#e0e7ff;color:#3730a3;}
+  .tag-shochi{background:#dcfce7;color:#15803d;}
+  .tag-bussan{background:#fef3c7;color:#92400e;}
+  .tag-pay{background:#f1f5f9;color:#475569;}
+  .bk-pay{margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .bk-yen{font-size:0.72rem;font-weight:bold;color:#16a34a;}
+  .bk-unpaid{font-size:0.68rem;font-weight:bold;color:#f97316;}
   .empty{color:#a08a6d;font-size:0.8rem;text-align:center;padding:30px 10px;}
   @media (max-width:820px){
     .split{flex-direction:column;height:auto;}
@@ -71,13 +82,26 @@ function loadBookingsForDate(dateStr){
     box.innerHTML='<div class="empty">この日の予約はありません<br>（この画面は今開いている端末のブラウザに保存された予約データを見ています。他の端末で見る場合は、その端末でも一度kanri.htmlを開いてデータを同期してから開いてください）</div>';
     return;
   }
+  const yen=n=>'￥'+(parseInt(n)||0).toLocaleString();
   box.innerHTML=rows.map(r=>{
     const bk=r.bk;
-    const sub=[bk.kubun||'', bk.cardId?('診察券'+bk.cardId):'', bk.symptom||''].filter(Boolean).join(' / ');
+    const kubunList=bk.kubunList||[bk.kubun||''];
+    const kubunHtml=kubunList.filter(Boolean).map(k=>`<span class="tag tag-kubun">${k}</span>`).join('');
+    const shochi=(bk.shochi||[]).map(s=>`<span class="tag tag-shochi">${s.name}${s.qty>1?'×'+s.qty:''}</span>`).join('');
+    const bussan=(bk.bussan||[]).filter(b=>b.qty>0).map(b=>`<span class="tag tag-bussan">🛍 ${b.name}×${b.qty}</span>`).join('');
+    const pay=(bk.pay||[]).map(p=>`<span class="tag tag-pay">${p}</span>`).join('');
+    const payAmount=parseInt(bk.payAmount)||0;
     return `<div class="bk-item" data-cardid="${bk.cardId||''}" data-name="${bk.name}" onclick="selectBooking(this)">
       <div class="bk-time">⏰ ${r.time}</div>
-      <div class="bk-name">${bk.name} 様</div>
-      <div class="bk-sub">${sub||'（詳細情報なし）'}</div>
+      <div class="bk-name">${bk.name} 様${bk.cardId?'　<span class="bk-cardid">診察券'+bk.cardId+'</span>':''}</div>
+      ${bk.menu?`<div class="bk-menu">📋 ${bk.menu}</div>`:''}
+      ${kubunHtml?`<div class="bk-tags">${kubunHtml}</div>`:''}
+      ${(shochi||bussan)?`<div class="bk-tags">${shochi}${bussan}</div>`:''}
+      <div class="bk-pay">
+        ${pay?`<span class="bk-tags">${pay}</span>`:''}
+        ${payAmount>0?`<span class="bk-yen">✅ ${yen(payAmount)}</span>`:'<span class="bk-unpaid">💴 未会計</span>'}
+      </div>
+      ${bk.symptom?`<div class="bk-sub">${bk.symptom}</div>`:''}
     </div>`;
   }).join('');
 }

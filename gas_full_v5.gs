@@ -1613,15 +1613,38 @@ function getAvailableSlots(dateStr){
     }
     // 院長が手動でブロックした枠も予約不可として扱う
     var blocked=getBlockedSlotsSet_(dateStr);
-    var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t];});
+    // ★インターバル設定：施術終了後の指定分数ぶんも予約不可にする（準備時間の確保）
+    var intervalBlocked=getIntervalBlockedSlots_(dateStr, occupied);
+    var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t] && !intervalBlocked[t];});
     available=addExtensionSlots_(available, occupied, blocked);
     // ★院長がその日だけ手動で追加した特別枠（昼休みなど）も、埋まっていなければ空きとして追加する
     var extraSlots=getExtraSlotsSet_(dateStr);
     Object.keys(extraSlots).forEach(function(t){
-      if(!occupied[t] && !blocked[t] && available.indexOf(t)<0) available.push(t);
+      if(!occupied[t] && !blocked[t] && !intervalBlocked[t] && available.indexOf(t)<0) available.push(t);
     });
     return {ok:true, closed:false, available:available};
   }catch(err){ return {ok:false, error:err.message}; }
+}
+// 予約が入っている枠の直後に、インターバル設定の分数ぶんの枠も予約不可として返す
+// （例：インターバル20分設定で、10:10に予約が終わる場合、次の10:10の枠は予約不可になる）
+function getIntervalBlockedSlots_(dateStr, occupied){
+  var blocked={};
+  var minutes=parseInt(PropertiesService.getScriptProperties().getProperty("INTERVAL_MINUTES")||"0");
+  if(!minutes || minutes<=0) return blocked;
+  var need=Math.ceil(minutes/20); // 20分刻みで何枠分のインターバルが必要か
+  // 「occupied」の中で、次の枠が空いている＝そこが予約の終わりの境目、とみなしてその直後をブロックする
+  Object.keys(occupied).forEach(function(t){
+    var idx=SLOTS_LIST_.indexOf(t);
+    if(idx<0) return;
+    var nextT=SLOTS_LIST_[idx+1];
+    if(nextT && occupied[nextT]) return; // まだ予約が続いているので、ここは予約の途中（終わりではない）
+    for(var k=1;k<=need;k++){
+      var bi=idx+k;
+      if(bi>=SLOTS_LIST_.length) break;
+      blocked[SLOTS_LIST_[bi]]=true;
+    }
+  });
+  return blocked;
 }
 // 指定日に追加されている特別枠のセットを返す
 function getExtraSlotsSet_(dateStr){
@@ -1679,11 +1702,12 @@ function getAvailableSlotsRange(startDateStr,numDays){
       var validSlots=getSlotsForDate_(dateStr);
       var occupied=allBooked[dateStr]||{};
       var blocked=getBlockedSlotsSet_(dateStr);
-      var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t];});
+      var intervalBlocked=getIntervalBlockedSlots_(dateStr, occupied);
+      var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t] && !intervalBlocked[t];});
       available=addExtensionSlots_(available, occupied, blocked);
       var extraSlots=getExtraSlotsSet_(dateStr);
       Object.keys(extraSlots).forEach(function(t){
-        if(!occupied[t] && !blocked[t] && available.indexOf(t)<0) available.push(t);
+        if(!occupied[t] && !blocked[t] && !intervalBlocked[t] && available.indexOf(t)<0) available.push(t);
       });
       result[dateStr]={closed:false, available:available};
     }
