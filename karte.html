@@ -50,6 +50,14 @@ textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;fon
 .saved-hd{font-size:0.76rem;color:#64748b;font-weight:bold;margin-bottom:6px;}
 .saved-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:0.76rem;}
 .mb{padding:4px 10px;border:none;border-radius:5px;font-size:0.7rem;font-weight:bold;cursor:pointer;}
+/* ★印刷用スタイル：印刷時はボタン類を隠し、カルテの内容だけをA4できれいに印刷する */
+@media print{
+  .back-btn, .patient-bar button, .toolbar, .action-row, .btn, #history-box{ display:none !important; }
+  body{ background:#fff !important; }
+  .main-layout{ display:block !important; }
+  .col-left, .col-right{ width:100% !important; }
+  @page{ size:A4; margin:14mm; }
+}
 </style>
 </head>
 <body>
@@ -139,6 +147,7 @@ textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;fon
     </div>
     <div class="card">
       <button class="btn b-save" style="width:100%;padding:12px" onclick="saveRec()">💾 このカルテを保存</button>
+      <button class="btn" style="width:100%;padding:10px;margin-top:6px;background:#eff6ff;color:#1d4ed8" onclick="printKarte()">🖨 このカルテを印刷する</button>
       <button class="btn" style="width:100%;padding:10px;margin-top:6px;background:#f1f5f9;color:#475569" onclick="startNewKarte()">📄 新規カルテとして入力し直す</button>
     </div>
   </div>
@@ -596,6 +605,11 @@ async function saveRec(){
     }
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
   if(btn){btn.disabled=false;btn.textContent='💾 保存';}
+}
+function printKarte(){
+  const name=document.getElementById('pt-name').value.trim();
+  if(!name){ alert('印刷する前に、患者様のお名前を入力してください'); return; }
+  window.print();
 }
 function startNewKarte(){
   editingKarteRowIdx=null;
