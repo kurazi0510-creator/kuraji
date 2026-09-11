@@ -1,0 +1,186 @@
+name: Build Yoyaku PRO Final
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-yoyaku-pro-final.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build standalone PRO file from production
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('yoyaku_status_generator.html')
+          s=p.read_text(encoding='utf-8')
+
+          s=s.replace('<div class="panel-title">📅 日付・背景色</div>','<div class="panel-title">📅 日付</div>')
+          s=s.replace('<div class="day-row" id="yDayRow">','<div class="day-row" id="yDayRow" style="display:none">')
+          s=s.replace('<label style="display:block;margin-top:10px">背景の柄（毎回変えるとマンネリ防止になります）</label>','<label style="display:none">背景の柄</label>')
+          s=s.replace('<select id="yPattern" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px;margin-top:4px">','<select id="yPattern" style="display:none">')
+          s=re.sub(r'\s*<div class="hint-row">\s*<span class="hint-badge badge-line">LINE VOOM</span>\s*①写真を保存 → ②LINEアプリ → ③VOOM投稿\s*</div>','',s)
+
+          block=r'''function compactTimePro(t){
+            const s=String(t||'').trim();
+            let m=s.match(/^(\d{1,2})時(?:(\d{1,2})分)?$/);
+            if(m) return Number(m[1])+':'+String(Number(m[2]||0)).padStart(2,'0');
+            m=s.match(/^(\d{1,2}):(\d{1,2})$/);
+            if(m) return Number(m[1])+':'+String(Number(m[2])).padStart(2,'0');
+            return s;
+          }
+
+          function slotMinutesPro(t){
+            const s=compactTimePro(t);
+            const m=s.match(/^(\d{1,2}):(\d{2})$/);
+            return m ? Number(m[1])*60+Number(m[2]) : 9999;
+          }
+
+          function sortedSelectedTimesPro(){
+            return selTimes.map(compactTimePro).sort((a,b)=>slotMinutesPro(a)-slotMinutesPro(b));
+          }
+
+          function drawSlotGroupPro(ctx,label,slots,y,opts={}){
+            if(!slots.length) return y;
+            const SIZE=800,left=42,right=42,cols=4,gapX=10,gapY=9;
+            const usable=SIZE-left-right;
+            const cardW=(usable-gapX*(cols-1))/cols;
+            const totalCount=opts.totalCount||slots.length;
+            const dense=totalCount>=21;
+            const medium=totalCount>=13;
+            const labelH=30;
+            const cardH=dense?43:(medium?49:56);
+            const fontSize=dense?27:(medium?30:34);
+            ctx.fillStyle='#FBE7D3';
+            rrPath(ctx,left,y,112,labelH,15);ctx.fill();
+            ctx.fillStyle='#8A3B10';
+            ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+            ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText(label,left+56,y+labelH/2+1);
+            y+=labelH+8;
+            slots.forEach((t,i)=>{
+              const col=i%cols,row=Math.floor(i/cols);
+              const x=left+col*(cardW+gapX),yy=y+row*(cardH+gapY);
+              ctx.fillStyle='#FFFFFF';rrPath(ctx,x,yy,cardW,cardH,12);ctx.fill();
+              ctx.strokeStyle='#F0C29E';ctx.lineWidth=2;rrPath(ctx,x,yy,cardW,cardH,12);ctx.stroke();
+              ctx.fillStyle='#5A2A12';
+              ctx.font='bold '+fontSize+'px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+              ctx.textAlign='center';ctx.textBaseline='middle';
+              ctx.fillText(t,x+cardW/2,yy+cardH/2+1);
+            });
+            ctx.textBaseline='alphabetic';
+            return y+Math.ceil(slots.length/cols)*(cardH+gapY)-gapY;
+          }
+
+          function drawClinicPhotoPro(ctx,x,y,w,h,done){
+            const photo=new Image();
+            photo.onload=()=>{
+              ctx.save();rrPath(ctx,x,y,w,h,18);ctx.clip();
+              const ir=photo.naturalWidth/photo.naturalHeight,br=w/h;
+              let sw,sh,sx,sy;
+              if(ir>br){sh=photo.naturalHeight;sw=sh*br;sy=0;sx=(photo.naturalWidth-sw)/2;}
+              else{sw=photo.naturalWidth;sh=sw/br;sx=0;sy=(photo.naturalHeight-sh)/2;}
+              ctx.drawImage(photo,sx,sy,sw,sh,x,y,w,h);
+              const g=ctx.createLinearGradient(0,y+h*0.55,0,y+h);
+              g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.32)');
+              ctx.fillStyle=g;ctx.fillRect(x,y,w,h);ctx.restore();
+              ctx.strokeStyle='#E6B487';ctx.lineWidth=2;rrPath(ctx,x,y,w,h,18);ctx.stroke();
+              done();
+            };
+            photo.onerror=done;
+            photo.src='data:image/jpeg;base64,'+PHOTO_B64;
+          }
+
+          function generateYoyaku(){
+            const dateVal=document.getElementById('yDate').value;
+            if(!dateVal){alert('日付を入力してください');return;}
+            if(selTimes.length===0){alert('空き時間を選んでください');return;}
+            const d=new Date(dateVal+'T00:00:00');
+            const month=d.getMonth()+1,day=d.getDate(),dow=DAY_NAMES[d.getDay()];
+            const SIZE=800,canvas=document.getElementById('yCanvas');
+            canvas.width=SIZE;canvas.height=SIZE;
+            const ctx=canvas.getContext('2d');
+            const all=sortedSelectedTimesPro();
+            const am=all.filter(t=>slotMinutesPro(t)<13*60);
+            const pm=all.filter(t=>slotMinutesPro(t)>=13*60);
+            const count=all.length;
+            const bg=ctx.createLinearGradient(0,0,0,SIZE);
+            bg.addColorStop(0,'#FFF8F1');bg.addColorStop(1,'#FFFDF9');
+            ctx.fillStyle=bg;ctx.fillRect(0,0,SIZE,SIZE);
+            ctx.fillStyle='#E96B16';ctx.fillRect(0,0,SIZE,104);
+            ctx.fillStyle='rgba(255,255,255,.10)';ctx.beginPath();ctx.arc(735,30,150,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
+            ctx.font='bold 42px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+            ctx.fillText('予約空き状況',SIZE/2,66);
+            ctx.fillStyle='#5A2A12';ctx.textAlign='left';
+            ctx.font='bold 38px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+            ctx.fillText(`${month}/${day}（${dow}）`,42,151);
+            ctx.fillStyle='#A05A2C';ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+            ctx.textAlign='right';ctx.fillText('倉治整骨院',758,148);
+            let y=174;
+            y=drawSlotGroupPro(ctx,'午前',am,y,{totalCount:count});
+            if(am.length&&pm.length)y+=10;
+            y=drawSlotGroupPro(ctx,'午後',pm,y,{totalCount:count});
+            let ctaY=y+14;
+            const footerTop=724;
+            if(ctaY>footerTop-70)ctaY=footerTop-70;
+            ctx.fillStyle='#FFF0E2';rrPath(ctx,42,ctaY,246,48,24);ctx.fill();
+            ctx.fillStyle='#C4510B';ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.font='bold 23px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+            ctx.fillText('✓ 空いています',165,ctaY+24);
+            ctx.fillStyle='#5A2A12';ctx.textAlign='left';
+            ctx.font='bold 22px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+            ctx.fillText('当日予約もOKです',316,ctaY+30);ctx.textBaseline='alphabetic';
+            const finish=()=>{
+              ctx.fillStyle='#E96B16';ctx.fillRect(0,724,SIZE,76);
+              ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
+              ctx.font='bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+              ctx.fillText('倉治整骨院',SIZE/2,756);
+              ctx.font='18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+              ctx.fillText('ご予約・お問い合わせをお待ちしております',SIZE/2,784);
+              showPreview('yCanvas','yPreview','yDlBtn',dateVal);
+            };
+            if(count<=8&&ctaY+62<710){
+              const photoY=ctaY+62,photoH=Math.min(150,710-photoY);
+              if(photoH>=75)drawClinicPhotoPro(ctx,42,photoY,716,photoH,finish);else finish();
+            }else finish();
+          }
+
+          function finishYoyaku(ctx,SIZE,month,day,dateVal,T,cid,pid,bid){showPreview(cid,pid,bid,dateVal);}
+          function drawBubbleFinal(){}
+
+          '''
+          pat=r'function generateYoyaku\(\)\{.*?function measureLines\(ctx,text,maxW,lineH\)\{'
+          m=re.search(pat,s,re.S)
+          if not m:
+              raise SystemExit('generate block not found')
+          s=s[:m.start()]+block+'function measureLines(ctx,text,maxW,lineH){'+s[m.end():]
+          Path('yoyaku_status_generator_pro_final.html').write_text(s,encoding='utf-8')
+          PY
+      - name: Verify preserved production logic
+        shell: bash
+        run: |
+          grep -q "async function autoFetchAvailability" yoyaku_status_generator_pro_final.html
+          grep -q "async function publishTodayStatus" yoyaku_status_generator_pro_final.html
+          grep -q "const KURAJI_GAS=" yoyaku_status_generator_pro_final.html
+          grep -q "予約空き状況" yoyaku_status_generator_pro_final.html
+          ! grep -q "LINE VOOM" yoyaku_status_generator_pro_final.html
+      - name: Commit generated standalone file
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add yoyaku_status_generator_pro_final.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Generate standalone PRO reservation generator"
+          git push
