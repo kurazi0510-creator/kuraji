@@ -4484,7 +4484,7 @@ function renderSched(){
         <td><span class="kb k-cancel">キャンセル</span></td>
         <td><span style="color:#dc2626;text-decoration:line-through;font-size:0.8rem">${bk.name||''}</span></td>
         <td colspan="4"><span class="cancel-badge">理由: ${reason||'未記入'}</span>${rebookedBy?'<span class="rebook-badge">→'+rebookedBy+'に変更</span>':''}</td>
-        <td colspan="3"><button class="btn ba bsm" onclick="openModal('${date}','${s}')">＋新規予約</button></td>`;
+        <td colspan="3"><button class="btn ba bsm" onclick="openModal('${date}','${s}')">＋新規予約</button> <button class="btn bd bsm" onclick="delBk('${date}','${s}')" style="margin-top:2px">🗑 完全に削除</button></td>`;
     }else if(bk){
       const kubunList=bk.kubunList||[bk.kubun||''];
       const kubunHtml=kubunList.map(k=>{const kc=k==='保険'?'k-ho':k==='自費'?'k-ji':k==='交通事故'?'k-ko':k==='新規'?'k-sh':'k-ji';return`<span class="kb ${kc}">${k}</span>`;}).join('+');
