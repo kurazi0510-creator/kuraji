@@ -236,6 +236,7 @@
       <button class="btn-save" id="yDlBtn">💾 写真を保存する（カメラロール）</button>
       <button class="btn-publish" id="yPublishBtn">📡 最新の予約状況として公開</button>
       <div class="publish-status" id="yPublishStatus"></div>
+      <button type="button" id="yResetPublishBtn" onclick="resetPublishCredentials();document.getElementById('yPublishStatus').textContent='公開設定をリセットしました。次回の公開時に再入力してください。';" style="width:100%;background:#fff7ed;color:#9a3412;border:2px solid #fdba74;border-radius:12px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">🔧 公開設定を再入力</button>
       <div class="post-hint">
         <div class="hint-title">📤 投稿手順</div>
         <div class="hint-row">
