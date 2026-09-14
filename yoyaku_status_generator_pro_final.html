@@ -369,7 +369,7 @@ function getPublishCredentials(){
 
   return {gas,token};
 }
-}function resetPublishCredentials(){
+function resetPublishCredentials(){
   localStorage.removeItem(PUBLISH_GAS_KEY);
   localStorage.removeItem(PUBLISH_TOKEN_KEY);
   alert('公開設定をこの端末から削除しました。次回の公開時に再入力できます。');
