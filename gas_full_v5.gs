@@ -272,6 +272,14 @@ function findLineUidByPhone_(phone){
   return "";
 }
 // 患者名から電話番号を検索（患者シートから）。dailyLineAlert/sendDayBeforeReminders用
+// 患者名の表記ゆれ（全角/半角スペース、"坂上(上坂)香織"のような旧姓の括弧書きなど）を
+// 吸収して比較するための正規化。括弧とその中身、スペースを取り除く。
+function normalizeName_(name){
+  return String(name||"")
+    .replace(/[（(][^）)]*[）)]/g,"") // 全角(）・半角()の括弧書きを除去（例:"(上坂)"）
+    .replace(/[ 　]/g,"") // 全角・半角スペースを除去
+    .trim();
+}
 function getTelByPatientName_(name){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
   if(!s) return "";
@@ -279,9 +287,10 @@ function getTelByPatientName_(name){
   var headers=(data[0]||[]).map(function(h){return String(h||"").trim();});
   var ni=headers.indexOf("患者名"), ti=headers.indexOf("電話番号");
   if(ni<0)ni=1; if(ti<0)ti=3;
-  var target=String(name||"").trim();
+  var target=normalizeName_(name);
+  if(!target) return "";
   for(var i=1;i<data.length;i++){
-    if(String(data[i][ni]||"").trim()===target) return fixPhoneLeadingZero_(data[i][ti]);
+    if(normalizeName_(data[i][ni])===target) return fixPhoneLeadingZero_(data[i][ti]);
   }
   return "";
 }
@@ -680,20 +689,22 @@ function sendDayBeforeReminders(){
   var sent=0,skip=[],sentNames=[];
   Object.keys(bp).forEach(function(name){
     var tid="";
-    // ①まず名前の完全一致をLINE_IDsシートから探す（最優先）
-    //  ※家族で同じ電話番号を共有しているケースで、電話番号照合を先にすると
-    //    家族の別の1人のLINEに誤って送られてしまうため、名前一致を優先する
-    tid=lu[name];
+    // ①電話番号ベースの照合（最優先）：括弧書きの旧姓併記などの表記ゆれはnormalizeName_で吸収済み。
+    //   患者ごとに別々の電話番号がLINE連携されていれば、これが最も確実に本人を特定できる。
+    var tel=getTelByPatientName_(name);
+    if(tel) tid=findLineUidByPhone_(tel);
+    // ②電話番号で見つからない場合のみ、LINE_IDsシートの名前と完全一致するか確認
+    if(!tid){
+      var normName=normalizeName_(name);
+      var exactKey=Object.keys(lu).find(function(k){return normalizeName_(k)===normName;});
+      if(exactKey)tid=lu[exactKey];
+    }
+    // ③それでも見つからない場合のみ、姓だけの緩い一致を最終手段として使う
+    //   （同姓の別の家族と取り違えるリスクがあるため、候補が1件に絞れる時だけ採用）
     if(!tid){
       var ln=name.split(" ")[0].split("　")[0];
       var candidates=Object.keys(lu).filter(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});
-      // 同姓の候補が複数ある場合はどちらか判別できないため、ここでは確定させない（誤送信防止）
       if(candidates.length===1)tid=lu[candidates[0]];
-    }
-    // ②名前で特定できなかった場合のみ、電話番号から検索（最終手段）
-    if(!tid){
-      var tel=getTelByPatientName_(name);
-      if(tel) tid=findLineUidByPhone_(tel);
     }
     if(!tid){skip.push(name);return;}
     var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
