@@ -680,11 +680,20 @@ function sendDayBeforeReminders(){
   var sent=0,skip=[],sentNames=[];
   Object.keys(bp).forEach(function(name){
     var tid="";
-    var tel=getTelByPatientName_(name);
-    if(tel) tid=findLineUidByPhone_(tel);
+    // ①まず名前の完全一致をLINE_IDsシートから探す（最優先）
+    //  ※家族で同じ電話番号を共有しているケースで、電話番号照合を先にすると
+    //    家族の別の1人のLINEに誤って送られてしまうため、名前一致を優先する
+    tid=lu[name];
     if(!tid){
-      tid=lu[name];
-      if(!tid){var ln=name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      var ln=name.split(" ")[0].split("　")[0];
+      var candidates=Object.keys(lu).filter(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});
+      // 同姓の候補が複数ある場合はどちらか判別できないため、ここでは確定させない（誤送信防止）
+      if(candidates.length===1)tid=lu[candidates[0]];
+    }
+    // ②名前で特定できなかった場合のみ、電話番号から検索（最終手段）
+    if(!tid){
+      var tel=getTelByPatientName_(name);
+      if(tel) tid=findLineUidByPhone_(tel);
     }
     if(!tid){skip.push(name);return;}
     var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
