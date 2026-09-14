@@ -357,17 +357,8 @@ const KURAJI_GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtq
 // 初回公開時だけ入力し、この端末のブラウザ内(localStorage)へ保存する。
 const PUBLISH_GAS_KEY='kuraji_publish_gas_url_v1';
 const PUBLISH_TOKEN_KEY='kuraji_publish_token_v1';
-
 function getPublishCredentials(){
-  let gas=(localStorage.getItem(PUBLISH_GAS_KEY)||'').trim();
-  if(!gas){
-    gas=(prompt('初回設定：予約状況公開専用GASのウェブアプリURL（末尾 /exec）を貼り付けてください')||'').trim();
-    if(!gas) throw new Error('公開先URLが未設定です');
-    if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/.test(gas)){
-      throw new Error('公開先URLが正しくありません');
-    }
-    localStorage.setItem(PUBLISH_GAS_KEY,gas);
-  }
+  const gas='https://script.google.com/macros/s/AKfycbyRO5WSOy-nZw4eMwFaTS-9wYXwNgoQoMZbre3hRf2C9McEfnyrDUNTWm7YvmOL4J5w/exec';
 
   let token=(localStorage.getItem(PUBLISH_TOKEN_KEY)||'').trim();
   if(!token){
@@ -377,6 +368,7 @@ function getPublishCredentials(){
   }
 
   return {gas,token};
+}
 }function resetPublishCredentials(){
   localStorage.removeItem(PUBLISH_GAS_KEY);
   localStorage.removeItem(PUBLISH_TOKEN_KEY);
