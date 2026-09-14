@@ -364,20 +364,20 @@ function getPublishCredentials(){
     gas=(prompt('初回設定：予約状況公開専用GASのウェブアプリURL（末尾 /exec）を貼り付けてください')||'').trim();
     if(!gas) throw new Error('公開先URLが未設定です');
     if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/.test(gas)){
-      throw new Error('公開先URLが正しくありません（script.google.com/macros/s/.../exec を使用してください）');
+      throw new Error('公開先URLが正しくありません');
     }
     localStorage.setItem(PUBLISH_GAS_KEY,gas);
   }
+
   let token=(localStorage.getItem(PUBLISH_TOKEN_KEY)||'').trim();
   if(!token){
     token=(prompt('初回設定：公開用パスワードを入力してください')||'').trim();
     if(!token) throw new Error('公開用パスワードが未設定です');
     localStorage.setItem(PUBLISH_TOKEN_KEY,token);
   }
-  return {gas,token};
-}
 
-function resetPublishCredentials(){
+  return {gas,token};
+}function resetPublishCredentials(){
   localStorage.removeItem(PUBLISH_GAS_KEY);
   localStorage.removeItem(PUBLISH_TOKEN_KEY);
   alert('公開設定をこの端末から削除しました。次回の公開時に再入力できます。');
