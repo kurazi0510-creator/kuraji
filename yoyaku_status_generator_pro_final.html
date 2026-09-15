@@ -737,7 +737,11 @@ function drawClinicPhotoPro(ctx,x,y,w,h,done){
 function generateYoyaku(){
   const dateVal=document.getElementById('yDate').value;
   if(!dateVal){alert('日付を入力してください');return;}
-  if(selTimes.length===0){alert('空き時間を選んでください');return;}
+  // ★変更：0枠でも「本日は満枠です」の画像を作れるよう、確認の上で続行できるようにする
+  //   （誤って空のまま生成してしまう事故は確認ダイアログで防ぐ）
+  if(selTimes.length===0){
+    if(!confirm('空き時間が選択されていません。\n「本日は満枠です」として画像を作成しますか？')) return;
+  }
   const d=new Date(dateVal+'T00:00:00');
   const month=d.getMonth()+1,day=d.getDate(),dow=DAY_NAMES[d.getDay()];
   const SIZE=800,canvas=document.getElementById('yCanvas');
@@ -747,6 +751,14 @@ function generateYoyaku(){
   const am=all.filter(t=>slotMinutesPro(t)<13*60);
   const pm=all.filter(t=>slotMinutesPro(t)>=13*60);
   const count=all.length;
+  // ★追加：最終更新時刻（24時間表記）
+  const now=new Date();
+  const hh=String(now.getHours()).padStart(2,'0'),mm=String(now.getMinutes()).padStart(2,'0');
+  // ★追加：当日予約OKの判定。「今日の日付」かつ「1枠以上空きがある」場合のみ表示する。
+  //   選択されている時間は autoFetchAvailability の時点で本日分の終了済み時刻が
+  //   既に除外されているため、既存の営業日・営業時間ロジックと矛盾しない。
+  const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const isSameDayBookable=(dateVal===todayStr&&count>0);
   const bg=ctx.createLinearGradient(0,0,0,SIZE);
   bg.addColorStop(0,'#FFF8F1');bg.addColorStop(1,'#FFFDF9');
   ctx.fillStyle=bg;ctx.fillRect(0,0,SIZE,SIZE);
@@ -755,12 +767,25 @@ function generateYoyaku(){
   ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
   ctx.font='bold 42px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.fillText('予約空き状況',SIZE/2,66);
+  // ★追加：最終更新時刻（ヘッダー右上に控えめに）
+  ctx.fillStyle='rgba(255,255,255,.85)';ctx.textAlign='right';
+  ctx.font='bold 15px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(`最終更新 ${hh}:${mm}`,758,26);
   ctx.fillStyle='#5A2A12';ctx.textAlign='left';
   ctx.font='bold 38px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.fillText(`${month}/${day}（${dow}）`,42,151);
   ctx.fillStyle='#A05A2C';ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.textAlign='right';ctx.fillText('倉治整骨院',758,148);
   let y=174;
+  // ★追加：当日予約OKバッジ（該当する場合のみ、その分だけ枠の開始位置を少し下げる）
+  if(isSameDayBookable){
+    ctx.fillStyle='#E96B16';rrPath(ctx,42,158,150,28,14);ctx.fill();
+    ctx.fillStyle='#FFFFFF';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font='bold 16px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.fillText('⚡ 当日予約OK',117,173);
+    ctx.textBaseline='alphabetic';
+    y=198;
+  }
   y=drawSlotGroupPro(ctx,'午前',am,y,{totalCount:count});
   if(am.length&&pm.length)y+=10;
   y=drawSlotGroupPro(ctx,'午後',pm,y,{totalCount:count});
@@ -769,11 +794,16 @@ function generateYoyaku(){
   if(ctaY>footerTop-70)ctaY=footerTop-70;
   ctx.fillStyle='#FFF0E2';rrPath(ctx,42,ctaY,246,48,24);ctx.fill();
   ctx.fillStyle='#C4510B';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.font='bold 23px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText('✓ 空いています',165,ctaY+24);
+  // ★変更：固定の「✓ 空いています」から、残り枠数に応じた状態表示に変更
+  const tierText=count>=6?'まだ余裕があります':count>=3?'残りわずか':count>=1?`残り${count}枠`:'本日は満枠です';
+  const tierFontSize=tierText.length>=8?17:(tierText.length>=5?19:23);
+  ctx.font=`bold ${tierFontSize}px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif`;
+  ctx.fillText(tierText,165,ctaY+24);
   ctx.fillStyle='#5A2A12';ctx.textAlign='left';
   ctx.font='bold 22px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText('当日予約もOKです',316,ctaY+30);ctx.textBaseline='alphabetic';
+  // ★変更：固定の「当日予約もOKです」から、実際の空き枠数の表示に変更（0枠の時は表示しない）
+  if(count>0)ctx.fillText(`現在 ${count}枠 空いています`,316,ctaY+30);
+  ctx.textBaseline='alphabetic';
   const finish=()=>{
     ctx.fillStyle='#E96B16';ctx.fillRect(0,724,SIZE,76);
     ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
