@@ -7145,15 +7145,25 @@ function renderPayU(){
   const mo=parseInt(document.getElementById('pay-mo').value);
   const payTypes=['現金','クレジット','PayPay','d払い','au Pay','その他'];
   const groups={};
-  Object.entries(uriage).forEach(([d,u])=>{
-    const dt=new Date(d+'T00:00:00');
+  // ★予約表の実データ（1件ごとの支払方法・金額）から直接集計する。
+  //   以前は売上シート（1日の合計と、その日使われた支払方法の"種類"のみ）を元に、
+  //   複数の支払方法が混在した日は日合計を方法の数で均等割りしていたため、
+  //   実際のクレジット等の金額とズレていた（「支払明細」タブの実データと不一致）。
+  //   ここは「支払明細」タブ(renderPayDetail)と同じ考え方で、各予約の実際の支払金額をそのまま集計する。
+  Object.entries(bookings).forEach(([date,slots])=>{
+    const dt=new Date(date+'T00:00:00');
     if(dt.getFullYear()!==yr)return;
     if(mo>0&&dt.getMonth()+1!==mo)return;
     const key=`${dt.getMonth()+1}月`;
     if(!groups[key]){groups[key]={};payTypes.forEach(p=>groups[key][p]=0);}
-    const pays=u.pay||[];const tot=(u.hoken||0)+(u.jhi||0)+(u.jiko||0)+(u.bussan||0)+(u.other||0);
-    if(pays.length){const pp=Math.round(tot/pays.length);pays.forEach(p=>{if(groups[key][p]!==undefined)groups[key][p]+=pp;else groups[key]['その他']+=pp;});}
-    else{groups[key]['現金']+=tot;}
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cont||bk.cancelled)return;
+      const amount=parseInt(bk.payAmount||0);
+      if(!amount)return;
+      const pays=bk.pay||[];
+      if(pays.length){pays.forEach(p=>{if(groups[key][p]!==undefined)groups[key][p]+=amount;else groups[key]['その他']+=amount;});}
+      else{groups[key]['現金']+=amount;}
+    });
   });
   const keys=Object.keys(groups).sort();
   const tbody=document.getElementById('pay-body');
