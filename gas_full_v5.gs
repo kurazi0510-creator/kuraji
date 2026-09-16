@@ -778,11 +778,117 @@ function getFollowers(){
   var ownerUserId=p.getProperty("LINE_USER_ID");
   if(ownerUserId)sendLineMessagingAPI(token,ownerUserId,"[倉治整骨院] フォロワー取得完了: "+count+"件のLINE IDを保存しました");
 }
+// ============================================================
+// ★売上自動集計（新規追加）
+// これまで「予約から集計」→「GAS保存」を手動で押さないと売上シートが更新されず、
+// 押し忘れると月別集計・支払別集計の画面が古いまま（実際より少ない金額）になっていた。
+// kanri.htmlの計算ロジック(calcUriageFromBookings)と同じ考え方を、
+// 予約表の実データからサーバー側だけで毎日自動計算し、売上シートに反映する。
+// ============================================================
+function calcUriageFromReservations_(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var bs=ss.getSheetByName("予約表");
+  if(!bs)return{};
+  var data=bs.getDataRange().getValues();
+  var headers=(data[0]||[]).map(function(h){return String(h||"").trim();});
+  var di=headers.indexOf("日付"),ki=headers.indexOf("区分"),pai=headers.indexOf("支払金額"),
+      bji=headers.indexOf("物販(JSON)"),pmi=headers.indexOf("支払方法"),kli=headers.indexOf("区分リスト");
+
+  var calc={};
+  for(var i=1;i<data.length;i++){
+    var row=data[i];
+    var kubun=String(row[ki]||"").trim();
+    if(kubun==="(キャンセル)"||kubun==="(継続)")continue; // kanri.html側のbk.cancelled/bk.contと同じ除外条件
+
+    var dv=row[di],dateStr="";
+    if(dv instanceof Date){dateStr=dv.getFullYear()+"-"+String(dv.getMonth()+1).padStart(2,"0")+"-"+String(dv.getDate()).padStart(2,"0");}
+    else{dateStr=String(dv||"").trim();}
+    if(!dateStr)continue;
+
+    var totalAmount=parseInt(row[pai]||0)||0;
+    if(!totalAmount)continue;
+
+    if(!calc[dateStr])calc[dateStr]={hoken:0,jhi:0,jiko:0,bussan:0,pay:[]};
+    var c=calc[dateStr];
+
+    var bussanTotal=0;
+    try{
+      var bussanArr=JSON.parse(row[bji]||"[]");
+      bussanArr.forEach(function(b){bussanTotal+=(b.price||0)*(b.qty||1);});
+    }catch(e){}
+    c.bussan+=bussanTotal;
+
+    var seturyoAmount=Math.max(0,totalAmount-bussanTotal);
+    if(seturyoAmount>0){
+      var kubunListRaw=String(row[kli]||"").trim();
+      var kubunList=kubunListRaw?kubunListRaw.split(",").map(function(s){return s.trim();}):[kubun];
+      if(kubunList.indexOf("保険")>=0)c.hoken+=seturyoAmount;
+      else if(kubunList.indexOf("交通事故")>=0)c.jiko+=seturyoAmount;
+      else c.jhi+=seturyoAmount;
+    }
+
+    var payListRaw=String(row[pmi]||"").trim();
+    if(payListRaw){
+      payListRaw.split(",").forEach(function(p){p=p.trim();if(p&&c.pay.indexOf(p)<0)c.pay.push(p);});
+    }
+  }
+  return calc;
+}
+// 計算結果を売上シートへ反映。対象日以外の既存行はそのまま維持する（安全のため全消去はしない）
+function syncUriageFromReservations_(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var us=ss.getSheetByName("売上")||ss.insertSheet("売上");
+  var existing=us.getDataRange().getValues();
+  var header=(existing[0]&&existing[0].length)?existing[0]:["日付","保険","自費","交通事故","物販","その他","支払方法","メモ"];
+
+  var map={};
+  for(var i=1;i<existing.length;i++){
+    var r=existing[i];
+    if(!r[0])continue;
+    var d=(r[0] instanceof Date)
+      ?(r[0].getFullYear()+"-"+String(r[0].getMonth()+1).padStart(2,"0")+"-"+String(r[0].getDate()).padStart(2,"0"))
+      :String(r[0]).trim();
+    map[d]=r;
+  }
+
+  var calc=calcUriageFromReservations_();
+  var updated=0;
+  Object.keys(calc).forEach(function(d){
+    var c=calc[d];
+    var total=c.hoken+c.jhi+c.jiko+c.bussan;
+    if(total<=0)return;
+    map[d]=[d,c.hoken,c.jhi,c.jiko,c.bussan,0,c.pay.join(","),""];
+    updated++;
+  });
+
+  var dates=Object.keys(map).sort();
+  var rows=[header].concat(dates.map(function(d){return map[d];}));
+  saveSheet("売上",rows);
+  return{ok:true,updated:updated};
+}
+// 毎日自動実行される本体（トリガーから呼ばれる）
+function dailyUriageSync(){
+  try{
+    var r=syncUriageFromReservations_();
+    Logger.log("売上自動集計: "+r.updated+"日分を更新");
+  }catch(err){
+    Logger.log("売上自動集計エラー: "+err.message);
+  }
+}
+// この売上自動集計トリガーだけを追加する（既存の他のトリガーには一切触れない）
+function addDailyUriageSyncTrigger(){
+  ScriptApp.getProjectTriggers().forEach(function(t){
+    if(t.getHandlerFunction()==="dailyUriageSync")ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("dailyUriageSync").timeBased().everyDays(1).atHour(23).nearMinute(50).create();
+  Logger.log("売上自動集計トリガーを追加しました（毎日23:50）");
+}
 function setupAllTriggers(){
   ScriptApp.getProjectTriggers().forEach(function(t){ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger("dailyLineAlert").timeBased().everyDays(1).atHour(9).nearMinute(0).create();
   ScriptApp.newTrigger("sendDayBeforeReminders").timeBased().everyDays(1).atHour(19).nearMinute(0).create();
   ScriptApp.newTrigger("sendBirthdayMessages").timeBased().everyDays(1).atHour(9).nearMinute(0).create();
+  ScriptApp.newTrigger("dailyUriageSync").timeBased().everyDays(1).atHour(23).nearMinute(50).create();
   Logger.log("Triggers set OK");
 }
 // 今設定されているトリガーを一覧で確認する（kanri.htmlから呼び出し、重複や設定漏れがないか診断する）
