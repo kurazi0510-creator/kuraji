@@ -229,6 +229,7 @@
   </div>
 
   <button class="btn-gen-yoyaku" onclick="generateYoyaku()">🎨 予約空き状況の画像を生成</button>
+  <button onclick="generateFullYoyaku()" style="width:100%;margin-top:10px;padding:16px;border:0;border-radius:12px;background:#d95a08;color:#fff;font-size:16px;font-weight:900;font-family:inherit;box-shadow:0 3px 16px rgba(217,90,8,.28)">🈵 満枠のお知らせ画像を生成</button>
 
   <div class="preview-wrap" id="yPreview">
     <canvas id="yCanvas"></canvas>
@@ -677,6 +678,64 @@ const DAY_THEMES = {
 
 function getTheme(color){
   return DAY_THEMES[color] || DAY_THEMES['#E8732A'];
+}
+
+function generateFullYoyaku(){
+  const dateVal=document.getElementById('yDate').value;
+  if(!dateVal){alert('日付を入力してください');return;}
+  const d=new Date(dateVal);
+  const month=d.getMonth()+1,day=d.getDate(),dow=DAY_NAMES[d.getDay()];
+  const SIZE=800,canvas=document.getElementById('yCanvas');
+  canvas.width=SIZE;canvas.height=SIZE;
+  const ctx=canvas.getContext('2d');
+
+  const bg=ctx.createLinearGradient(0,0,SIZE,SIZE);
+  bg.addColorStop(0,'#fff8ef');bg.addColorStop(1,'#ffe6cd');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,SIZE,SIZE);
+
+  ctx.fillStyle='#f36c0a';ctx.fillRect(0,0,SIZE,112);
+  ctx.fillStyle='#fff';ctx.textAlign='center';
+  ctx.font='bold 36px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText('倉治整骨院　予約状況',SIZE/2,70);
+
+  ctx.fillStyle='#fff';rrPath(ctx,42,145,SIZE-84,390,28);ctx.fill();
+  ctx.strokeStyle='#f1c7a5';ctx.lineWidth=3;rrPath(ctx,42,145,SIZE-84,390,28);ctx.stroke();
+
+  ctx.fillStyle='#f36c0a';rrPath(ctx,265,185,270,62,31);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 28px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(`${month}/${day}（${dow}） 本日満枠`,SIZE/2,226);
+
+  ctx.fillStyle='#b84f00';
+  ctx.font='bold 42px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText('ご予約は満枠となりました',SIZE/2,320);
+  ctx.fillStyle='#5f5148';ctx.font='bold 25px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText('たくさんのご予約ありがとうございます',SIZE/2,372);
+
+  ctx.fillStyle='#fff8f1';rrPath(ctx,100,410,SIZE-200,82,18);ctx.fill();
+  ctx.strokeStyle='#f3c69e';ctx.lineWidth=2;rrPath(ctx,100,410,SIZE-200,82,18);ctx.stroke();
+  ctx.fillStyle='#8a3e09';ctx.font='bold 27px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText('キャンセル待ちはLINEで承ります',SIZE/2,461);
+
+  const photo=new Image();
+  const finish=()=>{
+    ctx.fillStyle='#f36c0a';rrPath(ctx,80,722,SIZE-160,54,27);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='bold 22px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.fillText('明日以降のご予約はWEB予約をご利用ください',SIZE/2,757);
+    showPreview('yCanvas','yPreview','yDlBtn',`満枠_${dateVal}`);
+  };
+  photo.onload=()=>{
+    const x=42,y=565,w=SIZE-84,h=132;
+    ctx.save();rrPath(ctx,x,y,w,h,20);ctx.clip();
+    const ir=photo.naturalWidth/photo.naturalHeight,br=w/h;
+    let sw,sh,sx,sy;
+    if(ir>br){sh=photo.naturalHeight;sw=sh*br;sy=0;sx=(photo.naturalWidth-sw)/2;}
+    else{sw=photo.naturalWidth;sh=sw/br;sx=0;sy=(photo.naturalHeight-sh)/2;}
+    ctx.drawImage(photo,sx,sy,sw,sh,x,y,w,h);ctx.restore();
+    ctx.strokeStyle='#f3c69e';ctx.lineWidth=2;rrPath(ctx,x,y,w,h,20);ctx.stroke();
+    finish();
+  };
+  photo.onerror=finish;
+  photo.src='data:image/jpeg;base64,'+PHOTO_B64;
 }
 
 function generateYoyaku(){
