@@ -12,7 +12,7 @@
 <body>
 <main class="wrap">
 <div class="brand">倉治整骨院</div>
-<h1 class="title">本日の予約空き状況</h1>
+<h1 class="title" id="pageTitle">本日の予約空き状況</h1>
 <div class="updated" id="updated">最新情報を読み込んでいます…</div>
 <section class="status" id="status"><div class="loading">予約空き状況を読み込み中です…</div></section>
 <div class="actions">
@@ -29,17 +29,28 @@
  const GAS='https://script.google.com/macros/s/AKfycbyRO5WSOy-nZw4eMwFaTS-9wYXwNgoQoMZbre3hRf2C9McEfnyrDUNTWm7YvmOL4J5w/exec';
  const status=document.getElementById('status');
  const updated=document.getElementById('updated');
+ const pageTitle=document.getElementById('pageTitle');
  const lineBtn=document.getElementById('lineBtn');
  const statusNote=document.getElementById('statusNote');
  // 満枠になった日を登録。日付が変われば通常表示へ自動復帰します。
  const FULL_DATES=new Set(['2026-09-16']);
  const jstNow=()=>new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
  const ymd=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+ function closeMinutes(day){
+   if(day===0) return 0;
+   if(day===4||day===6) return 12*60+30;
+   return 20*60;
+ }
  function isClosedNow(){
-   const n=jstNow(),day=n.getDay(),mins=n.getHours()*60+n.getMinutes();
-   if(day===0) return true;
-   if(day===4||day===6) return mins>=12*60+30;
-   return mins>=20*60;
+   const n=jstNow(),mins=n.getHours()*60+n.getMinutes();
+   return mins>=closeMinutes(n.getDay());
+ }
+ function isPublishedAfterClose(d,now){
+   if(!d||!d.updatedAt) return false;
+   const x=new Date(d.updatedAt);
+   const xj=new Date(x.toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
+   const mins=xj.getHours()*60+xj.getMinutes();
+   return ymd(xj)===ymd(now)&&mins>=closeMinutes(now.getDay());
  }
  function showClosed(message){
    status.innerHTML='<div class="closed"><strong>本日の受付は終了しました</strong><div class="sub">'+message+'</div></div>';
@@ -54,9 +65,14 @@
  function render(){
    const d=window.KURAJI_LATEST_STATUS;
    const now=jstNow();
-   if(FULL_DATES.has(ymd(now))){showFull();return;}
-   if(isClosedNow()){showClosed('本日の診療時間は終了しております。');return;}
-   if(!d||!d.ok||!d.image){status.innerHTML='<div class="error">最新の予約状況を取得できませんでした。<br>少し時間をおいて再読み込みしてください。</div>';updated.textContent='';return;}
+   const closed=isClosedNow();
+   if(FULL_DATES.has(ymd(now))&&!closed){showFull();return;}
+   if(!d||!d.ok||!d.image){
+     if(closed){showClosed('明日の空き状況を準備中です。');return;}
+     status.innerHTML='<div class="error">最新の予約状況を取得できませんでした。<br>少し時間をおいて再読み込みしてください。</div>';updated.textContent='';return;
+   }
+   if(closed&&!isPublishedAfterClose(d,now)){showClosed('明日の空き状況を準備中です。');return;}
+   if(closed){pageTitle.textContent='明日の予約空き状況';lineBtn.textContent='LINEで予約・相談';statusNote.textContent='明日の空き状況は変動します。表示中の時間でも、ご連絡のタイミングにより埋まっている場合があります。';}
    if(d.updatedAt){
      const x=new Date(d.updatedAt);
      const xj=new Date(x.toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
@@ -69,8 +85,8 @@
    const img=document.createElement('img');img.alt='倉治整骨院 本日の予約空き状況';img.src=d.image;status.innerHTML='';status.appendChild(img);
    if(d.updatedAt){const x=new Date(d.updatedAt);updated.textContent='最終更新：'+x.toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});}else{updated.textContent='最新の予約空き状況';}
  }
- // 満枠日は外部画像を待たず、すぐに満枠表示へ切り替えます。
- if(FULL_DATES.has(ymd(jstNow()))){showFull();return;}
+ // 診療時間内の満枠日は、外部画像を待たずにすぐ満枠表示へ切り替えます。
+ if(FULL_DATES.has(ymd(jstNow()))&&!isClosedNow()) showFull();
  window.addEventListener('kuraji-status-loaded',render,{once:true});
  const s=document.createElement('script');s.src=GAS+'?action=js&t='+Date.now();s.onerror=function(){if(isClosedNow()){showClosed('本日の診療時間は終了しております。');return;}status.innerHTML='<div class="error">最新の予約状況を取得できませんでした。<br>再読み込みしてください。</div>';updated.textContent='';};document.body.appendChild(s);
  setTimeout(function(){if(!window.KURAJI_LATEST_STATUS){if(isClosedNow()){showClosed('本日の診療時間は終了しております。');return;}status.innerHTML='<div class="error">読み込みに時間がかかっています。<br>画面を再読み込みしてください。</div>';updated.textContent='';}},10000);
