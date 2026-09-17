@@ -738,186 +738,159 @@ function generateFullYoyaku(){
   photo.src='data:image/jpeg;base64,'+PHOTO_B64;
 }
 
-function generateYoyaku(){
-  const dateVal=document.getElementById('yDate').value;
-  if(!dateVal){alert('日付を入力してください');return;}
-  if(selTimes.length===0){alert('空き時間を選んでください');return;}
+function compactTimePro(t){
+  const s=String(t||'').trim();
+  let m=s.match(/^(\d{1,2})時(?:(\d{1,2})分)?$/);
+  if(m) return Number(m[1])+':'+String(Number(m[2]||0)).padStart(2,'0');
+  m=s.match(/^(\d{1,2}):(\d{1,2})$/);
+  if(m) return Number(m[1])+':'+String(Number(m[2])).padStart(2,'0');
+  return s;
+}
 
-  const d=new Date(dateVal);
-  const month=d.getMonth()+1, day=d.getDate(), dow=DAY_NAMES[d.getDay()];
-  const SIZE=800;
-  const canvas=document.getElementById('yCanvas');
-  canvas.width=SIZE; canvas.height=SIZE;
-  const ctx=canvas.getContext('2d');
+function slotMinutesPro(t){
+  const s=compactTimePro(t);
+  const m=s.match(/^(\d{1,2}):(\d{2})$/);
+  return m ? Number(m[1])*60+Number(m[2]) : 9999;
+}
 
-  const T=getTheme(yColor);
+function sortedSelectedTimesPro(){
+  return selTimes.map(compactTimePro).sort((a,b)=>slotMinutesPro(a)-slotMinutesPro(b));
+}
 
-  // ── 背景グラデーション（放射状）──
-  const bgG=ctx.createRadialGradient(SIZE*0.25,SIZE*0.15,0, SIZE*0.5,SIZE*0.5,SIZE);
-  bgG.addColorStop(0, T.bg1);
-  bgG.addColorStop(1, T.bg2);
-  ctx.fillStyle=bgG;
-  ctx.fillRect(0,0,SIZE,SIZE);
+function drawSlotGroupPro(ctx,label,slots,y,opts={}){
+  if(!slots.length) return y;
+  const SIZE=800,left=42,right=42,cols=4,gapX=10,gapY=9;
+  const usable=SIZE-left-right;
+  const cardW=(usable-gapX*(cols-1))/cols;
+  const totalCount=opts.totalCount||slots.length;
+  const dense=totalCount>=21;
+  const medium=totalCount>=13;
+  const labelH=30;
+  const cardH=dense?43:(medium?49:56);
+  const fontSize=dense?27:(medium?30:34);
+  ctx.fillStyle='#FBE7D3';
+  rrPath(ctx,left,y,112,labelH,15);ctx.fill();
+  ctx.fillStyle='#8A3B10';
+  ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(label,left+56,y+labelH/2+1);
+  y+=labelH+8;
+  slots.forEach((t,i)=>{
+    const col=i%cols,row=Math.floor(i/cols);
+    const x=left+col*(cardW+gapX),yy=y+row*(cardH+gapY);
+    ctx.fillStyle='#FFFFFF';rrPath(ctx,x,yy,cardW,cardH,12);ctx.fill();
+    ctx.strokeStyle='#F0C29E';ctx.lineWidth=2;rrPath(ctx,x,yy,cardW,cardH,12);ctx.stroke();
+    ctx.fillStyle='#5A2A12';
+    ctx.font='bold '+fontSize+'px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(t,x+cardW/2,yy+cardH/2+1);
+  });
+  ctx.textBaseline='alphabetic';
+  return y+Math.ceil(slots.length/cols)*(cardH+gapY)-gapY;
+}
 
-  // ── 背景の柄（選んだパターンによって切り替える）──
-  const pattern=document.getElementById('yPattern')?.value||'stripe';
-  ctx.save();
-  if(pattern==='stripe'){
-    ctx.strokeStyle=T.stripColor;
-    ctx.lineWidth=22;
-    for(let i=-SIZE;i<SIZE*2;i+=44){
-      ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+SIZE,SIZE);ctx.stroke();
-    }
-  }else if(pattern==='dot'){
-    // 大小の円をランダムに散らした、コンフェッティ（紙吹雪）風の上品なドット柄
-    const seed=[[70,60,10,0.14],[220,140,5,0.22],[400,90,16,0.10],[610,180,7,0.20],[130,260,6,0.18],
-      [340,300,13,0.12],[520,340,4,0.24],[720,260,9,0.16],[60,420,7,0.20],[250,470,11,0.13],
-      [460,510,5,0.22],[660,470,15,0.10],[110,600,9,0.18],[330,640,6,0.20],[540,610,12,0.12],
-      [740,600,5,0.22],[200,720,8,0.17],[420,750,14,0.11],[610,730,6,0.20],[30,760,10,0.15]];
-    seed.forEach(([xx,yy,r,a])=>{
-      ctx.globalAlpha=a;
-      ctx.fillStyle='#ffffff';
-      ctx.beginPath();ctx.arc(xx,yy,r,0,Math.PI*2);ctx.fill();
-    });
-    ctx.globalAlpha=1;
-  }else if(pattern==='wave'){
-    // 下部だけに、上品な曲線を1本重ねるデザイン（帯ではなく細いラインの優雅な波）
-    ctx.globalAlpha=0.16;
-    ctx.strokeStyle='#ffffff';
-    ctx.lineWidth=3;
-    [SIZE*0.90, SIZE*0.94, SIZE*0.98].forEach((baseY,idx)=>{
-      ctx.beginPath();
-      for(let xx=-20;xx<=SIZE+20;xx+=10){
-        const wy=baseY+Math.sin(xx*0.012+idx*1.4)*20;
-        if(xx===-20)ctx.moveTo(xx,wy);else ctx.lineTo(xx,wy);
-      }
-      ctx.stroke();
-    });
-    ctx.globalAlpha=1;
-  }else if(pattern==='plain'){
-    // 無地：何も描かず、控えめな大きい円のアクセントだけを右上・左下にそっと添える上品な仕上げ
-    ctx.globalAlpha=0.06;
-    ctx.fillStyle='#ffffff';
-    ctx.beginPath();ctx.arc(SIZE-30,60,220,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(20,SIZE-40,260,0,Math.PI*2);ctx.fill();
-    ctx.globalAlpha=1;
-  }
-  // plain の場合は何も描かない（無地）
-  ctx.restore();
-
-  // ── 右下に大きな丸（デザインアクセント）──
-  ctx.save();
-  ctx.globalAlpha=0.07;
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath();ctx.arc(SIZE+60,SIZE+60,380,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(SIZE-40,120,180,0,Math.PI*2);ctx.fill();
-  ctx.restore();
-
-  // ── ヘッダー帯 ──
-  ctx.save();
-  ctx.fillStyle=T.headerBg;
-  ctx.fillRect(0,0,SIZE,108);
-  ctx.restore();
-
-  // ── タイトル（中央・大）──
-  ctx.textAlign='center';
-  // シャドウ
-  ctx.save();ctx.globalAlpha=0.25;ctx.fillStyle='#000';
-  ctx.font='bold 46px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText(`《${month}/${day}の予約空き状況》`,SIZE/2+2,76);
-  ctx.restore();
-  ctx.fillStyle=T.textMain;
-  ctx.font='bold 46px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText(`《${month}/${day}の予約空き状況》`,SIZE/2,74);
-
-  // ── ヘッダー下ライン ──
-  const lineG=ctx.createLinearGradient(36,0,SIZE-36,0);
-  lineG.addColorStop(0,'rgba(255,255,255,0)');
-  lineG.addColorStop(0.25,T.lineBg);
-  lineG.addColorStop(0.75,T.lineBg);
-  lineG.addColorStop(1,'rgba(255,255,255,0)');
-  ctx.strokeStyle=lineG; ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(36,108);ctx.lineTo(SIZE-36,108);ctx.stroke();
-
-  // ── 吹き出し（ヘッダー下・右）──
-  drawBubbleFinal(ctx, SIZE-14, 116);
-
-  // ── 日付 ──
-  ctx.textAlign='left';
-  ctx.fillStyle=T.textMain;
-  ctx.font='bold 42px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  // 日付の左にカラーバー
-  ctx.fillStyle=T.badgeBg;
-  ctx.fillRect(34,134,5,40);
-  ctx.fillStyle=T.textMain;
-  ctx.fillText(`${month}/${day}（${dow}）`,48,170);
-
-  // ── 空き時間ボックス ──
-  const timeStr=selTimes.join('　');
-  // 仮描画で行数を計算
-  ctx.font='bold 30px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  const tmpLines=measureLines(ctx,timeStr,SIZE-104,36);
-  const timeBoxH=Math.max(76, tmpLines*36+28);
-
-  // ボックス背景
-  ctx.save();ctx.globalAlpha=0.22;ctx.fillStyle='#ffffff';
-  rrPath(ctx,34,182,SIZE-68,timeBoxH,14);ctx.fill();ctx.restore();
-  // ボックス枠
-  ctx.strokeStyle=T.boxBorder;ctx.lineWidth=1.5;
-  rrPath(ctx,34,182,SIZE-68,timeBoxH,14);ctx.stroke();
-  // 時間テキスト
-  ctx.fillStyle=T.textMain;
-  ctx.font='bold 30px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  wrapText(ctx,timeStr,52,222,SIZE-104,36);
-
-  // ── 「空いてます」バッジ ──
-  const badgeY=182+timeBoxH+20;
-  ctx.fillStyle=T.badgeBg;
-  rrPath(ctx,34,badgeY,258,56,28);ctx.fill();
-  // バッジ枠
-  ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=1;
-  rrPath(ctx,34,badgeY,258,56,28);ctx.stroke();
-  ctx.fillStyle=T.badgeText;
-  ctx.font='bold 30px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.textAlign='center';
-  ctx.fillText('✅ 空いてます',163,badgeY+37);
-
-  // サブテキスト
-  ctx.textAlign='left';
-  ctx.fillStyle=T.textSub;
-  ctx.font='28px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText('当日予約もOKです。',40,badgeY+88);
-  ctx.fillText('御予約お待ちしております。',40,badgeY+124);
-
-  // ── 外観写真（固定位置）──
-  const photoX=22, photoY=440, photoW=SIZE-44, photoH=244;
+function drawClinicPhotoPro(ctx,x,y,w,h,done){
   const photo=new Image();
   photo.onload=()=>{
-    ctx.save();
-    rrPath(ctx,photoX,photoY,photoW,photoH,20);
-    ctx.clip();
-    const ir=photo.naturalWidth/photo.naturalHeight, br=photoW/photoH;
+    ctx.save();rrPath(ctx,x,y,w,h,18);ctx.clip();
+    const ir=photo.naturalWidth/photo.naturalHeight,br=w/h;
     let sw,sh,sx,sy;
     if(ir>br){sh=photo.naturalHeight;sw=sh*br;sy=0;sx=(photo.naturalWidth-sw)/2;}
     else{sw=photo.naturalWidth;sh=sw/br;sx=0;sy=(photo.naturalHeight-sh)/2;}
-    ctx.drawImage(photo,sx,sy,sw,sh,photoX,photoY,photoW,photoH);
-
-    // 写真下部グラデオーバーレイ
-    const pGrad=ctx.createLinearGradient(0,photoY+photoH-90,0,photoY+photoH);
-    pGrad.addColorStop(0,'rgba(0,0,0,0)');
-    pGrad.addColorStop(1,'rgba(0,0,0,0.45)');
-    ctx.fillStyle=pGrad;
-    ctx.fillRect(photoX,photoY,photoW,photoH);
-    ctx.restore();
-
-    // 写真枠
-    ctx.strokeStyle='rgba(255,255,255,0.65)';ctx.lineWidth=3;
-    rrPath(ctx,photoX,photoY,photoW,photoH,20);ctx.stroke();
-
-    finishYoyaku(ctx,SIZE,month,day,dateVal,T,'yCanvas','yPreview','yDlBtn');
+    ctx.drawImage(photo,sx,sy,sw,sh,x,y,w,h);
+    const g=ctx.createLinearGradient(0,y+h*0.55,0,y+h);
+    g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.32)');
+    ctx.fillStyle=g;ctx.fillRect(x,y,w,h);ctx.restore();
+    ctx.strokeStyle='#E6B487';ctx.lineWidth=2;rrPath(ctx,x,y,w,h,18);ctx.stroke();
+    done();
   };
-  photo.onerror=()=>finishYoyaku(ctx,SIZE,month,day,dateVal,T,'yCanvas','yPreview','yDlBtn');
+  photo.onerror=done;
   photo.src='data:image/jpeg;base64,'+PHOTO_B64;
+}
+
+function generateYoyaku(){
+  const dateVal=document.getElementById('yDate').value;
+  if(!dateVal){alert('日付を入力してください');return;}
+  // ★変更：0枠でも「本日は満枠です」の画像を作れるよう、確認の上で続行できるようにする
+  //   （誤って空のまま生成してしまう事故は確認ダイアログで防ぐ）
+  if(selTimes.length===0){
+    if(!confirm('空き時間が選択されていません。\n「本日は満枠です」として画像を作成しますか？')) return;
+  }
+  const d=new Date(dateVal+'T00:00:00');
+  const month=d.getMonth()+1,day=d.getDate(),dow=DAY_NAMES[d.getDay()];
+  const SIZE=800,canvas=document.getElementById('yCanvas');
+  canvas.width=SIZE;canvas.height=SIZE;
+  const ctx=canvas.getContext('2d');
+  const all=sortedSelectedTimesPro();
+  const am=all.filter(t=>slotMinutesPro(t)<13*60);
+  const pm=all.filter(t=>slotMinutesPro(t)>=13*60);
+  const count=all.length;
+  // ★追加：最終更新時刻（24時間表記）
+  const now=new Date();
+  const hh=String(now.getHours()).padStart(2,'0'),mm=String(now.getMinutes()).padStart(2,'0');
+  // ★追加：当日予約OKの判定。「今日の日付」かつ「1枠以上空きがある」場合のみ表示する。
+  //   選択されている時間は autoFetchAvailability の時点で本日分の終了済み時刻が
+  //   既に除外されているため、既存の営業日・営業時間ロジックと矛盾しない。
+  const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const isSameDayBookable=(dateVal===todayStr&&count>0);
+  const bg=ctx.createLinearGradient(0,0,0,SIZE);
+  bg.addColorStop(0,'#FFF8F1');bg.addColorStop(1,'#FFFDF9');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,SIZE,SIZE);
+  ctx.fillStyle='#E96B16';ctx.fillRect(0,0,SIZE,104);
+  ctx.fillStyle='rgba(255,255,255,.10)';ctx.beginPath();ctx.arc(735,30,150,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
+  ctx.font='bold 42px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText('予約空き状況',SIZE/2,66);
+  // ★追加：最終更新時刻（ヘッダー右上に控えめに）
+  ctx.fillStyle='rgba(255,255,255,.85)';ctx.textAlign='right';
+  ctx.font='bold 15px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(`最終更新 ${hh}:${mm}`,758,26);
+  ctx.fillStyle='#5A2A12';ctx.textAlign='left';
+  ctx.font='bold 38px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(`${month}/${day}（${dow}）`,42,151);
+  ctx.fillStyle='#A05A2C';ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='right';ctx.fillText('倉治整骨院',758,148);
+  let y=174;
+  // ★追加：当日予約OKバッジ（該当する場合のみ、その分だけ枠の開始位置を少し下げる）
+  if(isSameDayBookable){
+    ctx.fillStyle='#E96B16';rrPath(ctx,42,158,150,28,14);ctx.fill();
+    ctx.fillStyle='#FFFFFF';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font='bold 16px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.fillText('⚡ 当日予約OK',117,173);
+    ctx.textBaseline='alphabetic';
+    y=198;
+  }
+  y=drawSlotGroupPro(ctx,'午前',am,y,{totalCount:count});
+  if(am.length&&pm.length)y+=10;
+  y=drawSlotGroupPro(ctx,'午後',pm,y,{totalCount:count});
+  let ctaY=y+14;
+  const footerTop=724;
+  if(ctaY>footerTop-70)ctaY=footerTop-70;
+  ctx.fillStyle='#FFF0E2';rrPath(ctx,42,ctaY,246,48,24);ctx.fill();
+  ctx.fillStyle='#C4510B';ctx.textAlign='center';ctx.textBaseline='middle';
+  // ★変更：固定の「✓ 空いています」から、残り枠数に応じた状態表示に変更
+  const tierText=count>=6?'まだ余裕があります':count>=3?'残りわずか':count>=1?`残り${count}枠`:'本日は満枠です';
+  const tierFontSize=tierText.length>=8?17:(tierText.length>=5?19:23);
+  ctx.font=`bold ${tierFontSize}px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif`;
+  ctx.fillText(tierText,165,ctaY+24);
+  ctx.fillStyle='#5A2A12';ctx.textAlign='left';
+  ctx.font='bold 22px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  // ★変更：固定の「当日予約もOKです」から、実際の空き枠数の表示に変更（0枠の時は表示しない）
+  if(count>0)ctx.fillText(`現在 ${count}枠 空いています`,316,ctaY+30);
+  ctx.textBaseline='alphabetic';
+  const finish=()=>{
+    ctx.fillStyle='#E96B16';ctx.fillRect(0,724,SIZE,76);
+    ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
+    ctx.font='bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.fillText('倉治整骨院',SIZE/2,756);
+    ctx.font='18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.fillText('ご予約・お問い合わせをお待ちしております',SIZE/2,784);
+    showPreview('yCanvas','yPreview','yDlBtn',dateVal);
+  };
+  if(count<=8&&ctaY+62<710){
+    const photoY=ctaY+62,photoH=Math.min(150,710-photoY);
+    if(photoH>=75)drawClinicPhotoPro(ctx,42,photoY,716,photoH,finish);else finish();
+  }else finish();
 }
 
 function finishYoyaku(ctx,SIZE,month,day,dateVal,T,cid,pid,bid){
@@ -1168,4 +1141,3 @@ function wrapTextColor(ctx,text,x,y,maxW,lineH,color,size){
 </script>
 </body>
 </html>
-
