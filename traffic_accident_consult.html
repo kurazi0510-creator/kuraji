@@ -126,6 +126,7 @@ function skipStep(){ goNext(); }
 
 function answerDate(){
   const v=document.getElementById('dateInput').value;
+  if(!v){ alert('日付を選択するか、下の「覚えていない」を押してください'); return; }
   state.accidentDate=v; state.accidentDateUnknown=false;
   goNext();
 }
@@ -147,6 +148,13 @@ function answerSingle(key,val){ state[key]=val; goNext(); }
 function answerText(key){
   const v=document.getElementById('textInput').value.trim();
   if(!v){ alert('入力してください'); return; }
+  if(key==='tel'){
+    const digits=v.replace(/[^0-9]/g,'');
+    if(!/^[0-9\-ー]+$/.test(v) || digits.length<10 || digits.length>11){
+      alert('お電話番号を正しく入力してください（例：090-1234-5678）');
+      return;
+    }
+  }
   state[key]=v;
   goNext();
 }
@@ -178,7 +186,8 @@ function renderConfirm(){
       ${progressBar()}
       ${backBtn()}
       <h1 style="font-size:22px;font-weight:bold;margin-bottom:18px">この内容でよろしいですか？</h1>
-      <div style="background:var(--card);border-radius:16px;padding:6px 18px;margin-bottom:22px">${rowsHtml}</div>
+      <div style="background:var(--card);border-radius:16px;padding:6px 18px;margin-bottom:14px">${rowsHtml}</div>
+      <p style="font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:22px">入力いただいた情報は、本相談へのご返信・ご連絡の目的にのみ使用し、他の目的では使用いたしません。</p>
       <button id="submitBtn" onclick="submitConsult()" style="width:100%;padding:18px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:bold;cursor:pointer">先生に送る</button>
     </div>
   `;
