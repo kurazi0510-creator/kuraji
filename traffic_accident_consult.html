@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>交通事故のご相談 - 倉治整骨院</title>
+<style>
+:root{
+  --main:#c9634b;
+  --main-dark:#b3382c;
+  --bg:#fffdfb;
+  --card:#fdf1ea;
+  --line:#ecdcd0;
+  --text:#3d2626;
+  --sub:#8a6560;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;}
+body{background:var(--bg);color:var(--text);min-height:100vh;}
+/* ★送信先URL：あとでここだけ差し替えればOK */
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ============================================================
+// ★送信先GAS URL（予約フォームとは別の、この専用エンドポイント）
+// ============================================================
+const GAS_URL = '__GAS_URL_WO_SET_LATER__';
+
+const state={
+  accidentDate:'', accidentDateUnknown:false,
+  painAreas:[],
+  hospital:'', certificate:'', insurance:'', hope:'',
+  name:'', tel:''
+};
+
+const steps=[
+  {key:'accidentDate', title:'事故日はいつですか？', type:'date'},
+  {key:'painAreas', title:'痛む場所はどこですか？', sub:'複数選べます', type:'multi',
+    options:['首','肩','腰','背中','頭','手・腕','足・ひざ','その他','わからない']},
+  {key:'hospital', title:'病院を受診しましたか？', type:'single', options:['はい','いいえ']},
+  {key:'certificate', title:'診断書はありますか？', type:'single', options:['ある','ない','わからない']},
+  {key:'insurance', title:'保険会社へ連絡しましたか？', type:'single', options:['はい','まだ']},
+  {key:'hope', title:'ご希望をお選びください', type:'single', options:['まずは相談したい','予約したい']},
+  {key:'name', title:'お名前を教えてください', type:'text', placeholder:'例：倉治 太郎'},
+  {key:'tel', title:'お電話番号を教えてください', sub:'折り返しご連絡する際に使用します', type:'tel', placeholder:'例：090-1234-5678'}
+];
+
+let idx=0; // 0..steps.length-1、steps.length で確認画面、+1 で完了画面
+const app=document.getElementById('app');
+
+function render(){
+  if(idx<steps.length) renderStep(steps[idx]);
+  else if(idx===steps.length) renderConfirm();
+  else renderDone();
+  window.scrollTo(0,0);
+}
+
+function progressBar(){
+  const total=steps.length+1; // 確認画面も1ステップとして数える
+  const cur=Math.min(idx+1,total);
+  const pct=Math.round(cur/total*100);
+  return `<div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:22px">
+    <div style="height:100%;width:${pct}%;background:var(--main);transition:width .3s"></div>
+  </div>`;
+}
+
+function backBtn(){
+  if(idx===0) return '';
+  return `<button onclick="goBack()" style="background:none;border:none;color:var(--sub);font-size:15px;font-weight:bold;padding:8px 0;margin-bottom:8px;cursor:pointer">← 戻る</button>`;
+}
+
+function skipBtn(step){
+  if(step.type==='date'||step.type==='multi'){
+    return `<button onclick="skipStep()" style="display:block;margin:18px auto 0;background:none;border:none;color:var(--sub);font-size:14px;text-decoration:underline;cursor:pointer">この質問をスキップする</button>`;
+  }
+  return '';
+}
+
+function renderStep(step){
+  let body='';
+  if(step.type==='date'){
+    body=`
+      <input type="date" id="dateInput" value="${state.accidentDate||''}" style="width:100%;padding:16px;font-size:18px;border:2px solid var(--line);border-radius:14px;color:var(--text);margin-bottom:14px">
+      <button onclick="answerDate()" style="width:100%;padding:16px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:bold;cursor:pointer">次へ</button>
+      <button onclick="answerUnknownDate()" style="width:100%;padding:14px;margin-top:10px;background:var(--card);color:var(--main-dark);border:2px solid var(--main);border-radius:14px;font-size:15px;font-weight:bold;cursor:pointer">覚えていない</button>
+    `;
+  }else if(step.type==='multi'){
+    const opts=step.options.map(o=>{
+      const sel=state.painAreas.includes(o);
+      return `<button onclick="togglePain('${o}')" style="padding:16px 8px;border:2px solid ${sel?'var(--main)':'var(--line)'};background:${sel?'var(--main)':'#fff'};color:${sel?'#fff':'var(--text)'};border-radius:14px;font-size:16px;font-weight:bold;cursor:pointer">${o}</button>`;
+    }).join('');
+    body=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">${opts}</div>
+      <button onclick="answerMulti()" style="width:100%;padding:16px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:bold;cursor:pointer">次へ</button>
+    `;
+  }else if(step.type==='single'){
+    body=step.options.map(o=>`<button onclick="answerSingle('${step.key}','${o}')" style="width:100%;padding:18px;margin-bottom:12px;border:2px solid var(--line);background:#fff;color:var(--text);border-radius:14px;font-size:17px;font-weight:bold;cursor:pointer">${o}</button>`).join('');
+  }else if(step.type==='text'||step.type==='tel'){
+    body=`
+      <input type="${step.type==='tel'?'tel':'text'}" id="textInput" value="${state[step.key]||''}" placeholder="${step.placeholder||''}" style="width:100%;padding:16px;font-size:18px;border:2px solid var(--line);border-radius:14px;color:var(--text);margin-bottom:14px">
+      <button onclick="answerText('${step.key}')" style="width:100%;padding:16px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:bold;cursor:pointer">次へ</button>
+    `;
+  }
+  app.innerHTML=`
+    <div style="max-width:520px;margin:0 auto;padding:22px 20px 60px">
+      ${progressBar()}
+      ${backBtn()}
+      <h1 style="font-size:22px;font-weight:bold;margin-bottom:6px;line-height:1.4">${step.title}</h1>
+      ${step.sub?`<p style="color:var(--sub);font-size:14px;margin-bottom:18px">${step.sub}</p>`:'<div style="margin-bottom:18px"></div>'}
+      ${body}
+      ${skipBtn(step)}
+    </div>
+  `;
+}
+
+function goNext(){ idx++; render(); }
+function goBack(){ if(idx>0){idx--; render();} }
+function skipStep(){ goNext(); }
+
+function answerDate(){
+  const v=document.getElementById('dateInput').value;
+  state.accidentDate=v; state.accidentDateUnknown=false;
+  goNext();
+}
+function answerUnknownDate(){
+  state.accidentDate=''; state.accidentDateUnknown=true;
+  goNext();
+}
+function togglePain(o){
+  const i=state.painAreas.indexOf(o);
+  if(i>=0) state.painAreas.splice(i,1); else state.painAreas.push(o);
+  render();
+}
+function answerMulti(){ goNext(); }
+function answerSingle(key,val){ state[key]=val; goNext(); }
+function answerText(key){
+  const v=document.getElementById('textInput').value.trim();
+  if(!v){ alert('入力してください'); return; }
+  state[key]=v;
+  goNext();
+}
+
+function renderConfirm(){
+  const rows=[
+    ['事故日', state.accidentDateUnknown?'覚えていない':(state.accidentDate||'未回答'), 0],
+    ['痛む場所', state.painAreas.length?state.painAreas.join('、'):'未回答', 1],
+    ['病院受診', state.hospital||'未回答', 2],
+    ['診断書', state.certificate||'未回答', 3],
+    ['保険会社へ連絡', state.insurance||'未回答', 4],
+    ['ご希望', state.hope||'未回答', 5],
+    ['お名前', state.name||'未回答', 6],
+    ['お電話番号', state.tel||'未回答', 7],
+  ];
+  const rowsHtml=rows.map(r=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)">
+      <div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:2px">${r[0]}</div>
+        <div style="font-size:16px;font-weight:bold">${r[1]}</div>
+      </div>
+      <button onclick="idx=${r[2]};render()" style="background:none;border:1px solid var(--main);color:var(--main-dark);border-radius:10px;padding:6px 14px;font-size:13px;font-weight:bold;cursor:pointer;white-space:nowrap">修正</button>
+    </div>
+  `).join('');
+  app.innerHTML=`
+    <div style="max-width:520px;margin:0 auto;padding:22px 20px 60px">
+      ${progressBar()}
+      ${backBtn()}
+      <h1 style="font-size:22px;font-weight:bold;margin-bottom:18px">この内容でよろしいですか？</h1>
+      <div style="background:var(--card);border-radius:16px;padding:6px 18px;margin-bottom:22px">${rowsHtml}</div>
+      <button id="submitBtn" onclick="submitConsult()" style="width:100%;padding:18px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:bold;cursor:pointer">先生に送る</button>
+    </div>
+  `;
+}
+
+async function submitConsult(){
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true; btn.textContent='送信中...';
+  try{
+    const payload={
+      name:state.name, tel:state.tel,
+      accidentDate: state.accidentDateUnknown?'覚えていない':state.accidentDate,
+      painAreas: state.painAreas,
+      hospital: state.hospital, certificate: state.certificate,
+      insurance: state.insurance, hope: state.hope
+    };
+    const res=await fetch(GAS_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveTrafficAccidentConsult', data:payload})
+    });
+    const d=await res.json();
+    if(!d.ok){
+      alert('⚠️ '+(d.error||'送信に失敗しました。恐れ入りますがお電話にてご連絡ください。'));
+      btn.disabled=false; btn.textContent='先生に送る';
+      return;
+    }
+    idx=steps.length+1;
+    render();
+  }catch(e){
+    alert('⚠️ 通信エラーが発生しました。恐れ入りますがお電話にてご連絡ください。');
+    btn.disabled=false; btn.textContent='先生に送る';
+  }
+}
+
+function renderDone(){
+  app.innerHTML=`
+    <div style="max-width:520px;margin:0 auto;padding:60px 20px;text-align:center">
+      <div style="font-size:56px;margin-bottom:18px">✅</div>
+      <h1 style="font-size:22px;font-weight:bold;margin-bottom:14px">送信しました</h1>
+      <p style="color:var(--sub);font-size:16px;line-height:1.8">先生からLINEまたはお電話にてご連絡いたします。<br>今しばらくお待ちください。</p>
+      <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line);color:var(--sub);font-size:14px">
+        倉治整骨院<br>072-892-3223
+      </div>
+    </div>
+  `;
+}
+
+render();
+</script>
+</body>
+</html>
