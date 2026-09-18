@@ -188,7 +188,7 @@ function renderConfirm(){
       <h1 style="font-size:22px;font-weight:bold;margin-bottom:18px">この内容でよろしいですか？</h1>
       <div style="background:var(--card);border-radius:16px;padding:6px 18px;margin-bottom:14px">${rowsHtml}</div>
       <p style="font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:22px">入力いただいた情報は、本相談へのご返信・ご連絡の目的にのみ使用し、他の目的では使用いたしません。</p>
-      <button id="submitBtn" onclick="submitConsult()" style="width:100%;padding:18px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:bold;cursor:pointer">先生に送る</button>
+      <button id="submitBtn" onclick="submitConsult()" style="width:100%;padding:18px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:18px;font-weight:bold;cursor:pointer">この内容で送信する</button>
     </div>
   `;
 }
@@ -212,14 +212,14 @@ async function submitConsult(){
     const d=await res.json();
     if(!d.ok){
       alert('⚠️ '+(d.error||'送信に失敗しました。恐れ入りますがお電話にてご連絡ください。'));
-      btn.disabled=false; btn.textContent='先生に送る';
+      btn.disabled=false; btn.textContent='この内容で送信する';
       return;
     }
     idx=steps.length+1;
     render();
   }catch(e){
     alert('⚠️ 通信エラーが発生しました。恐れ入りますがお電話にてご連絡ください。');
-    btn.disabled=false; btn.textContent='先生に送る';
+    btn.disabled=false; btn.textContent='この内容で送信する';
   }
 }
 
@@ -228,7 +228,9 @@ function renderDone(){
     <div style="max-width:520px;margin:0 auto;padding:60px 20px;text-align:center">
       <div style="font-size:56px;margin-bottom:18px">✅</div>
       <h1 style="font-size:22px;font-weight:bold;margin-bottom:14px">送信しました</h1>
-      <p style="color:var(--sub);font-size:16px;line-height:1.8">先生からLINEまたはお電話にてご連絡いたします。<br>今しばらくお待ちください。</p>
+      <p style="color:var(--sub);font-size:16px;line-height:1.8">倉治整骨院よりLINEまたはお電話にてご連絡いたします。<br>今しばらくお待ちください。</p>
+      <a href="https://lin.ee/yG8vE5n" style="display:block;margin-top:26px;padding:16px;background:var(--main);color:#fff;border-radius:14px;font-size:16px;font-weight:bold;text-decoration:none">LINEで倉治整骨院を友だち追加する</a>
+      <p style="color:var(--sub);font-size:12px;margin-top:8px">LINEを友だち追加いただくと、当院からの返信もLINEで受け取れます</p>
       <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line);color:var(--sub);font-size:14px">
         倉治整骨院<br>072-892-3223
       </div>
