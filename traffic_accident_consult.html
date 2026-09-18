@@ -31,6 +31,8 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqo
 const state={
   accidentDate:'', accidentDateUnknown:false,
   painAreas:[],
+  painAreasNote:'',
+  lawyerRider:'',
   hospital:'', certificate:'', insurance:'', hope:'',
   name:'', tel:''
 };
@@ -42,6 +44,7 @@ const steps=[
   {key:'hospital', title:'病院を受診しましたか？', type:'single', options:['はい','いいえ']},
   {key:'certificate', title:'診断書はありますか？', type:'single', options:['ある','ない','わからない']},
   {key:'insurance', title:'保険会社へ連絡しましたか？', type:'single', options:['はい','まだ']},
+  {key:'lawyerRider', title:'ご自身の保険に弁護士特約は付いていますか？', type:'single', options:['はい','いいえ']},
   {key:'hope', title:'ご希望をお選びください', type:'single', options:['まずは相談したい','予約したい']},
   {key:'name', title:'お名前を教えてください', type:'text', placeholder:'例：倉治 太郎'},
   {key:'tel', title:'お電話番号を教えてください', sub:'折り返しご連絡する際に使用します', type:'tel', placeholder:'例：090-1234-5678'}
@@ -92,7 +95,9 @@ function renderStep(step){
       return `<button onclick="togglePain('${o}')" style="padding:16px 8px;border:2px solid ${sel?'var(--main)':'var(--line)'};background:${sel?'var(--main)':'#fff'};color:${sel?'#fff':'var(--text)'};border-radius:14px;font-size:16px;font-weight:bold;cursor:pointer">${o}</button>`;
     }).join('');
     body=`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">${opts}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">${opts}</div>
+      <label style="display:block;font-size:13px;color:var(--sub);margin-bottom:6px">その他、詳しく伝えたいことがあれば（任意）</label>
+      <textarea id="painNoteInput" placeholder="例：右肩が特に痛い、しびれもある" style="width:100%;min-height:70px;padding:14px;font-size:15px;border:2px solid var(--line);border-radius:14px;color:var(--text);margin-bottom:18px;font-family:inherit;resize:vertical">${state.painAreasNote||''}</textarea>
       <button onclick="answerMulti()" style="width:100%;padding:16px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:bold;cursor:pointer">次へ</button>
     `;
   }else if(step.type==='single'){
@@ -133,7 +138,11 @@ function togglePain(o){
   if(i>=0) state.painAreas.splice(i,1); else state.painAreas.push(o);
   render();
 }
-function answerMulti(){ goNext(); }
+function answerMulti(){
+  const note=document.getElementById('painNoteInput');
+  if(note) state.painAreasNote=note.value.trim();
+  goNext();
+}
 function answerSingle(key,val){ state[key]=val; goNext(); }
 function answerText(key){
   const v=document.getElementById('textInput').value.trim();
@@ -143,15 +152,17 @@ function answerText(key){
 }
 
 function renderConfirm(){
+  const painDisplay=(state.painAreas.length?state.painAreas.join('、'):'未回答')+(state.painAreasNote?`（${state.painAreasNote}）`:'');
   const rows=[
     ['事故日', state.accidentDateUnknown?'覚えていない':(state.accidentDate||'未回答'), 0],
-    ['痛む場所', state.painAreas.length?state.painAreas.join('、'):'未回答', 1],
+    ['痛む場所', painDisplay, 1],
     ['病院受診', state.hospital||'未回答', 2],
     ['診断書', state.certificate||'未回答', 3],
     ['保険会社へ連絡', state.insurance||'未回答', 4],
-    ['ご希望', state.hope||'未回答', 5],
-    ['お名前', state.name||'未回答', 6],
-    ['お電話番号', state.tel||'未回答', 7],
+    ['弁護士特約', state.lawyerRider||'未回答', 5],
+    ['ご希望', state.hope||'未回答', 6],
+    ['お名前', state.name||'未回答', 7],
+    ['お電話番号', state.tel||'未回答', 8],
   ];
   const rowsHtml=rows.map(r=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)">
@@ -180,9 +191,9 @@ async function submitConsult(){
     const payload={
       name:state.name, tel:state.tel,
       accidentDate: state.accidentDateUnknown?'覚えていない':state.accidentDate,
-      painAreas: state.painAreas,
+      painAreas: state.painAreas, painAreasNote: state.painAreasNote,
       hospital: state.hospital, certificate: state.certificate,
-      insurance: state.insurance, hope: state.hope
+      insurance: state.insurance, lawyerRider: state.lawyerRider, hope: state.hope
     };
     const res=await fetch(GAS_URL,{
       method:'POST',
