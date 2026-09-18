@@ -91,6 +91,7 @@ function doPost(e){
       else if(action==="getLineUsers")result=getLineUsers();
       else if(action==="saveWebBooking")result=saveWebBooking(body.data);
       else if(action==="saveWebBookingRequest")result=saveWebBookingRequest(body.data);
+      else if(action==="saveTrafficAccidentConsult")result=saveTrafficAccidentConsult(body.data);
       else if(action==="getWebBookingRequests")result=getWebBookingRequests();
       else if(action==="updateWebBookingRequestStatus")result=updateWebBookingRequestStatus(body.rowIdx,body.status);
       else if(action==="deleteWebBookingRequest")result=deleteWebBookingRequest(body.rowIdx);
@@ -2130,6 +2131,54 @@ function getAllBlockedSlotsDebug(){
 // ★Web予約リクエスト方式（第一〜第三希望を受け付け、その場では確定しない）★
 // 個人経営で施術中に電話対応できないため、候補日時をいただいて後日院長が確認の上、確定連絡する運用。
 // ═══════════════════════════════════════
+// ============================================================
+// ★交通事故相談ページ（選択式診断フォーム）専用の送信処理（新規追加）
+// 既存の予約表・患者・web_yoyaku_requests等のシートには一切触れない、完全に独立した処理。
+// 専用の新しいシート(traffic_accident_consults)に記録し、先生のLINEに通知する。
+// 予約と違い「本日中はNG」等の制限は設けない（事故相談は当日連絡も多いため）。
+// ============================================================
+function saveTrafficAccidentConsult(data){
+  try{
+    if(!data||!data.name||!data.tel) return {ok:false, error:"お名前・お電話番号は必須です"};
+
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var s=ss.getSheetByName("traffic_accident_consults");
+    if(!s){
+      s=ss.insertSheet("traffic_accident_consults");
+      s.getRange(1,1,1,9).setValues([["受付日時","お名前","電話番号","事故日","痛む場所","受診","診断書","保険会社連絡","ご希望"]]);
+    }
+    var newRow=[
+      Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss"),
+      data.name||"", data.tel||"", data.accidentDate||"",
+      (data.painAreas||[]).join("、"), data.hospital||"", data.certificate||"",
+      data.insurance||"", data.hope||""
+    ];
+    var newRowIdx=s.getLastRow()+1;
+    var rng=s.getRange(newRowIdx,1,1,newRow.length);
+    rng.setNumberFormat("@");
+    rng.setValues([newRow]);
+
+    var p=PropertiesService.getScriptProperties();
+    var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
+    var nl=String.fromCharCode(10);
+    if(token&&ownerId){
+      sendLineMessagingAPI(token,ownerId,
+        "🚗交通事故の相談"+nl+nl+
+        "お名前："+(data.name||"")+" 様"+nl+
+        "電話："+(data.tel||"")+nl+
+        "事故日："+(data.accidentDate||"未回答")+nl+
+        "痛む場所："+((data.painAreas||[]).join("、")||"未回答")+nl+
+        "病院受診："+(data.hospital||"未回答")+nl+
+        "診断書："+(data.certificate||"未回答")+nl+
+        "保険会社へ連絡："+(data.insurance||"未回答")+nl+
+        "ご希望："+(data.hope||"未回答")
+      );
+    }
+    return {ok:true};
+  }catch(err){
+    return {ok:false, error:String(err)};
+  }
+}
 function saveWebBookingRequest(data){
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
