@@ -86,8 +86,10 @@ function renderStep(step){
   let body='';
   if(step.type==='date'){
     body=`
-      <label for="dateInput" style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--main-dark);font-weight:bold;margin-bottom:8px">📅 タップして日付を選んでください</label>
-      <input type="date" id="dateInput" value="${state.accidentDate||''}" style="width:100%;padding:16px;font-size:18px;border:2px solid var(--main);background:var(--card);border-radius:14px;color:var(--text);margin-bottom:14px">
+      <div style="position:relative;margin-bottom:14px">
+        <input type="date" id="dateInput" value="${state.accidentDate||''}" oninput="toggleDateHint()" style="width:100%;padding:16px;font-size:18px;border:2px solid var(--main);background:var(--card);border-radius:14px;color:var(--text)">
+        <span id="dateHint" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--main-dark);font-size:16px;font-weight:bold;display:${state.accidentDate?'none':'flex'};align-items:center;gap:6px">📅 タップして事故日を選んでください</span>
+      </div>
       <button onclick="answerDate()" style="width:100%;padding:16px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:bold;cursor:pointer">次へ</button>
       <button onclick="answerUnknownDate()" style="width:100%;padding:14px;margin-top:10px;background:var(--card);color:var(--main-dark);border:2px solid var(--main);border-radius:14px;font-size:15px;font-weight:bold;cursor:pointer">覚えていない</button>
     `;
@@ -126,6 +128,11 @@ function goNext(){ idx++; render(); }
 function goBack(){ if(idx>0){idx--; render();} }
 function skipStep(){ goNext(); }
 
+function toggleDateHint(){
+  const v=document.getElementById('dateInput').value;
+  const hint=document.getElementById('dateHint');
+  if(hint) hint.style.display=v?'none':'flex';
+}
 function answerDate(){
   const v=document.getElementById('dateInput').value;
   if(!v){ alert('日付を選択するか、下の「覚えていない」を押してください'); return; }
