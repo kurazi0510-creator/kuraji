@@ -86,7 +86,8 @@ function renderStep(step){
   let body='';
   if(step.type==='date'){
     body=`
-      <input type="date" id="dateInput" value="${state.accidentDate||''}" style="width:100%;padding:16px;font-size:18px;border:2px solid var(--line);border-radius:14px;color:var(--text);margin-bottom:14px">
+      <label for="dateInput" style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--main-dark);font-weight:bold;margin-bottom:8px">📅 タップして日付を選んでください</label>
+      <input type="date" id="dateInput" value="${state.accidentDate||''}" style="width:100%;padding:16px;font-size:18px;border:2px solid var(--main);background:var(--card);border-radius:14px;color:var(--text);margin-bottom:14px">
       <button onclick="answerDate()" style="width:100%;padding:16px;background:var(--main);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:bold;cursor:pointer">次へ</button>
       <button onclick="answerUnknownDate()" style="width:100%;padding:14px;margin-top:10px;background:var(--card);color:var(--main-dark);border:2px solid var(--main);border-radius:14px;font-size:15px;font-weight:bold;cursor:pointer">覚えていない</button>
     `;
