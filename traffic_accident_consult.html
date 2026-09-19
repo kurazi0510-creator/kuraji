@@ -226,27 +226,19 @@ async function submitConsult(){
   }
 }
 
-function buildLineSummaryText(){
-  return "🚗交通事故の相談\n"+
-    "お名前："+(state.name||"")+" 様\n"+
-    "電話："+(state.tel||"")+"\n"+
-    "事故日："+(state.accidentDateUnknown?'覚えていない':(state.accidentDate||'未回答'))+"\n"+
-    "痛む場所："+((state.painAreas.join('、')||'未回答')+(state.painAreasNote?'（'+state.painAreasNote+'）':''))+"\n"+
-    "病院受診："+(state.hospital||'未回答')+"\n"+
-    "診断書："+(state.certificate||'未回答')+"\n"+
-    "保険会社へ連絡："+(state.insurance||'未回答')+"\n"+
-    "弁護士特約："+(state.lawyerRider||'未回答')+"\n"+
-    "ご希望："+(state.hope||'未回答');
-}
 function renderDone(){
-  const lineOaLink='https://line.me/R/oaMessage/%40qin9307o/?'+encodeURIComponent(buildLineSummaryText());
+  const friendUrl='https://lin.ee/pwN03xs';
+  const isLineWish = state.callbackMethod==='LINEで連絡がいい';
+  const lineBlock = isLineWish
+    ? `<a href="${friendUrl}" style="display:block;margin-top:26px;padding:16px;background:var(--main);color:#fff;border-radius:14px;font-size:16px;font-weight:bold;text-decoration:none">LINEで返信を受け取る（友だち追加）</a>
+       <p style="color:var(--sub);font-size:12px;margin-top:8px">LINEでのご連絡をご希望のため、下記から友だち追加をお願いします</p>`
+    : `<a href="${friendUrl}" style="display:block;margin-top:26px;padding:14px;background:#fff;color:var(--main-dark);border:2px solid var(--main);border-radius:14px;font-size:14px;font-weight:bold;text-decoration:none">お急ぎの場合はLINE友だち追加もできます</a>`;
   app.innerHTML=`
     <div style="max-width:520px;margin:0 auto;padding:60px 20px;text-align:center">
       <div style="font-size:56px;margin-bottom:18px">✅</div>
       <h1 style="font-size:22px;font-weight:bold;margin-bottom:14px">送信しました</h1>
       <p style="color:var(--sub);font-size:16px;line-height:1.8">倉治整骨院よりLINEまたはお電話にてご連絡いたします。<br>今しばらくお待ちください。</p>
-      <a href="${lineOaLink}" style="display:block;margin-top:26px;padding:16px;background:var(--main);color:#fff;border-radius:14px;font-size:16px;font-weight:bold;text-decoration:none">LINEでも同じ内容を送る（友だち追加されます）</a>
-      <p style="color:var(--sub);font-size:12px;margin-top:8px">タップすると相談内容が入力済みのLINE画面が開きます。送信ボタンを押すだけで、LINEでも当院とやり取りできるようになります</p>
+      ${lineBlock}
       <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line);color:var(--sub);font-size:14px">
         倉治整骨院<br>072-892-3223
       </div>
