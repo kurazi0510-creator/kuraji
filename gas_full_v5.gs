@@ -2175,6 +2175,27 @@ function saveTrafficAccidentConsult(data){
     rng.setNumberFormat("@");
     rng.setValues([newRow]);
 
+    // ★「予約したい」を選んだ方は、Web予約リクエスト一覧（kanri.html）にも自動で載せる
+    //   ※日時の希望は聞いていないため空欄にし、症状欄に交通事故相談からのリクエストである旨を残す
+    if(data.hope==="予約したい"){
+      var ws=ss.getSheetByName("web_yoyaku_requests");
+      if(!ws){
+        ws=ss.insertSheet("web_yoyaku_requests");
+        ws.getRange(1,1,1,15).setValues([["date1","time1","date2","time2","date3","time3","name","tel","email","menu","symptom","status","createdAt","kana","cardId"]]);
+      }
+      var wRow=[
+        "","","","","","",
+        data.name||"", data.tel||"", "",
+        "交通事故のご相談（日程要調整）",
+        "【交通事故相談ページより】事故日:"+(data.accidentDate||"未回答")+"／痛む場所:"+(painDisplay||"未回答"),
+        "未対応", Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss"), "", ""
+      ];
+      var wIdx=ws.getLastRow()+1;
+      var wRng=ws.getRange(wIdx,1,1,wRow.length);
+      wRng.setNumberFormat("@");
+      wRng.setValues([wRow]);
+    }
+
     var p=PropertiesService.getScriptProperties();
     var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
     var nl=String.fromCharCode(10);
