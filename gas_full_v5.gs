@@ -2152,14 +2152,14 @@ function saveTrafficAccidentConsult(data){
 
     var ss=SpreadsheetApp.getActiveSpreadsheet();
     var s=ss.getSheetByName("traffic_accident_consults");
-    var expectedHeader=["受付日時","お名前","電話番号","事故日","痛む場所","受診","診断書","保険会社連絡","弁護士特約","ご希望"];
+    var expectedHeader=["受付日時","お名前","電話番号","事故日","痛む場所","受診","診断書","保険会社連絡","弁護士特約","ご希望","ご連絡方法"];
     if(!s){
       s=ss.insertSheet("traffic_accident_consults");
       s.getRange(1,1,1,expectedHeader.length).setValues([expectedHeader]);
     }else{
-      // ★既存シートに新しい列（弁護士特約）が無ければ、データ行はそのままにヘッダーだけ安全に拡張する
+      // ★既存シートに新しい列（弁護士特約／ご連絡方法）が無ければ、データ行はそのままにヘッダーだけ安全に拡張する
       var curHeader=s.getLastColumn()>0?s.getRange(1,1,1,s.getLastColumn()).getValues()[0]:[];
-      if(curHeader.indexOf("弁護士特約")<0){
+      if(curHeader.indexOf("ご連絡方法")<0){
         s.getRange(1,1,1,expectedHeader.length).setValues([expectedHeader]);
       }
     }
@@ -2168,7 +2168,7 @@ function saveTrafficAccidentConsult(data){
       Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss"),
       data.name||"", data.tel||"", data.accidentDate||"",
       painDisplay, data.hospital||"", data.certificate||"",
-      data.insurance||"", data.lawyerRider||"", data.hope||""
+      data.insurance||"", data.lawyerRider||"", data.hope||"", data.callbackMethod||""
     ];
     var newRowIdx=s.getLastRow()+1;
     var rng=s.getRange(newRowIdx,1,1,newRow.length);
@@ -2216,7 +2216,8 @@ function saveTrafficAccidentConsult(data){
         "診断書："+(data.certificate||"未回答")+nl+
         "保険会社へ連絡："+(data.insurance||"未回答")+nl+
         "弁護士特約："+(data.lawyerRider||"未回答")+nl+
-        "ご希望："+(data.hope||"未回答")
+        "ご希望："+(data.hope||"未回答")+nl+
+        "📞ご連絡方法："+(data.callbackMethod||"未回答")
       );
     }
     return {ok:true};
