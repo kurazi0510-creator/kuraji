@@ -51,14 +51,31 @@ const steps=[
   {key:'callbackMethod', title:'ご連絡方法のご希望をお選びください', sub:'※お電話は院内からのみおかけしております。休診日や診療時間外はご返信が遅くなる場合があります。お急ぎの場合はLINEがおすすめです。', type:'single', options:['LINEで連絡がいい','電話で連絡がいい']}
 ];
 
-let idx=0; // 0..steps.length-1、steps.length で確認画面、+1 で完了画面
+let idx=-1; // -1で前置き画面、0..steps.length-1、steps.length で確認画面、+1 で完了画面
 const app=document.getElementById('app');
 
 function render(){
-  if(idx<steps.length) renderStep(steps[idx]);
+  if(idx===-1) renderIntro();
+  else if(idx<steps.length) renderStep(steps[idx]);
   else if(idx===steps.length) renderConfirm();
   else renderDone();
   window.scrollTo(0,0);
+}
+
+function renderIntro(){
+  app.innerHTML=`
+    <div style="max-width:520px;margin:0 auto;padding:36px 20px 60px">
+      <h1 style="font-size:20px;font-weight:bold;margin-bottom:18px;line-height:1.6">交通事故・むちうちのご相談へお越しくださり、ありがとうございます。</h1>
+      <p style="font-size:15px;line-height:1.9;color:var(--text);margin-bottom:16px">事故のあとは、体の痛みだけでなく、「どこに相談したらいいの？」「保険の手続きはどうなるの？」と、不安なことが重なりますよね。</p>
+      <p style="font-size:15px;line-height:1.9;color:var(--text);margin-bottom:16px">まずは、あなたの今の状態を一緒に確認させてください。かんたんな質問にお答えいただくだけで、あなたに合ったサポートをご案内できます。</p>
+      <div style="background:var(--card);border-radius:16px;padding:18px;margin-bottom:28px">
+        <p style="font-size:14px;line-height:1.9;color:var(--text);margin-bottom:10px">下のボタンから、かんたんな質問がはじまります。</p>
+        <p style="font-size:14px;line-height:1.9;color:var(--text);margin-bottom:10px">答えはそのまま担当の先生にお届けします。内容を確認したうえで、先生から直接お返事しますので、どうぞ安心してお進みください。</p>
+        <p style="font-size:13px;line-height:1.8;color:var(--sub)">※わからない項目は「覚えていない」や「スキップ」でも大丈夫です。</p>
+      </div>
+      <button onclick="idx=0;render()" style="width:100%;padding:18px;background:#2f6fed;color:#fff;border:none;border-radius:28px;font-size:17px;font-weight:bold;cursor:pointer;box-shadow:0 4px 14px rgba(47,111,237,.35)">かんたん診断をはじめる　▶</button>
+    </div>
+  `;
 }
 
 function progressBar(){
@@ -71,7 +88,7 @@ function progressBar(){
 }
 
 function backBtn(){
-  if(idx===0) return '';
+  if(idx<0) return '';
   return `<button onclick="goBack()" style="background:none;border:none;color:var(--sub);font-size:15px;font-weight:bold;padding:8px 0;margin-bottom:8px;cursor:pointer">← 戻る</button>`;
 }
 
@@ -126,7 +143,7 @@ function renderStep(step){
 }
 
 function goNext(){ idx++; render(); }
-function goBack(){ if(idx>0){idx--; render();} }
+function goBack(){ if(idx>-1){idx--; render();} }
 function skipStep(){ goNext(); }
 
 function toggleDateHint(){
