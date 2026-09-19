@@ -237,9 +237,6 @@ function buildLineSummaryText(){
 }
 function renderDone(){
   const lineOaLink='https://line.me/R/oaMessage/%40qin9307o/?'+encodeURIComponent(buildLineSummaryText());
-  const bookingLink = state.hope==='予約したい'
-    ? `<a href="https://kurazi0510-creator.github.io/kuraji/book.html" style="display:block;margin-top:12px;padding:16px;background:#fff;color:var(--main-dark);border:2px solid var(--main);border-radius:14px;font-size:16px;font-weight:bold;text-decoration:none">そのままWeb予約に進む</a>`
-    : '';
   app.innerHTML=`
     <div style="max-width:520px;margin:0 auto;padding:60px 20px;text-align:center">
       <div style="font-size:56px;margin-bottom:18px">✅</div>
@@ -247,7 +244,6 @@ function renderDone(){
       <p style="color:var(--sub);font-size:16px;line-height:1.8">倉治整骨院よりLINEまたはお電話にてご連絡いたします。<br>今しばらくお待ちください。</p>
       <a href="${lineOaLink}" style="display:block;margin-top:26px;padding:16px;background:var(--main);color:#fff;border-radius:14px;font-size:16px;font-weight:bold;text-decoration:none">LINEでも同じ内容を送る（友だち追加されます）</a>
       <p style="color:var(--sub);font-size:12px;margin-top:8px">タップすると相談内容が入力済みのLINE画面が開きます。送信ボタンを押すだけで、LINEでも当院とやり取りできるようになります</p>
-      ${bookingLink}
       <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line);color:var(--sub);font-size:14px">
         倉治整骨院<br>072-892-3223
       </div>
