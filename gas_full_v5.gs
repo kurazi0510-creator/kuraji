@@ -43,6 +43,14 @@ function doPost(e){
               if(tok)sendLineMessagingAPI(tok,uid,"📱 お電話番号を登録しました！"+String.fromCharCode(10)+"今後、ご予約確認・前日リマインドをこちらのLINEにお送りします。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院");
             }else{
               saveLineUserId(uid,dname,msgText);
+              // ★交通事故相談ページの「LINEでも送る」ボタンから届いたメッセージは、
+              //   Webフォーム送信時と同様に先生へ転送する（二重に通知が届く形にする）
+              if(msgText.indexOf("交通事故の相談")>=0){
+                var ownerId3=PropertiesService.getScriptProperties().getProperty("LINE_USER_ID");
+                if(tok&&ownerId3)sendLineMessagingAPI(tok,ownerId3,"[倉治整骨院] 📩 LINE経由で交通事故のご相談が届きました"+String.fromCharCode(10)+String.fromCharCode(10)+msgText);
+                if(tok)sendLineMessagingAPI(tok,uid,"ご相談内容を受け付けました😊"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院よりLINEまたはお電話にてご連絡いたします。今しばらくお待ちください。"+String.fromCharCode(10)+String.fromCharCode(10)+"倉治整骨院"+String.fromCharCode(10)+"072-892-3223");
+                markPromptSent_(uid);
+              }else{
               // ★送られてきた文章が、Web予約リクエスト(未対応)の名前と一致するか確認する
               //   （Webフォームから送った方が、そのままフルネームだけ送ってきた場合の専用案内）
               var matchedReq=findPendingWebRequestByName_(msgText);
@@ -71,6 +79,7 @@ function doPost(e){
                 // 案内メッセージは友だち1人につき1回だけ送信（すでに送信済み・登録済みの方には送らない）
                 sendLineMessagingAPI(tok,uid,"いつもありがとうございます😊"+String.fromCharCode(10)+"ご予約のお知らせを受け取るには、お電話番号を数字のみで送ってください。"+String.fromCharCode(10)+"例）09012345678");
                 markPromptSent_(uid);
+              }
               }
             }
           }
