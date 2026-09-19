@@ -34,7 +34,7 @@ const state={
   painAreasNote:'',
   lawyerRider:'',
   hospital:'', certificate:'', insurance:'', hope:'',
-  name:'', tel:''
+  name:'', tel:'', callbackMethod:''
 };
 
 const steps=[
@@ -47,7 +47,8 @@ const steps=[
   {key:'lawyerRider', title:'ご自身の保険に弁護士特約は付いていますか？', type:'single', options:['はい','いいえ']},
   {key:'hope', title:'ご希望をお選びください', type:'single', options:['まずは相談したい','予約したい']},
   {key:'name', title:'お名前を教えてください', type:'text', placeholder:'例：倉治 太郎'},
-  {key:'tel', title:'お電話番号を教えてください', sub:'折り返しご連絡する際に使用します', type:'tel', placeholder:'例：090-1234-5678'}
+  {key:'tel', title:'お電話番号を教えてください', sub:'折り返しご連絡する際に使用します', type:'tel', placeholder:'例：090-1234-5678'},
+  {key:'callbackMethod', title:'ご連絡方法のご希望をお選びください', type:'single', options:['LINEで連絡がいい','電話で連絡がいい']}
 ];
 
 let idx=0; // 0..steps.length-1、steps.length で確認画面、+1 で完了画面
@@ -171,6 +172,7 @@ function renderConfirm(){
     ['ご希望', state.hope||'未回答', 6],
     ['お名前', state.name||'未回答', 7],
     ['お電話番号', state.tel||'未回答', 8],
+    ['ご連絡方法', state.callbackMethod||'未回答', 9],
   ];
   const rowsHtml=rows.map(r=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)">
@@ -202,7 +204,8 @@ async function submitConsult(){
       accidentDate: state.accidentDateUnknown?'覚えていない':state.accidentDate,
       painAreas: state.painAreas, painAreasNote: state.painAreasNote,
       hospital: state.hospital, certificate: state.certificate,
-      insurance: state.insurance, lawyerRider: state.lawyerRider, hope: state.hope
+      insurance: state.insurance, lawyerRider: state.lawyerRider, hope: state.hope,
+      callbackMethod: state.callbackMethod
     };
     const res=await fetch(GAS_URL,{
       method:'POST',
@@ -250,6 +253,18 @@ function renderDone(){
     </div>
   `;
 }
+
+// ★入力欄（テキスト・電話番号・自由記入・日付）にフォーカスした時、
+//   キーボード表示で欄が隠れないよう自動でスクロールする
+//   （Instagram・note.com等のアプリ内ブラウザで、キーボードが出ると入力中の文字が見えなくなる問題への対策）
+document.addEventListener('focusin',(e)=>{
+  const t=e.target;
+  if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA')){
+    setTimeout(()=>{
+      t.scrollIntoView({block:'center', behavior:'smooth'});
+    },300);
+  }
+});
 
 render();
 </script>
