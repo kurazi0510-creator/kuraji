@@ -48,7 +48,7 @@ const steps=[
   {key:'hope', title:'ご希望をお選びください', type:'single', options:['まずは相談したい','予約したい']},
   {key:'name', title:'お名前を教えてください', type:'text', placeholder:'例：倉治 太郎'},
   {key:'tel', title:'お電話番号を教えてください', sub:'折り返しご連絡する際に使用します', type:'tel', placeholder:'例：090-1234-5678'},
-  {key:'callbackMethod', title:'ご連絡方法のご希望をお選びください', type:'single', options:['LINEで連絡がいい','電話で連絡がいい']}
+  {key:'callbackMethod', title:'ご連絡方法のご希望をお選びください', sub:'※お電話は院内からのみおかけしております。休診日や診療時間外はご返信が遅くなる場合があります。お急ぎの場合はLINEがおすすめです。', type:'single', options:['LINEで連絡がいい','電話で連絡がいい']}
 ];
 
 let idx=0; // 0..steps.length-1、steps.length で確認画面、+1 で完了画面
