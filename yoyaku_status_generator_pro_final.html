@@ -189,6 +189,17 @@
   <button class="tab-btn tokubetsu" onclick="switchTab('tokubetsu')">🕐 臨時診療のお知らせ</button>
 </div>
 
+<div style="width:100%;max-width:460px;margin-bottom:14px;background:#fff;border-radius:12px;padding:12px 14px;border:2px solid #eee;box-sizing:border-box">
+  <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px">🖼 保存する画像サイズ（投稿先に合わせて選択）</label>
+  <select id="outSize" onchange="refreshSizedPreviews()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px;font-family:inherit">
+    <option value="orig">従来どおり（800×800）</option>
+    <option value="ig_feed">Instagram投稿・縦長 1080×1350（おすすめ）</option>
+    <option value="ig_sq">Instagram投稿・正方形 1080×1080</option>
+    <option value="ig_story">Instagramストーリーズ 1080×1920</option>
+    <option value="line">LINE公式アカウント 1040×1040</option>
+  </select>
+</div>
+
 <!-- ===== 予約空き状況タブ ===== -->
 <div class="tab-content active" id="tab-yoyaku">
 
@@ -1322,21 +1333,91 @@ async function generateTokubetsu(){
   showPreview('tCanvas','tPreview','tDlBtn',`tokubetsu_${dateVal}`);
 }
 
+// ===== 投稿先の規格サイズへの変換 =====
+// 元の800×800デザインはそのまま使い、高解像度に拡大＋縦長の場合は上下を同じ色で自然に延長する。
+// （ストーリーズは上下にUIが重なるため、中央配置で文字が隠れないようにしている）
+const OUT_SIZES={
+  orig:null,
+  ig_feed:{w:1080,h:1350,label:'Instagram投稿 1080×1350'},
+  ig_sq:{w:1080,h:1080,label:'Instagram投稿 1080×1080'},
+  ig_story:{w:1080,h:1920,label:'ストーリーズ 1080×1920'},
+  line:{w:1040,h:1040,label:'LINE公式 1040×1040'}
+};
+function pickColor(ctx,x,y,fallback){
+  try{const d=ctx.getImageData(x,y,1,1).data;return `rgb(${d[0]},${d[1]},${d[2]})`;}
+  catch(e){return fallback;}
+}
+function isDark(rgb){
+  const m=rgb.match(/\d+/g);if(!m)return false;
+  return (0.299*m[0]+0.587*m[1]+0.114*m[2])<150;
+}
+function buildSizedCanvas(src,key){
+  const s=OUT_SIZES[key];
+  if(!s) return src;
+  const out=document.createElement('canvas');
+  out.width=s.w;out.height=s.h;
+  const ctx=out.getContext('2d');
+  const sctx=src.getContext('2d');
+  const topC=pickColor(sctx,4,4,'#f5a623');
+  const botC=pickColor(sctx,4,src.height-4,'#fdf8f0');
+  const scale=s.w/src.width, dh=Math.round(src.height*scale), y=Math.round((s.h-dh)/2);
+  ctx.fillStyle=topC;ctx.fillRect(0,0,s.w,y+2);
+  ctx.fillStyle=botC;ctx.fillRect(0,y+dh-2,s.w,s.h-(y+dh)+2);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(src,0,y,s.w,dh);
+  // ストーリーズ用：上下の余白に一言添える（アンケートはスタンプを置く場所の案内）
+  if(key==='ig_story'){
+    ctx.textAlign='center';
+    ctx.font='bold 40px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.fillStyle=isDark(topC)?'#ffffff':'#3d3226';
+    ctx.fillText('倉治整骨院',s.w/2,y-150);
+    ctx.fillStyle=isDark(botC)?'#ffffff':'#3d3226';
+    const bottomMsg = src.id==='qCanvas' ? '👇 ここのアンケートで回答してね' : '👆 タップでプロフィールへ';
+    ctx.fillText(bottomMsg,s.w/2,y+dh+130);
+  }
+  return out;
+}
+function updateSizedPreview(cid){
+  const src=document.getElementById(cid);
+  if(!src||!src.width) return;
+  const key=document.getElementById('outSize').value;
+  let box=document.getElementById(cid+'_sized');
+  if(!box){
+    box=document.createElement('div');
+    box.id=cid+'_sized';
+    box.style.cssText='width:100%;margin-top:10px;text-align:center';
+    src.insertAdjacentElement('afterend',box);
+  }
+  if(key==='orig'){box.style.display='none';box.innerHTML='';return;}
+  const out=buildSizedCanvas(src,key);
+  box.style.display='block';
+  box.innerHTML=`<div style="font-size:12px;color:#666;font-weight:700;margin-bottom:6px">▼ 保存される画像（${OUT_SIZES[key].label}）</div>
+    <img src="${out.toDataURL('image/jpeg',0.85)}" style="width:${key==='ig_story'?'60%':'100%'};border-radius:10px;border:1px solid #ddd">`;
+}
+function refreshSizedPreviews(){
+  ['yCanvas','kCanvas','qCanvas','tCanvas'].forEach(id=>{
+    const c=document.getElementById(id);
+    if(c&&c.width&&c.closest('.preview-wrap')&&c.closest('.preview-wrap').classList.contains('active')) updateSizedPreview(id);
+  });
+}
+
 // ===== 共通 =====
 function showPreview(cid,pid,bid,dateStr){
   const wrap=document.getElementById(pid);
   wrap.classList.add('active');
   document.getElementById(bid).onclick=()=>{
-    document.getElementById(cid).toBlob(blob=>{
+    const key=document.getElementById('outSize').value;
+    const out=buildSizedCanvas(document.getElementById(cid),key);
+    out.toBlob(blob=>{
       const a=document.createElement('a');
       a.href=URL.createObjectURL(blob);
-      a.download=`${dateStr}.jpg`;
+      a.download=`${dateStr}${key==='orig'?'':'_'+key}.jpg`;
       a.click();
     },'image/jpeg',0.95);
   };
+  updateSizedPreview(cid);
   wrap.scrollIntoView({behavior:'smooth',block:'start'});
 }
-
 function rrPath(ctx,x,y,w,h,r){
   ctx.beginPath();
   ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
