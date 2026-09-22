@@ -19,18 +19,22 @@
 
   /* タブ切り替え */
   .tabs{
-    display:flex;gap:8px;width:100%;max-width:460px;margin-bottom:14px;
+    display:flex;flex-wrap:wrap;gap:8px;width:100%;max-width:460px;margin-bottom:14px;
   }
   .tab-btn{
-    flex:1;padding:12px 6px;border:2px solid transparent;border-radius:12px;
+    flex:1 1 45%;padding:12px 6px;border:2px solid transparent;border-radius:12px;
     font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
     text-align:center;transition:all .2s;
     -webkit-tap-highlight-color:transparent;
   }
   .tab-btn.yoyaku{background:#fff3e0;color:#e65100;border-color:#ffcc80;}
   .tab-btn.kyushin{background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;}
+  .tab-btn.enq{background:#f3e5f5;color:#6a1b9a;border-color:#ce93d8;}
+  .tab-btn.tokubetsu{background:#e0f7fa;color:#00838f;border-color:#80deea;}
   .tab-btn.active.yoyaku{background:#ff7043;color:#fff;border-color:#ff7043;}
   .tab-btn.active.kyushin{background:#43a047;color:#fff;border-color:#43a047;}
+  .tab-btn.active.enq{background:#8e24aa;color:#fff;border-color:#8e24aa;}
+  .tab-btn.active.tokubetsu{background:#00838f;color:#fff;border-color:#00838f;}
 
   .tab-content{display:none;width:100%;max-width:460px;flex-direction:column;align-items:center;}
   .tab-content.active{display:flex;}
@@ -181,6 +185,8 @@
 <div class="tabs">
   <button class="tab-btn yoyaku active" onclick="switchTab('yoyaku')">📅 予約空き状況</button>
   <button class="tab-btn kyushin" onclick="switchTab('kyushin')">🏥 休診のお知らせ</button>
+  <button class="tab-btn enq" onclick="switchTab('enq')">📊 アンケート投稿</button>
+  <button class="tab-btn tokubetsu" onclick="switchTab('tokubetsu')">🕐 臨時診療のお知らせ</button>
 </div>
 
 <!-- ===== 予約空き状況タブ ===== -->
@@ -306,6 +312,113 @@
     <canvas id="kCanvas"></canvas>
     <div class="action-btns">
       <button class="btn-save" id="kDlBtn">💾 写真を保存する（カメラロール）</button>
+      <div class="post-hint">
+        <div class="hint-title">📤 投稿手順</div>
+        <div class="hint-row">
+          <span class="hint-badge badge-ig">Instagram</span>
+          ①写真を保存 → ②Instagramアプリ → ③ストーリーズ or 投稿
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== アンケート投稿タブ ===== -->
+<div class="tab-content" id="tab-enq">
+
+  <div class="panel">
+    <div class="panel-title">📊 質問を入力</div>
+    <div class="form-row">
+      <label>質問文（必須）</label>
+      <textarea id="qQuestion" rows="2" placeholder="例：祝日に診療したら来てくれますか？">祝日に診療したら来てくれますか？</textarea>
+    </div>
+    <div class="form-row">
+      <label>選択肢の数</label>
+      <select id="qChoiceCount" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px" onchange="toggleQOptC()">
+        <option value="2">2択</option>
+        <option value="3">3択</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>選択肢A</label>
+      <input type="text" id="qOptA" placeholder="例：はい、行きたい" value="はい、行きたい">
+    </div>
+    <div class="form-row">
+      <label>選択肢B</label>
+      <input type="text" id="qOptB" placeholder="例：いいえ" value="いいえ">
+    </div>
+    <div class="form-row" id="qOptCRow" style="display:none">
+      <label>選択肢C</label>
+      <input type="text" id="qOptC" placeholder="例：わからない">
+    </div>
+    <div class="form-row">
+      <label>デザインの色</label>
+      <select id="qTheme" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px">
+        <option value="0">🟠 オレンジ・あたたかい（定番）</option>
+        <option value="1">🔵 ブルー・さわやか</option>
+        <option value="2">🌸 ピンク・やさしい</option>
+        <option value="3">🌿 グリーン・ナチュラル</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn-gen-kyushin" style="background:#8e24aa" onclick="generateEnquete()">🎨 アンケート画像を生成</button>
+
+  <div class="preview-wrap" id="qPreview">
+    <canvas id="qCanvas"></canvas>
+    <div class="action-btns">
+      <button class="btn-save" id="qDlBtn">💾 写真を保存する（カメラロール）</button>
+      <div class="post-hint">
+        <div class="hint-title">📤 投稿手順</div>
+        <div class="hint-row">
+          <span class="hint-badge badge-ig">Instagram</span>
+          ①写真を保存 → ②Instagramアプリ → ③ストーリーズ（質問スタンプと合わせても◎）
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 臨時診療のお知らせタブ ===== -->
+<div class="tab-content" id="tab-tokubetsu">
+
+  <div class="panel">
+    <div class="panel-title">🕐 臨時診療の内容を入力</div>
+    <div class="form-row">
+      <label>診療日（必須）</label>
+      <input type="date" id="tDate">
+    </div>
+    <div class="form-row" style="display:flex;gap:10px">
+      <div style="flex:1">
+        <label>開始時間</label>
+        <input type="time" id="tStart" value="09:00">
+      </div>
+      <div style="flex:1">
+        <label>終了時間</label>
+        <input type="time" id="tEnd" value="18:00">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>メッセージ（任意）</label>
+      <textarea id="tMessage" rows="2" placeholder="例：祝日ですが診療いたします！">祝日ですが診療いたします！</textarea>
+    </div>
+    <div class="form-row">
+      <label>デザインの色</label>
+      <select id="tTheme" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px">
+        <option value="0">🟠 オレンジ・あたたかい（定番）</option>
+        <option value="1">🔵 ブルー・さわやか</option>
+        <option value="2">🌸 ピンク・やさしい</option>
+        <option value="3">🌿 グリーン・ナチュラル</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn-gen-kyushin" style="background:#00838f" onclick="generateTokubetsu()">🎨 臨時診療お知らせ画像を生成</button>
+
+  <div class="preview-wrap" id="tPreview">
+    <canvas id="tCanvas"></canvas>
+    <div class="action-btns">
+      <button class="btn-save" id="tDlBtn">💾 写真を保存する（カメラロール）</button>
       <div class="post-hint">
         <div class="hint-title">📤 投稿手順</div>
         <div class="hint-row">
@@ -972,6 +1085,241 @@ async function generateKyushin(){
   ctx.fillText('倉治整骨院　TEL：072-892-3223',SIZE/2,SIZE-16);
 
   showPreview('kCanvas','kPreview','kDlBtn',`kyushin_${dateVal}`);
+}
+
+// ===== アンケート投稿（3択まで対応） =====
+function toggleQOptC(){
+  const n=parseInt(document.getElementById('qChoiceCount').value);
+  document.getElementById('qOptCRow').style.display = n>=3 ? 'block' : 'none';
+}
+
+async function generateEnquete(){
+  const question=document.getElementById('qQuestion').value.trim();
+  if(!question){alert('質問文を入力してください');return;}
+  const count=parseInt(document.getElementById('qChoiceCount').value);
+  const optA=document.getElementById('qOptA').value.trim()||'選択肢A';
+  const optB=document.getElementById('qOptB').value.trim()||'選択肢B';
+  const optC=document.getElementById('qOptC').value.trim();
+  const opts=[optA,optB];
+  if(count>=3 && optC) opts.push(optC);
+  const themeIdx=parseInt(document.getElementById('qTheme').value)||0;
+  const T=KYUSHIN_THEMES[themeIdx];
+
+  const SIZE=800;
+  const canvas=document.getElementById('qCanvas');
+  canvas.width=SIZE;canvas.height=SIZE;
+  const ctx=canvas.getContext('2d');
+
+  const photo=await loadImg('data:image/jpeg;base64,'+PHOTO_B64);
+
+  // ---- 背景 ----
+  ctx.fillStyle=T.bg;ctx.fillRect(0,0,SIZE,SIZE);
+
+  // ---- 上部帯 ----
+  ctx.fillStyle=T.header;
+  ctx.fillRect(0,0,SIZE,132);
+  ctx.font='44px serif';ctx.textAlign='center';
+  ctx.fillText('📊',SIZE/2,60);
+  ctx.fillStyle='#fff';
+  ctx.font='bold 28px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText('アンケート',SIZE/2,110);
+
+  // ---- 質問文ボックス ----
+  const qBoxY=152;
+  ctx.fillStyle='#fff';
+  const qLines=[];
+  wrapTextMeasure(ctx,question,SIZE-100,'bold 26px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif',qLines);
+  const qBoxH=Math.max(90, qLines.length*36+40);
+  rrPath(ctx,40,qBoxY,SIZE-80,qBoxH,16);ctx.fill();
+  ctx.strokeStyle=T.header;ctx.lineWidth=3;
+  rrPath(ctx,40,qBoxY,SIZE-80,qBoxH,16);ctx.stroke();
+  ctx.fillStyle='#3d3226';
+  ctx.font='bold 26px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='center';
+  qLines.forEach((line,i)=>{
+    ctx.fillText(line,SIZE/2,qBoxY+38+i*36);
+  });
+
+  // ---- 選択肢（A/B/C） ----
+  const optLabels=['A','B','C'];
+  let oy=qBoxY+qBoxH+30;
+  const optH=76;
+  opts.forEach((opt,i)=>{
+    ctx.fillStyle=i%2===0?'#fff':T.reopenBg;
+    rrPath(ctx,50,oy,SIZE-100,optH,14);ctx.fill();
+    ctx.strokeStyle=T.header;ctx.lineWidth=2.5;
+    rrPath(ctx,50,oy,SIZE-100,optH,14);ctx.stroke();
+    // ラベル丸
+    ctx.fillStyle=T.header;
+    ctx.beginPath();ctx.arc(94,oy+optH/2,24,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font='bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(optLabels[i],94,oy+optH/2+2);
+    ctx.textBaseline='alphabetic';
+    // 選択肢テキスト
+    ctx.fillStyle='#3d3226';
+    ctx.font='bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.textAlign='left';
+    ctx.fillText(opt,138,oy+optH/2+9);
+    oy+=optH+16;
+  });
+
+  // ---- 外観写真（余白があれば） ----
+  const photoY=oy+10, photoH=SIZE-72-photoY;
+  if(photo && photoH>=90){
+    ctx.save();rrPath(ctx,40,photoY,SIZE-80,photoH,14);ctx.clip();
+    const ir=photo.naturalWidth/photo.naturalHeight,br=(SIZE-80)/photoH;
+    let sw,sh,sx,sy;
+    if(ir>br){sh=photo.naturalHeight;sw=sh*br;sy=0;sx=(photo.naturalWidth-sw)/2;}
+    else{sw=photo.naturalWidth;sh=sw/br;sx=0;sy=(photo.naturalHeight-sh)*0.35;}
+    ctx.drawImage(photo,sx,sy,sw,sh,40,photoY,SIZE-80,photoH);
+    ctx.restore();
+    ctx.strokeStyle=T.photoBorder;ctx.lineWidth=2;
+    rrPath(ctx,40,photoY,SIZE-80,photoH,14);ctx.stroke();
+  }
+
+  // ---- フッター ----
+  ctx.fillStyle=T.footer;
+  ctx.font='bold 16px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('倉治整骨院　TEL：072-892-3223',SIZE/2,SIZE-16);
+
+  showPreview('qCanvas','qPreview','qDlBtn',`enquete_${Date.now()}`);
+}
+
+// テキストを指定幅で折り返し、行の配列を返す（実測用・描画はしない）
+function wrapTextMeasure(ctx,text,maxW,font,outLines){
+  ctx.font=font;
+  const chars=text.split('');
+  let line='';
+  chars.forEach(ch=>{
+    const test=line+ch;
+    if(ctx.measureText(test).width>maxW && line){
+      outLines.push(line);
+      line=ch;
+    }else{
+      line=test;
+    }
+  });
+  if(line) outLines.push(line);
+}
+
+// ===== 臨時診療のお知らせ =====
+async function generateTokubetsu(){
+  const dateVal=document.getElementById('tDate').value;
+  if(!dateVal){alert('診療日を入力してください');return;}
+  const start=document.getElementById('tStart').value||'09:00';
+  const end=document.getElementById('tEnd').value||'18:00';
+  const msg=document.getElementById('tMessage').value.trim();
+  const themeIdx=parseInt(document.getElementById('tTheme').value)||0;
+  const T=KYUSHIN_THEMES[themeIdx];
+
+  const d=new Date(dateVal);
+  const month=d.getMonth()+1,day=d.getDate(),dow=DAY_NAMES[d.getDay()];
+
+  const SIZE=800;
+  const canvas=document.getElementById('tCanvas');
+  canvas.width=SIZE;canvas.height=SIZE;
+  const ctx=canvas.getContext('2d');
+
+  const [photo, lineQr, hpQr]=await Promise.all([
+    loadImg('data:image/jpeg;base64,'+PHOTO_B64),
+    loadImg('https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data='+encodeURIComponent(LINE_ADD_URL_K)),
+    loadImg('https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data='+encodeURIComponent(HOMEPAGE_URL_K)),
+  ]);
+
+  // ---- 背景 ----
+  ctx.fillStyle=T.bg;ctx.fillRect(0,0,SIZE,SIZE);
+
+  // ---- 上部帯 ----
+  ctx.fillStyle=T.header;
+  ctx.fillRect(0,0,SIZE,132);
+  ctx.font='44px serif';ctx.textAlign='center';
+  ctx.fillText('🕐',SIZE/2,60);
+  ctx.fillStyle='#fff';
+  ctx.font='bold 30px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText('臨時診療のお知らせ',SIZE/2,112);
+
+  // ---- 日付ボックス ----
+  const boxY=150, boxH=100;
+  ctx.fillStyle='#fff';
+  rrPath(ctx,40,boxY,SIZE-80,boxH,16);ctx.fill();
+  ctx.strokeStyle=T.header;ctx.lineWidth=3;
+  rrPath(ctx,40,boxY,SIZE-80,boxH,16);ctx.stroke();
+  ctx.fillStyle=T.accent;
+  ctx.font='bold 20px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('診 療 日',SIZE/2,boxY+32);
+  ctx.fillStyle='#3d3226';
+  ctx.font='bold 40px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(`${month}月${day}日（${dow}）`,SIZE/2,boxY+78);
+
+  // ---- 診療時間ボックス ----
+  const timeY=boxY+boxH+22, timeH=88;
+  ctx.fillStyle=T.reopenBg;
+  rrPath(ctx,40,timeY,SIZE-80,timeH,16);ctx.fill();
+  ctx.fillStyle=T.reopenText;
+  ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('診 療 時 間',SIZE/2,timeY+30);
+  ctx.font='bold 34px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(`${start} 〜 ${end}`,SIZE/2,timeY+70);
+
+  // ---- メッセージ ----
+  let my=timeY+timeH+30;
+  if(msg){
+    const lines=[];
+    wrapTextMeasure(ctx,msg,SIZE-100,'21px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif',lines);
+    ctx.fillStyle=T.msg;
+    ctx.font='21px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    lines.forEach((line,i)=>{
+      ctx.fillText(line,SIZE/2,my+i*29);
+    });
+    my+=lines.length*29+10;
+  }
+
+  // ---- 外観写真 ----
+  const photoY=Math.min(Math.max(my+6,378),410), photoH=118;
+  if(photo){
+    ctx.save();rrPath(ctx,40,photoY,SIZE-80,photoH,14);ctx.clip();
+    const ir=photo.naturalWidth/photo.naturalHeight,br=(SIZE-80)/photoH;
+    let sw,sh,sx,sy;
+    if(ir>br){sh=photo.naturalHeight;sw=sh*br;sy=0;sx=(photo.naturalWidth-sw)/2;}
+    else{sw=photo.naturalWidth;sh=sw/br;sx=0;sy=(photo.naturalHeight-sh)*0.35;}
+    ctx.drawImage(photo,sx,sy,sw,sh,40,photoY,SIZE-80,photoH);
+    ctx.restore();
+    ctx.strokeStyle=T.photoBorder;ctx.lineWidth=2;
+    rrPath(ctx,40,photoY,SIZE-80,photoH,14);ctx.stroke();
+  }
+
+  // ---- QRコード（LINE・ホームページ） ----
+  const qrY=photoY+photoH+26, qrSize=118;
+  ctx.fillStyle='#3d3226';
+  ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('▼ ご予約・お問い合わせはこちらから ▼',SIZE/2,qrY-6);
+
+  const qrLeftX=SIZE/2-qrSize-26, qrRightX=SIZE/2+26;
+  [[qrLeftX,lineQr,'💬 LINEで予約','#06c755'],[qrRightX,hpQr,'🌐 ホームページ','#4b8ac9']].forEach(([qx,img,label,color])=>{
+    ctx.fillStyle='#fff';
+    rrPath(ctx,qx-6,qrY+12,qrSize+12,qrSize+44,12);ctx.fill();
+    ctx.strokeStyle=color;ctx.lineWidth=2;
+    rrPath(ctx,qx-6,qrY+12,qrSize+12,qrSize+44,12);ctx.stroke();
+    if(img)ctx.drawImage(img,qx,qrY+18,qrSize,qrSize);
+    ctx.fillStyle=color;
+    ctx.font='bold 15px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(label,qx+qrSize/2,qrY+18+qrSize+24);
+  });
+
+  // ---- フッター ----
+  ctx.fillStyle=T.footer;
+  ctx.font='bold 16px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('倉治整骨院　TEL：072-892-3223',SIZE/2,SIZE-16);
+
+  showPreview('tCanvas','tPreview','tDlBtn',`tokubetsu_${dateVal}`);
 }
 
 // ===== 共通 =====
