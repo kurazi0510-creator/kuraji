@@ -509,8 +509,11 @@ async function publishTodayStatus(){
   }
   btn.disabled=true;
   statusEl.textContent='公開中…';
+  const startedAt=Date.now();
+  let gasUrl='';
   try{
     const {gas,token}=getPublishCredentials();
+    gasUrl=gas;
     const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.95));
     const base64=await new Promise((res,rej)=>{
       const reader=new FileReader();
@@ -529,7 +532,21 @@ async function publishTodayStatus(){
       statusEl.textContent='❌ 公開に失敗しました：'+(data.error||'unknown error');
     }
   }catch(err){
-    statusEl.textContent='❌ 通信エラー：'+err;
+    // ★iPhoneのSafariでは、画像の保存は成功しているのに「返事の受信」だけ失敗することがある。
+    //   その場合はGASの更新時刻を確認し、今回の操作で更新されていれば成功として表示する。
+    let confirmed=false;
+    if(gasUrl){
+      try{
+        statusEl.textContent='公開状況を確認中…';
+        const r=await fetch(gasUrl+'?action=meta&t='+Date.now(),{cache:'no-store'});
+        const m=await r.json();
+        if(m.updatedAt && new Date(m.updatedAt).getTime()>=startedAt-10000){
+          confirmed=true;
+          statusEl.textContent='✅ 公開しました（'+new Date(m.updatedAt).toLocaleString('ja-JP')+'）';
+        }
+      }catch(e2){}
+    }
+    if(!confirmed) statusEl.textContent='❌ 通信エラー：'+err+'（電波の良い場所でもう一度お試しください）';
   }finally{
     btn.disabled=false;
   }
