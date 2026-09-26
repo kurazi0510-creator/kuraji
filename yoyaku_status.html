@@ -106,17 +106,19 @@
    const old=document.getElementById('slotBox');if(old)old.remove();
    if(!d||!Array.isArray(d.slots)||!d.slots.length||!d.slotDate) return;
    const today=ymd(now);
-   const t=new Date(now);t.setDate(t.getDate()+1);
-   const tomorrow=ymd(t);
-   // 表示中の日付（診療中は本日分、受付終了後は明日分）と一致する時だけボタンを出す
-   if(!((!closed&&d.slotDate===today)||(closed&&d.slotDate===tomorrow))) return;
+   // 診療中は「今日」の分だけ、受付終了後は「今日より先（明日以降）」の分を表示する。
+   // 明日が休診（日曜等）で先生が明後日の分を公開した場合も、日付を問わずそのまま表示する。
+   if(!closed && d.slotDate!==today) return;
+   if(closed && d.slotDate<=today) return;
    const nowMin=now.getHours()*60+now.getMinutes();
    const toMin=x=>{const a=x.split(':').map(Number);return a[0]*60+a[1];};
    // 本日分は、すでに過ぎた時間を出さない
    const list=d.slots.filter(x=>d.slotDate!==today||toMin(x)>nowMin);
    if(!list.length) return;
    const dt=new Date(d.slotDate+'T00:00:00');
-   const dayLabel=(d.slotDate===today?'本日 ':'明日 ')+(dt.getMonth()+1)+'/'+dt.getDate()+'('+WD[dt.getDay()]+')';
+   const diffDays=Math.round((dt-new Date(today+'T00:00:00'))/86400000);
+   const relLabel=diffDays===0?'本日 ':diffDays===1?'明日 ':'次回 ';
+   const dayLabel=relLabel+(dt.getMonth()+1)+'/'+dt.getDate()+'('+WD[dt.getDay()]+')';
    const am=list.filter(x=>toMin(x)<13*60),pm=list.filter(x=>toMin(x)>=13*60);
    const btns=arr=>arr.map(x=>'<button class="slotbtn" onclick="openSheet(\''+d.slotDate+'\',\''+x+'\')">'+x+'</button>').join('');
    const box=document.createElement('section');
