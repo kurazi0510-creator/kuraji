@@ -28,9 +28,10 @@
 <div class="sheet-bg" id="sheetBg" onclick="if(event.target===this)closeSheet()">
  <div class="sheet">
   <div class="when" id="sheetWhen"></div>
-  <div class="sub2">ご予約方法をお選びください</div>
+  <div class="sub2">ご来院は初めてですか？</div>
   <div class="actions" style="margin-top:0">
-   <a class="btn line" id="sheetLine" href="#">LINEで予約する（入力済み）</a>
+   <a class="btn line" id="sheetLineNew" href="#">LINEで予約する（初めての方）</a>
+   <a class="btn line" id="sheetLineRepeat" href="#" style="background:#059669">LINEで予約する（通院中の方）</a>
    <a class="btn phone" href="tel:0728923223">☎ 電話で予約する</a>
   </div>
   <button class="cancel" onclick="closeSheet()">閉じる</button>
@@ -106,8 +107,10 @@
    const dt=new Date(date+'T00:00:00');
    const label=(dt.getMonth()+1)+'月'+dt.getDate()+'日('+WD[dt.getDay()]+') '+time+'〜';
    document.getElementById('sheetWhen').textContent=label;
-   const msg='【ご予約希望】\n'+label+' で予約をお願いします。\n\nお名前：\nご症状・ご希望メニュー：';
-   document.getElementById('sheetLine').href=LINE_OA+encodeURIComponent(msg);
+   const msgNew='【ご予約希望・初めての方】\n'+label+' で予約希望です。\n\nお名前：\nお電話番号：\n気になる症状・痛い場所：\nいつ頃からですか？：';
+   const msgRepeat='【ご予約希望・通院中の方】\n'+label+' で予約希望です。\n\nお名前：\n診察券番号（わかれば）：\n今日の症状・ご希望：';
+   document.getElementById('sheetLineNew').href=LINE_OA+encodeURIComponent(msgNew);
+   document.getElementById('sheetLineRepeat').href=LINE_OA+encodeURIComponent(msgRepeat);
    document.getElementById('sheetBg').style.display='flex';
  };
  window.closeSheet=function(){document.getElementById('sheetBg').style.display='none';};
