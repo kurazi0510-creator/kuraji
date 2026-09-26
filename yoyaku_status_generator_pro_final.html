@@ -499,6 +499,19 @@ function resetPublishCredentials(){
   alert('公開設定をこの端末から削除しました。次回の公開時に再入力できます。');
 }
 
+// ★患者向けページで「時間をタップして予約」できるよう、画像と一緒に空き時間の一覧も送る
+//   （手修正後の最終的な選択＝画像と同じ内容。"9時10分"→"9:10" の形にそろえる）
+function publishSlotTimes(){
+  const toHM=t=>{
+    const m=String(t).match(/(\d{1,2})\s*[時:：]\s*(\d{1,2})?/);
+    if(!m) return null;
+    return parseInt(m[1],10)+':'+String(parseInt(m[2]||'0',10)).padStart(2,'0');
+  };
+  const list=(typeof selTimes!=='undefined'?selTimes:[]).map(toHM).filter(Boolean);
+  const uniq=[...new Set(list)];
+  uniq.sort((a,b)=>{const f=x=>{const [h,m]=x.split(':').map(Number);return h*60+m;};return f(a)-f(b);});
+  return uniq;
+}
 async function publishTodayStatus(){
   const btn=document.getElementById('yPublishBtn');
   const statusEl=document.getElementById('yPublishStatus');
@@ -523,7 +536,7 @@ async function publishTodayStatus(){
     });
     const resp=await fetch(gas,{
       method:'POST',
-      body:JSON.stringify({token:token,image:base64})
+      body:JSON.stringify({token:token,image:base64,date:(document.getElementById('yDate')||{}).value||'',times:publishSlotTimes()})
     });
     const data=await resp.json();
     if(data.ok){
