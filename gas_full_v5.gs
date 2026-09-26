@@ -138,6 +138,7 @@ function doPost(e){
       else if(action==="getTestMode")result=getTestMode();
       else if(action==="runDayBeforeRemindersNow"){sendDayBeforeReminders();result={ok:true};}
       else if(action==="sendReminderToOne")result=sendReminderToOne(body.name,body.dateStr);
+      else if(action==="sendReviewRequestToOne")result=sendReviewRequestToOne(body.name);
       else if(action==="runBirthdayMessagesNow"){sendBirthdayMessages();result={ok:true};}
       else if(action==="getBirthdayLog")result=getBirthdayLog();
       else if(action==="sendBirthdayMessageTestTo")result=sendBirthdayMessageTestTo(body.name);
@@ -607,6 +608,63 @@ function dailyLineAlert(){
 }
 // 指定した名前・日付の患者様に、個別に前日リマインドを手動で送る
 // （自動送信が何らかの理由で漏れてしまった時、その場で個別にフォローするための機能）
+// ============================================================
+// ★Google口コミ依頼を1人にLINEで送信（新規追加）
+// kanri.htmlの患者一覧・予約表から名前を指定して呼び出す想定。
+// 名前の表記ゆれ（旧姓の括弧書き等）にも対応するため、既存のnormalizeName_を使う。
+// ============================================================
+// ★GoogleビジネスプロフィールのクチコミURL（先生から共有いただき次第、ここに設定）
+var GOOGLE_REVIEW_URL = "__GOOGLE_REVIEW_URL_WO_SET_LATER__";
+
+function sendReviewRequestToOne(name){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  if(!token) return {ok:false, error:"LINEトークンが未設定です"};
+  var target=String(name||"").trim();
+  if(!target) return {ok:false, error:"名前を指定してください"};
+  if(!GOOGLE_REVIEW_URL || GOOGLE_REVIEW_URL.indexOf("WO_SET_LATER")>=0){
+    return {ok:false, error:"Googleクチコミ用のURLがまだ設定されていません"};
+  }
+
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+
+  // ①電話番号ベースの照合（最優先・最も確実）
+  var tid="";
+  var tel=getTelByPatientName_(target);
+  if(tel) tid=findLineUidByPhone_(tel);
+
+  // ②LINE_IDsシートの名前との完全一致（表記ゆれ対応）
+  if(!tid){
+    var ls=ss.getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      var normName=normalizeName_(target);
+      var exactKey=Object.keys(lu).find(function(k){return normalizeName_(k)===normName;});
+      if(exactKey)tid=lu[exactKey];
+
+      // ③姓だけの緩い一致（最終手段・候補が1件に絞れる時だけ）
+      if(!tid){
+        var ln=target.split(" ")[0].split("　")[0];
+        var candidates=Object.keys(lu).filter(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});
+        if(candidates.length===1)tid=lu[candidates[0]];
+      }
+    }
+  }
+  if(!tid) return {ok:false, error:target+"様のLINE連携が見つかりませんでした（電話番号登録がお済みでない可能性があります）"};
+
+  var nl=String.fromCharCode(10);
+  var msg="いつも倉治整骨院をご利用いただき、誠にありがとうございます😊"+nl+nl+
+    "もしよろしければ、今後の励みになりますので、Googleの口コミにご協力いただけますと大変嬉しいです🙏"+nl+nl+
+    "▼こちらからお願いいたします"+nl+GOOGLE_REVIEW_URL+nl+nl+
+    "お忙しい中恐れ入りますが、何卒よろしくお願いいたします。"+nl+nl+
+    "倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
+  var r=sendLineMessagingAPI(token,tid,msg);
+  if(!r.ok) return {ok:false, error:"送信に失敗しました"};
+
+  return {ok:true};
+}
+
 function sendReminderToOne(name, dateStr){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
