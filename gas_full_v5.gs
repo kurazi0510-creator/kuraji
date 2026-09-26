@@ -614,7 +614,7 @@ function dailyLineAlert(){
 // 名前の表記ゆれ（旧姓の括弧書き等）にも対応するため、既存のnormalizeName_を使う。
 // ============================================================
 // ★GoogleビジネスプロフィールのクチコミURL（先生から共有いただき次第、ここに設定）
-var GOOGLE_REVIEW_URL = "__GOOGLE_REVIEW_URL_WO_SET_LATER__";
+var GOOGLE_REVIEW_URL = "https://g.page/r/CZBfNKGrXbFyEBM/review";
 
 function sendReviewRequestToOne(name){
   var p=PropertiesService.getScriptProperties();
