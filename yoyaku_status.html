@@ -183,6 +183,8 @@
    if(!name){alert('お名前を入力してください');return false;}
    if(bookIsNew && !furigana){alert('ふりがなを入力してください（受付前の診察券作成に使用します）');return false;}
    if(!tel){alert('お電話番号を入力してください');return false;}
+   const telDigits=tel.replace(/[^0-9]/g,'');
+   if(!/^[0-9\-ー]+$/.test(tel) || telDigits.length<10 || telDigits.length>11){alert('お電話番号を正しく入力してください（例：090-1234-5678）');return false;}
    const card=document.getElementById('fldCard').value.trim();
    if(!bookIsNew && !card && !cardUnknown){alert('診察券番号を入力するか、「番号がわからない方はこちら」を押してください');return false;}
    const extra=document.getElementById('fldExtra').value.trim();
