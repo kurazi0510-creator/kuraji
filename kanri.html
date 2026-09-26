@@ -314,6 +314,7 @@ function printThisPage(pageId){
         <button class="btn bp bsm" onclick="openTestModeSettings()" style="background:#7c3aed;color:white;border-color:#7c3aed">🧪 前日リマインド テスト設定</button>
         <button class="btn bp bsm" onclick="runReminderTestNow()" style="background:#f59e0b;color:white;border-color:#f59e0b">▶ 前日リマインドを今すぐテスト送信</button>
         <button class="btn bp bsm" onclick="sendReminderToOnePrompt()" style="background:#0284c7;color:white;border-color:#0284c7">🔔 前日リマインドを個別に送る</button>
+        <button class="btn bp bsm" onclick="sendReviewRequestPrompt()" style="background:#f59e0b;color:white;border-color:#f59e0b">🌟 Google口コミ依頼を個別に送る</button>
         <button class="btn bp bsm" onclick="runBirthdayTestNow()" style="background:#ec4899;color:white;border-color:#ec4899">🎂 誕生日メッセージを今すぐテスト送信</button>
         <button class="btn bp bsm" onclick="sendBirthdayPreview()" style="background:#a21caf;color:white;border-color:#a21caf">👀 誕生日メッセージのプレビューを指定の人に送る</button>
         <button class="btn bp bsm" onclick="setupReviewUrl()" style="background:#0f766e;color:white;border-color:#0f766e">⚙️ GoogleクチコミURLを設定</button>
@@ -3653,6 +3654,16 @@ async function markWebRequestDone(rowIdx){
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 
+// ===== Google口コミ依頼を個別に送信 =====
+async function sendReviewRequestPrompt(){
+  const name=prompt('Googleの口コミ依頼を送りたい患者様のお名前を入力してください');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendReviewRequestToOne',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}様に口コミ依頼を送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
 // ===== 前日リマインド送信履歴 =====
 async function sendReminderToOnePrompt(){
   const name=prompt('前日リマインドを送りたい患者様のお名前を入力してください');
