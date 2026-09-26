@@ -41,8 +41,11 @@
   <div id="sheetStep2" style="display:none">
    <div class="sub2" id="step2Label"></div>
    <div class="formfield"><label>お名前</label><input type="text" id="fldName" placeholder="例：山田 太郎"></div>
+   <div class="formfield" id="fldFuriganaWrap"><label>ふりがな</label><input type="text" id="fldFurigana" placeholder="例：やまだ たろう"></div>
    <div class="formfield"><label>お電話番号</label><input type="tel" id="fldTel" placeholder="例：09012345678"></div>
+   <div class="formfield" id="fldCardWrap"><label>診察券番号</label><input type="text" id="fldCard" placeholder="わかれば入力してください"></div>
    <div class="formfield" id="fldExtraWrap"><label id="fldExtraLabel">痛めている箇所</label><input type="text" id="fldExtra" placeholder=""></div>
+   <div class="formfield" id="fldReferrerWrap"><label>ご紹介者様（いらっしゃれば）</label><input type="text" id="fldReferrer" placeholder="任意でご記入ください"></div>
    <div class="actions" style="margin-top:14px">
     <a class="btn line" id="sheetLineGo" href="#" onclick="return fillCheck()">LINEで送る</a>
    </div>
@@ -124,8 +127,11 @@
    bookLabel=(dt.getMonth()+1)+'月'+dt.getDate()+'日('+WD[dt.getDay()]+') '+time+'〜';
    document.getElementById('sheetWhen').textContent=bookLabel;
    document.getElementById('fldName').value='';
+   document.getElementById('fldFurigana').value='';
    document.getElementById('fldTel').value='';
+   document.getElementById('fldCard').value='';
    document.getElementById('fldExtra').value='';
+   document.getElementById('fldReferrer').value='';
    document.getElementById('sheetStep1').style.display='block';
    document.getElementById('sheetStep2').style.display='none';
    document.getElementById('sheetBg').style.display='flex';
@@ -133,8 +139,11 @@
  window.chooseType=function(isNew){
    bookIsNew=isNew;
    document.getElementById('step2Label').textContent=bookLabel+'（'+(isNew?'初めての方':'通院中の方')+'）';
-   document.getElementById('fldExtraLabel').textContent=isNew?'痛めている箇所':'症状・ご希望（診察券番号がわかれば併せて）';
-   document.getElementById('fldExtra').placeholder=isNew?'例：右肩':'例：腰が痛い／診察券No.123';
+   document.getElementById('fldFuriganaWrap').style.display=isNew?'block':'none';
+   document.getElementById('fldReferrerWrap').style.display=isNew?'block':'none';
+   document.getElementById('fldCardWrap').style.display=isNew?'none':'block';
+   document.getElementById('fldExtraLabel').textContent=isNew?'痛めている箇所':'症状・ご希望';
+   document.getElementById('fldExtra').placeholder=isNew?'例：右肩':'例：腰が痛い';
    document.getElementById('sheetStep1').style.display='none';
    document.getElementById('sheetStep2').style.display='block';
    document.getElementById('fldName').focus();
@@ -146,12 +155,20 @@
  window.fillCheck=function(){
    const name=document.getElementById('fldName').value.trim();
    const tel=document.getElementById('fldTel').value.trim();
+   const furigana=document.getElementById('fldFurigana').value.trim();
    if(!name){alert('お名前を入力してください');return false;}
+   if(bookIsNew && !furigana){alert('ふりがなを入力してください（受付前の診察券作成に使用します）');return false;}
    if(!tel){alert('お電話番号を入力してください');return false;}
    const extra=document.getElementById('fldExtra').value.trim();
+   const referrer=document.getElementById('fldReferrer').value.trim();
+   const card=document.getElementById('fldCard').value.trim();
    const extraLabel=bookIsNew?'痛めている箇所':'症状・ご希望';
-   const msg='【ご予約希望・'+(bookIsNew?'初めての方':'通院中の方')+'】\n'+bookLabel+' で予約希望です。\n\nお名前：'+name+'\nお電話番号：'+tel+
-     (extra?'\n'+extraLabel+'：'+extra:'');
+   let msg='【ご予約希望・'+(bookIsNew?'初めての方':'通院中の方')+'】\n'+bookLabel+' で予約希望です。\n\nお名前：'+name;
+   if(bookIsNew) msg+='\nふりがな：'+furigana;
+   msg+='\nお電話番号：'+tel;
+   if(!bookIsNew && card) msg+='\n診察券番号：'+card;
+   if(extra) msg+='\n'+extraLabel+'：'+extra;
+   if(bookIsNew && referrer) msg+='\nご紹介者様：'+referrer;
    document.getElementById('sheetLineGo').href=LINE_OA+encodeURIComponent(msg);
    return true;
  };
