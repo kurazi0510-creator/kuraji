@@ -107,8 +107,8 @@
    const dt=new Date(date+'T00:00:00');
    const label=(dt.getMonth()+1)+'月'+dt.getDate()+'日('+WD[dt.getDay()]+') '+time+'〜';
    document.getElementById('sheetWhen').textContent=label;
-   const msgNew='【ご予約希望・初めての方】\n'+label+' で予約希望です。\n\nお名前：\nお電話番号：\n気になる症状・痛い場所：\nいつ頃からですか？：';
-   const msgRepeat='【ご予約希望・通院中の方】\n'+label+' で予約希望です。\n\nお名前：\n診察券番号（わかれば）：\n今日の症状・ご希望：';
+   const msgNew='【ご予約希望・初めての方】\n'+label+' で予約希望です。\n\nお名前（漢字）：\nふりがな：\nお電話番号：\n痛めている箇所：\nご紹介者様（いらっしゃれば）：\nご質問等：';
+   const msgRepeat='【ご予約希望・通院中の方】\n'+label+' で予約希望です。\n\nお名前：\n診察券番号（わかれば）：\n今日の症状・ご希望：\nご質問等：';
    document.getElementById('sheetLineNew').href=LINE_OA+encodeURIComponent(msgNew);
    document.getElementById('sheetLineRepeat').href=LINE_OA+encodeURIComponent(msgRepeat);
    document.getElementById('sheetBg').style.display='flex';
