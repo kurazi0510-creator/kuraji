@@ -1250,7 +1250,7 @@ function sendReviewRequests(){
       }
     }
     if(!tid){skip.push(t.name);return;}
-    var msg="いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+t.name+"様には"+targetCount+"回目のご来院をいただきました。"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
+    var msg="いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
     if(sendLineMessagingAPI(token,tid,msg).ok){
       sentNames.push(t.name);
       var rngC=ps.getRange(t.rowIdx, reqI+1);
@@ -1290,7 +1290,7 @@ function sendReviewRequestTestTo(name){
     }
   }
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
-  var msg="【プレビュー送信】"+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+target+"様には3回目のご来院をいただきました。"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
+  var msg="【プレビュー送信】"+nl+"いつも倉治整骨院をご利用いただき、ありがとうございます😊"+nl+nl+"もしよろしければ、今後の励みになりますので"+nl+"Googleクチコミへのご協力をお願いできますと大変嬉しいです🙏"+nl+nl+reviewUrl+nl+nl+"(1分ほどで完了します。ご協力いただける方のみで構いません)"+nl+nl+"倉治整骨院";
   var r=sendLineMessagingAPI(token,tid,msg);
   return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
