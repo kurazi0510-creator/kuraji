@@ -80,13 +80,6 @@
    const n=jstNow(),mins=n.getHours()*60+n.getMinutes();
    return mins>=closeMinutes(n.getDay());
  }
- function isPublishedAfterClose(d,now){
-   if(!d||!d.updatedAt) return false;
-   const x=new Date(d.updatedAt);
-   const xj=new Date(x.toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
-   const mins=xj.getHours()*60+xj.getMinutes();
-   return ymd(xj)===ymd(now)&&mins>=closeMinutes(now.getDay());
- }
  function showClosed(message){
    status.innerHTML='<div class="closed"><strong>本日の受付は終了しました</strong><div class="sub">'+message+'</div></div>';
    updated.textContent='明日以降のご予約はWEB予約をご利用ください';
@@ -205,22 +198,27 @@
  function render(){
    const d=window.KURAJI_LATEST_STATUS;
    const now=jstNow();
+   const today=ymd(now);
    const closed=isClosedNow();
-   if(FULL_DATES.has(ymd(now))&&!closed){showFull();return;}
+   if(FULL_DATES.has(today)&&!closed){showFull();return;}
    if(!d||!d.ok||!d.image){
      if(closed){showClosed('明日の空き状況を準備中です。');return;}
      status.innerHTML='<div class="error">最新の予約状況を取得できませんでした。<br>少し時間をおいて再読み込みしてください。</div>';updated.textContent='';return;
    }
-   if(closed&&!isPublishedAfterClose(d,now)){showClosed('明日の空き状況を準備中です。');return;}
-   if(closed){pageTitle.textContent='明日の予約空き状況';lineBtn.textContent='LINEで予約・相談';statusNote.textContent='明日の空き状況は変動します。表示中の時間でも、ご連絡のタイミングにより埋まっている場合があります。';}
-   if(d.updatedAt){
-     const x=new Date(d.updatedAt);
-     const xj=new Date(x.toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
-     if(ymd(xj)!==ymd(now)){
-       status.innerHTML='<div class="closed"><strong>本日の空き状況は未更新です</strong><div class="sub">別日の予約画像は表示していません。<br>お急ぎの場合はLINEまたはお電話でお問い合わせください。</div></div>';
-       updated.textContent='本日分の最新情報をご確認ください';
+   // ★「いつ公開されたか」ではなく「その画像が何日分の予定か(slotDate)」だけで判断する。
+   //   休診日を挟んで先読み公開していても、日付が変わった瞬間に消えないようにするため。
+   const slotDate=d.slotDate||'';
+   if(!closed){
+     // 診療中：公開されている画像が「今日の分」でなければ、まだ本日分が準備できていない
+     if(slotDate && slotDate!==today){
+       status.innerHTML='<div class="closed"><strong>本日の空き状況は準備中です</strong><div class="sub">お急ぎの場合はLINEまたはお電話でお問い合わせください。</div></div>';
+       updated.textContent='';
        return;
      }
+   }else{
+     // 受付終了後：公開されている画像が「今日以前」の分のままなら、次回分がまだ準備できていない
+     if(!slotDate || slotDate<=today){showClosed('明日の空き状況を準備中です。');return;}
+     pageTitle.textContent='明日の予約空き状況';lineBtn.textContent='LINEで予約・相談';statusNote.textContent='明日の空き状況は変動します。表示中の時間でも、ご連絡のタイミングにより埋まっている場合があります。';
    }
    const img=document.createElement('img');img.alt='倉治整骨院 本日の予約空き状況';img.src=d.image;status.innerHTML='';status.appendChild(img);
    renderSlots(d,now,closed);
