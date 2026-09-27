@@ -905,9 +905,7 @@ function generateYoyaku(){
   const am=all.filter(t=>slotMinutesPro(t)<13*60);
   const pm=all.filter(t=>slotMinutesPro(t)>=13*60);
   const count=all.length;
-  // ★追加：最終更新時刻（24時間表記）
   const now=new Date();
-  const hh=String(now.getHours()).padStart(2,'0'),mm=String(now.getMinutes()).padStart(2,'0');
   // ★追加：当日予約OKの判定。「今日の日付」かつ「1枠以上空きがある」場合のみ表示する。
   //   選択されている時間は autoFetchAvailability の時点で本日分の終了済み時刻が
   //   既に除外されているため、既存の営業日・営業時間ロジックと矛盾しない。
@@ -921,10 +919,6 @@ function generateYoyaku(){
   ctx.fillStyle='#FFFFFF';ctx.textAlign='center';
   ctx.font='bold 42px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.fillText('予約空き状況',SIZE/2,66);
-  // ★追加：最終更新時刻（ヘッダー右上に控えめに）
-  ctx.fillStyle='rgba(255,255,255,.85)';ctx.textAlign='right';
-  ctx.font='bold 15px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText(`最終更新 ${hh}:${mm}`,758,26);
   ctx.fillStyle='#5A2A12';ctx.textAlign='left';
   ctx.font='bold 38px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.fillText(`${month}/${day}（${dow}）`,42,151);
