@@ -235,9 +235,9 @@
     </div>
     <div class="grp-label grp-am">🌅 午前&nbsp;<span style="font-weight:400;font-size:11px;">（8:30〜12:30）</span></div>
     <div class="time-grid" id="amGrid"></div>
+    <details id="extraTimeSection" style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;color:#1976d2;font-weight:bold;padding:8px 0">＋ 臨時の14時台（必要な日だけ）</summary><div class="time-grid" id="extraGrid" style="margin:8px 0 0"></div></details>
     <div class="grp-label grp-pm">🌆 午後&nbsp;<span style="font-weight:400;font-size:11px;">（15:00〜19:40）</span></div>
     <div class="time-grid" id="pmGrid"></div>
-    <details id="extraTimeSection" style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;color:#1976d2;font-weight:bold;padding:8px 0">＋ 臨時の14時台を追加する</summary><div class="time-grid" id="extraGrid" style="margin:8px 0 0"></div></details>
     <div style="font-size:11px;color:#aaa;margin-bottom:6px;">その他：</div>
     <div class="custom-row">
       <input type="text" id="customTime" placeholder="例：14時30分">
@@ -688,8 +688,15 @@ function addCustom(){
   if(!m||Number(m[1])>23||Number(m[2]||0)>59){alert('時刻は「14時20分」または「14:20」で入力してください');return;}
   const normalized=Number(m[1])+'時'+(Number(m[2]||0)?Number(m[2])+'分':'');
   if(selTimes.some(t=>compactTimePro(t)===compactTimePro(normalized))){inp.value='';return;}
-  selTimes.push(normalized);timeType[normalized]=Number(m[1])<13?'am':'pm';
-  inp.value='';renderChips();
+  const existing=document.querySelector(`.t-btn[data-time="${normalized}"]`);
+  if(existing){
+    if(EXTRA_TIMES.includes(normalized))document.getElementById('extraTimeSection').open=true;
+    toggleTime(normalized,existing,existing.dataset.type);
+  }else{
+    selTimes.push(normalized);timeType[normalized]=Number(m[1])<13?'am':'pm';
+    renderChips();
+  }
+  inp.value='';
 }
 function removeTime(t){
   selTimes=selTimes.filter(x=>x!==t);
