@@ -222,6 +222,73 @@ function getCardIdByPatientName_(name){
   }
   return found.length===1 ? found[0] : "";
 }
+// ============================================================
+// ★個別送信用：名前・診察券番号・電話番号の「どれか1つ」から患者様を特定する
+//   ・数字だけ10桁以上 → 電話番号 ／ それ以外の数字 → 診察券番号 ／ 文字 → 名前
+//   ・同じ方が二重登録(診察券番号が2つ)されている場合は、同一人物として扱う
+//   ・名前が違う別の方が複数該当する時は、間違えないよう送らずに候補を表示する
+// ============================================================
+function resolvePatientKey_(input){
+  var raw=String(input||"").trim();
+  if(!raw) return {ok:false,error:"お名前・診察券番号・電話番号のいずれかを入力してください"};
+  var rows=[], s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
+  if(s){
+    var data=s.getDataRange().getValues();
+    var hd=(data[0]||[]).map(function(h){return String(h||"").trim();});
+    var ci=hd.indexOf("診察券No"); if(ci<0)ci=0;
+    var ni=hd.indexOf("患者名"); if(ni<0)ni=1;
+    var ti=hd.indexOf("電話番号"); if(ti<0)ti=4;
+    for(var i=1;i<data.length;i++){
+      if(!data[i][ni]) continue;
+      rows.push({card:String(data[i][ci]||"").trim(), name:String(data[i][ni]||"").trim(), tel:fixPhoneLeadingZero_(data[i][ti])});
+    }
+  }
+  var compact=raw.normalize("NFKC").replace(/[\s\u3000\-ー－]/g,"");
+  var hits=[], kind="";
+  if(/^[0-9]+$/.test(compact)){
+    if(compact.length>=10){ kind="電話番号"; var tel=fixPhoneLeadingZero_(compact); hits=rows.filter(function(r){return r.tel&&r.tel===tel;}); }
+    else { kind="診察券番号"; hits=rows.filter(function(r){return r.card===compact;}); }
+    if(!hits.length) return {ok:false,error:kind+"「"+raw+"」に該当する患者様が見つかりませんでした"};
+  }else{
+    var n=normalizeName_(raw);
+    hits=rows.filter(function(r){return normalizeName_(r.name)===n;});
+    // 名簿に無い名前でも、従来どおり予約表の名前で探せるようにする
+    if(!hits.length) return {ok:true,name:raw,cards:[],tel:""};
+  }
+  var names={}; hits.forEach(function(h){names[normalizeName_(h.name)]=1;});
+  if(Object.keys(names).length>1){
+    return {ok:false,error:"該当する患者様が複数います（"+hits.map(function(h){return h.name.replace(/\u3000/g," ")+"／診察券"+h.card;}).join("、")+"）。診察券番号で指定してください"};
+  }
+  var cards=[]; hits.forEach(function(h){ if(h.card && cards.indexOf(h.card)<0) cards.push(h.card); });
+  var tel2=""; hits.forEach(function(h){ if(!tel2 && h.tel) tel2=h.tel; });
+  return {ok:true,name:hits[0].name,cards:cards,tel:tel2};
+}
+// 診察券番号から、LINE友だち名簿の「1人だけ」を探す（複数該当は送らない）
+function findLineUidByCardId_(card){
+  var c=String(card||"").trim(); if(!c) return "";
+  var ls=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs"); if(!ls) return "";
+  var d=ls.getDataRange().getValues(), h=(d[0]||[]).map(function(x){return String(x||"").trim();});
+  var ci=h.indexOf("cardId"); if(ci<0)ci=6;
+  var found=[];
+  for(var r=1;r<d.length;r++){ if(d[r][0] && String(d[r][ci]||"").trim()===c) found.push(String(d[r][0])); }
+  return found.length===1 ? found[0] : "";
+}
+// 特定した患者様のLINE送信先を探す：電話番号 → 診察券番号 → 名前の完全一致（姓だけの推測はしない）
+function findLineUidForPatient_(pt){
+  var tid="";
+  var tel=pt.tel||getTelByPatientName_(pt.name);
+  if(tel) tid=findLineUidByPhone_(tel);
+  if(!tid){ for(var i=0;i<(pt.cards||[]).length&&!tid;i++) tid=findLineUidByCardId_(pt.cards[i]); }
+  if(!tid){
+    var ls=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+    if(ls){
+      var lu={};
+      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
+      tid=findLineUidSafely_(pt.name,lu);
+    }
+  }
+  return tid;
+}
 function findPendingWebRequestByName_(msgText){
   try{
     var target=normalizeName_(msgText);
@@ -647,28 +714,15 @@ function sendReviewRequestToOne(name){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
-  var target=String(name||"").trim();
-  if(!target) return {ok:false, error:"名前を指定してください"};
+  if(!String(name||"").trim()) return {ok:false, error:"お名前（または診察券番号・電話番号）を指定してください"};
+  var pt=resolvePatientKey_(name);
+  if(!pt.ok) return {ok:false, error:pt.error};
+  var target=pt.name;
   if(!GOOGLE_REVIEW_URL || GOOGLE_REVIEW_URL.indexOf("WO_SET_LATER")>=0){
     return {ok:false, error:"Googleクチコミ用のURLがまだ設定されていません"};
   }
 
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-
-  // ①電話番号ベースの照合（最優先・最も確実）
-  var tid="";
-  var tel=getTelByPatientName_(target);
-  if(tel) tid=findLineUidByPhone_(tel);
-
-  // ②LINE_IDsシートの名前との完全一致（表記ゆれ対応）
-  if(!tid){
-    var ls=ss.getSheetByName("LINE_IDs");
-    if(ls){
-      var lu={};
-      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
-      tid=findLineUidSafely_(target,lu);
-    }
-  }
+  var tid=findLineUidForPatient_(pt);
   if(!tid) return {ok:false, error:target+"様のLINE連携が見つかりませんでした（電話番号登録がお済みでない可能性があります）"};
 
   var nl=String.fromCharCode(10);
@@ -680,21 +734,24 @@ function sendReviewRequestToOne(name){
   var r=sendLineMessagingAPI(token,tid,msg);
   if(!r.ok) return {ok:false, error:"送信に失敗しました"};
 
-  return {ok:true};
+  return {ok:true, name:target};
 }
 
 function sendReminderToOne(name, dateStr){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
-  var target=String(name||"").trim();
-  if(!target || !dateStr) return {ok:false, error:"名前・日付を指定してください"};
+  if(!String(name||"").trim() || !dateStr) return {ok:false, error:"お名前（または診察券番号・電話番号）と日付を指定してください"};
+  // ★名前・診察券番号・電話番号のどれで指定されても、患者様を確実に特定する
+  var pt=resolvePatientKey_(name);
+  if(!pt.ok) return {ok:false, error:pt.error};
+  var target=pt.name;
 
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var bs=ss.getSheetByName("予約表");
   if(!bs) return {ok:false, error:"予約表シートが見つかりません"};
   var bd=bs.getDataRange().getValues(),bh=bd[0];
-  var di=bh.indexOf("日付"),ti=bh.indexOf("時間"),ni=bh.indexOf("患者名"),ki=bh.indexOf("区分");
+  var di=bh.indexOf("日付"),ti=bh.indexOf("時間"),ni=bh.indexOf("患者名"),ki=bh.indexOf("区分"),ci=bh.indexOf("診察券No");
   var times=[];
   bd.slice(1).forEach(function(r){
     var rawDate=r[di];
@@ -702,24 +759,16 @@ function sendReminderToOne(name, dateStr){
     var k=String(r[ki]||"");
     if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1||dv!==dateStr)return;
     var n=String(r[ni]||"").trim();
-    if(n.replace(/[\s　]+/g,"")!==target.replace(/[\s　]+/g,""))return;
+    // 予約表に診察券番号が入っていれば番号で照合（同姓同名でも取り違えない）。無ければ名前で照合
+    var rc=(ci>=0)?String(r[ci]||"").trim():"";
+    if(rc && pt.cards.length){ if(pt.cards.indexOf(rc)<0) return; }
+    else if(normalizeName_(n)!==normalizeName_(target)) return;
     var t=String(r[ti]||"").trim();
     if(t)times.push(t);
   });
   if(!times.length) return {ok:false, error:target+"様の"+dateStr+"のご予約が見つかりませんでした"};
 
-  var tid="";
-  var tel=getTelByPatientName_(target);
-  if(tel) tid=findLineUidByPhone_(tel);
-  if(!tid){
-    var ls=ss.getSheetByName("LINE_IDs");
-    if(ls){
-      var lu={};
-      ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
-      tid=lu[target];
-      if(!tid){tid=findLineUidSafely_(target,lu);}
-    }
-  }
+  var tid=findLineUidForPatient_(pt);
   if(!tid) return {ok:false, error:target+"様のLINE連携が見つかりませんでした（電話番号登録がお済みでない可能性があります）"};
 
   var nl=String.fromCharCode(10);
@@ -736,7 +785,7 @@ function sendReminderToOne(name, dateStr){
   var rng=log.getRange(newIdx,1,1,6);
   rng.setNumberFormat("@");
   rng.setValues([[todayStr4, nowStr, target, dateStr, "送信済み(個別手動送信)", times.join("・")]]);
-  return {ok:true};
+  return {ok:true, name:target};
 }
 function sendDayBeforeReminders(){
   var p=PropertiesService.getScriptProperties();
