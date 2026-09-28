@@ -7999,7 +7999,10 @@ document.getElementById('histModal').addEventListener('click',function(e){if(e.t
     var w=document.getElementById('floatingNotifyWrap');
     if(w) w.style.display=open?'none':'flex';
   }
-  new MutationObserver(syncModalOpen).observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true,childList:true});
+  // ★childList(要素の追加・削除)は監視しない。一覧の描画で要素が大量に追加されるたびに
+  //   発火してしまい、モーダルを開いた直後の描画が極端に遅くなっていたため。
+  //   class属性の変化（モーダルの開閉）だけを監視すれば十分。
+  new MutationObserver(syncModalOpen).observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true});
   syncModalOpen();
 })();
 </script>
