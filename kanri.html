@@ -3662,24 +3662,24 @@ async function markWebRequestDone(rowIdx){
 
 // ===== Google口コミ依頼を個別に送信 =====
 async function sendReviewRequestPrompt(){
-  const name=prompt('Googleの口コミ依頼を送りたい患者様のお名前を入力してください');
+  const name=prompt('Googleの口コミ依頼を送りたい患者様を入力してください\n\n【お名前】【診察券番号】【電話番号】のどれか1つでOKです');
   if(!name)return;
   try{
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendReviewRequestToOne',name})});
     const d=await res.json();
-    alert(d.ok?`✅ ${name}様に口コミ依頼を送信しました`:'❌ 送信失敗：'+(d.error||''));
+    alert(d.ok?`✅ ${d.name||name}様に口コミ依頼を送信しました`:'❌ 送信失敗：'+(d.error||''));
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 // ===== 前日リマインド送信履歴 =====
 async function sendReminderToOnePrompt(){
-  const name=prompt('前日リマインドを送りたい患者様のお名前を入力してください');
+  const name=prompt('前日リマインドを送りたい患者様を入力してください\n\n【お名前】【診察券番号】【電話番号】のどれか1つでOKです\n（同じ苗字の方がいる場合は、診察券番号がおすすめです）');
   if(!name)return;
   const dateStr=prompt('ご予約日を入力してください（例：2026-08-26）', toLocalDateStr(new Date(Date.now()+86400000)));
   if(!dateStr)return;
   try{
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendReminderToOne',name,dateStr})});
     const d=await res.json();
-    alert(d.ok?`✅ ${name}様に${dateStr}の前日リマインドを送信しました`:'❌ 送信失敗：'+(d.error||''));
+    alert(d.ok?`✅ ${d.name||name}様に${dateStr}の前日リマインドを送信しました`:'❌ 送信失敗：'+(d.error||''));
   }catch(e){ alert('❌ 通信エラー：'+e.message); }
 }
 async function openReminderLog(){
