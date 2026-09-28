@@ -80,6 +80,8 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 .empty{text-align:center;padding:28px;color:var(--muted);font-size:0.82rem;}
 .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;z-index:200;align-items:center;justify-content:center;padding:16px;}
 .modal-ov.on{display:flex;}
+/* ★入力画面(モーダル)が開いている間は、右下の通知ボタンを隠す（スマホで登録ボタンに重なって押せなくなるため） */
+body.modal-open #floatingNotifyWrap{display:none !important;}
 .modal{background:white;border-radius:12px;padding:18px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
 .modal-wide{background:white;border-radius:12px;padding:18px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
 .mtitle{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:700;font-size:0.95rem;color:var(--primary);margin-bottom:12px;}
@@ -7989,6 +7991,17 @@ document.getElementById('peditModal').addEventListener('click',function(e){if(e.
 document.getElementById('ueditModal').addEventListener('click',function(e){if(e.target===this)closeUedit();});
 document.getElementById('cancelModal').addEventListener('click',function(e){if(e.target===this)closeCancelModal();});
 document.getElementById('histModal').addEventListener('click',function(e){if(e.target===this)closeHistModal();});
+// ★どの入力画面（モーダル）が開いている間も、右下の「未対応のWeb予約」等の通知ボタンを隠す
+(function(){
+  function syncModalOpen(){
+    var open=!!document.querySelector('.modal-ov.on');
+    document.body.classList.toggle('modal-open', open);
+    var w=document.getElementById('floatingNotifyWrap');
+    if(w) w.style.display=open?'none':'flex';
+  }
+  new MutationObserver(syncModalOpen).observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true,childList:true});
+  syncModalOpen();
+})();
 </script>
 </body>
 </html>
