@@ -182,8 +182,45 @@ function saveLineUserId(userId,displayName,message){
 function normalizeName_(s){
   return String(s||"").trim()
     .normalize("NFKC") // 全角英数字→半角、半角カナ→全角カナ 等に統一
-    .replace(/[\s　]+/g,"") // 半角・全角スペースを全て除去
+    .replace(/[（(][^）)]*[）)]/g,"") // 旧姓の括弧書き（例:「坂上(上坂)香織」の「(上坂)」）を除去
+    .replace(/[\s\u3000]+/g,"") // 半角・全角スペースを全て除去
     .toLowerCase(); // 大文字小文字を統一
+}
+// ★患者への送信先(LINE)を「確実に本人だと言える場合だけ」特定する。
+//   ①名前が完全に一致する1人（表記ゆれ・旧姓の括弧書きは吸収）
+//   ②診察券番号が一致する1人（患者名簿の診察券No ⇔ LINE友だちの診察券No。名前が違っていても本人と分かる）
+//   ※姓だけが同じ別人（ご家族等）へ誤送信しないため、姓だけの一致は絶対に使わない。
+//   複数人に一致してしまう場合も、どちらか分からないので送らない（→「未登録」として先生へ報告される）。
+function findLineUidSafely_(name,lu){
+  var n=normalizeName_(name);
+  if(!n) return "";
+  var hits=Object.keys(lu).filter(function(k){return normalizeName_(k)===n;});
+  if(hits.length===1) return lu[hits[0]];
+  if(hits.length>1) return "";
+  var card=getCardIdByPatientName_(name);
+  if(card){
+    var ls=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+    if(ls){
+      var d=ls.getDataRange().getValues(), h=d[0].map(function(x){return String(x||"").trim();});
+      var ci=h.indexOf("cardId"); if(ci<0)ci=6;
+      var found=[];
+      for(var r=1;r<d.length;r++){ if(d[r][0] && String(d[r][ci]||"").trim()===card) found.push(String(d[r][0])); }
+      if(found.length===1) return found[0];
+    }
+  }
+  return "";
+}
+// 患者名から診察券番号を探す（同じ名前の患者が複数いて特定できない場合は空を返す）
+function getCardIdByPatientName_(name){
+  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
+  if(!s) return "";
+  var data=s.getDataRange().getValues();
+  var target=normalizeName_(name), found=[];
+  if(!target) return "";
+  for(var i=1;i<data.length;i++){
+    if(normalizeName_(data[i][1])===target){ var c=String(data[i][0]||"").trim(); if(c) found.push(c); }
+  }
+  return found.length===1 ? found[0] : "";
 }
 function findPendingWebRequestByName_(msgText){
   try{
@@ -285,12 +322,6 @@ function findLineUidByPhone_(phone){
 // 患者名から電話番号を検索（患者シートから）。dailyLineAlert/sendDayBeforeReminders用
 // 患者名の表記ゆれ（全角/半角スペース、"坂上(上坂)香織"のような旧姓の括弧書きなど）を
 // 吸収して比較するための正規化。括弧とその中身、スペースを取り除く。
-function normalizeName_(name){
-  return String(name||"")
-    .replace(/[（(][^）)]*[）)]/g,"") // 全角(）・半角()の括弧書きを除去（例:"(上坂)"）
-    .replace(/[ 　]/g,"") // 全角・半角スペースを除去
-    .trim();
-}
 function getTelByPatientName_(name){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
   if(!s) return "";
@@ -589,11 +620,7 @@ function dailyLineAlert(){
     if(tel) tid=findLineUidByPhone_(tel);
     if(!tid){
       tid=lu[v.name]||null;
-      if(!tid){
-        var ln=v.name.split(" ")[0].split("　")[0];
-        var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});
-        if(fk)tid=lu[fk];
-      }
+      if(!tid){tid=findLineUidSafely_(v.name,lu);}
     }
     if(!tid){skip++;return;}
     var deadline=new Date(v.date);deadline.setDate(deadline.getDate()+20);
@@ -639,16 +666,7 @@ function sendReviewRequestToOne(name){
     if(ls){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
-      var normName=normalizeName_(target);
-      var exactKey=Object.keys(lu).find(function(k){return normalizeName_(k)===normName;});
-      if(exactKey)tid=lu[exactKey];
-
-      // ③姓だけの緩い一致（最終手段・候補が1件に絞れる時だけ）
-      if(!tid){
-        var ln=target.split(" ")[0].split("　")[0];
-        var candidates=Object.keys(lu).filter(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});
-        if(candidates.length===1)tid=lu[candidates[0]];
-      }
+      tid=findLineUidSafely_(target,lu);
     }
   }
   if(!tid) return {ok:false, error:target+"様のLINE連携が見つかりませんでした（電話番号登録がお済みでない可能性があります）"};
@@ -699,7 +717,7 @@ function sendReminderToOne(name, dateStr){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
       tid=lu[target];
-      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){tid=findLineUidSafely_(target,lu);}
     }
   }
   if(!tid) return {ok:false, error:target+"様のLINE連携が見つかりませんでした（電話番号登録がお済みでない可能性があります）"};
@@ -763,17 +781,9 @@ function sendDayBeforeReminders(){
     if(tel) tid=findLineUidByPhone_(tel);
     // ②電話番号で見つからない場合のみ、LINE_IDsシートの名前と完全一致するか確認
     if(!tid){
-      var normName=normalizeName_(name);
-      var exactKey=Object.keys(lu).find(function(k){return normalizeName_(k)===normName;});
-      if(exactKey)tid=lu[exactKey];
+      tid=findLineUidSafely_(name,lu);
     }
-    // ③それでも見つからない場合のみ、姓だけの緩い一致を最終手段として使う
-    //   （同姓の別の家族と取り違えるリスクがあるため、候補が1件に絞れる時だけ採用）
-    if(!tid){
-      var ln=name.split(" ")[0].split("　")[0];
-      var candidates=Object.keys(lu).filter(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});
-      if(candidates.length===1)tid=lu[candidates[0]];
-    }
+    // ※姓だけが同じ別の方（ご家族等）へは絶対に送らない。見つからなければ「未登録」として先生へ報告する
     if(!tid){skip.push(name);return;}
     var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;sentNames.push(name);}else{skip.push(name);}
@@ -1076,7 +1086,7 @@ function sendBirthdayMessages(){
         var lu={};
         ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
         tid=lu[t.name];
-        if(!tid){var ln=t.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+        if(!tid){tid=findLineUidSafely_(t.name,lu);}
       }
     }
     var result;
@@ -1146,7 +1156,7 @@ function sendWebLineGreetingPreviewTo(name){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
       tid=lu[target];
-      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){tid=findLineUidSafely_(target,lu);}
     }
   }
   // ★「郡」宛てで名前が見つからない場合は、必ず届く院長のLINE(オーナーID)に送る
@@ -1189,7 +1199,7 @@ function sendBirthdayMessageTestTo(name){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
       tid=lu[target];
-      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){tid=findLineUidSafely_(target,lu);}
     }
   }
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
@@ -1246,7 +1256,7 @@ function sendReviewRequests(){
         var lu={};
         ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
         tid=lu[t.name];
-        if(!tid){var ln=t.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+        if(!tid){tid=findLineUidSafely_(t.name,lu);}
       }
     }
     if(!tid){skip.push(t.name);return;}
@@ -1286,7 +1296,7 @@ function sendReviewRequestTestTo(name){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
       tid=lu[target];
-      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){tid=findLineUidSafely_(target,lu);}
     }
   }
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
@@ -1392,7 +1402,7 @@ function sendDormantPatientOutreach(){
         var lu={};
         ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
         tid=lu[v.name];
-        if(!tid){var ln=v.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+        if(!tid){tid=findLineUidSafely_(v.name,lu);}
       }
     }
     var result;
@@ -1431,7 +1441,7 @@ function sendDormantOutreachTestTo(name){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
       tid=lu[target];
-      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){tid=findLineUidSafely_(target,lu);}
     }
   }
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
@@ -1470,7 +1480,7 @@ function sendPointsMilestoneTestTo(name){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
       tid=lu[target];
-      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){tid=findLineUidSafely_(target,lu);}
     }
   }
   if(!tid) return {ok:false, error:target+"さんのLINE連携が見つかりませんでした"};
@@ -1516,7 +1526,7 @@ function sendPointsMilestone(){
         var lu={};
         ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
         tid=lu[t.name];
-        if(!tid){var ln=t.name.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+        if(!tid){tid=findLineUidSafely_(t.name,lu);}
       }
     }
     if(!tid){skip.push(t.name);return;}
@@ -1970,7 +1980,7 @@ function sendWaitlistPreviewTo(name, date, time, menu){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
       tid=lu[target];
-      if(!tid){var ln=target.split(" ")[0].split("　")[0];var fk=Object.keys(lu).find(function(k){return k.replace(/[ 　]/g,"").indexOf(ln)===0;});if(fk)tid=lu[fk];}
+      if(!tid){tid=findLineUidSafely_(target,lu);}
     }
   }
   if(!tid && (target==="郡"||target==="郡雄一朗")){ tid=p.getProperty("LINE_USER_ID")||""; }
