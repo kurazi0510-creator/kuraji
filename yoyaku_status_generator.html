@@ -218,8 +218,9 @@
     </div>
     <div class="grp-label grp-am">🌅 午前&nbsp;<span style="font-weight:400;font-size:11px;">（8:30〜12:30）</span></div>
     <div class="time-grid" id="amGrid"></div>
-    <div class="grp-label grp-pm">🌆 午後&nbsp;<span style="font-weight:400;font-size:11px;">（時間外枠も選択可）</span></div>
+    <div class="grp-label grp-pm">🌆 午後&nbsp;<span style="font-weight:400;font-size:11px;">（15:00〜19:40）</span></div>
     <div class="time-grid" id="pmGrid"></div>
+    <details id="extraTimeSection" style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;color:#1976d2;font-weight:bold;padding:8px 0">＋ 臨時の14時台を追加する</summary><div class="time-grid" id="extraGrid" style="margin:8px 0 0"></div></details>
     <div style="font-size:11px;color:#aaa;margin-bottom:6px;">その他：</div>
     <div class="custom-row">
       <input type="text" id="customTime" placeholder="例：14時30分">
@@ -345,7 +346,7 @@ function switchTab(tab){
 // ===== 予約空き状況 =====
 const AM_TIMES=['8時30分','8時50分','9時10分','9時30分','9時50分',
   '10時10分','10時30分','10時50分','11時10分','11時30分','11時50分','12時10分','12時30分'];
-const PM_TIMES=['14時','14時20分','14時40分','15時','15時20分','15時40分','16時','16時20分','16時40分',
+const PM_TIMES=['15時','15時20分','15時40分','16時','16時20分','16時40分',
   '17時','17時20分','17時40分','18時','18時20分','18時40分','19時','19時20分','19時40分'];
 
 // 予約システム側の"HH:MM"形式と、この画面の日本語表記を相互変換するための対応表
@@ -464,6 +465,7 @@ async function autoFetchAvailability(){
       if(!jp) return;
       const btn=document.querySelector(`.t-btn[data-time="${jp}"]`);
       if(btn && !selTimes.includes(jp)){
+        if(EXTRA_TIMES.includes(jp))document.getElementById('extraTimeSection').open=true;
         const type=btn.dataset.type;
         selTimes.push(jp);
         btn.classList.add(type==='am'?'am-sel':'pm-sel');
@@ -484,9 +486,11 @@ const ALL_TIMES_ORDER=['8時30分','8時50分','9時10分','9時30分','9時50�
   '14時','14時20分','14時40分','15時','15時20分','15時40分','16時','16時20分','16時40分',
   '17時','17時20分','17時40分','18時','18時20分','18時40分',
   '19時','19時20分','19時40分','20時','20時20分'];
+const EXTRA_TIMES=['14時','14時20分','14時40分'];
 const timeType={};
 AM_TIMES.forEach(t=>timeType[t]='am');
 PM_TIMES.forEach(t=>timeType[t]='pm');
+EXTRA_TIMES.forEach(t=>timeType[t]='pm');
 
 window.onload=()=>{
   const today=new Date();
@@ -507,6 +511,7 @@ window.onload=()=>{
 
   buildGrid('amGrid',AM_TIMES,'am');
   buildGrid('pmGrid',PM_TIMES,'pm');
+  buildGrid('extraGrid',EXTRA_TIMES,'pm');
   document.getElementById('customTime').addEventListener('keydown',e=>{if(e.key==='Enter')addCustom();});
 
   // 休診デフォルトメッセージ
