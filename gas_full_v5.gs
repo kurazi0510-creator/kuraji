@@ -549,6 +549,106 @@ function deletePatientByCardId(cardId){
     return {ok:true, deleted:deleted};
   }catch(err){ return {ok:false, error:err.message}; }
 }
+// ============================================================
+// ★重複登録された患者様の「余分な診察券番号」を完全に削除する（安全装置つき・1回だけ実行する用）
+//   ・まず previewDeleteDuplicatePatients を実行 → 何が起きるかだけ確認（データは変更しない）
+//   ・問題なければ runDeleteDuplicatePatients を実行 → 実際に削除
+//   安全装置：①同一人物か(名前・電話番号)を確認 ②他のシートに紐づく記録があれば中止
+//            ③消す前に deleted_patients_backup シートへ控えを残す ④残す側が空欄の情報は引き継ぐ
+//            ⑤古い画面から保存されても復活しないよう、削除した番号を記録する
+// ============================================================
+var DUP_PATIENT_PAIRS_=[
+  {del:"1440", keep:"1571"},  // 中畑 みどり様
+  {del:"2089", keep:"2084"}   // 老千代 史子様
+];
+function previewDeleteDuplicatePatients(){ return deleteDuplicatePatients_(true); }
+function runDeleteDuplicatePatients(){ return deleteDuplicatePatients_(false); }
+
+function getPatientTombstones_(){
+  var m={};
+  try{ JSON.parse(PropertiesService.getScriptProperties().getProperty("DELETED_PATIENT_IDS")||"[]").forEach(function(x){m[String(x)]=true;}); }catch(e){}
+  return m;
+}
+function addPatientTombstone_(id){
+  var p=PropertiesService.getScriptProperties(), arr=[];
+  try{ arr=JSON.parse(p.getProperty("DELETED_PATIENT_IDS")||"[]"); }catch(e){}
+  if(arr.indexOf(String(id))<0){ arr.push(String(id)); p.setProperty("DELETED_PATIENT_IDS",JSON.stringify(arr)); }
+}
+// 患者シート以外で、その診察券番号に紐づく記録がないか調べる（あれば「シート名:件数」を返す）
+function findCardReferences_(cardId){
+  var refs=[], skip={"患者":1,"alert_log":1,"birthday_log":1,"reminder_log":1,"deleted_patients_backup":1};
+  SpreadsheetApp.getActiveSpreadsheet().getSheets().forEach(function(sh){
+    var name=sh.getName(); if(skip[name]) return;
+    var d=sh.getDataRange().getValues(); if(d.length<2) return;
+    var cols=[]; d[0].forEach(function(h,i){ if(/診察券|card|patientid|patient_id/i.test(String(h||""))) cols.push(i); });
+    if(!cols.length) return;
+    var n=0;
+    for(var r=1;r<d.length;r++){ cols.forEach(function(c){ if(String(d[r][c]||"").trim()===cardId) n++; }); }
+    if(n) refs.push(name+":"+n+"件");
+  });
+  return refs;
+}
+function deleteDuplicatePatients_(dryRun){
+  var lock=LockService.getScriptLock(); lock.waitLock(20000);
+  var out=[];
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ps=ss.getSheetByName("患者");
+    if(!ps) throw new Error("患者シートが見つかりません");
+    DUP_PATIENT_PAIRS_.forEach(function(pair){
+      var data=ps.getDataRange().getValues();
+      var hd=data[0].map(function(h){return String(h||"").trim();});
+      var ci=hd.indexOf("診察券No"), ni=hd.indexOf("患者名"), ti=hd.indexOf("電話番号");
+      if(ci<0||ni<0) throw new Error("患者シートの列（診察券No／患者名）が見つかりません");
+      var delRow=-1, keepRow=-1;
+      for(var i=1;i<data.length;i++){
+        var id=String(data[i][ci]||"").trim();
+        if(id===pair.del) delRow=i;
+        if(id===pair.keep) keepRow=i;
+      }
+      if(delRow<0){
+        if(!dryRun) addPatientTombstone_(pair.del);
+        out.push("診察券"+pair.del+"：すでに名簿にありません（削除済み）"); return;
+      }
+      if(keepRow<0){ out.push("診察券"+pair.del+"：【中止】残す側の診察券"+pair.keep+"が名簿に見つかりません"); return; }
+      var gone=data[delRow], keeper=data[keepRow].slice();
+      var nm=String(gone[ni]||"").replace(/\u3000/g," ");
+      // 安全装置①：同一人物か（名前・電話番号）
+      if(normalizeName_(gone[ni])!==normalizeName_(keeper[ni])){ out.push("診察券"+pair.del+"（"+nm+"）：【中止】残す側と名前が違います"); return; }
+      if(ti>=0){
+        var gt=fixPhoneLeadingZero_(gone[ti]), kt=fixPhoneLeadingZero_(keeper[ti]);
+        if(gt&&kt&&gt!==kt){ out.push("診察券"+pair.del+"（"+nm+"）：【中止】残す側と電話番号が違います"); return; }
+      }
+      // 安全装置②：他のシートに紐づく記録があれば中止
+      var refs=findCardReferences_(pair.del);
+      if(refs.length){ out.push("診察券"+pair.del+"（"+nm+"）：【中止】他のシートに記録が残っています → "+refs.join("、")); return; }
+      // 安全装置④：残す側が空欄の情報は引き継ぐ（前回通院日・通院回数は新しい／大きい方）
+      var moved=[];
+      for(var c=0;c<hd.length;c++){
+        if(c===ci) continue;
+        var gs=String(gone[c]===null||gone[c]===undefined?"":gone[c]).trim();
+        var ks=String(keeper[c]===null||keeper[c]===undefined?"":keeper[c]).trim();
+        if(!gs) continue;
+        if(hd[c]==="前回通院日"){ if(!ks||gs>ks){ keeper[c]=gone[c]; moved.push(hd[c]+"="+gs); } }
+        else if(hd[c]==="通院回数"){ if((parseInt(gs,10)||0)>(parseInt(ks,10)||0)){ keeper[c]=gone[c]; moved.push(hd[c]+"="+gs); } }
+        else if(!ks){ keeper[c]=gone[c]; moved.push(hd[c]+"="+gs); }
+      }
+      var msg="診察券"+pair.del+"（"+nm+"）を削除 → 診察券"+pair.keep+"に統合"+(moved.length?"／引き継ぎ："+moved.join("、"):"／引き継ぐ情報なし");
+      if(dryRun){ out.push("【確認のみ・未実行】"+msg); return; }
+      if(moved.length) ps.getRange(keepRow+1,1,1,hd.length).setValues([keeper]);
+      // 安全装置③：控えを残す
+      var bk=ss.getSheetByName("deleted_patients_backup");
+      if(!bk){ bk=ss.insertSheet("deleted_patients_backup"); bk.getRange(1,1,1,hd.length+2).setValues([["削除日時","統合先の診察券No"].concat(hd)]); }
+      var brow=[Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy-MM-dd HH:mm:ss"),pair.keep].concat(gone);
+      var br=bk.getRange(bk.getLastRow()+1,1,1,brow.length); br.setNumberFormat("@"); br.setValues([brow]);
+      ps.deleteRow(delRow+1);
+      addPatientTombstone_(pair.del); // 安全装置⑤
+      out.push("【削除完了】"+msg);
+    });
+  } finally { lock.releaseLock(); }
+  out.forEach(function(x){Logger.log(x);});
+  return out;
+}
 function saveCustomersSafe(rows){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("患者");
@@ -561,10 +661,12 @@ function saveCustomersSafe(rows){
   }
   var merged=[header];
   var seenIds={};
+  var tomb=getPatientTombstones_(); // ★完全削除した診察券番号（古い画面からの保存で復活させない）
   for(var j=1;j<rows.length;j++){
     var incoming=rows[j];
     var id=String(incoming[0]||"").trim();
     if(!id) continue;
+    if(tomb[id]) continue;
     seenIds[id]=true;
     var base=existingById[id];
     var mergedRow=incoming.map(function(val,colIdx){
