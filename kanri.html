@@ -2200,6 +2200,11 @@ let bsPaySel=[], uPaySel=[];
 let bsSelectedPatient=null, editPatientId=null;
 let cancelDate=null, cancelSlot=null, cancelReasonVal='';
 
+// 画面切替の高速化：データが変わっていないページは重い再描画を繰り返さない。
+// save() のたびに版番号を進め、必要なページだけ次回表示時に更新する。
+let dataRenderVersion=0;
+const pageRenderVersion=Object.create(null);
+
 function save(){
   try{
     localStorage.setItem('kj_p',JSON.stringify(patients));
@@ -2214,6 +2219,7 @@ function save(){
     // 予約データのバックアップ（GASで上書きされた時の復元用）
     localStorage.setItem('kj_b_bak',JSON.stringify(bookings));
     localStorage.setItem('kj_b_bak_ts',Date.now().toString());
+    dataRenderVersion++;
   }catch(e){console.error('save error:',e);}
 }
 function load(){
@@ -7933,18 +7939,25 @@ function renderWeekDayTabs(){
   }).join('');
 }
 function goPage(id){
+  // まず画面だけ即座に切り替える。集計・一覧生成は次の描画フレームに回す。
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nav-t').forEach(t=>t.classList.remove('on'));
   document.getElementById('page-'+id).classList.add('on');
   const pages=['yoyaku','patients','uriage','bussan','stock','ltv','master','lottery'];
   document.querySelectorAll('.nav-t').forEach((t,i)=>{if(pages[i]===id)t.classList.add('on');});
-  if(id==='patients')renderPatients();
-  if(id==='uriage'){renderDayU();document.getElementById('u-date').value=today();}
-  if(id==='master'){loadLineTokenUI();}
-  if(id==='bussan'){renderBsPatients();renderBsProductList();}
-  if(id==='stock')renderStock();
-  if(id==='ltv'){switchLtv('ltv_main');}
-  if(id==='master')renderMasterList();
+  window.scrollTo({top:0,behavior:'instant'});
+
+  // データに変更がなければ、前回作った画面をそのまま再利用する。
+  if(pageRenderVersion[id]===dataRenderVersion)return;
+  pageRenderVersion[id]=dataRenderVersion;
+  requestAnimationFrame(()=>{
+    if(id==='patients')renderPatients();
+    if(id==='uriage'){renderDayU();document.getElementById('u-date').value=today();}
+    if(id==='master'){loadLineTokenUI();renderMasterList();}
+    if(id==='bussan'){renderBsPatients();renderBsProductList();}
+    if(id==='stock')renderStock();
+    if(id==='ltv')switchLtv('ltv_main');
+  });
 }
 
 // ===== INIT =====
@@ -7960,6 +7973,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   // まずlocalStorageから即表示（データは消えない）
   load();renderSched();renderWeekDayTabs();recalcAllVisitCounts();renderPatients();
+  pageRenderVersion.yoyaku=dataRenderVersion;
+  pageRenderVersion.patients=dataRenderVersion;
   loadJpHolidays().then(()=>{renderWeekDayTabs();renderSched();});
   // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
