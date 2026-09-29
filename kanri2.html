@@ -1751,6 +1751,10 @@ header{background:var(--primary);color:white;padding:0 16px;display:flex;align-i
 <script>
 const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
 
+// ★セキュリティ対策：過去にブラウザへ保存されたLINEトークンが残っていれば削除する（初回起動時に1回実行すれば十分だが、毎回実行しても害はない）
+localStorage.removeItem('kj_line_token');
+localStorage.removeItem('kj_line_token2');
+
 const DEFAULT_BUSSAN_MASTER=[
   {id:'bs001',name:'クラウドテープS',price:300,unit:'枚',stockId:'st001'},
   {id:'bs002',name:'クラウドテープL',price:300,unit:'枚',stockId:'st002'},
@@ -2648,25 +2652,17 @@ function generateCarePlan(){
 }
 
 // ===== LINE Notify =====
-function saveLineToken(){
-  const token=document.getElementById('line-notify-token').value.trim();
-  if(!token)return;
-  localStorage.setItem('kj_line_token',token);
-  document.getElementById('line-token-status').innerHTML='✅ トークンを保存しました';
-}
-function getLineToken(){
-  // localStorageになければGASのトークンをデフォルトとして使用
-  return localStorage.getItem('kj_line_token2')||localStorage.getItem('kj_line_token')||''; // ★実際の送信はGAS側でスクリプトプロパティのトークンのみを使用するため、ここは空でよい
-}
+// ★セキュリティ対策：LINEチャンネルアクセストークンはブラウザ側では一切保持・送信しない。
+//   実際の送信に使うトークンは、GAS側のスクリプトプロパティ(LINE_TOKEN)からのみ読み込む（lineNotifyV2アクション側）。
+//   ここではLINEの送信先(userId)だけを扱う。
 async function sendLineNotify(msg){
-  const token=localStorage.getItem('kj_line_token2')||getLineToken();
   const userId=localStorage.getItem('kj_line_userid')||'';
-  if(!token||!userId)return false;
+  if(!userId)return false;
   try{
     const res=await fetch(GAS,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'lineNotifyV2',token,userId,message:msg}),
+      body:JSON.stringify({action:'lineNotifyV2',userId,message:msg}),
       redirect:'follow'
     });
     const d=JSON.parse(await res.text());
@@ -2674,30 +2670,19 @@ async function sendLineNotify(msg){
   }catch(e){console.error('LINE error:',e);return false;}
 }
 async function testLineNotify2(){
-  const token=localStorage.getItem('kj_line_token2')||getLineToken();
   const userId=localStorage.getItem('kj_line_userid')||'';
   const st=document.getElementById('line-token-status');
-  if(!token){if(st)st.innerHTML='❌ まずセットアップしてください';return;}
+  if(!userId){if(st)st.innerHTML='❌ 送信先(LINEユーザーID)が未設定です。セットアップしてください';return;}
   if(st)st.innerHTML='📤 送信中...';
   const ok=await sendLineNotify('\n【倉治整骨院 管理システム】\nLINE通知テスト✅\n'+new Date().toLocaleString('ja-JP'));
-  if(st)st.innerHTML=ok?'✅ 送信成功！LINEを確認してください':'❌ 送信失敗。セットアップをやり直してください';
+  if(st)st.innerHTML=ok?'✅ 送信成功！LINEを確認してください':'❌ 送信失敗';
 }
-async function testLineNotify(){
-  const token=document.getElementById('line-notify-token').value.trim()||getLineToken();
-  if(!token){document.getElementById('line-token-status').innerHTML='❌ トークンを入力してください';return;}
-  document.getElementById('line-token-status').innerHTML='📤 送信中...';
-  localStorage.setItem('kj_line_token',token);
-  const ok=await sendLineNotify('\n【倉治整骨院 管理システム】\nLINE Notify接続テスト成功✅\n'+new Date().toLocaleString('ja-JP'));
-  document.getElementById('line-token-status').innerHTML=ok?'✅ 送信成功！LINEを確認してください':'❌ 送信失敗。トークンを確認してください';
-}
-// 起動時にトークンをフォームに反映
+// 起動時に設定状況をフォームに反映
 function loadLineTokenUI(){
-  const token=localStorage.getItem('kj_line_token2')||getLineToken();
   const userId=localStorage.getItem('kj_line_userid')||'';
   const st=document.getElementById('line-token-status');
   if(st){
-    if(token&&userId)st.innerHTML='✅ LINE通知設定済み（ユーザーID: '+userId.slice(0,8)+'...）';
-    else if(token)st.innerHTML='⚠️ ユーザーID未設定 → セットアップをやり直してください';
+    if(userId)st.innerHTML='✅ LINE通知設定済み（ユーザーID: '+userId.slice(0,8)+'...）';
     else st.innerHTML='❌ 未設定';
   }
 }
@@ -2735,7 +2720,7 @@ function calcFutureBookedIds(todayStr){
 }
 
 async function checkElapsedAlert(todayStr){
-  const token=getLineToken();if(!token)return;
+  const lineUserId=localStorage.getItem('kj_line_userid')||'';if(!lineUserId)return;
 
   // 予約表から最終来院日を集計
   const lastMap=calcLastVisitFromBookings();
@@ -2771,12 +2756,12 @@ async function testPatientLine(){
   const name=document.getElementById('pe-nm')?.value.trim()||'患者様';
   if(!uid){alert('LINEユーザーIDを入力してください');return;}
   // GASに保存されているトークンを使用（localStorageになくてもOK）
-  const token=''; // ★GAS側でスクリプトプロパティのトークンのみを使用するため、クライアント側でトークンを保持・送信しない
+  // ★GAS側でスクリプトプロパティのトークンのみを使用するため、クライアント側でトークンを保持・送信しない
   const msg='【倉治整骨院】\n'+name+'様\nLINE連携のテスト送信です✅\n正常に届いていれば設定完了です。';
   try{
     const res=await fetch('https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec',{
       method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'lineNotifyV2',token,userId:uid,message:msg}),
+      body:JSON.stringify({action:'lineNotifyV2',userId:uid,message:msg}),
       redirect:'follow'
     });
     const d=JSON.parse(await res.text());
@@ -2971,8 +2956,8 @@ async function execCancel(){
   bookings[cancelDate][cancelSlot]={cancelled:true,name,cardId,cancelReason:reason,reBookedBy:''};
   save();closeCancelModal();renderSched();await pushB();
   // LINE Notify送信
-  const token=getLineToken();
-  if(token){
+  const lineUserId=localStorage.getItem('kj_line_userid')||'';
+  if(lineUserId){
     const msg='\n【倉治整骨院】\n❌ キャンセル発生\n患者: '+name+'（'+cardId+'号）\n日時: '+cancelDate+' '+cancelSlot+'\n理由: '+(reason||'未記入')+'\n→ 空き枠が発生しました';
     sendLineNotify(msg);
   }
@@ -4595,13 +4580,19 @@ function setMedStatus(s){
   document.getElementById('pe-med-none').classList.toggle('on',s==='none');
   document.getElementById('pe-med-yes').classList.toggle('on',s==='yes');
 }
-function testPatientLine2(){
+async function testPatientLine2(){
   const uid=document.getElementById('pe-line-uid2').value.trim()||document.getElementById('pe-line-uid').value.trim();
   if(!uid){alert('LINEユーザーIDを入力してください');return;}
-  const token=localStorage.getItem('kj_line_token2')||'';
-  if(!token){alert('LINE設定が未完了です');return;}
-  sendLineNotify('【倉治整骨院】テスト送信です');
-  alert('テスト送信しました');
+  // ★GAS側でスクリプトプロパティのトークンのみを使用するため、クライアント側でトークンを保持・送信しない
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'lineNotifyV2',userId:uid,message:'【倉治整骨院】テスト送信です'}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res.text());
+    alert(d.ok?'✅ テスト送信しました':'❌ 送信失敗：'+JSON.stringify(d));
+  }catch(e){ alert('❌ エラー：'+e.message); }
 }
 function openPEdit(id){
   const p=patients.find(x=>x.id===id);if(!p)return;
