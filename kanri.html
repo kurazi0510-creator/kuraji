@@ -3333,7 +3333,7 @@ async function debugCheckMondoNotify(){
   alert(msg);
   beepNotify();
 }
-async function checkNewWebRequests(){
+async function checkNewWebRequests(silent){
   // ★Web予約とWeb問診票、キャンセル待ち、それぞれ個別に取得する（片方が失敗してももう片方は動くように）
   let pending=[], mondoList=[], mondoKotsuList=[], waitlist=[];
   try{
@@ -3419,15 +3419,15 @@ async function checkNewWebRequests(){
   updateFloatingNotifyBadge(pending.length, mondoUnseenCount, waitlist.length);
 
   // ---- 新着があれば、色分けした通知バナー＋音で知らせる ----
-  if(bookingNames.length>0){
+  if(bookingNames.length>0 && !silent){
     beepNotify();
     showNotifyBanner(`📩 新しいWeb予約リクエスト：${bookingNames.join('、')}`, '#c98a4b', openWebRequests);
   }
-  if(mondoNames.length>0){
+  if(mondoNames.length>0 && !silent){
     beepNotify();
     showNotifyBanner(`📋 新しいWeb問診票：${mondoNames.join('、')}`, '#0891b2', openMondoList);
   }
-  if(waitlistNames.length>0){
+  if(waitlistNames.length>0 && !silent){
     beepNotify();
     showNotifyBanner(`⏳ 新しいキャンセル待ち：${waitlistNames.join('、')}`, '#7e22ce', openWaitlist);
   }
@@ -3478,9 +3478,22 @@ function updateFloatingNotifyBadge(bookingCount, mondoCount, waitlistCount){
 checkNewWebRequests();
 setInterval(checkNewWebRequests, 120000); // 2分ごとに自動チェック
 // ★画面(タブ)が裏に回っている間はブラウザがタイマーを遅らせることがあるため、
-//   タブがまた表に戻ってきた瞬間にも必ず1回チェックする
+//   タブがまた表に戻ってきた瞬間にも必ず1回チェックする。
+//   ただし、長時間（5分以上）裏に回っていた場合は、その間に溜まっていた分をまとめて
+//   「新着」として音で知らせてしまわないよう、まず音を鳴らさずに現状だけ静かに同期する。
+let lastHiddenAt=null;
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState==='visible') checkNewWebRequests();
+  if(document.visibilityState==='hidden'){
+    lastHiddenAt=Date.now();
+  }else if(document.visibilityState==='visible'){
+    const hiddenMs=lastHiddenAt?(Date.now()-lastHiddenAt):0;
+    if(hiddenMs>5*60*1000){
+      checkNewWebRequests(true); // 5分以上裏に回っていた→音を鳴らさず静かに同期するだけ
+    }else{
+      checkNewWebRequests();
+    }
+    lastHiddenAt=null;
+  }
 });
 
 // ===== Web問診票一覧 =====
