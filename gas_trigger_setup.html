@@ -18,10 +18,7 @@ h1{color:#1e293b;font-size:0.9rem;text-align:center;margin-bottom:4px;}
 .btn-green{background:#22c55e;color:white;}
 .btn-back{background:#1e3a5f;color:#7dd3fc;}
 .tip{background:#eff6ff;border-radius:8px;padding:10px;font-size:0.76rem;color:#1e40af;margin-top:8px;line-height:1.7;}
-.inp{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px 12px;font-size:0.82rem;margin-bottom:8px;}
-.result{border-radius:8px;padding:10px;margin-top:8px;display:none;font-size:0.78rem;}
-.result-ok{background:#dcfce7;color:#166534;}
-.result-ng{background:#fee2e2;color:#dc2626;}
+code{background:#e2e8f0;padding:1px 5px;border-radius:4px;font-size:0.78rem;}
 </style>
 </head>
 <body>
@@ -42,15 +39,20 @@ h1{color:#1e293b;font-size:0.9rem;text-align:center;margin-bottom:4px;}
 
   <div class="step">
     <div class="step-num">STEP 2</div>
-    <div class="step-title">🔑 LINEトークンをGASに保存する</div>
+    <div class="step-title">🔑 LINEトークンをApps Scriptに設定する</div>
     <div class="step-desc">
-      Apps Scriptで<code>saveLineSettings</code>関数を実行して、LINEトークンをGASのプロパティに保存します。
+      <strong>セキュリティのため、トークンをこのページから送信して保存する仕組みは廃止しました。</strong><br><br>
+      Apps Script側で直接、スクリプト プロパティに設定してください。<br><br>
+      ① Apps Script（script.google.com）を開く<br>
+      ② 左メニューの歯車アイコン「プロジェクトの設定」<br>
+      ③ 下にスクロールして「スクリプト プロパティ」→「スクリプト プロパティを追加」<br>
+      ④ プロパティ名 <code>LINE_TOKEN</code> に、発行したチャネルアクセストークン（長期）を貼り付けて保存<br>
+      ⑤ 同じく プロパティ名 <code>LINE_USER_ID</code> に、自分（院長）のユーザーIDを貼り付けて保存
     </div>
-    <input class="inp" type="password" id="setup-token" placeholder="チャネルアクセストークン（長期）">
-    <input class="inp" type="text" id="setup-userid" placeholder="あなたのユーザーID（Uで始まる）">
-    <button class="btn btn-green" onclick="saveToGAS()">💾 GASにLINE設定を保存する</button>
-    <div class="result" id="save-result"></div>
-    <div class="tip">保存した設定はGASのスクリプトプロパティに安全に保存されます。</div>
+    <div class="tip">
+      💡 トークンの発行方法・ユーザーIDの確認方法が分からない場合は、
+      <a href="line_setup.html" style="color:#1e40af">LINE通知セットアップガイド</a>のSTEP 1〜4を先にご覧ください。
+    </div>
   </div>
 
   <div class="step">
@@ -68,33 +70,16 @@ h1{color:#1e293b;font-size:0.9rem;text-align:center;margin-bottom:4px;}
     </div>
   </div>
 
+  <div class="step">
+    <div class="step-num">確認</div>
+    <div class="step-title">🧪 正しく設定できたか確認する</div>
+    <div class="step-desc">
+      STEP 2の設定が終わったら、実際にLINEへ届くか確認できます。
+    </div>
+    <button class="btn btn-green" onclick="location.href='line_setup.html'">🧪 院長のLINEへテスト送信する</button>
+  </div>
+
   <button class="btn btn-back" onclick="location.href='kanri.html'">← 管理システムに戻る</button>
 </div>
-
-<script>
-const GAS='https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
-
-// localStorageからトークンを自動入力
-window.addEventListener('load',()=>{
-  const t=localStorage.getItem('kj_line_token2')||'';
-  const u=localStorage.getItem('kj_line_userid')||'';
-  if(t)document.getElementById('setup-token').value=t;
-  if(u)document.getElementById('setup-userid').value=u;
-});
-
-async function saveToGAS(){
-  const token=document.getElementById('setup-token').value.trim();
-  const userId=document.getElementById('setup-userid').value.trim();
-  const res=document.getElementById('save-result');
-  if(!token||!userId){res.className='result result-ng';res.style.display='block';res.textContent='❌ トークンとユーザーIDを入力してください';return;}
-  res.className='result';res.style.display='block';res.textContent='📤 GASに保存中...';
-  try{
-    const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveLineSettings',token,userId}),redirect:'follow'});
-    const d=JSON.parse(await r.text());
-    if(d.ok){res.className='result result-ok';res.textContent='✅ GASにLINE設定を保存しました！STEP 3のトリガー設定に進んでください。';}
-    else{res.className='result result-ng';res.textContent='❌ 失敗：'+JSON.stringify(d);}
-  }catch(e){res.className='result result-ng';res.textContent='❌ エラー：'+e.message;}
-}
-</script>
 </body>
 </html>
