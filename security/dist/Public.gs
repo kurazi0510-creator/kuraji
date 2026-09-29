@@ -1,4 +1,19 @@
+// PUBLIC deployment: no patient list, no management writes, no arbitrary LINE sends.
+var PUBLIC_GET_ACTIONS_={"getMenuMaster":true,"getBizHours":true,"getAvailableSlots":true,"getAvailableSlotsRange":true};
+var PUBLIC_POST_ACTIONS_={"saveWebBookingRequest":true,"saveTrafficAccidentConsult":true,"registerWaitlist":true,"saveMondoshin":true,"saveMondoshinKotsu":true,"requestBookingLookupCode":true,"verifyBookingLookupCode":true};
+function publicReject_(){return ContentService.createTextOutput(JSON.stringify({ok:false,error:'権限がありません'})).setMimeType(ContentService.MimeType.JSON);}
+function webhookAllowed_(e){
+  var configured=PropertiesService.getScriptProperties().getProperty('LINE_WEBHOOK_FORWARD_KEY');
+  var supplied=e&&e.parameter&&e.parameter.webhookKey;
+  if(!configured||!supplied||String(configured).length!==String(supplied).length)return false;
+  var diff=0;for(var i=0;i<configured.length;i++)diff|=configured.charCodeAt(i)^String(supplied).charCodeAt(i);
+  return diff===0;
+}
 function doGet(e){
+  var publicAction=(e&&e.parameter&&e.parameter.action)||'';
+  if(!PUBLIC_GET_ACTIONS_[publicAction])return publicReject_();
+  if(e.parameter.callback&&!/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(e.parameter.callback))return publicReject_();
+  if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
@@ -9,6 +24,10 @@ function doGet(e){
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 function doPost(e){
+  var rawBody=e&&e.postData&&e.postData.contents||'{}', incoming;
+  try{incoming=JSON.parse(rawBody);}catch(parseError){return publicReject_();}
+  if(incoming.events){if(!webhookAllowed_(e))return publicReject_();}
+  else if(!PUBLIC_POST_ACTIONS_[incoming.action])return publicReject_();
   var ret=ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
   try{
     var raw=e&&e.postData&&e.postData.contents?e.postData.contents:"{}";
@@ -794,7 +813,7 @@ function dailyLineAlert(){
   // ★患者様への直接送信は日付カウントの不具合により一時停止中★
   // （院長への通知のみ行い、実際に連絡するかどうかは院長の判断で行う）
   var sent=0,skip=alerts.length;
-  /* 
+  /*
   alerts.forEach(function(v){
     var tid="";
     var tel=getTelByPatientName_(v.name);

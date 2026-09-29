@@ -30,27 +30,50 @@ input:focus{outline:none;border-color:#c98a4b;}
 <body>
 <div class="header">
   <h1>📋 ご予約内容の確認</h1>
-  <p>ご予約時のお電話番号を入力してください</p>
+  <p>LINEにお届けする確認コードで、ご本人確認を行います</p>
 </div>
 <div class="wrap">
   <div class="card">
     <label>お電話番号</label>
     <input type="tel" id="tel" placeholder="09012345678" inputmode="numeric">
-    <button class="btn" id="btn" onclick="search()">確認する</button>
+    <button class="btn" id="btn" onclick="requestCode()">確認コードをLINEへ送る</button>
+    <div id="codeBox" style="display:none;margin-top:14px">
+      <label>LINEに届いた8文字の確認コード</label>
+      <input id="code" inputmode="text" autocomplete="one-time-code" maxlength="8" placeholder="例：A1B2C3D4">
+      <button class="btn" id="verifyBtn" onclick="search()">予約を確認する</button>
+    </div>
+    <p style="font-size:.75rem;color:#8a7860;margin-top:10px">LINEと電話番号を連携していない方は、お電話またはLINEでお問い合わせください。</p>
     <div class="err" id="err"></div>
   </div>
   <div id="results"></div>
 </div>
 <script>
 const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function requestCode(){
+  const tel=document.getElementById('tel').value.replace(/[^0-9]/g,'');
+  const btn=document.getElementById('btn'),err=document.getElementById('err');
+  err.style.display='none';
+  if(!/^0\d{9,10}$/.test(tel)){err.textContent='電話番号を正しく入力してください';err.style.display='block';return;}
+  btn.disabled=true;
+  try{
+    const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'requestBookingLookupCode',tel})});
+    const d=await r.json();
+    if(!d.ok)throw new Error(d.error||'送信できませんでした');
+    document.getElementById('codeBox').style.display='block';
+    err.textContent=d.message;err.style.display='block';
+  }catch(e){err.textContent='送信できませんでした。院へお問い合わせください。';err.style.display='block';}
+  finally{btn.disabled=false;}
+}
 async function search(){
   const tel=document.getElementById('tel').value.replace(/[^0-9]/g,'');
-  const btn=document.getElementById('btn'), err=document.getElementById('err'), res=document.getElementById('results');
+  const code=document.getElementById('code').value.trim();
+  const btn=document.getElementById('verifyBtn'), err=document.getElementById('err'), res=document.getElementById('results');
   err.style.display='none'; res.innerHTML='';
   if(tel.length<10){ err.textContent='電話番号を正しく入力してください'; err.style.display='block'; return; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>確認中...';
   try{
-    const r=await fetch(GAS+'?action=lookupBooking&tel='+encodeURIComponent(tel)+'&t='+Date.now(),{cache:'no-store'});
+    const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'verifyBookingLookupCode',tel,code})});
     const d=await r.json();
     if(!d.ok){ err.textContent='⚠️ '+(d.error||'確認に失敗しました'); err.style.display='block'; }
     else if(!d.list || !d.list.length){
@@ -59,7 +82,7 @@ async function search(){
       res.innerHTML=d.list.map(b=>{
         const dd=new Date(b.date);
         const disp=isNaN(dd.getTime())?b.date:dd.toLocaleDateString('ja-JP',{month:'long',day:'numeric',weekday:'short'});
-        return `<div class="result-item"><div class="d">${disp} ${b.time}〜</div><div class="n">${b.name} 様</div><div class="m">${b.menu||''}</div></div>`;
+        return `<div class="result-item"><div class="d">${escapeHtml(disp)} ${escapeHtml(b.time)}〜</div><div class="n">${escapeHtml(b.name)} 様</div><div class="m">${escapeHtml(b.menu||'')}</div></div>`;
       }).join('');
     }
   }catch(e){

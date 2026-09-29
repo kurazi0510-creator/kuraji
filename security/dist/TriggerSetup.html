@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GASトリガー設定 - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;padding:14px;}
+.card{background:white;border-radius:12px;padding:16px;max-width:600px;margin:0 auto 12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+h1{color:#1e293b;font-size:0.9rem;text-align:center;margin-bottom:4px;}
+.step{background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #f97316;}
+.step-num{color:#f97316;font-size:0.72rem;font-weight:bold;margin-bottom:4px;}
+.step-title{color:#1e293b;font-size:0.88rem;font-weight:bold;margin-bottom:8px;}
+.step-desc{color:#374151;font-size:0.78rem;line-height:1.9;}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:0.88rem;font-weight:bold;cursor:pointer;margin-top:8px;}
+.btn-primary{background:#f97316;color:white;}
+.btn-green{background:#22c55e;color:white;}
+.btn-back{background:#1e3a5f;color:#7dd3fc;}
+.tip{background:#eff6ff;border-radius:8px;padding:10px;font-size:0.76rem;color:#1e40af;margin-top:8px;line-height:1.7;}
+code{background:#e2e8f0;padding:1px 5px;border-radius:4px;font-size:0.78rem;}
+</style>
+<script>
+window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
+// Only runs inside an owner-only Apps Script HTML-service deployment.
+// The public GitHub copy of kanri.html must not be used after cutover.
+(() => {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init = {}) {
+    const url = typeof input === 'string' ? input : input.url;
+    const parsed = new URL(url, location.href);
+    if (parsed.hostname !== 'script.google.com' ||
+        !/^\/macros\/s\/[^/]+\/exec$/.test(parsed.pathname) ||
+        parsed.pathname !== '/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec') {
+      return nativeFetch(input, init);
+    }
+    const method = (init.method || (input.method || 'GET')).toUpperCase();
+    const request = method === 'GET'
+      ? {method, params: Object.fromEntries(parsed.searchParams)}
+      : {method, body: JSON.parse(init.body || '{}')};
+    const data = await new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).adminRequest(request);
+    });
+    return new Response(data, {status: 200, headers: {'Content-Type': 'application/json'}});
+  };
+})();
+
+</script>
+</head>
+<body>
+<div class="card">
+  <h1>⏰ GAS自動トリガー設定ガイド</h1>
+  <p style="text-align:center;font-size:0.74rem;color:#64748b;margin-bottom:14px">毎朝8時に20日未来院患者を自動でLINEに通知</p>
+
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <div class="step-title">📋 最新GASコードに更新する</div>
+    <div class="step-desc">
+      まず下のページを開いてGASコードを更新してください。<br>
+      新しいコードに<code>dailyLineAlert</code>関数が含まれています。
+    </div>
+    <button class="btn btn-primary" onclick="window.open('https://kurazi0510-creator.github.io/kuraji/gas_copy.html')">📋 GASコードをコピーする</button>
+    <div class="tip">コピー後：Apps Script → Ctrl+A → Delete → 貼り付け → Ctrl+S → デプロイ</div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <div class="step-title">🔑 LINEトークンをApps Scriptに設定する</div>
+    <div class="step-desc">
+      <strong>セキュリティのため、トークンをこのページから送信して保存する仕組みは廃止しました。</strong><br><br>
+      Apps Script側で直接、スクリプト プロパティに設定してください。<br><br>
+      ① Apps Script（script.google.com）を開く<br>
+      ② 左メニューの歯車アイコン「プロジェクトの設定」<br>
+      ③ 下にスクロールして「スクリプト プロパティ」→「スクリプト プロパティを追加」<br>
+      ④ プロパティ名 <code>LINE_TOKEN</code> に、発行したチャネルアクセストークン（長期）を貼り付けて保存<br>
+      ⑤ 同じく プロパティ名 <code>LINE_USER_ID</code> に、自分（院長）のユーザーIDを貼り付けて保存
+    </div>
+    <div class="tip">
+      💡 トークンの発行方法・ユーザーIDの確認方法が分からない場合は、
+      <a href="<?!= webAppUrl ?>?page=LineSetup" style="color:#1e40af">LINE通知セットアップガイド</a>のSTEP 1〜4を先にご覧ください。
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">STEP 3</div>
+    <div class="step-title">⏰ トリガーを自動設定する（1回実行するだけ）</div>
+    <div class="step-desc">
+      Apps Scriptで：<br>
+      ① 関数のドロップダウンを <strong>「setupDailyTrigger」</strong> に変更<br>
+      ② <strong>「▶ 実行」</strong> を押す<br>
+      ③ 「✅ 完了！毎朝8時に...」というメッセージが出たら設定完了！
+    </div>
+    <div class="tip">
+      ✅ これだけで毎朝8時に自動でLINEに20日アラートが届くようになります。<br>
+      ⚠️ 実行は1回だけでOKです。複数回実行すると重複してしまいます。
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">確認</div>
+    <div class="step-title">🧪 正しく設定できたか確認する</div>
+    <div class="step-desc">
+      STEP 2の設定が終わったら、実際にLINEへ届くか確認できます。
+    </div>
+    <button class="btn btn-green" onclick="location.href=adminPageUrl('LineSetup')">🧪 院長のLINEへテスト送信する</button>
+  </div>
+
+  <button class="btn btn-back" onclick="location.href=adminPageUrl('Admin')">← 管理システムに戻る</button>
+</div>
+</body>
+</html>

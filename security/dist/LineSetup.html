@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LINE通知セットアップ - 倉治整骨院</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Hiragino Sans',sans-serif;background:#f0f4f8;padding:16px;}
+.card{background:white;border-radius:12px;padding:16px;max-width:600px;margin:0 auto 12px;}
+h1{color:#1e293b;font-size:1rem;text-align:center;margin-bottom:4px;}
+.sub{color:#64748b;font-size:0.75rem;text-align:center;margin-bottom:16px;}
+.step{background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #f97316;}
+.step-num{color:#f97316;font-size:0.72rem;font-weight:bold;margin-bottom:4px;}
+.step-title{color:#1e293b;font-size:0.88rem;font-weight:bold;margin-bottom:8px;}
+.step-desc{color:#374151;font-size:0.78rem;line-height:1.8;}
+.url-box{background:#1e293b;color:#22c55e;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:0.78rem;margin:8px 0;word-break:break-all;cursor:pointer;}
+.inp-area{background:white;border-radius:10px;padding:14px;border:2px solid #e2e8f0;}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:0.88rem;font-weight:bold;cursor:pointer;margin-top:6px;}
+.btn-primary{background:#f97316;color:white;}
+.btn-green{background:#22c55e;color:white;}
+.btn-back{background:#1e3a5f;color:#7dd3fc;}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.68rem;font-weight:bold;}
+.free{background:#dcfce7;color:#166534;}
+.warn{background:#fef3c7;color:#92400e;}
+.tip{background:#eff6ff;border-radius:8px;padding:10px;font-size:0.76rem;color:#1e40af;margin-top:8px;line-height:1.7;}
+.result{border-radius:8px;padding:10px;margin-top:8px;display:none;font-size:0.78rem;}
+.result-ok{background:#dcfce7;color:#166534;}
+.result-ng{background:#fee2e2;color:#dc2626;}
+code{background:#e2e8f0;padding:1px 5px;border-radius:4px;font-size:0.78rem;}
+</style>
+<script>
+window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
+// Only runs inside an owner-only Apps Script HTML-service deployment.
+// The public GitHub copy of kanri.html must not be used after cutover.
+(() => {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init = {}) {
+    const url = typeof input === 'string' ? input : input.url;
+    const parsed = new URL(url, location.href);
+    if (parsed.hostname !== 'script.google.com' ||
+        !/^\/macros\/s\/[^/]+\/exec$/.test(parsed.pathname) ||
+        parsed.pathname !== '/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec') {
+      return nativeFetch(input, init);
+    }
+    const method = (init.method || (input.method || 'GET')).toUpperCase();
+    const request = method === 'GET'
+      ? {method, params: Object.fromEntries(parsed.searchParams)}
+      : {method, body: JSON.parse(init.body || '{}')};
+    const data = await new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).adminRequest(request);
+    });
+    return new Response(data, {status: 200, headers: {'Content-Type': 'application/json'}});
+  };
+})();
+
+</script>
+</head>
+<body>
+<div class="card">
+  <h1>📱 LINE通知セットアップガイド</h1>
+  <p class="sub">倉治整骨院 管理システム ｜ 21日アラート・キャンセル通知を自分のLINEに送る</p>
+  <div style="text-align:center;margin-bottom:12px">
+    <span class="badge free">月200通まで無料</span>&nbsp;
+    <span class="badge warn">所要時間：約5分</span>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <div class="step-title">🏢 LINE公式アカウントを作成する</div>
+    <div class="step-desc">
+      以下のURLにアクセスしてLINEアカウントでログインします。<br>
+      （すでに倉治整骨院のLINE公式アカウントをお持ちの場合はSTEP 2へ）
+    </div>
+    <div class="url-box" onclick="navigator.clipboard.writeText('https://manager.line.biz/')">
+      https://manager.line.biz/ （タップでコピー）
+    </div>
+    <div class="step-desc">
+      ① LINEアカウントでログイン<br>
+      ② 「アカウントを作成」→ 店舗名「倉治整骨院管理通知」などで作成<br>
+      ③ 業種は「医療・健康」を選択
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <div class="step-title">⚙️ Messaging APIを有効にする</div>
+    <div class="step-desc">
+      ① LINE Official Account Manager にログイン<br>
+      ② 右上「設定」→ 左メニュー「Messaging API」<br>
+      ③「Messaging APIを利用する」をクリック<br>
+      ④ プロバイダー名を入力（例：倉治整骨院）して同意・OK<br>
+      ⑤「LINE Developersコンソールで確認する」をクリック
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-num">STEP 3</div>
+    <div class="step-title">🔑 アクセストークンを発行する</div>
+    <div class="step-desc">
+      LINE Developersコンソール（developers.line.biz）で：<br>
+      ① 作成したチャネルを選択<br>
+      ② 「Messaging API設定」タブを選択<br>
+      ③ 下にスクロール → 「チャネルアクセストークン（長期）」の「発行」をクリック<br>
+      ④ 表示されたトークンをコピーしておく
+    </div>
+    <div class="tip">
+      💡 トークンは長い文字列（約180文字）です。全部コピーしてください。
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-num">STEP 4</div>
+    <div class="step-title">👤 自分のユーザーIDを確認する</div>
+    <div class="step-desc">
+      ① LINE Developersコンソール → 作成したチャネル<br>
+      ② 「Messaging API設定」タブ → QRコードが表示される<br>
+      ③ そのQRコードを自分のLINEで読み取り「友だち追加」する<br>
+      ④ 「チャネル基本設定」タブ → 「あなたのユーザーID」をコピー（Uで始まる文字列）
+    </div>
+    <div class="tip">
+      ⚠️ 友だち追加しないとメッセージが届きません。必ず自分で友だち追加してください。
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step">
+    <div class="step-num">STEP 5</div>
+    <div class="step-title">✅ Apps Scriptに直接設定する</div>
+    <div class="step-desc">
+      <strong>セキュリティのため、トークンをこのページや管理システムに入力・保存する仕組みは廃止しました。</strong><br><br>
+      発行したトークンとユーザーIDは、<strong>Apps Scriptの「スクリプト プロパティ」にだけ</strong>保存してください。<br><br>
+      ① Apps Script（script.google.com）を開く<br>
+      ② 左メニューの歯車アイコン「プロジェクトの設定」<br>
+      ③ 下にスクロールして「スクリプト プロパティ」→「スクリプト プロパティを追加」<br>
+      ④ プロパティ名 <code>LINE_TOKEN</code> に、発行したトークンを貼り付けて保存<br>
+      ⑤ 同じく プロパティ名 <code>LINE_USER_ID</code> に、自分のユーザーIDを貼り付けて保存
+    </div>
+    <div class="tip">
+      💡 ここに保存した値は、GAS（サーバー側）だけが読み込みます。ブラウザ（このページやkanri.html）には一切保存されません。
+    </div>
+  </div>
+
+  <!-- テスト送信 -->
+  <div class="inp-area">
+    <div class="step-desc" style="margin-bottom:8px">STEP 5の設定が終わったら、実際に届くかテストしてください（院長ご本人のLINEにだけ届きます）。</div>
+    <button class="btn btn-green" onclick="testSend()">🧪 院長のLINEへテスト送信</button>
+    <button class="btn" id="auth-btn" onclick="openAuthPage()" style="display:none;background:#7c3aed;color:white;margin-top:6px">🔑 権限承認ページを開く（エラー時）</button>
+    <div class="result" id="test-result"></div>
+  </div>
+
+  <button class="btn btn-back" onclick="location.href=adminPageUrl('Admin')" style="margin-top:10px">← 管理システムに戻る</button>
+</div>
+
+<script>
+// ★現在使用中のGAS URL（kanri.html等と同じもの）
+const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+
+// ★セキュリティ対策：トークン・ユーザーIDは一切送信しない。「testLineOwner」だけを送り、
+//   GAS側がスクリプトプロパティのLINE_TOKEN／LINE_USER_IDだけを使って院長本人にテスト送信する。
+async function testSend(){
+  const res=document.getElementById('test-result');
+  res.className='result';res.style.display='block';res.textContent='📤 GAS経由で送信中...';
+  try{
+    const r=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'testLineOwner'}),
+      redirect:'follow'
+    });
+    const txt=await r.text();
+    let d;
+    try{d=JSON.parse(txt);}catch(e){d={ok:false,error:txt};}
+    if(d.ok){
+      res.className='result result-ok';
+      res.textContent='✅ 送信成功！院長のLINEを確認してください。';
+    }else{
+      res.className='result result-ng';
+      res.textContent='❌ 失敗：'+(d.error||JSON.stringify(d))+'　→ STEP 5のスクリプトプロパティ設定を確認するか、Apps Scriptで権限承認が必要です。下のボタンを押してください。';
+      document.getElementById('auth-btn').style.display='block';
+    }
+  }catch(e){
+    res.className='result result-ng';
+    res.textContent='❌ エラー：'+e.message;
+  }
+}
+
+function openAuthPage(){
+  // GASの権限承認ページを直接開く
+  window.open(GAS+'?action=auth','_blank');
+  alert('新しいタブでGASページが開きます。\n「このアプリを信頼する」や「許可」が表示されたら承認してください。\n承認後、もう一度テスト送信してください。');
+}
+</script>
+</body>
+</html>

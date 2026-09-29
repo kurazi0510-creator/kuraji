@@ -1,4 +1,4 @@
-function doGet(e){
+function adminApiGet_(e){
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
   var callback=(e&&e.parameter&&e.parameter.callback)||"";
   var result;
@@ -8,7 +8,7 @@ function doGet(e){
   if(callback)return ContentService.createTextOutput(callback+"("+json+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
-function doPost(e){
+function adminApiPost_(e){
   var ret=ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
   try{
     var raw=e&&e.postData&&e.postData.contents?e.postData.contents:"{}";
@@ -794,7 +794,7 @@ function dailyLineAlert(){
   // ★患者様への直接送信は日付カウントの不具合により一時停止中★
   // （院長への通知のみ行い、実際に連絡するかどうかは院長の判断で行う）
   var sent=0,skip=alerts.length;
-  /* 
+  /*
   alerts.forEach(function(v){
     var tid="";
     var tel=getTelByPatientName_(v.name);
@@ -3044,4 +3044,24 @@ function deleteBookingsByName(namePrefix){
     }
     return {ok:true, deleted:deleted};
   }catch(err){ return {ok:false, error:err.message}; }
+}
+
+// This entire project must be deployed with access: Only myself.
+var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,MondoPrint:true,MondoKotsuPrint:true};
+function doGet(e){
+  var page=e&&e.parameter&&e.parameter.page||'Admin';
+  if(!ADMIN_PAGES_[page])throw new Error('Unknown page');
+  var template=HtmlService.createTemplateFromFile(page);
+  template.webAppUrl=ScriptApp.getService().getUrl();
+  return template.evaluate().setTitle('倉治整骨院 管理システム');
+}
+function adminRequest(request){
+  if(!request||!request.method)throw new Error('Invalid request');
+  var output;
+  if(request.method==='GET'){
+    output=adminApiGet_({parameter:request.params||{}});
+  }else if(request.method==='POST'){
+    output=adminApiPost_({postData:{contents:JSON.stringify(request.body||{})},parameter:{}});
+  }else throw new Error('Invalid method');
+  return output.getContent();
 }
