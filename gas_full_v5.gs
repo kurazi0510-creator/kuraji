@@ -96,6 +96,7 @@ function doPost(e){
       else if(action==="saveUriage"){saveSheet("売上",JSON.parse(body.rows));result={ok:true};}
       else if(action==="resetBookings"){resetBookings();result={ok:true};}
       else if(action==="lineNotifyV2")result=sendLineMessagingAPI(PropertiesService.getScriptProperties().getProperty("LINE_TOKEN"),body.userId,body.message); // ★セキュリティ対策：クライアントから送られてきたトークンは使わず、必ずサーバー側の設定値だけを使う
+      else if(action==="testLineOwner")result=testLineOwner(); // ★院長本人へのテスト送信専用。token/userIdをクライアントから一切受け取らない
       else if(action==="getLineUsers")result=getLineUsers();
       else if(action==="saveWebBooking")result=saveWebBooking(body.data);
       else if(action==="saveWebBookingRequest")result=saveWebBookingRequest(body.data);
@@ -287,6 +288,21 @@ function findLineUidForPatient_(pt){
     }
   }
   return tid;
+}
+// ============================================================
+// ★院長本人へのLINEテスト送信（新規追加）
+//   line_setup.html等のテストボタンから呼ばれる。トークン・送信先IDは一切クライアントから受け取らず、
+//   必ずスクリプトプロパティ(LINE_TOKEN・LINE_USER_ID)だけを使う。
+// ============================================================
+function testLineOwner(){
+  var p=PropertiesService.getScriptProperties();
+  var token=p.getProperty("LINE_TOKEN");
+  var ownerId=p.getProperty("LINE_USER_ID");
+  if(!token) return {ok:false, error:"スクリプトプロパティにLINE_TOKENが設定されていません"};
+  if(!ownerId) return {ok:false, error:"スクリプトプロパティにLINE_USER_IDが設定されていません"};
+  var msg="【倉治整骨院 管理システム】"+String.fromCharCode(10)+"✅ LINE通知テスト成功！"+String.fromCharCode(10)+Utilities.formatDate(new Date(),"Asia/Tokyo","yyyy/MM/dd HH:mm:ss");
+  var r=sendLineMessagingAPI(token,ownerId,msg);
+  return (r&&r.ok) ? {ok:true} : {ok:false, error:"LINE送信に失敗しました"};
 }
 function findPendingWebRequestByName_(msgText){
   try{
