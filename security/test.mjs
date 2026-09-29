@@ -35,6 +35,27 @@ assert.equal(get({action:'getAvailableSlots',callback:'evil();',date:'2026-09-30
 const page=fs.readFileSync(path.join(dist,'Admin.html'),'utf8');
 assert.match(page,/google\.script\.run/);
 assert.match(page,/adminPageUrl\('Karte'\)/);
+assert.match(page,/adminPageUrl\('TriggerSetup'\)/);
+const bridge=fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)),'admin_fetch_bridge.js'),'utf8');
+let intercepted;
+const nativeCalls=[];
+const bridgeCtx={
+  window:{fetch:async url=>{nativeCalls.push(url);return {ok:true};}},
+  URL,Response,location:{href:'https://script.googleusercontent.com/iframe'},
+  google:{script:{run:{
+    withSuccessHandler(cb){this.success=cb;return this;},
+    withFailureHandler(cb){this.failure=cb;return this;},
+    adminRequest(req){intercepted=req;this.success('{"ok":true}');},
+  }}},
+};
+vm.createContext(bridgeCtx);vm.runInContext(bridge,bridgeCtx);
+const gas='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+assert.equal((await bridgeCtx.window.fetch(gas+'?action=getAll')).ok,true);
+assert.equal(intercepted.params.action,'getAll');
+await bridgeCtx.window.fetch(gas,{method:'POST',body:JSON.stringify({action:'lineNotifyV2',userId:'test'})});
+assert.equal(intercepted.body.action,'lineNotifyV2');
+await bridgeCtx.window.fetch('https://example.com/public');
+assert.equal(nativeCalls.length,1);
 const {default: worker}=await import('./line-webhook-worker.js');
 const env={LINE_CHANNEL_SECRET:'test-channel-secret',GAS_WEBHOOK_URL:'https://example.invalid/exec?webhookKey=not-real'};
 let forwarded=0;
