@@ -16,7 +16,6 @@ h1{color:#1e293b;font-size:1rem;text-align:center;margin-bottom:4px;}
 .step-desc{color:#374151;font-size:0.78rem;line-height:1.8;}
 .url-box{background:#1e293b;color:#22c55e;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:0.78rem;margin:8px 0;word-break:break-all;cursor:pointer;}
 .inp-area{background:white;border-radius:10px;padding:14px;border:2px solid #e2e8f0;}
-.inp{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px 12px;font-size:0.82rem;margin-bottom:8px;}
 .btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:0.88rem;font-weight:bold;cursor:pointer;margin-top:6px;}
 .btn-primary{background:#f97316;color:white;}
 .btn-green{background:#22c55e;color:white;}
@@ -28,6 +27,7 @@ h1{color:#1e293b;font-size:1rem;text-align:center;margin-bottom:4px;}
 .result{border-radius:8px;padding:10px;margin-top:8px;display:none;font-size:0.78rem;}
 .result-ok{background:#dcfce7;color:#166534;}
 .result-ng{background:#fee2e2;color:#dc2626;}
+code{background:#e2e8f0;padding:1px 5px;border-radius:4px;font-size:0.78rem;}
 </style>
 </head>
 <body>
@@ -104,54 +104,46 @@ h1{color:#1e293b;font-size:1rem;text-align:center;margin-bottom:4px;}
   <!-- STEP 5 -->
   <div class="step">
     <div class="step-num">STEP 5</div>
-    <div class="step-title">✅ 管理システムに設定する</div>
-    <div class="step-desc">下記に入力してテスト送信してください</div>
+    <div class="step-title">✅ Apps Scriptに直接設定する</div>
+    <div class="step-desc">
+      <strong>セキュリティのため、トークンをこのページや管理システムに入力・保存する仕組みは廃止しました。</strong><br><br>
+      発行したトークンとユーザーIDは、<strong>Apps Scriptの「スクリプト プロパティ」にだけ</strong>保存してください。<br><br>
+      ① Apps Script（script.google.com）を開く<br>
+      ② 左メニューの歯車アイコン「プロジェクトの設定」<br>
+      ③ 下にスクロールして「スクリプト プロパティ」→「スクリプト プロパティを追加」<br>
+      ④ プロパティ名 <code>LINE_TOKEN</code> に、発行したトークンを貼り付けて保存<br>
+      ⑤ 同じく プロパティ名 <code>LINE_USER_ID</code> に、自分のユーザーIDを貼り付けて保存
+    </div>
+    <div class="tip">
+      💡 ここに保存した値は、GAS（サーバー側）だけが読み込みます。ブラウザ（このページやkanri.html）には一切保存されません。
+    </div>
   </div>
 
-  <!-- 設定フォーム -->
+  <!-- テスト送信 -->
   <div class="inp-area">
-    <label style="font-size:0.76rem;font-weight:bold;color:#374151;display:block;margin-bottom:4px">チャネルアクセストークン（長期）</label>
-    <input class="inp" type="password" id="token-input" placeholder="発行したトークンを貼り付け">
-    <label style="font-size:0.76rem;font-weight:bold;color:#374151;display:block;margin-bottom:4px;margin-top:8px">あなたのユーザーID（Uで始まる）</label>
-    <input class="inp" type="text" id="userid-input" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-    <button class="btn btn-green" onclick="testSend()">🧪 テスト送信してLINEに届くか確認</button>
+    <div class="step-desc" style="margin-bottom:8px">STEP 5の設定が終わったら、実際に届くかテストしてください（院長ご本人のLINEにだけ届きます）。</div>
+    <button class="btn btn-green" onclick="testSend()">🧪 院長のLINEへテスト送信</button>
     <button class="btn" id="auth-btn" onclick="openAuthPage()" style="display:none;background:#7c3aed;color:white;margin-top:6px">🔑 権限承認ページを開く（エラー時）</button>
     <div class="result" id="test-result"></div>
-    <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:10px">💾 管理システムに保存して完了</button>
   </div>
 
   <button class="btn btn-back" onclick="location.href='kanri.html'" style="margin-top:10px">← 管理システムに戻る</button>
 </div>
 
 <script>
-// GAS URL
-const GAS='https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
+// ★現在使用中のGAS URL（kanri.html等と同じもの）
+const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
 
-// 保存済みの値を読み込む
-window.addEventListener('load',()=>{
-  const t=localStorage.getItem('kj_line_token2')||'';
-  const u=localStorage.getItem('kj_line_userid')||'';
-  if(t)document.getElementById('token-input').value=t;
-  if(u)document.getElementById('userid-input').value=u;
-});
-
+// ★セキュリティ対策：トークン・ユーザーIDは一切送信しない。「testLineOwner」だけを送り、
+//   GAS側がスクリプトプロパティのLINE_TOKEN／LINE_USER_IDだけを使って院長本人にテスト送信する。
 async function testSend(){
-  const token=document.getElementById('token-input').value.trim();
-  const userId=document.getElementById('userid-input').value.trim();
   const res=document.getElementById('test-result');
-  if(!token||!userId){res.className='result result-ng';res.style.display='block';res.textContent='❌ トークンとユーザーIDを両方入力してください';return;}
   res.className='result';res.style.display='block';res.textContent='📤 GAS経由で送信中...';
-  const GAS='https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec';
   try{
     const r=await fetch(GAS,{
       method:'POST',
       headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({
-        action:'lineNotifyV2',
-        token:token,
-        userId:userId,
-        message:'【倉治整骨院 管理システム】\n✅ LINE通知テスト成功！\n'+new Date().toLocaleString('ja-JP')
-      }),
+      body:JSON.stringify({action:'testLineOwner'}),
       redirect:'follow'
     });
     const txt=await r.text();
@@ -159,10 +151,10 @@ async function testSend(){
     try{d=JSON.parse(txt);}catch(e){d={ok:false,error:txt};}
     if(d.ok){
       res.className='result result-ok';
-      res.textContent='✅ 送信成功！LINEを確認してください。';
+      res.textContent='✅ 送信成功！院長のLINEを確認してください。';
     }else{
       res.className='result result-ng';
-      res.textContent='❌ 失敗：'+(d.error||JSON.stringify(d))+'　→ Apps Scriptで権限承認が必要です。下のボタンを押してください。';
+      res.textContent='❌ 失敗：'+(d.error||JSON.stringify(d))+'　→ STEP 5のスクリプトプロパティ設定を確認するか、Apps Scriptで権限承認が必要です。下のボタンを押してください。';
       document.getElementById('auth-btn').style.display='block';
     }
   }catch(e){
@@ -173,17 +165,8 @@ async function testSend(){
 
 function openAuthPage(){
   // GASの権限承認ページを直接開く
-  window.open('https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec?action=auth','_blank');
+  window.open(GAS+'?action=auth','_blank');
   alert('新しいタブでGASページが開きます。\n「このアプリを信頼する」や「許可」が表示されたら承認してください。\n承認後、もう一度テスト送信してください。');
-}
-function saveSettings(){
-  const token=document.getElementById('token-input').value.trim();
-  const userId=document.getElementById('userid-input').value.trim();
-  if(!token||!userId){alert('トークンとユーザーIDを入力してください');return;}
-  localStorage.setItem('kj_line_token2',token);
-  localStorage.setItem('kj_line_userid',userId);
-  alert('✅ 保存完了！管理システムに戻ってください。\n\n次回から：\n・患者が21日来院なし → 自動でLINEに通知\n・キャンセル発生時 → 即座にLINEに通知');
-  location.href='kanri.html';
 }
 </script>
 </body>
