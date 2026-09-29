@@ -8,6 +8,13 @@ const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dist');
 const source = fs.readFileSync(path.join(dist, 'Public.gs'), 'utf8');
 const admin = fs.readFileSync(path.join(dist, 'Admin.gs'), 'utf8');
 new vm.Script(source);new vm.Script(admin);
+assert.equal(admin.includes('SpreadsheetApp.getActiveSpreadsheet()'),false);
+const sheetSentinel={};
+const adminCtx={PropertiesService:{getScriptProperties(){return {getProperty(){return 'test-sheet-id';}};}},SpreadsheetApp:{openById(id){assert.equal(id,'test-sheet-id');return sheetSentinel;}}};
+vm.createContext(adminCtx);vm.runInContext(admin,adminCtx);
+assert.equal(adminCtx.adminSpreadsheet_(),sheetSentinel);
+adminCtx.PropertiesService.getScriptProperties=()=>({getProperty:()=>null});
+assert.throws(()=>adminCtx.adminSpreadsheet_(),/SPREADSHEET_ID/);
 const ctx = {
   ContentService: {
     MimeType: {JSON: 'json', JAVASCRIPT: 'js'},

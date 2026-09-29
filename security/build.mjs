@@ -39,11 +39,17 @@ pub = pub.replace('function doPost(e){', `function doPost(e){
 writeGenerated('Public.gs', pub);
 
 // The admin deployment MUST be restricted to the owner by Google's deployment ACL.
-// It is a separate Apps Script project, bound to the same spreadsheet.
+// It is a standalone project; the spreadsheet ID is configured server-side.
 let admin = core.replace('function doGet(e){', 'function adminApiGet_(e){')
-                .replace('function doPost(e){', 'function adminApiPost_(e){');
+                .replace('function doPost(e){', 'function adminApiPost_(e){')
+                .replaceAll('SpreadsheetApp.getActiveSpreadsheet()', 'adminSpreadsheet_()');
 admin += `
 // This entire project must be deployed with access: Only myself.
+function adminSpreadsheet_(){
+  var id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if(!id)throw new Error('SPREADSHEET_ID is not configured');
+  return SpreadsheetApp.openById(id);
+}
 var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,MondoPrint:true,MondoKotsuPrint:true};
 function doGet(e){
   var page=e&&e.parameter&&e.parameter.page||'Admin';

@@ -15,7 +15,7 @@
 
 ## 切替手順（院長のGoogle・LINE・Cloudflareでの操作が必要）
 
-1. 既存スプレッドシートから新しい**スプレッドシート紐付けApps Scriptプロジェクト**を作ります。生成した `Admin.gs` をコードへ、`Admin.html`・`Karte.html`・`TodaySplit.html`・`LineSetup.html`・`TriggerSetup.html`・`Uriage.html`・`MondoPrint.html`・`MondoKotsuPrint.html` を同名のHTMLファイルへ追加します。Script Properties に新プロジェクトで使う `LINE_TOKEN` と `LINE_USER_ID` を設定します。値をGitHubやチャットに貼り付けないでください。
+1. `https://script.google.com/` の「新しいプロジェクト」で、独立した管理用Apps Scriptを作ります。元のプロジェクトは変更しません。生成した `Admin.gs` をコードへ、`Admin.html`・`Karte.html`・`TodaySplit.html`・`LineSetup.html`・`TriggerSetup.html`・`Uriage.html`・`MondoPrint.html`・`MondoKotsuPrint.html` を同名のHTMLファイルへ追加します。Script Properties に `SPREADSHEET_ID`（元の予約表URLの `/d/` と `/edit` の間のID）、新プロジェクトで使う `LINE_TOKEN` と `LINE_USER_ID` を設定します。値をGitHubやチャットに貼り付けないでください。管理用コードはIDをサーバー側から読み、同じ予約表に接続します。
 2. この管理プロジェクトを「次のユーザーとして実行：自分」「アクセスできるユーザー：自分のみ」で**新規**デプロイします。新しい管理URLに院長のGoogleアカウントで入り、患者一覧・予約編集・LINEの院長宛てテスト・電子カルテ・売上を確認します。第三者やログアウト状態では管理URLに入れないことを確認します。旧GitHub Pagesの `kanri.html` を管理に使い続けないでください。
 3. Cloudflare Workerを作成し、`security/line-webhook-worker.js` を設定します。Secret `LINE_CHANNEL_SECRET` はLINE Developersから、`GAS_WEBHOOK_URL` は既存の公開GAS URLの末尾に `?webhookKey=` と**新たに生成したランダムな長い値**を付けたものです。同じ値を既存GASのScript Property `LINE_WEBHOOK_FORWARD_KEY` に設定します。いずれもGitHub・HTML・チャットには記載しません。
 4. LINE DevelopersのWebhook URLをWorkerのURLへ変え、検証と実際の友だちからのメッセージ受信を確認します。署名がない、または不正なPOSTをWorkerが401で拒否することも確認します。

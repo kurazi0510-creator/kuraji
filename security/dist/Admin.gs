@@ -161,7 +161,7 @@ function adminApiPost_(e){
   return ret;
 }
 function saveLineUserId(userId,displayName,message){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("LINE_IDs");
   if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,5).setValues([["userId","name","lastMsg","updated","phone"]]);}
   var data=s.getDataRange().getValues();
@@ -201,7 +201,7 @@ function findLineUidSafely_(name,lu){
   if(hits.length>1) return "";
   var card=getCardIdByPatientName_(name);
   if(card){
-    var ls=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+    var ls=adminSpreadsheet_().getSheetByName("LINE_IDs");
     if(ls){
       var d=ls.getDataRange().getValues(), h=d[0].map(function(x){return String(x||"").trim();});
       var ci=h.indexOf("cardId"); if(ci<0)ci=6;
@@ -214,7 +214,7 @@ function findLineUidSafely_(name,lu){
 }
 // 患者名から診察券番号を探す（同じ名前の患者が複数いて特定できない場合は空を返す）
 function getCardIdByPatientName_(name){
-  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
+  var s=adminSpreadsheet_().getSheetByName("患者");
   if(!s) return "";
   var data=s.getDataRange().getValues();
   var target=normalizeName_(name), found=[];
@@ -233,7 +233,7 @@ function getCardIdByPatientName_(name){
 function resolvePatientKey_(input){
   var raw=String(input||"").trim();
   if(!raw) return {ok:false,error:"お名前・診察券番号・電話番号のいずれかを入力してください"};
-  var rows=[], s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
+  var rows=[], s=adminSpreadsheet_().getSheetByName("患者");
   if(s){
     var data=s.getDataRange().getValues();
     var hd=(data[0]||[]).map(function(h){return String(h||"").trim();});
@@ -268,7 +268,7 @@ function resolvePatientKey_(input){
 // 診察券番号から、LINE友だち名簿の「1人だけ」を探す（複数該当は送らない）
 function findLineUidByCardId_(card){
   var c=String(card||"").trim(); if(!c) return "";
-  var ls=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs"); if(!ls) return "";
+  var ls=adminSpreadsheet_().getSheetByName("LINE_IDs"); if(!ls) return "";
   var d=ls.getDataRange().getValues(), h=(d[0]||[]).map(function(x){return String(x||"").trim();});
   var ci=h.indexOf("cardId"); if(ci<0)ci=6;
   var found=[];
@@ -282,7 +282,7 @@ function findLineUidForPatient_(pt){
   if(tel) tid=findLineUidByPhone_(tel);
   if(!tid){ for(var i=0;i<(pt.cards||[]).length&&!tid;i++) tid=findLineUidByCardId_(pt.cards[i]); }
   if(!tid){
-    var ls=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+    var ls=adminSpreadsheet_().getSheetByName("LINE_IDs");
     if(ls){
       var lu={};
       ls.getDataRange().getValues().slice(1).forEach(function(r){if(r[0]&&r[1])lu[String(r[1]).trim()]=String(r[0]);});
@@ -310,7 +310,7 @@ function findPendingWebRequestByName_(msgText){
   try{
     var target=normalizeName_(msgText);
     if(!target) return null;
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("web_yoyaku_requests");
     if(!s) return null;
     var data=s.getDataRange().getValues();
@@ -334,7 +334,7 @@ function saveLinePhone_(userId,phoneDigits,displayName){
   var pd=String(phoneDigits||"").replace(/[^0-9]/g,"");
   if(pd.length<9||pd.length>11) return;
   phoneDigits=pd;
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("LINE_IDs");
   if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,5).setValues([["userId","name","lastMsg","updated","phone"]]);}
   var data=s.getDataRange().getValues();
@@ -355,7 +355,7 @@ function saveLinePhone_(userId,phoneDigits,displayName){
   rng2.setValues([[userId,displayName||"","(電話番号登録)",now,phoneDigits]]);
 }
 function findPhoneByUid_(userId){
-  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+  var s=adminSpreadsheet_().getSheetByName("LINE_IDs");
   if(!s) return "";
   var data=s.getDataRange().getValues();
   for(var i=1;i<data.length;i++){ if(data[i][0]===userId) return fixPhoneLeadingZero_(data[i][4]); }
@@ -363,14 +363,14 @@ function findPhoneByUid_(userId){
 }
 // 案内メッセージを送信済みかどうかを確認（1人1回だけ送るための管理）
 function hasPromptSent_(userId){
-  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+  var s=adminSpreadsheet_().getSheetByName("LINE_IDs");
   if(!s) return false;
   var data=s.getDataRange().getValues();
   for(var i=1;i<data.length;i++){ if(data[i][0]===userId) return String(data[i][5]||"")==="TRUE"; }
   return false;
 }
 function markPromptSent_(userId){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("LINE_IDs");
   if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,6).setValues([["userId","name","lastMsg","updated","phone","promptSent"]]);}
   var data=s.getDataRange().getValues();
@@ -394,7 +394,7 @@ function fixPhoneLeadingZero_(v){
 function findLineUidByPhone_(phone){
   var digits=fixPhoneLeadingZero_(phone);
   if(!digits) return "";
-  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+  var s=adminSpreadsheet_().getSheetByName("LINE_IDs");
   if(!s) return "";
   var data=s.getDataRange().getValues();
   for(var i=1;i<data.length;i++){
@@ -407,7 +407,7 @@ function findLineUidByPhone_(phone){
 // 患者名の表記ゆれ（全角/半角スペース、"坂上(上坂)香織"のような旧姓の括弧書きなど）を
 // 吸収して比較するための正規化。括弧とその中身、スペースを取り除く。
 function getTelByPatientName_(name){
-  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("患者");
+  var s=adminSpreadsheet_().getSheetByName("患者");
   if(!s) return "";
   var data=s.getDataRange().getValues();
   var headers=(data[0]||[]).map(function(h){return String(h||"").trim();});
@@ -421,7 +421,7 @@ function getTelByPatientName_(name){
   return "";
 }
 function getLineUsers(){
-  var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+  var s=adminSpreadsheet_().getSheetByName("LINE_IDs");
   if(!s)return{ok:true,users:[]};
   return{ok:true,users:s.getDataRange().getValues().slice(1).map(function(r){
     var phoneFixed=fixPhoneLeadingZero_(r[4]);
@@ -432,7 +432,7 @@ function getLineUsers(){
 // ★書き込みは一切行わない（安全のため自動修正機能は廃止）★
 // 重複しているuserIdを見つけて一覧を返すだけ。実際の削除・修正は一覧画面から1件ずつ手動で行う。
 function findDuplicateLineUsers(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("LINE_IDs");
   if(!s) return {ok:true, duplicates:[]};
   var data=s.getDataRange().getValues();
@@ -460,7 +460,7 @@ function findDuplicateLineUsers(){
 function saveLineUserPhoneManual(userId,phone,name,cardId){
   try{
     if(!userId) return {ok:false,error:'userIdが指定されていません'};
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("LINE_IDs");
     if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,7).setValues([["userId","name","lastMsg","updated","phone","promptSent","cardId"]]);}
     var data=s.getDataRange().getValues();
@@ -492,12 +492,12 @@ function saveLineUserPhoneManual(userId,phone,name,cardId){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getAllData(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var b=ss.getSheetByName("予約表"),c=ss.getSheetByName("患者"),u=ss.getSheetByName("売上");
   return{ok:true,bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
 }
 function saveSheet(name,rows){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName(name)||ss.insertSheet(name);
   s.clearContents();
   if(!rows||!rows.length)return;
@@ -520,7 +520,7 @@ function saveSheet(name,rows){
 // 日付＋時間をキーに、送られてきた値が空の項目は既存のサーバー側の値を残す方式にする。
 // （行そのものが送られてこなかった場合＝意図的な削除の可能性があるため、行の削除自体は妨げない）
 function saveBookingsSafe(rows){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("予約表");
   var existing=s?s.getDataRange().getValues():[];
   var header=(existing.length?existing[0]:(rows.length?rows[0]:[]));
@@ -552,7 +552,7 @@ function saveBookingsSafe(rows){
 // この関数は該当の診察券Noの行を直接シートから削除するため、確実に消える。
 function deletePatientByCardId(cardId){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("患者");
     if(!s) return {ok:false, error:"シートが見つかりません"};
     var data=s.getDataRange().getValues();
@@ -594,7 +594,7 @@ function addPatientTombstone_(id){
 // 患者シート以外で、その診察券番号に紐づく記録がないか調べる（あれば「シート名:件数」を返す）
 function findCardReferences_(cardId){
   var refs=[], skip={"患者":1,"alert_log":1,"birthday_log":1,"reminder_log":1,"deleted_patients_backup":1};
-  SpreadsheetApp.getActiveSpreadsheet().getSheets().forEach(function(sh){
+  adminSpreadsheet_().getSheets().forEach(function(sh){
     var name=sh.getName(); if(skip[name]) return;
     var d=sh.getDataRange().getValues(); if(d.length<2) return;
     var cols=[]; d[0].forEach(function(h,i){ if(/診察券|card|patientid|patient_id/i.test(String(h||""))) cols.push(i); });
@@ -609,7 +609,7 @@ function deleteDuplicatePatients_(dryRun){
   var lock=LockService.getScriptLock(); lock.waitLock(20000);
   var out=[];
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var ps=ss.getSheetByName("患者");
     if(!ps) throw new Error("患者シートが見つかりません");
     DUP_PATIENT_PAIRS_.forEach(function(pair){
@@ -667,7 +667,7 @@ function deleteDuplicatePatients_(dryRun){
   return out;
 }
 function saveCustomersSafe(rows){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("患者");
   var existing=s?s.getDataRange().getValues():[];
   var header=(existing.length?existing[0]:(rows.length?rows[0]:[]));
@@ -701,7 +701,7 @@ function saveCustomersSafe(rows){
   saveSheet("患者", merged);
 }
 function resetBookings(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("予約表")||ss.insertSheet("予約表");
   s.clearContents();
   s.getRange(1,1,1,20).setValues([["日付","時間","区分","患者名","診察券No","予約ルート","来院回数","経過日数","症状","オプション","自費メニュー","処置(JSON)","処置メモ","物販(JSON)","支払方法","支払金額","区分リスト","再予約情報","キャンセル理由","施術部位"]]);
@@ -711,7 +711,7 @@ function dailyLineAlert(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
   if(!token||!ownerId){Logger.log("token not set");return;}
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var today=new Date();today.setHours(0,0,0,0);
   var nl=String.fromCharCode(10);
   var lu={};
@@ -861,7 +861,7 @@ function sendReminderToOne(name, dateStr){
   if(!pt.ok) return {ok:false, error:pt.error};
   var target=pt.name;
 
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var bs=ss.getSheetByName("予約表");
   if(!bs) return {ok:false, error:"予約表シートが見つかりません"};
   var bd=bs.getDataRange().getValues(),bh=bd[0];
@@ -906,7 +906,7 @@ function sendDayBeforeReminders(){
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
   if(!token)return;
   var testModeName=p.getProperty("TEST_MODE_NAME")||""; // 例:"郡" と設定すると、その名前を含む患者にしか送らない
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var today=new Date();today.setHours(0,0,0,0);
   var tmr=new Date(today);tmr.setDate(tmr.getDate()+1);
   var tmrStr=Utilities.formatDate(tmr,"Asia/Tokyo","yyyy-MM-dd");
@@ -990,7 +990,7 @@ function getFollowers(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token){Logger.log("token not set");return;}
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("LINE_IDs");
   if(!s){s=ss.insertSheet("LINE_IDs");s.getRange(1,1,1,4).setValues([["userId","name","lastMsg","updated"]]);}
   var nl=String.fromCharCode(10);
@@ -1027,7 +1027,7 @@ function getFollowers(){
 // 予約表の実データからサーバー側だけで毎日自動計算し、売上シートに反映する。
 // ============================================================
 function calcUriageFromReservations_(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var bs=ss.getSheetByName("予約表");
   if(!bs)return{};
   var data=bs.getDataRange().getValues();
@@ -1077,7 +1077,7 @@ function calcUriageFromReservations_(){
 }
 // 計算結果を売上シートへ反映。対象日以外の既存行はそのまま維持する（安全のため全消去はしない）
 function syncUriageFromReservations_(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var us=ss.getSheetByName("売上")||ss.insertSheet("売上");
   var existing=us.getDataRange().getValues();
   var header=(existing[0]&&existing[0].length)?existing[0]:["日付","保険","自費","交通事故","物販","その他","支払方法","メモ"];
@@ -1158,7 +1158,7 @@ function sendBirthdayMessages(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
   if(!token)return;
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var ps=ss.getSheetByName("患者");
   if(!ps)return;
   var nl=String.fromCharCode(10);
@@ -1273,7 +1273,7 @@ function sendBirthdayMessages(){
 }
 // kanri.html側から前日リマインドの送信履歴を確認するためのAPI
 function getReminderLog(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var log=ss.getSheetByName("reminder_log");
   if(!log) return {ok:true, list:[]};
   var data=log.getDataRange().getValues().slice(1);
@@ -1283,7 +1283,7 @@ function getReminderLog(){
 }
 // kanri.html側から17日/20日アラートの対象履歴を確認するためのAPI
 function getDailyAlertLog(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var log=ss.getSheetByName("alert_log");
   if(!log) return {ok:true, list:[]};
   var data=log.getDataRange().getValues().slice(1);
@@ -1293,7 +1293,7 @@ function getDailyAlertLog(){
 }
 // kanri.html側から送信履歴を確認するためのAPI
 function getBirthdayLog(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var log=ss.getSheetByName("birthday_log");
   if(!log) return {ok:true, list:[]};
   var data=log.getDataRange().getValues().slice(1);
@@ -1307,7 +1307,7 @@ function sendWebLineGreetingPreviewTo(name){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var nl=String.fromCharCode(10);
   var target=String(name||"").trim();
   if(!target) return {ok:false, error:"名前を指定してください"};
@@ -1345,7 +1345,7 @@ function sendBirthdayMessageTestTo(name){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var nl=String.fromCharCode(10);
   var today=new Date();
   var expireDate=new Date(today.getFullYear(),today.getMonth(),today.getDate()+30);
@@ -1384,7 +1384,7 @@ function sendReviewRequests(){
   if(!reviewUrl){ if(ownerId)sendLineMessagingAPI(token,ownerId,"[倉治整骨院] 口コミ依頼を送ろうとしましたが、GoogleクチコミのURLが未設定のため中止しました。「setReviewUrl」関数で設定してください。"); return; }
   var targetCount=parseInt(p.getProperty("REVIEW_TARGET_COUNT")||"3"); // 何回目の来院で送るか（デフォルト3回目）
 
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var ps=ss.getSheetByName("患者");
   if(!ps)return;
   var nl=String.fromCharCode(10);
@@ -1446,7 +1446,7 @@ function sendReviewRequestTestTo(name){
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
   var reviewUrl=p.getProperty("GOOGLE_REVIEW_URL")||"";
   if(!reviewUrl) return {ok:false, error:"GoogleクチコミのURLが未設定です"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var nl=String.fromCharCode(10);
 
   var target=String(name||"").trim();
@@ -1479,7 +1479,7 @@ function sendDormantPatientOutreach(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
   if(!token)return;
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var today=new Date();today.setHours(0,0,0,0);
   var nl=String.fromCharCode(10);
   var DORMANT_DAYS=90; // 何日来院がなければ「休眠」とみなすか
@@ -1592,7 +1592,7 @@ function sendDormantOutreachTestTo(name){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var nl=String.fromCharCode(10);
   var target=String(name||"").trim();
   if(!target) return {ok:false, error:"名前を指定してください"};
@@ -1613,7 +1613,7 @@ function sendDormantOutreachTestTo(name){
   return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 function getDormantLog(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var log=ss.getSheetByName("dormant_log");
   if(!log) return {ok:true, list:[]};
   var data=log.getDataRange().getValues().slice(1);
@@ -1631,7 +1631,7 @@ function sendPointsMilestoneTestTo(name){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var nl=String.fromCharCode(10);
   var target=String(name||"").trim();
   if(!target) return {ok:false, error:"名前を指定してください"};
@@ -1655,7 +1655,7 @@ function sendPointsMilestone(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
   if(!token)return;
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var ps=ss.getSheetByName("患者");
   if(!ps)return;
   var nl=String.fromCharCode(10);
@@ -1712,7 +1712,7 @@ function sendPointsMilestone(){
 }
 function getPatientVisitStats(cardId, name){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var bs=ss.getSheetByName("予約表");
     if(!bs) return {ok:true, visits:0, avgIntervalDays:null, cancelCount:0, cancelRate:0};
     var bd=bs.getDataRange().getValues(),bh=bd[0];
@@ -1789,7 +1789,7 @@ function sendLineMessagingAPI(token,userId,message){
 // ═══════════════════════════════════════
 function saveBizHoursWeekly(rows){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("biz_hours_weekly");
     if(!s) s=ss.insertSheet("biz_hours_weekly");
     s.clearContents();
@@ -1804,7 +1804,7 @@ function saveBizHoursWeekly(rows){
 }
 function saveBizHoursOverride(rows){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("biz_hours_override");
     if(!s) s=ss.insertSheet("biz_hours_override");
     s.clearContents();
@@ -1831,7 +1831,7 @@ function toHHMM_(v){
   return "";
 }
 function getBizHours(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var w=ss.getSheetByName("biz_hours_weekly");
   var o=ss.getSheetByName("biz_hours_override");
   var weekly=w?w.getDataRange().getValues().slice(1).map(function(r){
@@ -1890,7 +1890,7 @@ function genSlots_(startStr,endStr){
 }
 // 指定日の診療設定を取得（特定日の上書き優先、無ければ曜日の設定、それも無ければ従来のデフォルト）
 function getDayConfig_(dateStr){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var o=ss.getSheetByName("biz_hours_override");
   if(o){
     var od=o.getDataRange().getValues();
@@ -1964,7 +1964,7 @@ function getAvailableSlots(dateStr){
     var validSlots=getSlotsForDate_(dateStr);
     if(!validSlots.length) return {ok:true, closed:true, available:[]};
 
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("予約表");
     var occupied={};
     if(s){
@@ -2015,7 +2015,7 @@ function getIntervalBlockedSlots_(dateStr, occupied){
 }
 // 指定日に追加されている特別枠のセットを返す
 function getExtraSlotsSet_(dateStr){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var es=ss.getSheetByName("extra_slots");
   var extra={};
   if(es){
@@ -2028,7 +2028,7 @@ function getExtraSlotsSet_(dateStr){
 }
 // 指定日にブロック（手動で潰した）されている時間のセットを返す
 function getBlockedSlotsSet_(dateStr){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var bs=ss.getSheetByName("blocked_slots");
   var blocked={};
   if(bs){
@@ -2044,7 +2044,7 @@ function getAvailableSlotsRange(startDateStr,numDays){
   try{
     if(!startDateStr) return {ok:false, error:"開始日を指定してください"};
     numDays=parseInt(numDays)||7;
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var bs=ss.getSheetByName("予約表");
     var allBooked={}; // date -> {time:true}
     if(bs){
@@ -2098,7 +2098,7 @@ function formatDateWithYobi_(dateStr){
 }
 function registerWaitlist(data){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("waitlist");
     if(!s){ s=ss.insertSheet("waitlist"); s.getRange(1,1,1,9).setValues([["date","time","name","tel","menu","kana","cardId","status","createdAt"]]); }
     if(!data.name || !data.tel || !data.date || !data.time) return {ok:false, error:"お名前・お電話番号・希望日時は必須です"};
@@ -2131,7 +2131,7 @@ function sendWaitlistPreviewTo(name, date, time, menu){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN");
   if(!token) return {ok:false, error:"LINEトークンが未設定です"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var nl=String.fromCharCode(10);
   var target=String(name||"").trim();
   if(!target) return {ok:false, error:"名前を指定してください"};
@@ -2160,7 +2160,7 @@ function sendWaitlistPreviewTo(name, date, time, menu){
   return r.ok ? {ok:true} : {ok:false, error:r.error||"送信に失敗しました"};
 }
 function getWaitlist(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("waitlist");
   if(!s) return {ok:true, list:[]};
   var data=s.getDataRange().getValues();
@@ -2173,7 +2173,7 @@ function getWaitlist(){
 }
 function deleteWaitlistEntry(rowIdx){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("waitlist");
     if(!s) return {ok:false, error:"シートが見つかりません"};
     s.deleteRow(parseInt(rowIdx));
@@ -2184,7 +2184,7 @@ function deleteWaitlistEntry(rowIdx){
 // （院長がkanri.htmlで予約をキャンセルにした時に呼び出す）
 function notifyWaitlistForDate(dateStr){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("waitlist");
     if(!s) return {ok:true, notified:0};
     var data=s.getDataRange().getValues();
@@ -2237,7 +2237,7 @@ function notifyWaitlistForDate(dateStr){
 // ═══════════════════════════════════════
 function saveTicketMaster(rows){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("ticket_master");
     if(!s) s=ss.insertSheet("ticket_master");
     s.clearContents();
@@ -2251,7 +2251,7 @@ function saveTicketMaster(rows){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getTicketMaster(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("ticket_master");
   if(!s) return {ok:true, rows:[]};
   var data=s.getDataRange().getValues();
@@ -2259,7 +2259,7 @@ function getTicketMaster(){
 }
 function savePatientTickets(rows){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("patient_tickets");
     if(!s) s=ss.insertSheet("patient_tickets");
     s.clearContents();
@@ -2273,7 +2273,7 @@ function savePatientTickets(rows){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getPatientTickets(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("patient_tickets");
   if(!s) return {ok:true, rows:[]};
   var data=s.getDataRange().getValues();
@@ -2297,7 +2297,7 @@ function getIntervalSetting(){
 function toggleExtraSlot(dateStr,timeStr,add){
   try{
     if(!dateStr||!timeStr) return {ok:false, error:"日付・時間を指定してください"};
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("extra_slots");
     if(!s){ s=ss.insertSheet("extra_slots"); s.getRange(1,1,1,3).setValues([["date","time","note"]]); }
     var data=s.getDataRange().getValues();
@@ -2319,7 +2319,7 @@ function toggleExtraSlot(dateStr,timeStr,add){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getExtraSlotsForDate(dateStr){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("extra_slots");
   if(!s) return {ok:true, extra:[]};
   var data=s.getDataRange().getValues();
@@ -2332,7 +2332,7 @@ function getExtraSlotsForDate(dateStr){
 function toggleBlockedSlot(dateStr,timeStr,block){
   try{
     if(!dateStr||!timeStr) return {ok:false, error:"日付・時間を指定してください"};
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var bs=ss.getSheetByName("blocked_slots");
     if(!bs){ bs=ss.insertSheet("blocked_slots"); bs.getRange(1,1,1,3).setValues([["date","time","note"]]); }
     var data=bs.getDataRange().getValues();
@@ -2360,7 +2360,7 @@ function getBlockedSlotsForDate(dateStr){
 }
 // デバッグ用：blocked_slotsシートの中身を全件そのまま返す（日付ごとの実データを確認するため）
 function getAllBlockedSlotsDebug(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var bs=ss.getSheetByName("blocked_slots");
   if(!bs) return {ok:true, rows:[]};
   var data=bs.getDataRange().getValues();
@@ -2381,7 +2381,7 @@ function saveTrafficAccidentConsult(data){
   try{
     if(!data||!data.name||!data.tel) return {ok:false, error:"お名前・お電話番号は必須です"};
 
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("traffic_accident_consults");
     var expectedHeader=["受付日時","お名前","電話番号","事故日","痛む場所","受診","診断書","保険会社連絡","弁護士特約","ご希望","ご連絡方法"];
     if(!s){
@@ -2458,7 +2458,7 @@ function saveTrafficAccidentConsult(data){
 }
 function saveWebBookingRequest(data){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("web_yoyaku_requests");
     if(!s){
       s=ss.insertSheet("web_yoyaku_requests");
@@ -2544,7 +2544,7 @@ var MONDO_HEADERS_=["createdAt","kana","name","dob","sex","job","zip","addr","te
   "treatment","effort","alcohol","smoke","otherCond","pregnant","surgery","accident","goal"];
 function saveMondoshin(data){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("web_mondoshin");
     if(!s){ s=ss.insertSheet("web_mondoshin"); s.getRange(1,1,1,MONDO_HEADERS_.length).setValues([MONDO_HEADERS_]); }
     if(!data.kana||!data.name||!data.tel) return {ok:false, error:"ふりがな・お名前・お電話番号は必須です"};
@@ -2572,7 +2572,7 @@ function saveMondoshin(data){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getMondoshinList(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("web_mondoshin");
   if(!s) return {ok:true, list:[]};
   var data=s.getDataRange().getValues();
@@ -2588,7 +2588,7 @@ function getMondoshinList(){
 // テスト送信した問診票などを削除する（内容確認・A4印刷が済んだ後の整理用）
 function deleteMondoshin(rowIdx){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("web_mondoshin");
     if(!s) return {ok:false, error:"シートが見つかりません"};
     s.deleteRow(parseInt(rowIdx));
@@ -2596,7 +2596,7 @@ function deleteMondoshin(rowIdx){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getMondoshinById(rowIdx){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("web_mondoshin");
   if(!s) return {ok:false, error:"データがありません"};
   var row=s.getRange(parseInt(rowIdx),1,1,MONDO_HEADERS_.length).getValues()[0];
@@ -2611,7 +2611,7 @@ var MONDO_KOTSU_HEADERS_=["createdAt","kana","name","dob","zip","addr","tel","ac
   "otherParty","police","otherIns","myIns","bengoshi","injury","symptomDetail","onset","otherHosp","otherHospName","image","freq","work"];
 function saveMondoshinKotsu(data){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("web_mondoshin_kotsu");
     if(!s){ s=ss.insertSheet("web_mondoshin_kotsu"); s.getRange(1,1,1,MONDO_KOTSU_HEADERS_.length).setValues([MONDO_KOTSU_HEADERS_]); }
     if(!data.kana||!data.name||!data.tel||!data.accDate) return {ok:false, error:"ふりがな・お名前・お電話番号・事故日は必須です"};
@@ -2640,7 +2640,7 @@ function saveMondoshinKotsu(data){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getMondoshinKotsuList(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("web_mondoshin_kotsu");
   if(!s) return {ok:true, list:[]};
   var data=s.getDataRange().getValues();
@@ -2655,7 +2655,7 @@ function getMondoshinKotsuList(){
 }
 function deleteMondoshinKotsu(rowIdx){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("web_mondoshin_kotsu");
     if(!s) return {ok:false, error:"シートが見つかりません"};
     s.deleteRow(parseInt(rowIdx));
@@ -2663,7 +2663,7 @@ function deleteMondoshinKotsu(rowIdx){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getMondoshinKotsuById(rowIdx){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("web_mondoshin_kotsu");
   if(!s) return {ok:false, error:"データがありません"};
   var row=s.getRange(parseInt(rowIdx),1,1,MONDO_KOTSU_HEADERS_.length).getValues()[0];
@@ -2677,7 +2677,7 @@ function getMondoshinKotsuById(rowIdx){
 var KARTE_HEADERS_=["createdAt","cardId","name","visitDate","subjective","objective","assessment","plan","bodyImage","staffNote"];
 function saveKarte(data){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("karte");
     if(!s){ s=ss.insertSheet("karte"); s.getRange(1,1,1,KARTE_HEADERS_.length).setValues([KARTE_HEADERS_]); }
     if(!data.cardId || !data.name) return {ok:false, error:"診察券No・お名前は必須です"};
@@ -2696,7 +2696,7 @@ function saveKarte(data){
 // 既存のカルテを上書き保存する（新規追加ではなく、同じ行を更新する）
 function updateKarte(rowIdx, data){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("karte");
     if(!s) return {ok:false, error:"シートが見つかりません"};
     if(!data.cardId || !data.name) return {ok:false, error:"診察券No・お名前は必須です"};
@@ -2713,7 +2713,7 @@ function updateKarte(rowIdx, data){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getKarteListByCardId(cardId){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("karte");
   if(!s) return {ok:true, list:[]};
   var data=s.getDataRange().getValues();
@@ -2728,7 +2728,7 @@ function getKarteListByCardId(cardId){
   return {ok:true, list:list};
 }
 function getKarteById(rowIdx){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("karte");
   if(!s) return {ok:false, error:"データがありません"};
   var row=s.getRange(parseInt(rowIdx),1,1,KARTE_HEADERS_.length).getValues()[0];
@@ -2738,7 +2738,7 @@ function getKarteById(rowIdx){
 }
 function deleteKarte(rowIdx){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("karte");
     if(!s) return {ok:false, error:"シートが見つかりません"};
     s.deleteRow(parseInt(rowIdx));
@@ -2746,7 +2746,7 @@ function deleteKarte(rowIdx){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getWebBookingRequests(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("web_yoyaku_requests");
   if(!s) return {ok:true, list:[]};
   var data=s.getDataRange().getValues();
@@ -2769,7 +2769,7 @@ function getWebBookingRequests(){
 // テスト送信したWeb予約リクエストなどを削除する（一覧の整理用）
 function deleteWebBookingRequest(rowIdx){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("web_yoyaku_requests");
     if(!s) return {ok:false, error:"シートが見つかりません"};
     s.deleteRow(parseInt(rowIdx));
@@ -2777,7 +2777,7 @@ function deleteWebBookingRequest(rowIdx){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function updateWebBookingRequestStatus(rowIdx,status){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("web_yoyaku_requests");
   if(!s) return {ok:false, error:"シートが見つかりません"};
   var rng=s.getRange(parseInt(rowIdx),12);
@@ -2788,7 +2788,7 @@ function updateWebBookingRequestStatus(rowIdx,status){
 
 function saveWebBooking(data){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("予約表");
     if(!s) return {ok:false, error:"予約表シートが見つかりません"};
 
@@ -2900,7 +2900,7 @@ function saveWebBooking(data){
 function lookupBooking(tel){
   var digits=String(tel||"").replace(/[^0-9]/g,"");
   if(!digits) return {ok:false, error:"電話番号を入力してください"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var meta=ss.getSheetByName("web_yoyaku_meta");
   if(!meta) return {ok:true, list:[]};
   var rows=meta.getDataRange().getValues();
@@ -2982,7 +2982,7 @@ function sendTestEmailTo(email){
 // 自費メニュー(処置マスター)をGASにも保存し、Web予約フォームから見えるようにする
 function saveMenuMaster(rows){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("menu_master");
     if(!s) s=ss.insertSheet("menu_master");
     s.clearContents();
@@ -2994,7 +2994,7 @@ function saveMenuMaster(rows){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getMenuMaster(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("menu_master");
   if(!s) return {ok:true, rows:[]};
   var data=s.getDataRange().getValues();
@@ -3005,7 +3005,7 @@ function getMenuMaster(){
 // ═══════════════════════════════════════
 function saveStock(rows){
   try{
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("stock_master");
     if(!s) s=ss.insertSheet("stock_master");
     s.clearContents();
@@ -3019,7 +3019,7 @@ function saveStock(rows){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 function getStock(){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("stock_master");
   if(!s) return {ok:true, rows:[]};
   var data=s.getDataRange().getValues();
@@ -3029,7 +3029,7 @@ function getStock(){
 function deleteBookingsByName(namePrefix){
   try{
     if(!namePrefix) return {ok:false, error:"名前を指定してください"};
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
+    var ss=adminSpreadsheet_();
     var s=ss.getSheetByName("予約表");
     if(!s) return {ok:false, error:"予約表シートが見つかりません"};
     var data=s.getDataRange().getValues();
@@ -3047,6 +3047,11 @@ function deleteBookingsByName(namePrefix){
 }
 
 // This entire project must be deployed with access: Only myself.
+function adminSpreadsheet_(){
+  var id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if(!id)throw new Error('SPREADSHEET_ID is not configured');
+  return SpreadsheetApp.openById(id);
+}
 var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,MondoPrint:true,MondoKotsuPrint:true};
 function doGet(e){
   var page=e&&e.parameter&&e.parameter.page||'Admin';
