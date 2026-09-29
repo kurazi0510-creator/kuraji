@@ -95,8 +95,7 @@ function doPost(e){
       else if(action==="deletePatientByCardId")result=deletePatientByCardId(body.cardId);
       else if(action==="saveUriage"){saveSheet("売上",JSON.parse(body.rows));result={ok:true};}
       else if(action==="resetBookings"){resetBookings();result={ok:true};}
-      else if(action==="lineNotifyV2")result=sendLineMessagingAPI(body.token,body.userId,body.message);
-      else if(action==="saveLineSettings"){saveLineSettings();result={ok:true};}
+      else if(action==="lineNotifyV2")result=sendLineMessagingAPI(PropertiesService.getScriptProperties().getProperty("LINE_TOKEN"),body.userId,body.message); // ★セキュリティ対策：クライアントから送られてきたトークンは使わず、必ずサーバー側の設定値だけを使う
       else if(action==="getLineUsers")result=getLineUsers();
       else if(action==="saveWebBooking")result=saveWebBooking(body.data);
       else if(action==="saveWebBookingRequest")result=saveWebBookingRequest(body.data);
@@ -689,12 +688,7 @@ function resetBookings(){
   s.clearContents();
   s.getRange(1,1,1,20).setValues([["日付","時間","区分","患者名","診察券No","予約ルート","来院回数","経過日数","症状","オプション","自費メニュー","処置(JSON)","処置メモ","物販(JSON)","支払方法","支払金額","区分リスト","再予約情報","キャンセル理由","施術部位"]]);
 }
-function saveLineSettings(){
-  var p=PropertiesService.getScriptProperties();
-  p.setProperty("LINE_TOKEN","RomnT7om/ytYjz1dicHgMbaxHZvnccCeBP6C3FX1s1TtiCW1ME3X3fK098wacBfDttVgnMM4jZPRN6G+RWRmYrkZUW+qkEjlugm5FVNagj5WOfwINV6NqEoNCH9OVbI7qViP6XzF3GEYdjWGHQvIsgdB04t89/1O/w1cDnyilFU=");
-  p.setProperty("LINE_USER_ID","U9f7333eed2d51ceba13641059e8bd341");
-  Logger.log("LINE settings saved");
-}
+
 function dailyLineAlert(){
   var p=PropertiesService.getScriptProperties();
   var token=p.getProperty("LINE_TOKEN"),ownerId=p.getProperty("LINE_USER_ID");
