@@ -115,9 +115,9 @@ await bridgeCtx.window.fetch('https://example.com/public');
 assert.equal(nativeCalls.length,1);
 const {default: worker}=await import('./line-webhook-worker.js');
 const env={LINE_CHANNEL_SECRET:'test-channel-secret',GAS_WEBHOOK_URL:'https://example.invalid/exec?webhookKey=not-real'};
-let forwarded=0;
+let forwarded=0, forwardedRequest;
 const oldFetch=globalThis.fetch;
-globalThis.fetch=async()=>{forwarded++;return {ok:true,json:async()=>({ok:true})};};
+globalThis.fetch=async(url,options)=>{forwarded++;forwardedRequest={url,options};return {ok:true,status:200,json:async()=>({ok:true})};};
 try{
   const raw='{"events":[]}';
   const invalid=await worker.fetch(new Request('https://worker.example/',{method:'POST',body:raw,headers:{'x-line-signature':'wrong'}}),env);
@@ -126,10 +126,30 @@ try{
   const sig=Buffer.from(await webcrypto.subtle.sign('HMAC',key,new TextEncoder().encode(raw))).toString('base64');
   const valid=await worker.fetch(new Request('https://worker.example/',{method:'POST',body:raw,headers:{'x-line-signature':sig}}),env);
   assert.equal(valid.status,200);assert.equal(forwarded,1);
+  assert.equal(forwardedRequest.url,env.GAS_WEBHOOK_URL);
+  assert.equal(forwardedRequest.options.redirect,'follow');
+  assert.equal(new TextDecoder().decode(forwardedRequest.options.body),raw);
+  const tampered=await worker.fetch(new Request('https://worker.example/',{method:'POST',body:'{"events":[{}]}',headers:{'x-line-signature':sig}}),env);
+  assert.equal(tampered.status,401);assert.equal(forwarded,1);
+  assert.equal((await worker.fetch(new Request('https://worker.example/'),env)).status,404);
+  assert.equal((await worker.fetch(new Request('https://worker.example/',{method:'POST',body:raw}),{})).status,503);
   const signedRequest=()=>new Request('https://worker.example/',{method:'POST',body:raw,headers:{'x-line-signature':sig}});
+  globalThis.fetch=async()=>({ok:false,status:403});
+  assert.equal((await worker.fetch(signedRequest(),env)).status,502);
+  globalThis.fetch=async()=>({ok:true,status:200,json:async()=>{throw new SyntaxError('HTML response')}});
+  assert.equal((await worker.fetch(signedRequest(),env)).status,502);
   globalThis.fetch=async()=>({ok:true,json:async()=>({ok:false})});
   assert.equal((await worker.fetch(signedRequest(),env)).status,502);
   globalThis.fetch=async()=>{throw new Error('temporary upstream failure')};
   assert.equal((await worker.fetch(signedRequest(),env)).status,502);
+  const logs=[],oldLog=console.log;
+  console.log=(...args)=>logs.push(args);
+  try {
+    globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({ok:false,error:'権限がありません',patient:'DO_NOT_LOG_PATIENT'})});
+    assert.equal((await worker.fetch(signedRequest(),env)).status,502);
+    const printed=JSON.stringify(logs);
+    assert.ok(printed.includes('"denied":true'));
+    for(const secret of [env.LINE_CHANNEL_SECRET,env.GAS_WEBHOOK_URL,'not-real','DO_NOT_LOG_PATIENT',sig])assert.ok(!printed.includes(secret));
+  } finally {console.log=oldLog;}
 }finally{globalThis.fetch=oldFetch;}
 console.log('Security routing and webhook-signature tests passed');
