@@ -11,7 +11,7 @@ function webhookAllowed_(e){
 }
 function doGet(e){
   var publicAction=(e&&e.parameter&&e.parameter.action)||'';
-  if(!PUBLIC_GET_ACTIONS_[publicAction])return publicReject_();
+  if(typeof publicAction!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_GET_ACTIONS_,publicAction))return publicReject_();
   if(e.parameter.callback&&!/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(e.parameter.callback))return publicReject_();
   if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
@@ -26,8 +26,9 @@ function doGet(e){
 function doPost(e){
   var rawBody=e&&e.postData&&e.postData.contents||'{}', incoming;
   try{incoming=JSON.parse(rawBody);}catch(parseError){return publicReject_();}
-  if(incoming.events){if(!webhookAllowed_(e))return publicReject_();}
-  else if(!PUBLIC_POST_ACTIONS_[incoming.action])return publicReject_();
+  if(!incoming||typeof incoming!=='object'||Array.isArray(incoming))return publicReject_();
+  if(Object.prototype.hasOwnProperty.call(incoming,'events')){if(!Array.isArray(incoming.events)||incoming.action||!webhookAllowed_(e))return publicReject_();}
+  else if(typeof incoming.action!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_POST_ACTIONS_,incoming.action))return publicReject_();
   var ret=ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON);
   try{
     var raw=e&&e.postData&&e.postData.contents?e.postData.contents:"{}";
@@ -2941,16 +2942,27 @@ function bookingLookupCacheKey_(tel){
   var digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(tel));
   return 'lookup_'+Utilities.base64EncodeWebSafe(digest).replace(/=/g,'');
 }
+// 自己申告の電話番号は本人確認にならない。院側で確認した対応表だけを照会に使う。
+// JSON {"電話番号":"LINE userId"} をサーバーのプロパティに設定する。未設定は非開示。
+function verifiedBookingLookupUid_(tel){
+  var raw=PropertiesService.getScriptProperties().getProperty('BOOKING_LOOKUP_VERIFIED_LINKS');
+  try{
+    var links=JSON.parse(raw||'{}');
+    if(!links||Array.isArray(links)||!Object.prototype.hasOwnProperty.call(links,tel))return '';
+    var uid=links[tel];
+    return typeof uid==='string'&&/^U[0-9a-f]{32}$/i.test(uid)?uid:'';
+  }catch(error){return '';}
+}
 function requestBookingLookupCode(tel){
   var digits=String(tel||'').replace(/\D/g,'');
   if(!/^0\d{9,10}$/.test(digits))return {ok:false,error:'電話番号を確認してください'};
   var generic={ok:true,message:'LINEに確認コードが届いた場合は入力してください。届かない場合は院へお問い合わせください。'};
   var cache=CacheService.getScriptCache(),key=bookingLookupCacheKey_(digits);
   if(cache.get(key))return generic; // 5分間、同一番号への再送を止める
-  var uid=findLineUidByPhone_(digits),token=PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
+  var uid=verifiedBookingLookupUid_(digits),token=PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
   if(!uid||!token)return generic; // 登録有無を外部に知らせない
   var code=Utilities.getUuid().replace(/-/g,'').slice(0,8).toUpperCase();
-  cache.put(key,JSON.stringify({code:code,tries:0}),300);
+  cache.put(key,JSON.stringify({code:code,tries:0,uid:uid,expiresAt:Date.now()+300000}),300);
   var sent=sendLineMessagingAPI(token,uid,'【倉治整骨院】予約確認コード：'+code+'\n5分間有効です。心当たりがない場合は無視してください。');
   if(!sent||!sent.ok)cache.remove(key);
   return generic;
@@ -2966,6 +2978,7 @@ function verifyBookingLookupCode(tel,code){
     var raw=cache.get(key);
     if(!raw)return {ok:false,error:'確認コードが違うか期限切れです'};
     var state=JSON.parse(raw);
+    if(!state.uid||state.uid!==verifiedBookingLookupUid_(digits)||!state.expiresAt||Date.now()>=state.expiresAt){cache.remove(key);return {ok:false,error:'確認コードが違うか期限切れです'};}
     if(state.tries>=4){cache.remove(key);return {ok:false,error:'確認回数を超えました。しばらくしてから再度お試しください'};}
     state.tries++;
     if(state.code!==supplied){cache.put(key,JSON.stringify(state),60);return {ok:false,error:'確認コードが違うか期限切れです'};}

@@ -30,6 +30,7 @@ table.info th{background:#f5e5df;width:16%;white-space:nowrap;}
 </style>
 <script>
 window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+window.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;
 function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
 // Only runs inside an owner-only Apps Script HTML-service deployment.
 // The public GitHub copy of kanri.html must not be used after cutover.
@@ -65,7 +66,7 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
 
 <script>
 const GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
-const params=new URLSearchParams(location.search);
+const params=new URLSearchParams(window.KURAJI_PAGE_PARAMS);
 const rowIdx=params.get('id');
 
 function esc(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

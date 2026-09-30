@@ -14,9 +14,15 @@ export default {
     let diff = a.length ^ b.length;
     for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] || 0) ^ (b[i] || 0);
     if (diff) return new Response('Unauthorized', {status: 401});
-    const upstream = await fetch(env.GAS_WEBHOOK_URL, {
-      method: 'POST', headers: {'Content-Type': 'text/plain'}, body: raw,
-    });
-    return new Response(upstream.ok ? 'OK' : 'Webhook upstream error', {status: upstream.ok ? 200 : 502});
+    try {
+      const upstream = await fetch(env.GAS_WEBHOOK_URL, {
+        method: 'POST', headers: {'Content-Type': 'text/plain'}, body: raw,
+      });
+      const result = upstream.ok ? await upstream.json() : null;
+      if (!result || result.ok !== true) return new Response('Webhook upstream error', {status: 502});
+      return new Response('OK', {status: 200});
+    } catch {
+      return new Response('Webhook upstream error', {status: 502});
+    }
   },
 };

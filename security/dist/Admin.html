@@ -219,6 +219,7 @@ function printThisPage(pageId){
 </script>
 <script>
 window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+window.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;
 function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
 // Only runs inside an owner-only Apps Script HTML-service deployment.
 // The public GitHub copy of kanri.html must not be used after cutover.
@@ -7996,7 +7997,7 @@ function goPage(id){
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded',async()=>{
   // ?clear=1 でlocalStorage完全リセット
-  if(new URLSearchParams(location.search).get('clear')==='1'){
+  if(new URLSearchParams(window.KURAJI_PAGE_PARAMS).get('clear')==='1'){
     ['kj_bookings','kj_patients','kj_uriage'].forEach(k=>localStorage.removeItem(k));
     bookings={};patients=[];uriage=[];
     history.replaceState(null,'',location.pathname);

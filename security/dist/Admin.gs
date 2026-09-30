@@ -2922,16 +2922,27 @@ function bookingLookupCacheKey_(tel){
   var digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(tel));
   return 'lookup_'+Utilities.base64EncodeWebSafe(digest).replace(/=/g,'');
 }
+// 自己申告の電話番号は本人確認にならない。院側で確認した対応表だけを照会に使う。
+// JSON {"電話番号":"LINE userId"} をサーバーのプロパティに設定する。未設定は非開示。
+function verifiedBookingLookupUid_(tel){
+  var raw=PropertiesService.getScriptProperties().getProperty('BOOKING_LOOKUP_VERIFIED_LINKS');
+  try{
+    var links=JSON.parse(raw||'{}');
+    if(!links||Array.isArray(links)||!Object.prototype.hasOwnProperty.call(links,tel))return '';
+    var uid=links[tel];
+    return typeof uid==='string'&&/^U[0-9a-f]{32}$/i.test(uid)?uid:'';
+  }catch(error){return '';}
+}
 function requestBookingLookupCode(tel){
   var digits=String(tel||'').replace(/\D/g,'');
   if(!/^0\d{9,10}$/.test(digits))return {ok:false,error:'電話番号を確認してください'};
   var generic={ok:true,message:'LINEに確認コードが届いた場合は入力してください。届かない場合は院へお問い合わせください。'};
   var cache=CacheService.getScriptCache(),key=bookingLookupCacheKey_(digits);
   if(cache.get(key))return generic; // 5分間、同一番号への再送を止める
-  var uid=findLineUidByPhone_(digits),token=PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
+  var uid=verifiedBookingLookupUid_(digits),token=PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
   if(!uid||!token)return generic; // 登録有無を外部に知らせない
   var code=Utilities.getUuid().replace(/-/g,'').slice(0,8).toUpperCase();
-  cache.put(key,JSON.stringify({code:code,tries:0}),300);
+  cache.put(key,JSON.stringify({code:code,tries:0,uid:uid,expiresAt:Date.now()+300000}),300);
   var sent=sendLineMessagingAPI(token,uid,'【倉治整骨院】予約確認コード：'+code+'\n5分間有効です。心当たりがない場合は無視してください。');
   if(!sent||!sent.ok)cache.remove(key);
   return generic;
@@ -2947,6 +2958,7 @@ function verifyBookingLookupCode(tel,code){
     var raw=cache.get(key);
     if(!raw)return {ok:false,error:'確認コードが違うか期限切れです'};
     var state=JSON.parse(raw);
+    if(!state.uid||state.uid!==verifiedBookingLookupUid_(digits)||!state.expiresAt||Date.now()>=state.expiresAt){cache.remove(key);return {ok:false,error:'確認コードが違うか期限切れです'};}
     if(state.tries>=4){cache.remove(key);return {ok:false,error:'確認回数を超えました。しばらくしてから再度お試しください'};}
     state.tries++;
     if(state.code!==supplied){cache.put(key,JSON.stringify(state),60);return {ok:false,error:'確認コードが違うか期限切れです'};}
@@ -3055,9 +3067,10 @@ function adminSpreadsheet_(){
 var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,MondoPrint:true,MondoKotsuPrint:true};
 function doGet(e){
   var page=e&&e.parameter&&e.parameter.page||'Admin';
-  if(!ADMIN_PAGES_[page])throw new Error('Unknown page');
+  if(typeof page!=='string'||!Object.prototype.hasOwnProperty.call(ADMIN_PAGES_,page))throw new Error('Unknown page');
   var template=HtmlService.createTemplateFromFile(page);
   template.webAppUrl=ScriptApp.getService().getUrl();
+  template.pageParamsJson=JSON.stringify(e&&e.parameter||{}).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026');
   return template.evaluate().setTitle('倉治整骨院 管理システム');
 }
 function adminRequest(request){

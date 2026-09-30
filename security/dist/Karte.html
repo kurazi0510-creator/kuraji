@@ -61,6 +61,7 @@ textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;fon
 </style>
 <script>
 window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+window.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;
 function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
 // Only runs inside an owner-only Apps Script HTML-service deployment.
 // The public GitHub copy of kanri.html must not be used after cutover.
@@ -746,7 +747,7 @@ resize('front');drawBg('front');
 
 // URLパラメータ(?cardId=xxx&name=xxx)があれば自動入力し、履歴も自動表示する
 (function(){
-  const params=new URLSearchParams(location.search);
+  const params=new URLSearchParams(window.KURAJI_PAGE_PARAMS);
   const cid=params.get('cardId'), nm=params.get('name');
   if(cid){ document.getElementById('pt-cardid').value=cid; }
   if(nm){ document.getElementById('pt-name').value=nm; }

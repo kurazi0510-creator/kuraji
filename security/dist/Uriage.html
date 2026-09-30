@@ -85,6 +85,7 @@ input[type=date],input[type=month]{background:var(--card);border:1.5px solid var
 </style>
 <script>
 window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+window.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;
 function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
 // Only runs inside an owner-only Apps Script HTML-service deployment.
 // The public GitHub copy of kanri.html must not be used after cutover.

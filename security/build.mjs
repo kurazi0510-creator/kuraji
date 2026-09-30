@@ -28,14 +28,15 @@ function webhookAllowed_(e){
 let pub = publicPrelude + core;
 pub = pub.replace('function doGet(e){', `function doGet(e){
   var publicAction=(e&&e.parameter&&e.parameter.action)||'';
-  if(!PUBLIC_GET_ACTIONS_[publicAction])return publicReject_();
+  if(typeof publicAction!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_GET_ACTIONS_,publicAction))return publicReject_();
   if(e.parameter.callback&&!/^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$/.test(e.parameter.callback))return publicReject_();
   if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));`);
 pub = pub.replace('function doPost(e){', `function doPost(e){
   var rawBody=e&&e.postData&&e.postData.contents||'{}', incoming;
   try{incoming=JSON.parse(rawBody);}catch(parseError){return publicReject_();}
-  if(incoming.events){if(!webhookAllowed_(e))return publicReject_();}
-  else if(!PUBLIC_POST_ACTIONS_[incoming.action])return publicReject_();`);
+  if(!incoming||typeof incoming!=='object'||Array.isArray(incoming))return publicReject_();
+  if(Object.prototype.hasOwnProperty.call(incoming,'events')){if(!Array.isArray(incoming.events)||incoming.action||!webhookAllowed_(e))return publicReject_();}
+  else if(typeof incoming.action!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_POST_ACTIONS_,incoming.action))return publicReject_();`);
 writeGenerated('Public.gs', pub);
 
 // The admin deployment MUST be restricted to the owner by Google's deployment ACL.
@@ -53,9 +54,10 @@ function adminSpreadsheet_(){
 var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,MondoPrint:true,MondoKotsuPrint:true};
 function doGet(e){
   var page=e&&e.parameter&&e.parameter.page||'Admin';
-  if(!ADMIN_PAGES_[page])throw new Error('Unknown page');
+  if(typeof page!=='string'||!Object.prototype.hasOwnProperty.call(ADMIN_PAGES_,page))throw new Error('Unknown page');
   var template=HtmlService.createTemplateFromFile(page);
   template.webAppUrl=ScriptApp.getService().getUrl();
+  template.pageParamsJson=JSON.stringify(e&&e.parameter||{}).replace(/</g,'\\\\u003c').replace(/>/g,'\\\\u003e').replace(/&/g,'\\\\u0026');
   return template.evaluate().setTitle('倉治整骨院 管理システム');
 }
 function adminRequest(request){
@@ -71,7 +73,7 @@ function adminRequest(request){
 `;
 writeGenerated('Admin.gs', admin);
 
-const bridgeTag = `<script>\nwindow.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;\nfunction adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}\n${bridge}\n</script>\n`;
+const bridgeTag = `<script>\nwindow.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;\nwindow.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;\nfunction adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}\n${bridge}\n</script>\n`;
 const pages = {
   Admin: 'kanri.html', Karte: 'karte.html', TodaySplit: 'today_split.html',
   LineSetup: 'line_setup.html', TriggerSetup: 'gas_trigger_setup.html',
@@ -80,6 +82,7 @@ const pages = {
 const publicPages = ['book.html', 'confirm.html', 'consent.html', 'symptom.html', 'line_template.html', 'gas_update.html', 'gas_copy.html'];
 for (const [name, filename] of Object.entries(pages)) {
   let html = fs.readFileSync(path.join(root, filename), 'utf8');
+  html=html.replaceAll('new URLSearchParams(location.search)','new URLSearchParams(window.KURAJI_PAGE_PARAMS)');
   if(name==='Karte'){
     const diagrams=fs.readFileSync(path.join(root,'security/body_diagrams.json'),'utf8');
     html=html.replace('function drawBg(key){',`const BODY_DIAGRAM_PNG=${diagrams};\nfunction drawBg(key){`)
