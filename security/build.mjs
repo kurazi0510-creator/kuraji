@@ -81,7 +81,7 @@ const publicPages = ['book.html', 'confirm.html', 'consent.html', 'symptom.html'
 for (const [name, filename] of Object.entries(pages)) {
   let html = fs.readFileSync(path.join(root, filename), 'utf8');
   for (const [target, page] of Object.entries(pages)) {
-    html = html.replaceAll(`location.href='${page}'`, `location.href=adminPageUrl('${target}')`);
+    html = html.replaceAll(`location.href='${page}'`, `window.open(adminPageUrl('${target}'),'_top')`);
     html = html.replaceAll(`window.open('${page}'`, `window.open(adminPageUrl('${target}')`);
   }
   html = html.replaceAll("'karte.html?cardId='+", "adminPageUrl('Karte')+'&cardId='+");

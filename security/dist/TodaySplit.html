@@ -74,7 +74,7 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
 <div class="banner">🧪 これは「試験プレビュー」画面です。気に入ったら本採用（メイン画面への組み込み）をご検討ください</div>
 <div class="header">
   <h1>📋 本日の施術画面（左：予約内容／右：電子カルテ）</h1>
-  <button class="back-btn" onclick="location.href=adminPageUrl('Admin')">← 管理システムに戻る</button>
+  <button class="back-btn" onclick="window.open(adminPageUrl('Admin'),'_top')">← 管理システムに戻る</button>
 </div>
 
 <div class="split">

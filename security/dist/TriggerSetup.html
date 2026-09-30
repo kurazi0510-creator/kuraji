@@ -103,10 +103,10 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
     <div class="step-desc">
       STEP 2の設定が終わったら、実際にLINEへ届くか確認できます。
     </div>
-    <button class="btn btn-green" onclick="location.href=adminPageUrl('LineSetup')">🧪 院長のLINEへテスト送信する</button>
+    <button class="btn btn-green" onclick="window.open(adminPageUrl('LineSetup'),'_top')">🧪 院長のLINEへテスト送信する</button>
   </div>
 
-  <button class="btn btn-back" onclick="location.href=adminPageUrl('Admin')">← 管理システムに戻る</button>
+  <button class="btn btn-back" onclick="window.open(adminPageUrl('Admin'),'_top')">← 管理システムに戻る</button>
 </div>
 </body>
 </html>
