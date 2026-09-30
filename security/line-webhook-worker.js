@@ -15,13 +15,25 @@ export default {
     for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] || 0) ^ (b[i] || 0);
     if (diff) return new Response('Unauthorized', {status: 401});
     try {
-      const upstream = await fetch(env.GAS_WEBHOOK_URL, {
-        method: 'POST', headers: {'Content-Type': 'text/plain'}, body: raw,
+      const target = new URL(env.GAS_WEBHOOK_URL);
+      console.log('relay_target', {
+        googleHost: target.hostname === 'script.google.com',
+        productionPath: /^\/macros\/s\/[^/]+\/exec$/.test(target.pathname),
+        keyLength: (target.searchParams.get('webhookKey') || '').length,
       });
+      const upstream = await fetch(env.GAS_WEBHOOK_URL, {
+        method: 'POST', headers: {'Content-Type': 'text/plain'}, body: raw, redirect: 'follow',
+      });
+      console.log('relay_upstream_status', upstream.status);
       const result = upstream.ok ? await upstream.json() : null;
+      console.log('relay_result', {
+        accepted: result?.ok === true,
+        denied: result?.error === '権限がありません',
+      });
       if (!result || result.ok !== true) return new Response('Webhook upstream error', {status: 502});
       return new Response('OK', {status: 200});
     } catch {
+      console.log('relay_failed', 'URL, connection, or response format');
       return new Response('Webhook upstream error', {status: 502});
     }
   },
