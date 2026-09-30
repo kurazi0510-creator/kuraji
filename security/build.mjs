@@ -11,7 +11,7 @@ const writeGenerated = (filename, contents) =>
 const core = fs.readFileSync(path.join(root, 'gas_full_v5.gs'), 'utf8');
 const bridge = fs.readFileSync(path.join(root, 'security', 'admin_fetch_bridge.js'), 'utf8');
 
-const publicGet = ['getMenuMaster', 'getBizHours', 'getAvailableSlots', 'getAvailableSlotsRange'];
+const publicGet = ['getPublicSecurityStatus', 'getMenuMaster', 'getBizHours', 'getAvailableSlots', 'getAvailableSlotsRange'];
 const publicPost = ['saveWebBookingRequest', 'saveTrafficAccidentConsult', 'registerWaitlist', 'saveMondoshin', 'saveMondoshinKotsu', 'requestBookingLookupCode', 'verifyBookingLookupCode'];
 const publicPrelude = `// PUBLIC deployment: no patient list, no management writes, no arbitrary LINE sends.
 var PUBLIC_GET_ACTIONS_=${JSON.stringify(Object.fromEntries(publicGet.map(x => [x, true])))};
@@ -29,6 +29,7 @@ let pub = publicPrelude + core;
 pub = pub.replace('function doGet(e){', `function doGet(e){
   var publicAction=(e&&e.parameter&&e.parameter.action)||'';
   if(typeof publicAction!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_GET_ACTIONS_,publicAction))return publicReject_();
+  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
   if(e.parameter.callback&&!/^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$/.test(e.parameter.callback))return publicReject_();
   if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));`);
 pub = pub.replace('function doPost(e){', `function doPost(e){
@@ -37,6 +38,22 @@ pub = pub.replace('function doPost(e){', `function doPost(e){
   if(!incoming||typeof incoming!=='object'||Array.isArray(incoming))return publicReject_();
   if(Object.prototype.hasOwnProperty.call(incoming,'events')){if(!Array.isArray(incoming.events)||incoming.action||!webhookAllowed_(e))return publicReject_();}
   else if(typeof incoming.action!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_POST_ACTIONS_,incoming.action))return publicReject_();`);
+// The legacy handler swallowed failures and returned ok:true. A relay must be able
+// to distinguish a rejected/failed webhook from a successfully processed one.
+pub=pub.replace('var lock=LockService.getScriptLock();\n      try{ lock.waitLock(10000); }catch(lockErr){ /* ロック取得失敗時もそのまま続行（最悪重複の可能性は残るが処理は止めない） */ }',
+  'var webhookFailed=false;\n      var lock=LockService.getScriptLock();\n      lock.waitLock(10000);');
+pub=pub.replace('}catch(err){Logger.log("event error:"+err);}', '}catch(err){webhookFailed=true;Logger.log("event error:"+err);}');
+// Retry a failed batch without repeating already completed events. Cache entries
+// are a best-effort six-hour deduplication window, not an exactly-once guarantee.
+pub=pub.replace('body.events.forEach(function(ev){\n        try{', `body.events.forEach(function(ev){
+        try{
+          var eventKey=ev&&ev.webhookEventId?bookingLookupCacheKey_('webhook:'+ev.webhookEventId):'';
+          if(eventKey&&CacheService.getScriptCache().get(eventKey))return;`);
+pub=pub.replace('}catch(err){webhookFailed=true;Logger.log("event error:"+err);}', `if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);
+        }catch(err){webhookFailed=true;Logger.log("event error:"+err);}`);
+pub=pub.replace('try{ lock.releaseLock(); }catch(relErr){}', `try{ lock.releaseLock(); }catch(relErr){}
+      if(webhookFailed)ret=ContentService.createTextOutput(JSON.stringify({ok:false,error:'LINE処理に失敗しました'})).setMimeType(ContentService.MimeType.JSON);`);
+pub=pub.replace('}catch(err){Logger.log("doPost error:"+err);}', `}catch(err){Logger.log("doPost error:"+err);ret=ContentService.createTextOutput(JSON.stringify({ok:false,error:'処理に失敗しました'})).setMimeType(ContentService.MimeType.JSON);}`);
 writeGenerated('Public.gs', pub);
 
 // The admin deployment MUST be restricted to the owner by Google's deployment ACL.

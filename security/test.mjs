@@ -27,6 +27,36 @@ vm.createContext(ctx);
 vm.runInContext(source, ctx);
 const get = params => JSON.parse(ctx.doGet({parameter:params}).getContent());
 const post = (body, parameter = {}) => JSON.parse(ctx.doPost({postData:{contents:JSON.stringify(body)},parameter}).getContent());
+const status=get({action:'getPublicSecurityStatus'});
+assert.equal(status.version,'kuraji-public-boundary-20260930');
+assert.equal(status.managementAccess,false);
+assert.equal(status.webhookRequiresRelay,true);
+const legacyActions=[...new Set([...source.matchAll(/action\s*===\s*"([^"]+)"/g)].map(m=>m[1]))];
+for(const action of legacyActions){
+  if(!Object.hasOwn(ctx.PUBLIC_GET_ACTIONS_,action))assert.equal(get({action}).ok,false,`GET ${action}`);
+  if(!Object.hasOwn(ctx.PUBLIC_POST_ACTIONS_,action))assert.equal(post({action}).ok,false,`POST ${action}`);
+}
+ctx.LockService={getScriptLock:()=>({waitLock(){throw new Error('lock busy')},releaseLock(){}})};
+assert.equal(post({events:[]},{webhookKey:'test-key'}).ok,false,'lock failures must not be acknowledged as success');
+ctx.LockService={getScriptLock:()=>({waitLock(){},releaseLock(){}})};
+assert.equal(post({events:[]},{webhookKey:'test-key'}).ok,true,'valid LINE verification request');
+assert.equal(post({events:[null]},{webhookKey:'test-key'}).ok,false,'failed LINE event must not report success');
+const webhookCache=new Map();
+ctx.CacheService={getScriptCache:()=>({get:key=>webhookCache.get(key)||null,put:(key,value)=>webhookCache.set(key,value)})};
+ctx.Utilities={DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,text)=>text,base64EncodeWebSafe:text=>Buffer.from(text).toString('base64url')};
+let savedUsers=0;
+ctx.saveLineUserId=()=>{savedUsers++;};
+ctx.findPendingWebRequestByName_=()=>null;
+const event={webhookEventId:'test-event-id',type:'message',source:{userId:'test-line-user'},message:{type:'text',text:'test-name'}};
+assert.equal(post({events:[event]},{webhookKey:'test-key'}).ok,true);
+assert.equal(post({events:[event]},{webhookKey:'test-key'}).ok,true);
+assert.equal(savedUsers,1,'completed event must not run twice during cache window');
+const failedEvent={...event,webhookEventId:'retry-event-id'};
+ctx.saveLineUserId=()=>{throw new Error('temporary write failure');};
+assert.equal(post({events:[failedEvent]},{webhookKey:'test-key'}).ok,false);
+ctx.saveLineUserId=()=>{savedUsers++;};
+assert.equal(post({events:[failedEvent]},{webhookKey:'test-key'}).ok,true);
+assert.equal(savedUsers,2,'failed event must be retryable');
 for (const action of ['getAll','getLineUsers','getWebBookingRequests','lookupBooking','getKarteListByCardId']) {
   assert.equal(get({action}).ok, false, `GET ${action} must fail`);
 }

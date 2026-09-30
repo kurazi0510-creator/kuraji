@@ -1,5 +1,5 @@
 // PUBLIC deployment: no patient list, no management writes, no arbitrary LINE sends.
-var PUBLIC_GET_ACTIONS_={"getMenuMaster":true,"getBizHours":true,"getAvailableSlots":true,"getAvailableSlotsRange":true};
+var PUBLIC_GET_ACTIONS_={"getPublicSecurityStatus":true,"getMenuMaster":true,"getBizHours":true,"getAvailableSlots":true,"getAvailableSlotsRange":true};
 var PUBLIC_POST_ACTIONS_={"saveWebBookingRequest":true,"saveTrafficAccidentConsult":true,"registerWaitlist":true,"saveMondoshin":true,"saveMondoshinKotsu":true,"requestBookingLookupCode":true,"verifyBookingLookupCode":true};
 function publicReject_(){return ContentService.createTextOutput(JSON.stringify({ok:false,error:'権限がありません'})).setMimeType(ContentService.MimeType.JSON);}
 function webhookAllowed_(e){
@@ -12,6 +12,7 @@ function webhookAllowed_(e){
 function doGet(e){
   var publicAction=(e&&e.parameter&&e.parameter.action)||'';
   if(typeof publicAction!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_GET_ACTIONS_,publicAction))return publicReject_();
+  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
   if(e.parameter.callback&&!/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(e.parameter.callback))return publicReject_();
   if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
@@ -36,10 +37,13 @@ function doPost(e){
     if(body.events){
       // 同時に複数のLINEイベントが届いた際、LINE_IDsシートへの書き込みが競合して
       // 同じ人が重複登録されてしまう不具合を防ぐため、処理をロックする
+      var webhookFailed=false;
       var lock=LockService.getScriptLock();
-      try{ lock.waitLock(10000); }catch(lockErr){ /* ロック取得失敗時もそのまま続行（最悪重複の可能性は残るが処理は止めない） */ }
+      lock.waitLock(10000);
       body.events.forEach(function(ev){
         try{
+          var eventKey=ev&&ev.webhookEventId?bookingLookupCacheKey_('webhook:'+ev.webhookEventId):'';
+          if(eventKey&&CacheService.getScriptCache().get(eventKey))return;
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
             // ★LINE公式アカウントマネージャー側の「あいさつメッセージ」を使用しているため、
             //   ここでの自動送信はしない（重複して2通届いてしまうのを防ぐ）。
@@ -103,9 +107,11 @@ function doPost(e){
               }
             }
           }
-        }catch(err){Logger.log("event error:"+err);}
+        if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);
+        }catch(err){webhookFailed=true;Logger.log("event error:"+err);}
       });
       try{ lock.releaseLock(); }catch(relErr){}
+      if(webhookFailed)ret=ContentService.createTextOutput(JSON.stringify({ok:false,error:'LINE処理に失敗しました'})).setMimeType(ContentService.MimeType.JSON);
     }else{
       var action=body.action||"";
       var result;
@@ -177,7 +183,7 @@ function doPost(e){
       else result={ok:false,error:"unknown"};
       if(result)ret=ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
     }
-  }catch(err){Logger.log("doPost error:"+err);}
+  }catch(err){Logger.log("doPost error:"+err);ret=ContentService.createTextOutput(JSON.stringify({ok:false,error:'処理に失敗しました'})).setMimeType(ContentService.MimeType.JSON);}
   return ret;
 }
 function saveLineUserId(userId,displayName,message){
