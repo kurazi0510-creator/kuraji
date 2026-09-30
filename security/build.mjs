@@ -80,6 +80,12 @@ const pages = {
 const publicPages = ['book.html', 'confirm.html', 'consent.html', 'symptom.html', 'line_template.html', 'gas_update.html', 'gas_copy.html'];
 for (const [name, filename] of Object.entries(pages)) {
   let html = fs.readFileSync(path.join(root, filename), 'utf8');
+  if(name==='Karte'){
+    const diagrams=fs.readFileSync(path.join(root,'security/body_diagrams.json'),'utf8');
+    html=html.replace('function drawBg(key){',`const BODY_DIAGRAM_PNG=${diagrams};\nfunction drawBg(key){`)
+      .replace('if(cur===key)bx.drawImage(img,0,0,f.w,f.h);', `if(cur===key){bx.drawImage(img,0,0,f.w,f.h);const doc=new DOMParser().parseFromString(svg,'image/svg+xml');doc.querySelectorAll('text').forEach(t=>{bx.fillStyle=t.getAttribute('fill')||'#555';bx.font=(t.getAttribute('font-weight')||'normal')+' '+(t.getAttribute('font-size')||12)+'px sans-serif';bx.textAlign=({middle:'center',end:'right'})[t.getAttribute('text-anchor')]||'left';bx.fillText(t.textContent,Number(t.getAttribute('x')),Number(t.getAttribute('y')));});}`)
+      .replace("img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);", "img.onerror=()=>{if(cur===key){bx.fillStyle='#b91c1c';bx.font='12px sans-serif';bx.fillText('体図の読み込みに失敗しました',5,30);}};\n  img.src=BODY_DIAGRAM_PNG[key];");
+  }
   for (const [target, page] of Object.entries(pages)) {
     html = html.replaceAll(`location.href='${page}'`, `window.open(adminPageUrl('${target}'),'_top')`);
     html = html.replaceAll(`window.open('${page}'`, `window.open(adminPageUrl('${target}')`);
