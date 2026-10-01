@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>予約確認のLINE連携</title>
+<style>body{font-family:sans-serif;background:#faf6f0;color:#3d3226;margin:0;padding:20px}main{max-width:640px;margin:auto}section{background:white;padding:20px;border-radius:12px;margin:16px 0}label{display:block;margin:12px 0 6px}input,select,button{font:inherit;padding:10px;box-sizing:border-box}input:not([type=checkbox]),select{width:100%}button{cursor:pointer;margin:12px 6px 0 0}#message{white-space:pre-wrap}li{margin-bottom:16px}a{color:#79502f}</style></head><body><main>
+<a href="<?!= webAppUrl ?>?page=Admin" target="_top">← 管理画面へ戻る</a>
+<h1>予約確認のLINE連携</h1><p>患者さんがご自分の予約を確認するための登録です。電話番号の自己申告やLINEの表示名だけで登録しないでください。</p>
+<section><label for="uid">ご本人のLINE</label><select id="uid"></select><label for="tel">患者一覧に登録されている電話番号</label><input id="tel" type="tel" inputmode="numeric"><label for="card">診察券番号</label><input id="card">
+<label><input id="checked" type="checkbox"> 来院時またはご本人とのやり取りで、このLINE・電話番号・診察券番号が同じ患者さんのものと確認しました。</label>
+<button id="save" onclick="saveLink()">本人確認済みとして登録</button><p id="message" role="status"></p></section>
+<section><h2>登録済み</h2><button onclick="loadLinks()">最新の状態を取得</button><ul id="links"></ul></section>
+</main><script>
+let users=[];
+function rpc(request){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).bookingLookupAdminRequest(request));}
+function message(text){document.getElementById('message').textContent=text;}
+async function loadLinks(){try{
+  const result=await rpc({action:'list'});users=result.users;
+  const select=document.getElementById('uid');select.replaceChildren(new Option('選択してください',''));
+  users.forEach(user=>select.add(new Option((user.name||'名前未登録')+' ／ '+(user.phone||'電話番号未登録')+' ／ '+(user.cardId||'診察券未登録'),user.userId)));
+  const list=document.getElementById('links');list.replaceChildren();
+  result.links.filter(link=>link.active).forEach(link=>{
+    const item=document.createElement('li');item.textContent=link.name+' ／ 診察券 '+link.cardId+' ／ '+link.tel+' ';
+    const button=document.createElement('button');button.textContent='連携を解除';button.onclick=async()=>{
+      if(!confirm(link.name+'さんの予約確認用の連携を解除しますか？'))return;
+      try{await rpc({action:'revoke',tel:link.tel});await loadLinks();message('解除しました');}catch(err){message(err.message);}
+    };item.append(button);list.append(item);
+  });
+  if(!list.children.length){const item=document.createElement('li');item.textContent='まだ登録されていません';list.append(item);}
+}catch(err){message('取得できませんでした: '+err.message);}}
+document.getElementById('uid').addEventListener('change',event=>{
+  const user=users.find(user=>user.userId===event.target.value);
+  document.getElementById('tel').value=user?.phone||'';document.getElementById('card').value=user?.cardId||'';
+  document.getElementById('checked').checked=false;
+});
+async function saveLink(){
+  const button=document.getElementById('save');button.disabled=true;
+  try{
+    await rpc({action:'verify',uid:document.getElementById('uid').value,tel:document.getElementById('tel').value,cardId:document.getElementById('card').value,confirmed:document.getElementById('checked').checked});
+    document.getElementById('checked').checked=false;await loadLinks();message('登録しました。患者さんは予約確認ページから確認コードを受け取れます。');
+  }catch(err){message('登録できませんでした: '+err.message);}finally{button.disabled=false;}
+}
+loadLinks();
+</script></body></html>

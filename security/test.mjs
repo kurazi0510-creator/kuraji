@@ -29,6 +29,7 @@ const get = params => JSON.parse(ctx.doGet({parameter:params}).getContent());
 const post = (body, parameter = {}) => JSON.parse(ctx.doPost({postData:{contents:JSON.stringify(body)},parameter}).getContent());
 const status=get({action:'getPublicSecurityStatus'});
 assert.equal(status.version,'kuraji-public-boundary-20260930');
+assert.equal(status.bookingLookupVersion,'verified-card-20261001');
 assert.equal(status.managementAccess,false);
 assert.equal(status.webhookRequiresRelay,true);
 const legacyActions=[...new Set([...source.matchAll(/action\s*===\s*"([^"]+)"/g)].map(m=>m[1]))];
@@ -65,6 +66,7 @@ for(const action of ['constructor','toString','__proto__']){
   assert.equal(post({action}).ok,false);
 }
 for(const body of [null,[],true,'test',{events:{}},{events:[],action:'getAll'}])assert.equal(post(body).ok,false);
+ctx.SpreadsheetApp={getActiveSpreadsheet:()=>({getSheetByName:()=>null})};
 assert.equal(ctx.verifiedBookingLookupUid_('09012345678'),'');
 const verifiedUid='U'+'a'.repeat(32);
 ctx.PropertiesService.getScriptProperties=()=>({getProperty:name=>name==='BOOKING_LOOKUP_VERIFIED_LINKS'?JSON.stringify({'09012345678':verifiedUid}):name==='LINE_WEBHOOK_FORWARD_KEY'?'test-key':null});
@@ -173,11 +175,14 @@ try{
   globalThis.fetch=async()=>{throw new Error('temporary upstream failure')};
   assert.equal((await worker.fetch(signedRequest(),env,workerCtx)).status,502);
   // A slow upstream must remain pending and be registered for disconnect survival.
-  let finishUpstream;
-  globalThis.fetch=()=>new Promise(resolve=>{finishUpstream=resolve;});
+  let finishUpstream,signalUpstreamStarted;
+  const upstreamStarted=new Promise(resolve=>{signalUpstreamStarted=resolve;});
+  globalThis.fetch=()=>new Promise(resolve=>{finishUpstream=resolve;signalUpstreamStarted();});
   let returnedEarly=false;
   const slowResponse=worker.fetch(signedRequest(),env,workerCtx).then(response=>{returnedEarly=true;return response;});
-  for(let attempt=0;!finishUpstream&&attempt<100;attempt++)await new Promise(resolve=>setImmediate(resolve));
+  let startTimeout;
+  try{await Promise.race([upstreamStarted,new Promise((_,reject)=>{startTimeout=setTimeout(()=>reject(new Error('upstream did not start')),5000);})]);}
+  finally{clearTimeout(startTimeout);}
   assert.equal(typeof finishUpstream,'function');
   assert.equal(returnedEarly,false);
   const retained=lifetimeTasks.at(-1);

@@ -2896,26 +2896,8 @@ function saveWebBooking(data){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 
-// 予約確認ページ(confirm.html)用：電話番号から今後の予約を検索
-function lookupBooking(tel){
-  var digits=String(tel||"").replace(/[^0-9]/g,"");
-  if(!digits) return {ok:false, error:"電話番号を入力してください"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var meta=ss.getSheetByName("web_yoyaku_meta");
-  if(!meta) return {ok:true, list:[]};
-  var rows=meta.getDataRange().getValues();
-  var today=new Date();today.setHours(0,0,0,0);
-  var list=[];
-  for(var i=1;i<rows.length;i++){
-    var rTel=String(rows[i][3]||"").replace(/[^0-9]/g,"");
-    if(rTel!==digits) continue;
-    var d=new Date(String(rows[i][0]));
-    if(isNaN(d.getTime())||d<today) continue;
-    list.push({date:String(rows[i][0]), time:String(rows[i][1]), name:String(rows[i][2]), menu:String(rows[i][5])});
-  }
-  list.sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1;});
-  return {ok:true, list:list};
-}
+// Authenticated lookup reads current bookings, never stale web booking copies.
+function lookupBooking(tel){return lookupVerifiedBookings_(String(tel||'').replace(/\D/g,''));}
 
 // 公開ページの電話番号だけでは予約を開示しない。登録済みLINEへ短時間の確認コードを送る。
 function bookingLookupCacheKey_(tel){
@@ -2925,13 +2907,8 @@ function bookingLookupCacheKey_(tel){
 // 自己申告の電話番号は本人確認にならない。院側で確認した対応表だけを照会に使う。
 // JSON {"電話番号":"LINE userId"} をサーバーのプロパティに設定する。未設定は非開示。
 function verifiedBookingLookupUid_(tel){
-  var raw=PropertiesService.getScriptProperties().getProperty('BOOKING_LOOKUP_VERIFIED_LINKS');
-  try{
-    var links=JSON.parse(raw||'{}');
-    if(!links||Array.isArray(links)||!Object.prototype.hasOwnProperty.call(links,tel))return '';
-    var uid=links[tel];
-    return typeof uid==='string'&&/^U[0-9a-f]{32}$/i.test(uid)?uid:'';
-  }catch(error){return '';}
+  var link=verifiedBookingLookupLink_(tel);
+  return link?link.uid:'';
 }
 function requestBookingLookupCode(tel){
   var digits=String(tel||'').replace(/\D/g,'');
