@@ -1,3 +1,12 @@
+## 2026-10-01 09:50 JST checkpoint
+
+- Cloudflare diagnostics showed keyLength 33 versus GAS property length 64, with denied true. Owner corrected GAS_WEBHOOK_URL; LINE verification now reports success (09:44 screenshot).
+- Owner sent a real test message at 09:45. Worker invocation shows outcome canceled, wallTimeMs 1980; no upstream/result logs. Real message processing is not yet verified, and GAS may have continued separately.
+- Prepared Worker lifetime fix: register the authenticated forwarding promise with ctx.waitUntil while still awaiting GAS acceptance before returning 200. Invalid signatures do not schedule work; upstream failures still return 502. Tests cover pending upstream retention and no early success.
+- This does not provide durable delivery, retry, or an immediate successful response to LINE. Cloudflare grants up to 30 seconds after disconnect; live completion must be checked. If latency still causes webhook timeouts, use a durable queue and audit GAS event idempotency before enabling retries.
+- Next: replace only Cloudflare Worker code with the prepared version, deploy, send one fresh owner test message, inspect relay_result after disconnect. Secrets and GAS source need no reentry for this change.
+- Old active deployment audit and WEB reservation checks remain pending. Do not label full security cutover complete.
+
 # 移行の現在地（2026年9月30日）
 
 ## 18:40 JST時点の確認結果
