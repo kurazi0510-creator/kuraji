@@ -182,6 +182,9 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
     <span class="sync-status" id="syncStatus">📱 未同期</span>
     <button class="btn-sync" id="btnUpload" onclick="gasUpload()">⬆ このデバイスのデータを保存</button>
     <button class="btn-sync" id="btnDownload" onclick="gasDownload()">⬇ 他デバイスのデータを取得</button>
+    <button class="btn-sync" onclick="salaryExport()">💾 バックアップを保存</button>
+    <button class="btn-sync" onclick="document.getElementById('salaryImportFile').click()">📂 バックアップを取り込む</button>
+    <input type="file" id="salaryImportFile" accept="application/json,.json" hidden onchange="salaryImport(this.files[0]);this.value=''">
   </div>
   <p style="font-size:.72rem;color:var(--muted);margin-top:4px">
     ※ デスクトップで入力後「⬆保存」→ iPhone/iPad で「⬇取得」すると反映されます
@@ -779,5 +782,6 @@ renderHistory();
   }
 })();
 </script>
+<script src="security/salary_transfer.js"></script>
 </body>
 </html>
