@@ -8,7 +8,7 @@ const out = path.join(root, 'security', 'dist');
 fs.mkdirSync(out, { recursive: true });
 const writeGenerated = (filename, contents) =>
   fs.writeFileSync(path.join(out, filename), contents.replace(/[\t ]+$/gm, ''));
-const core = fs.readFileSync(path.join(root, 'gas_full_v5.gs'), 'utf8')+'\n'+fs.readFileSync(path.join(root,'security/booking_lookup.gs'),'utf8');
+const core = fs.readFileSync(path.join(root, 'gas_full_v5.gs'), 'utf8')+'\n'+fs.readFileSync(path.join(root,'security/booking_lookup.gs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'security/booking_lookup_line.gs'),'utf8');
 const bridge = fs.readFileSync(path.join(root, 'security', 'admin_fetch_bridge.js'), 'utf8');
 
 const publicGet = ['getPublicSecurityStatus', 'getMenuMaster', 'getBizHours', 'getAvailableSlots', 'getAvailableSlotsRange'];
@@ -29,7 +29,7 @@ let pub = publicPrelude + core;
 pub = pub.replace('function doGet(e){', `function doGet(e){
   var publicAction=(e&&e.parameter&&e.parameter.action)||'';
   if(typeof publicAction!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_GET_ACTIONS_,publicAction))return publicReject_();
-  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',bookingLookupVersion:'verified-card-20261001',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
+  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',bookingLookupVersion:'verified-card-20261001',bookingLineVersion:'one-tap-20261001',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
   if(e.parameter.callback&&!/^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$/.test(e.parameter.callback))return publicReject_();
   if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));`);
 pub = pub.replace('function doPost(e){', `function doPost(e){
@@ -49,6 +49,7 @@ pub=pub.replace('body.events.forEach(function(ev){\n        try{', `body.events.
         try{
           var eventKey=ev&&ev.webhookEventId?bookingLookupCacheKey_('webhook:'+ev.webhookEventId):'';
           if(eventKey&&CacheService.getScriptCache().get(eventKey))return;`);
+pub=pub.replace('if(handleBookingLookupLineEvent_(ev))return;', "if(handleBookingLookupLineEvent_(ev)){if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);return;}");
 pub=pub.replace('}catch(err){webhookFailed=true;Logger.log("event error:"+err);}', `if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);
         }catch(err){webhookFailed=true;Logger.log("event error:"+err);}`);
 pub=pub.replace('try{ lock.releaseLock(); }catch(relErr){}', `try{ lock.releaseLock(); }catch(relErr){}

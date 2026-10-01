@@ -20,6 +20,7 @@ function doPost(e){
       try{ lock.waitLock(10000); }catch(lockErr){ /* ロック取得失敗時もそのまま続行（最悪重複の可能性は残るが処理は止めない） */ }
       body.events.forEach(function(ev){
         try{
+          if(handleBookingLookupLineEvent_(ev))return;
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
             // ★LINE公式アカウントマネージャー側の「あいさつメッセージ」を使用しているため、
             //   ここでの自動送信はしない（重複して2通届いてしまうのを防ぐ）。
@@ -2920,7 +2921,7 @@ function requestBookingLookupCode(tel){
   if(!uid||!token)return generic; // 登録有無を外部に知らせない
   var code=Utilities.getUuid().replace(/-/g,'').slice(0,8).toUpperCase();
   cache.put(key,JSON.stringify({code:code,tries:0,uid:uid,expiresAt:Date.now()+300000}),300);
-  var sent=sendLineMessagingAPI(token,uid,'【倉治整骨院】予約確認コード：'+code+'\n5分間有効です。心当たりがない場合は無視してください。');
+  var sent=sendBookingLookupCode_(token,uid,code);
   if(!sent||!sent.ok)cache.remove(key);
   return generic;
 }

@@ -35,7 +35,7 @@ const ctx={
   Utilities:{DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,text)=>createHash('sha256').update(text).digest(),base64EncodeWebSafe:value=>Buffer.from(value).toString('base64url'),getUuid:()=> '1234abcd-1234-1234-1234-123456789012',formatDate:(date,tz,format)=>format==='HH:mm'?'08:30':format==='yyyy-MM-dd'?'2026-10-01':'2026-10-01 12:00:00'},
 };
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(new URL('Public.gs',dist),'utf8'),ctx);
-ctx.sendLineMessagingAPI=(_,to,message)=>{sends.push({to,message});return {ok:true};};
+ctx.sendBookingLookupCode_=(_,to,message)=>{sends.push({to,message});return {ok:true};};
 assert.equal(ctx.verifiedBookingLookupUid_(tel),uid);
 assert.equal(ctx.verifiedBookingLookupUid_(otherTel),'');
 let result=ctx.lookupBooking(tel);
@@ -62,7 +62,7 @@ assert.equal(ctx.verifiedBookingLookupUid_(tel),'','revocation overrides legacy 
 data['予約確認連携'].push([tel,uid,'123','確認 太郎','有効']);
 data['患者'][1][4]=otherTel;
 assert.equal(ctx.lookupBooking(tel).ok,false,'changed patient phone cannot expose old account');data['患者'][1][4]=tel;
-ctx.sendLineMessagingAPI=()=>({ok:false});ctx.requestBookingLookupCode(tel);assert.equal(cache.has(key),false,'failed delivery removes the code');
+ctx.sendBookingLookupCode_=()=>({ok:false});ctx.requestBookingLookupCode(tel);assert.equal(cache.has(key),false,'failed delivery removes the code');
 const adminCtx={...ctx};vm.createContext(adminCtx);vm.runInContext(fs.readFileSync(new URL('Admin.gs',dist),'utf8'),adminCtx);
 adminCtx.adminSpreadsheet_=()=>ss;adminCtx.getLineUsers=()=>({users:[{userId:uid,name:'確認 太郎'},{userId:otherUid,name:'別人 花子'}]});
 assert.throws(()=>adminCtx.bookingLookupAdminRequest({action:'verify',tel,uid,cardId:'123'}),/確認/);
