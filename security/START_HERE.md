@@ -1,3 +1,16 @@
+## 2026-10-01 11:00 JST checkpoint（最新）
+
+- 中継URLのキー33文字／GAS64文字の不一致を修正し、LINE検証は09:44に成功。
+- Workerに ctx.waitUntil を追加した版を反映。09:55の実際のLINEテストで upstream 200、accepted:true、denied:false を写真で確認。永続キューや再送保証ではない。
+- book.htmlからのテスト申込が10:02に受付成功。10:06に管理専用GAS（script.google.com）の「同期済み」と一覧への表示を確認。
+- テスト名「動作確認 郡」のみ削除したと10:58に先生から報告。既存患者の申込は削除対象外。
+- GitHubの旧kanri.htmlは公開GASの管理API制限によりオフライン。管理専用GASを使用する。
+- 次：元の公開GASの「デプロイを管理」を確認し、稼働中の患者用デプロイを残して旧公開先の用途を監査する。名称「無題」だけでアーカイブしない。
+- コードには患者用以外に3つの異なるGAS URLが残る。稼働状態・別プロジェクトとの対応は未確認。予約状況公開専用GASも別途監査する。
+- 予約確認ページの確認コード方式の公開、本人確認済みLINE対応表、売上データの引継ぎ、旧公開先の閉鎖は未完了。全体の移行完了とはしない。
+
+以下は過去の経過記録であり、最新状態は上記を優先する。
+
 ## 2026-10-01 09:50 JST checkpoint
 
 - Cloudflare diagnostics showed keyLength 33 versus GAS property length 64, with denied true. Owner corrected GAS_WEBHOOK_URL; LINE verification now reports success (09:44 screenshot).
