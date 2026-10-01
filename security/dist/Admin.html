@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 124384)
-Total output lines: 8043
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -2292,7 +2289,2836 @@ function load(){
     const st=JSON.parse(localStorage.getItem('kj_st')||'null');
     stockData=st||DEFAULT_STOCK;
     ticketMaster=JSON.parse(localStorage.getItem('kj_tm')||'[]');
-    patientTickets=JSON.parse(localStorage.getItem('kj_pt')||'…39384 tokens truncated…-memo').value=bk.shochiMemo;
+    patientTickets=JSON.parse(localStorage.getItem('kj_pt')||'[]');
+  }catch(e){
+    console.error('load error:',e);
+    patients=[];bookings={};uriage={};bussanLog=[];
+    bussanMaster=DEFAULT_BUSSAN_MASTER;shochiMaster=DEFAULT_SHOCHI_MASTER;stockData=DEFAULT_STOCK;
+    ticketMaster=[];patientTickets=[];
+  }
+}
+
+const pad=n=>String(n).padStart(2,'0');
+function toLocalDateStr(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+const today=()=>toLocalDateStr(new Date());
+function fmtDate(v){
+  if(!v&&v!==0)return'';
+  if(typeof v==='string'){
+    // 1899-12-30T... は壊れた日付（GASのタイムゾーンバグ）→ 空文字を返す
+    if(v.startsWith('1899-')||v.startsWith('1900-')||v.startsWith('1905-'))return'';
+    if(v.includes('T')){
+      // 正常なISO日付は日付部分だけ取る
+      const datePart=v.split('T')[0];
+      if(datePart>='1970-01-01')return datePart;
+      return'';
+    }
+    return v.replace(/\//g,'-').substring(0,10);
+  }
+  if(v instanceof Date){
+    const yr=v.getFullYear();
+    if(yr<1970)return'';
+    return yr+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());
+  }
+  if(typeof v==='number'&&v>0){
+    const d=new Date(Math.round((v-25569)*86400*1000));
+    return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());
+  }
+  return'';
+}
+function fmtTime(v){
+  if(v===null||v===undefined||v==='')return'';
+  const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
+    '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
+    '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
+    '19:00','19:20','19:40'];
+  const snapSlot=min=>{
+    // 完全一致を最優先チェック
+    const exact=pad(Math.floor(min/60)%24)+':'+pad(min%60);
+    if(SLOTS.includes(exact))return exact;
+    // 次に最近接スロット（10分以内のみ）
+    let best=null,bestDiff=9999;
+    SLOTS.forEach(s=>{
+      const[sh,sm]=s.split(':').map(Number);
+      const d=Math.abs(sh*60+sm-min);
+      if(d<bestDiff){bestDiff=d;best=s;}
+    });
+    if(bestDiff<=10)return best;
+    // それ以外はそのまま返す
+    return exact;
+  };
+  if(typeof v==='string'){
+    // GASのExcelシリアル値バグ: 1899-12-30 or 1899-12-31 形式
+    // JST時刻 + 510分 = GAS UTC分。逆変換: GAS分 - 510 = JST分
+    const isoM=v.match(/^1899-12-(2[89]|3[01])T(\d{2}):(\d{2})/);
+    if(isoM){
+      const dayNum=parseInt(isoM[1]);
+      const extraDay=(dayNum-29)*1440; // 29日を基準(0分)として日ズレを補正
+      const utcMin=parseInt(isoM[2])*60+parseInt(isoM[3])+extraDay;
+      // スプレッドシートはJSTの時刻をUTCとして絶対時刻保存するため、+540分(9時間)で復元する
+      const jstMin=((utcMin+540)%1440+1440)%1440;
+      return snapSlot(jstMin);
+    }
+    // 通常のHH:MM形式（予約表シートはJST文字列で保存済み→変換不要、そのまま返す）
+    const m=v.trim().match(/^(\d{1,2}):(\d{2})/);
+    if(m){
+      const hh=parseInt(m[1]),mm=parseInt(m[2]);
+      const exact=pad(hh)+':'+pad(mm);
+      if(SLOTS.includes(exact))return exact;
+      // スロットにない場合のみ最近接（20分以内）
+      const min2=hh*60+mm;
+      let best2=null,bd2=9999;
+      SLOTS.forEach(s=>{const[sh,sm]=s.split(':').map(Number);const d=Math.abs(sh*60+sm-min2);if(d<bd2){bd2=d;best2=s;}});
+      return bd2<=20?best2:exact;
+    }
+    return v.trim();
+  }
+  if(v instanceof Date){
+    // JST絶対時刻がUTCとして保存されているため、+540分(9時間)で復元する
+    const utcMin=v.getUTCHours()*60+v.getUTCMinutes();
+    const jstMin=((utcMin+540)%1440+1440)%1440;
+    return snapSlot(jstMin);
+  }
+  if(typeof v==='number'){
+    const t=Math.round(v*24*60);
+    return snapSlot(t);
+  }
+  return'';
+}
+function calcAge(dob){if(!dob)return'';const d=new Date(dob);if(isNaN(d.getTime()))return'';return Math.floor((new Date()-d)/(365.25*24*3600*1000));}
+// 和暦→西暦変換
+function warekiToSeireki(val){
+  val=String(val).trim();
+  const tbl=[
+    {re:/^令和\s*(\d+)/i,base:2018},{re:/^R(\d+)/i,base:2018},
+    {re:/^平成\s*(\d+)/i,base:1988},{re:/^H(\d+)/i,base:1988},
+    {re:/^昭和\s*(\d+)/i,base:1925},{re:/^S(\d+)/i,base:1925},
+    {re:/^大正\s*(\d+)/i,base:1911},{re:/^T(\d+)/i,base:1911},
+    {re:/^明治\s*(\d+)/i,base:1867},{re:/^M(\d+)/i,base:1867},
+  ];
+  for(const {re,base} of tbl){
+    const m=val.match(re);
+    if(m)return String(base+parseInt(m[1]));
+  }
+  return val;
+}
+function dobInputToISO(val){
+  // 「昭和40」「H40」「平成2年5月3日」「S40.5.3」「19650503」「1965-05-03」など対応
+  val=String(val).trim();
+  // まず和暦年だけ取り出して西暦変換
+  const warekiFull=/^(令和|平成|昭和|大正|明治|R|H|S|T|M)\s*(\d+)\s*[年\/.\-]?\s*(\d{1,2})?\s*[月\/.\-]?\s*(\d{1,2})?/i;
+  const wm=val.match(warekiFull);
+  if(wm){
+    const tbl={令和:2018,R:2018,平成:1988,H:1988,昭和:1925,S:1925,大正:1911,T:1911,明治:1867,M:1867};
+    const base=tbl[wm[1].charAt(0).toUpperCase()]||tbl[wm[1]]||0;
+    if(!base)return null;
+    const yr=base+parseInt(wm[2]);
+    const mo=wm[3]?String(wm[3]).padStart(2,'0'):'01';
+    const dy=wm[4]?String(wm[4]).padStart(2,'0'):'01';
+    return `\${yr}-\${mo}-\${dy}`;
+  }
+  // 数字8桁 YYYYMMDD
+  if(/^\d{8}$/.test(val)){return `\${val.slice(0,4)}-\${val.slice(4,6)}-\${val.slice(6,8)}`;}
+  // 既存ISO
+  if(/^\d{4}-\d{2}-\d{2}$/.test(val))return val;
+  return null;
+}
+const elapsed=last=>last?Math.round((new Date()-new Date(last+'T00:00:00'))/86400000):'';
+const yen=n=>Number(n||0).toLocaleString()+'円';
+function tryParse(v){try{return JSON.parse(v);}catch(e){return[];}}
+function normTel(t){
+  if(!t)return'';
+  // 数字のみ抽出（ハイフン・スペース・括弧除去）
+  t=String(t).replace(/[^0-9]/g,'');
+  if(!t)return'';
+  // 先頭0補完ルール
+  // 携帯10桁（0抜け）: 9,8,7,6から始まる → 0を先頭補完
+  if(t.length===10&&/^[6789]/.test(t))t='0'+t;
+  // 携帯9桁（0抜け）: 80,90,70 → 11桁
+  if(t.length===9&&/^[789]/.test(t))t='0'+t;
+  // 固定電話9桁（0抜け）: 728など → 0補完
+  if(t.length===9&&/^[2-9]/.test(t))t='0'+t;
+  // 固定電話8桁（0抜け）: 72... → 0補完
+  if(t.length===8&&/^[2-9]/.test(t))t='0'+t;
+  return t;
+}
+// データ破損チェック（日付文字列・「○日前」が混入していないか）
+function isGarbageData(v){
+  if(!v)return false;
+  const s=String(v);
+  if(s.match(/\d+日前/))return true;
+  if(s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:/))return true;
+  if(s.match(/^1899-|^1900-|^1905-/))return true;
+  return false;
+}
+// 症状フィールドの壊れたデータを除去
+function cleanSymptom(v){
+  if(!v)return'−';
+  if(isGarbageData(v))return'−';
+  return v;
+}
+function setStat(cls,txt){const el=document.getElementById('sbadge');el.className='sbadge '+cls;el.textContent=txt;}
+
+// ===== SYNC =====
+async function syncAll(){
+  setStat('s-ing','🔄 同期中...');
+  const _syncFromGAS=async()=>{
+    const controller=new AbortController();
+    const tid=setTimeout(()=>controller.abort(),12000);
+    try{
+      const res=await fetch(GAS+'?action=getAll&t='+Date.now(),{redirect:'follow',cache:'no-store',signal:controller.signal});
+      clearTimeout(tid);
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const data=JSON.parse(await res.text());
+      if(!data.ok)throw new Error('GAS error');
+
+      // 患者データ（GAS優先）
+      const prows=data.customers||[];
+      if(prows.length>1){
+        const headers=(prows[0]||[]).map(h=>String(h||'').trim());
+        const parsed=prows.slice(1).filter(r=>r[0]!==''&&r[0]!=null).map(r=>{
+          const idx=k=>{const i=headers.indexOf(k);return i>-1?i:-1;};
+          const g=(k,fb)=>{const i=idx(k);return i>-1?String(r[i]||'').trim():String(r[fb]||'').trim();};
+          const gDate=(k,fb)=>{const i=idx(k);return i>-1?fmtDate(r[i]):fmtDate(r[fb]);};
+          const gInt=(k,fb)=>{const i=idx(k);return i>-1?parseInt(r[i])||0:parseInt(r[fb])||0;};
+          // ★GAS実データに完全対応したパース処理
+          // GASのヘッダーと実データのズレを全て吸収する
+          // ヘッダー名で検索して位置を取得、なければ実測インデックスを使用
+          const hi = k => headers.indexOf(k); // ヘッダーインデックス取得
+          const gv = (k,fb) => String((hi(k)>-1 ? r[hi(k)] : r[fb])||'').trim();
+          const gd = (k,fb) => { const i=hi(k); return fmtDate(i>-1?r[i]:r[fb]); };
+
+          // [0]診察券No [1]患者名 [2]性別
+          const rv_id   = String(r[0]||'').trim();
+          const rv_name = String(r[1]||'').trim();
+          const rv_sex  = gv('性別', 2);
+
+          // [3]電話番号 - 先頭0を確実に補完
+          const rv_tel  = normTel((gv('電話番号',3)||gv('電話',3)).replace(/[^0-9]/g,''));
+
+          // LINE・住所・職業・流入元
+          // GASヘッダー: LINE[4], 住所[5], 職業[6], 流入元[7]
+          // 実データ:    住所[4], 職業[5], 流入元[6], ?[7]
+          // → ヘッダー「LINE」が[4]にあるが実データは住所なのでLINEは別途判定
+          const rv_line_hdr = hi('LINE')>-1 ? String(r[hi('LINE')]||'').trim() : '';
+          // LINEの値判定: 「あり」「なし」「-」以外は住所データなので除外
+          const rv_line = (rv_line_hdr==='あり'||rv_line_hdr==='なし'||rv_line_hdr==='-') ? rv_line_hdr : '';
+
+          // 住所: ヘッダー「住所」の位置 と [4] の両方を確認、住所らしい方を採用
+          const rv_city_hdr = hi('住所')>-1 ? String(r[hi('住所')]||'').trim() : '';
+          const rv_city_r4  = String(r[4]||'').trim();
+          const rv_city_r6  = String(r[6]||'').trim();
+          // 住所判定: 数字や「市」「町」「丁」を含む
+          const isAddress = v => v && (v.includes('市')||v.includes('町')||v.includes('丁')||v.includes('番')||v.match(/\d+-\d+/));
+          // 住所: ヘッダー位置を優先、なければr[5]、r[6]も候補
+          const rv_city = isAddress(rv_city_hdr) ? rv_city_hdr :
+                          isAddress(rv_city_r4)  ? rv_city_r4  :
+                          isAddress(rv_city_r6)  ? rv_city_r6  :
+                          rv_city_hdr||rv_city_r4;
+
+          // 職業: ヘッダー「職業」の位置 と [5] の両方確認
+          const rv_job_hdr = hi('職業')>-1 ? String(r[hi('職業')]||'').trim() : '';
+          const rv_job_r5  = String(r[5]||'').trim();
+          // 住所が職業欄に混入するのを防ぐ
+          const rv_job = isAddress(rv_job_hdr) ? '' : (rv_job_hdr || (isAddress(rv_job_r5)?'':rv_job_r5));
+
+          // 流入元: ヘッダー「流入元」の位置 と [6]
+          const rv_src_hdr = hi('流入元')>-1 ? String(r[hi('流入元')]||'').trim() : '';
+          const rv_src_r6  = String(r[6]||'').trim();
+          // 流入元の有効値: LINE,紹介,その他,三四郎,-
+          const validSrc = ['LINE','紹介','その他','三四郎','-','電話','ネット'];
+          const rv_src = validSrc.includes(rv_src_hdr) ? rv_src_hdr :
+                         validSrc.includes(rv_src_r6)  ? rv_src_r6  : rv_src_hdr||rv_src_r6;
+
+          // 症状: ヘッダー「症状」の位置 or [8]、壊れたデータを除外
+          const rv_sym_raw = gv('症状', 8);
+          const rv_sym = isGarbageData(rv_sym_raw) ? '' : rv_sym_raw;
+
+          // 前回通院日: ヘッダー「前回通院日」or [9]、壊れたデータ除外
+          const rv_last_raw = gd('前回通院日', 9);
+          const rv_last = isGarbageData(rv_last_raw) ? '' : rv_last_raw;
+
+          // 通院回数: ヘッダー「通院回数」or [10]
+          // ただし[10]には生年月日4桁が入っている場合があるので慎重に
+          const rv_cnt_i = hi('通院回数');
+          const rv_cnt_val = rv_cnt_i>-1 ? r[rv_cnt_i] : null;
+          const rv_cnt_num = parseInt(rv_cnt_val)||0;
+          // 通院回数として不自然に大きい値(1900以上)は生年月日と判断
+          const rv_cnt = (rv_cnt_num > 1900) ? 0 : rv_cnt_num;
+
+          // 生年月日: ヘッダー「生年月日」or [11]、NaN・壊れたデータ除外
+          // また[10]が通院回数として不自然に大きい場合は生年月日として使用
+          const rv_dob_i = hi('生年月日');
+          let rv_dob_raw = rv_dob_i>-1 ? r[rv_dob_i] : r[11];
+          // [10]が1900年代の数値なら生年月日として使う
+          if((!rv_dob_raw || String(rv_dob_raw).includes('NaN')) && rv_cnt_num>1900){
+            rv_dob_raw = String(rv_cnt_num)+'-01-01';
+          }
+          const rv_dob = (()=>{
+            if(!rv_dob_raw) return '';
+            const s = String(rv_dob_raw).trim();
+            if(!s || s.includes('NaN') || s==='-' || isGarbageData(s)) return '';
+            if(/^\d{4}$/.test(s)) return s+'-01-01';
+            if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+            return fmtDate(rv_dob_raw)||'';
+          })();
+
+          // 備考
+          const rv_note = gv('備考', 12);
+
+          // アラート送信フラグ（ヘッダー「アラート送信」or [13]。未設定は送る扱い＝true）
+          const rv_alertSend = (()=>{ const v=(gv('アラート送信',13)||'').toUpperCase(); if(v==='FALSE')return false; return true; })();
+          // 誕生日クーポン送信フラグ（ヘッダー「誕生日クーポン送信」。未設定は送る扱い＝true）
+          const rv_bdaySend = (()=>{ const v=(gv('誕生日クーポン送信',14)||'').toUpperCase(); if(v==='FALSE')return false; return true; })();
+
+          return{
+            id:rv_id, name:rv_name, kana:gv('ふりがな',2),
+            sex:rv_sex, tel:rv_tel, line:rv_line,
+            city:rv_city, job:rv_job, src:rv_src,
+            symptom:rv_sym, last:rv_last, count:rv_cnt,
+            dob:rv_dob, note:rv_note, alertSend:rv_alertSend, birthdaySend:rv_bdaySend,
+          };
+        });
+        if(parsed.length>0){
+          if(patients.length===0){
+            patients=parsed;
+          }else{
+            // ★安全マージ：GASにしかない患者(ID)だけ追加。既存のローカル患者は絶対に削除・上書きしない
+            const byId={}; patients.forEach(p=>{byId[p.id]=p;});
+            parsed.forEach(p=>{
+              if(!byId[p.id]){
+                patients.push(p); // ローカルに無いIDはGASから追加
+              }else{
+                // 既存患者は、空欄の項目だけGAS側で補完する（値がある項目は上書きしない）
+                const ex=byId[p.id];
+                Object.keys(p).forEach(k=>{ if(!ex[k] && p[k]) ex[k]=p[k]; });
+              }
+            });
+          }
+        }
+      }
+
+      // 予約データ：★localStorageを優先・GASにしかない日付のみ追加
+      const brows=data.bookings||[];
+      // 売上データをGASから取得
+      const urows=data.uriage||[];
+      if(urows.length>1){
+        const uhdr=urows[0];
+        const uhi=k=>uhdr.findIndex(h=>String(h)===k);
+        // GASの売上データで上書き（localStorageより優先）
+        const newU={};
+        urows.slice(1).forEach(r=>{
+          const d=String(r[0]||'').trim();
+          if(!d||d.startsWith('1899')||d.startsWith('日付'))return;
+          newU[d]={
+            hoken:parseInt(r[uhi('保険')])||0,
+            jhi:parseInt(r[uhi('自費')])||0,
+            jiko:parseInt(r[uhi('交通事故')])||0,
+            bussan:parseInt(r[uhi('物販')])||0,
+            other:parseInt(r[uhi('その他')])||0,
+            pay:r[uhi('支払方法')]?String(r[uhi('支払方法')]).split(',').filter(s=>s):[],
+            memo:String(r[uhi('メモ')]||'').trim()
+          };
+        });
+        // localStorageにしかないデータを保持しつつGASデータをマージ
+        Object.keys(newU).forEach(d=>uriage[d]=newU[d]);
+      }
+      if(brows.length>1){
+        const newB={};
+        brows.slice(1).forEach(r=>{
+          if(!r[0]&&r[0]!==0)return;
+          const date=fmtDate(r[0]),slot=fmtTime(r[1]);
+          if(!date||!slot)return;
+          if(!newB[date])newB[date]={};
+          const kubunStr=String(r[2]||'').trim();
+          if(kubunStr==='(継続)'){newB[date][slot]={cont:true,name:String(r[3]||''),cardId:String(r[4]||'')};}
+          else if(kubunStr==='(キャンセル)'){newB[date][slot]={cancelled:true,name:String(r[3]||''),cardId:String(r[4]||''),cancelReason:String(r[18]||''),reBookedBy:String(r[17]||'')};}
+          else{newB[date][slot]={
+            kubun:kubunStr,kubunList:String(r[16]||kubunStr).split(',').filter(s=>s),
+            name:String(r[3]||'').trim(),cardId:String(r[4]||'').trim(),
+            route:String(r[5]||'LINE').trim(),visitCount:String(r[6]||'').trim(),
+            elapsed:String(r[7]||'').trim(),symptom:String(r[8]||'').trim(),
+            option:String(r[9]||'').trim(),menu:String(r[10]||'').trim(),
+            bui:r[19]?String(r[19]).split(',').filter(s=>s):[],
+            shochi:r[11]?tryParse(r[11]):[],shochiMemo:String(r[12]||'').trim(),
+            bussan:r[13]?tryParse(r[13]):[],
+            pay:r[14]?String(r[14]).split(',').filter(s=>s):[],
+            payAmount:String(r[15]||'').trim()
+          };}
+        });
+        // ★予約マージルール（localStorage保護版）
+        // GASにあってlocalStorageにない日付 → GASから追加
+        // localStorageにある日付 → localStorageを優先（消えない）
+        // GASが空の場合のみlocalStorageを維持（初回同期前などの保険）
+        if(Object.keys(newB).length === 0){
+          console.warn('GAS予約データが空のためlocalStorageを維持します');
+        } else {
+          // ★スロット単位のマージ（2026年版・再修正）
+          // 前回の修正では「スロットを1つずつ上書き」する方式にしたが、これだと
+          // サーバー側で削除・移動されて無くなった枠（例：門脇さんが9:10→8:50に移動し、
+          // 9:10は空きに戻った）が、その端末のローカルにまだ残ったままになってしまう不具合が残っていた。
+          // 「その日の予約枠は、サーバーの内容でまるごと置き換える」方式に変更し、
+          // 削除・移動もローカルに正しく反映されるようにする。
+          Object.keys(newB).forEach(d=>{
+            bookings[d]=newB[d];
+          });
+        }
+      }
+      save();
+      setStat('s-ok','✅ 同期済み');
+      recalcAllVisitCounts();
+      // LINE IDを自動取得して患者と照合
+      setTimeout(syncLineIds,3000);
+      // 21日未来院アラートチェック（バックグラウンドで実行）
+      const curDate=document.getElementById('yoyaku-date')?.value||today();
+      setTimeout(()=>checkElapsedAlert(curDate),2000);
+    }catch(e){
+      clearTimeout(tid);
+      throw e;
+    }
+  };
+  try{
+    await _syncFromGAS();
+  }catch(e){
+    console.warn('GAS sync failed:', e.message);
+    setStat('s-err','⚠ オフライン');
+  }finally{
+    renderSched();
+    renderPatients();
+    pullStock(); // 在庫データもGASから最新を取得して各端末を統一する
+  }
+}
+
+async function pushB(){
+  // ★列順をGASヘッダーと完全一致させる
+  // [0]日付,[1]時間,[2]区分,[3]患者名,[4]診察券No,[5]予約ルート,[6]来院回数,[7]経過日数
+  // [8]症状,[9]オプション,[10]自費メニュー,[11]処置JSON,[12]処置メモ,[13]物販JSON
+  // [14]支払方法,[15]支払金額,[16]区分リスト,[17]再予約情報,[18]キャンセル理由,[19]施術部位
+  const hdr=['日付','時間','区分','患者名','診察券No','予約ルート','来院回数','経過日数','症状','オプション','自費メニュー','処置(JSON)','処置メモ','物販(JSON)','支払方法','支払金額','区分リスト','再予約情報','キャンセル理由','施術部位'];
+  const rows=[hdr];
+  Object.keys(bookings).sort().forEach(date=>{
+    Object.keys(bookings[date]).sort().forEach(slot=>{
+      const b=bookings[date][slot];
+      if(!b)return;
+      if(b.cont){
+        rows.push([date,slot,'(継続)',b.name||'',b.cardId||'','','','','','','','','','','','','','','','']);
+      }else if(b.cancelled){
+        rows.push([date,slot,'(キャンセル)',b.name||'',b.cardId||'','','','','','','','','','','','','',b.reBookedBy||'',b.cancelReason||'','']);
+      }else{
+        rows.push([
+          date,                                    // [0] 日付
+          slot,                                    // [1] 時間
+          b.kubun||'',                             // [2] 区分
+          b.name||'',                              // [3] 患者名
+          b.cardId||'',                            // [4] 診察券No
+          b.route||'',                             // [5] 予約ルート
+          b.visitCount||'',                        // [6] 来院回数
+          b.elapsed||'',                           // [7] 経過日数
+          b.symptom||'',                           // [8] 症状
+          b.option||'',                            // [9] オプション
+          b.menu||'',                              // [10] 自費メニュー
+          JSON.stringify(b.shochi||[]),            // [11] 処置JSON
+          b.shochiMemo||'',                        // [12] 処置メモ
+          JSON.stringify(b.bussan||[]),            // [13] 物販JSON
+          (b.pay||[]).join(','),                   // [14] 支払方法
+          b.payAmount||'',                         // [15] 支払金額
+          (b.kubunList||[b.kubun||'']).join(','), // [16] 区分リスト
+          '',                                      // [17] 再予約情報
+          '',                                      // [18] キャンセル理由
+          (b.bui||[]).join(','),                   // [19] 施術部位
+        ]);
+      }
+    });
+  });
+  try{
+    setStat('s-ing','🔄 保存中...');
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(rows)}),redirect:'follow'});
+    const d=JSON.parse(await res.text());
+    setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');return d.ok;
+  }catch(e){setStat('s-err','⚠ 保存エラー');return false;}
+}
+
+async function pushP(){
+  const hdr=['診察券No','患者名','ふりがな','性別','電話番号','LINE','LINEユーザーID','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考','アラート送信','誕生日クーポン送信'];
+  const rows=[hdr,...patients.map(p=>[p.id,p.name,p.kana||'',p.sex||'',normTel(p.tel||''),p.line||'',p.lineUid||'',p.city||'',p.job||'',p.src||'',p.symptom||'',p.last||'',p.count||0,p.dob||'',p.note||'',p.alertSend===false?'FALSE':'TRUE',p.birthdaySend===false?'FALSE':'TRUE'])];
+  try{const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveCustomers',rows:JSON.stringify(rows)}),redirect:'follow'});const d=JSON.parse(await res.text());setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');}catch(e){setStat('s-err','⚠ 保存エラー');}
+}
+
+// GASのカラムがずれていた時に正しい形式で上書きする
+async function deletePatientByIdPrompt(){
+  const cardId=prompt('確実に削除したい患者の診察券Noを入力してください（例：1400）');
+  if(!cardId)return;
+  const target=patients.find(p=>p.id===cardId.trim());
+  const nameInfo=target?`（${target.name}様）`:'（現在ローカルには見当たりませんが、サーバー側は削除します）';
+  if(!confirm(`診察券No「${cardId}」${nameInfo}を完全に削除します。よろしいですか？`))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deletePatientByCardId',cardId:cardId.trim()})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました：'+(d.error||'')); return; }
+    patients=patients.filter(p=>p.id!==cardId.trim());
+    save(); renderPatients();
+    alert(`✅ 診察券No「${cardId}」を削除しました（${d.deleted||0}件）`);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function forcePushPatients(){
+  if(!patients.length){alert('患者データがありません。先に「最新データ取得」を押してください。');return;}
+  if(!confirm('GASスプレッドシートの患者データを現在のデータで上書きします。よろしいですか？'))return;
+  setStat('s-ing','🔧 修復中...');
+  await pushP();
+  alert('患者データをGASに送信しました。\n「最新データ取得」を押して確認してください。');
+}
+
+// ★予約データをlocalStorageからGASに強制送信（データ復旧用）
+async function forcePushBookings(){
+  const bCount = Object.values(bookings).reduce((n,d)=>n+Object.values(d).filter(s=>s&&!s.cont).length, 0);
+  if(bCount === 0){alert('localStorageに予約データがありません。\nこのデバイスにはデータが残っていない可能性があります。');return;}
+  if(!confirm(`localStorageの予約データ（${bCount}件）をGASスプレッドシートに送信します。\nGASの既存予約データは上書きされます。よろしいですか？`))return;
+  setStat('s-ing','🔧 予約データ送信中...');
+  const ok = await pushB();
+  if(ok){
+    alert(`✅ 予約データ${bCount}件をGASに送信しました。\n他のデバイスで「最新データ取得」を押すと反映されます。`);
+  } else {
+    alert('❌ 送信に失敗しました。インターネット接続を確認してください。');
+  }
+}
+
+// ===== 区分（複合対応） =====
+function toggleKubun(btn){
+  const v=btn.getAttribute('data-v');
+  btn.classList.toggle('on');
+  if(btn.classList.contains('on')){if(!mKubunSel.includes(v))mKubunSel.push(v);}
+  else{mKubunSel=mKubunSel.filter(x=>x!==v);}
+  updateKubunDisplay();
+  updateKubunFeeArea();
+  // 交通事故以外の区分も選択されている場合はpay-amountのdisabledを解除
+  const amtEl=document.getElementById('m-pay-amount');
+  const hasNonJiko=mKubunSel.some(k=>k!=='交通事故');
+  if(amtEl&&hasNonJiko){
+    amtEl.disabled=false;
+    const payArea=document.getElementById('m-pay-btns');
+    if(payArea)payArea.style.opacity='1';
+  }
+}
+
+function setJikoPay(hasPay){
+  // 交通事故の支払い設定
+  const payArea=document.getElementById('m-pay-btns');
+  const amountEl=document.getElementById('m-pay-amount');
+  const nopayBtn=document.getElementById('jiko-nopay-btn');
+  const payBtn=document.getElementById('jiko-pay-btn');
+  if(hasPay){
+    // 支払いあり：通常表示
+    if(payArea)payArea.style.opacity='1';
+    if(amountEl)amountEl.disabled=false;
+    if(nopayBtn){nopayBtn.classList.remove('on');nopayBtn.style.background='';nopayBtn.style.color='';nopayBtn.style.borderColor='';}
+    if(payBtn){payBtn.classList.add('on');}
+  } else {
+    // 支払いなし：支払方法・金額をリセット・非活性
+    mPaySel=[];
+    document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+    if(amountEl){amountEl.value='0';// disabledは交通事故のみの場合のみ
+    if(mKubunSel.length===0||mKubunSel.every(k=>k==='交通事故'))amountEl.disabled=true;}
+    if(payArea)payArea.style.opacity='0.4';
+    if(nopayBtn){nopayBtn.classList.add('on');nopayBtn.style.background='#fef3c7';nopayBtn.style.color='#92400e';nopayBtn.style.borderColor='#fcd34d';}
+    if(payBtn)payBtn.classList.remove('on');
+  }
+}
+function updateKubunDisplay(){
+  // 交通事故選択時はトグル表示
+  const jikoToggle=document.getElementById('jiko-pay-toggle');
+  if(jikoToggle){
+    const isJiko=mKubunSel.includes('交通事故');
+    const wasShown=jikoToggle.style.display!=='none';
+    jikoToggle.style.display=isJiko?'block':'none';
+    if(isJiko&&!wasShown)setJikoPay(false);// 初回のみデフォルト支払いなし
+  }
+  const disp=document.getElementById('kubun-display');
+  if(!mKubunSel.length){disp.style.display='none';return;}
+  disp.style.display='block';
+  const label=mKubunSel.join(' ＋ ');
+  const slots=mKubunSel.includes('新規')?3:mKubunSel.includes('自費')&&mKubunSel.includes('保険')?3:mKubunSel.includes('自費')?2:1;
+  disp.textContent='区分: '+label+' （'+slots+'枠 '+slots*20+'分）';
+}
+
+function getKubunPrimary(){return mKubunSel[0]||'保険';}
+function getKubunSlots(){
+  if(mKubunSel.includes('新規'))return 3;
+  if(mKubunSel.includes('自費')&&mKubunSel.includes('保険'))return 3;
+  if(mKubunSel.includes('自費'))return 2;
+  return 1;
+}
+
+// ===== 部位タブ =====
+function toggleBui(btn){
+  const v=btn.getAttribute('data-v');
+  btn.classList.toggle('on');
+  if(btn.classList.contains('on')){if(!mBuiSel.includes(v))mBuiSel.push(v);}
+  else{mBuiSel=mBuiSel.filter(x=>x!==v);}
+}
+function resetBui(){
+  mBuiSel=[];
+  document.querySelectorAll('.bui-tab').forEach(b=>b.classList.remove('on'));
+}
+function loadBui(arr){
+  resetBui();
+  (arr||[]).forEach(v=>{
+    const btn=document.querySelector(`.bui-tab[data-v="${v}"]`);
+    if(btn){btn.classList.add('on');mBuiSel.push(v);}
+  });
+}
+
+// ===== SCHEDULE =====
+// ===== LINE ID照合 =====
+let lineIdMap={};// LINE表示名→userId
+async function matchLineIdsFromGAS(){
+  const btn=document.querySelector('[onclick="matchLineIdsFromGAS()"]');
+  const result=document.getElementById('line-match-result');
+  if(btn){btn.textContent='🔄 照合中...';btn.disabled=true;}
+  if(result){result.textContent='通信中...';result.style.color='#64748b';}
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'matchLineIds'}),redirect:'follow'});
+    const raw=await res.text();
+    let d;
+    try{d=JSON.parse(raw);}catch(e){
+      if(result){result.textContent='❌ JSONパースエラー: '+raw.slice(0,80);result.style.color='#dc2626';}
+      return;
+    }
+    if(d.ok){
+      // GASがシートに書き込み済み → matchMapでlocalStorageに反映
+      if(d.matchMap){
+        Object.keys(d.matchMap).forEach(patId=>{
+          const p=patients.find(x=>String(x.id)===patId);
+          if(p)p.lineUid=d.matchMap[patId];
+        });
+        save();
+      }
+      const msg=`✅ ${d.matched}件紐付け完了・${d.already}件登録済み`+(d.skipped>0?`・${d.skipped}件スキップ`:'');
+      if(result){result.textContent=msg;result.style.color='#16a34a';}
+      if(d.matched>0)renderPatients();
+    }else{
+      if(result){result.textContent='❌ '+( d.error||'不明なエラー');result.style.color='#dc2626';}
+    }
+  }catch(e){
+    if(result){result.textContent='❌ 通信エラー: '+e.message;result.style.color='#dc2626';}
+  }finally{
+    if(btn){btn.textContent='🔗 LINE ID自動照合';btn.disabled=false;}
+  }
+}
+async function syncLineIds(){
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getLineUsers'}),redirect:'follow'});
+    const d=JSON.parse(await res.text());
+    if(d.ok&&d.users){
+      lineIdMap={};
+      d.users.forEach(u=>{if(u.userId&&u.name)lineIdMap[u.name.trim()]=u.userId;});
+    }
+  }catch(e){}
+}
+// 患者名からLINE IDを検索
+function getPatientLineId(patientName){
+  // 患者名で直接検索
+  if(lineIdMap[patientName])return lineIdMap[patientName];
+  // 姓のみで検索
+  const lastName=patientName.split(/[　 ]/)[0];
+  const found=Object.keys(lineIdMap).find(k=>k.startsWith(lastName));
+  return found?lineIdMap[found]:null;
+}
+
+// ===== 印刷プレビューモーダル =====
+function showPrintModal(title, htmlContent){
+  document.getElementById('print-modal-title').textContent=title;
+  document.getElementById('print-content').innerHTML=htmlContent;
+  document.getElementById('printModal').style.display='block';
+  window.scrollTo(0,0);
+}
+function printContent(){
+  const content=document.getElementById('print-content').innerHTML;
+  const title=document.getElementById('print-modal-title').textContent;
+  const iframe=document.createElement('iframe');
+  iframe.style.display='none';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Hiragino Sans',sans-serif;padding:20px;color:#1e293b;font-size:12px;}
+    table{width:100%;border-collapse:collapse;}th{background:#1e293b;color:white;padding:6px 10px;text-align:left;font-size:11px;}
+    td{border-bottom:1px solid #e2e8f0;padding:5px 10px;font-size:11px;}.total{font-weight:bold;background:#f8fafc;}
+    h2{font-size:13px;font-weight:bold;margin:14px 0 6px;border-left:4px solid #f97316;padding-left:8px;}
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+    .kpi{border:1.5px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center;}
+    .kpi .n{font-size:18px;font-weight:bold;}.kpi .l{font-size:9px;color:#64748b;}
+    .row{display:flex;border-bottom:1px solid #e2e8f0;padding:4px 0;}
+    .label{width:110px;font-size:11px;color:#64748b;flex-shrink:0;}.value{flex:1;font-size:11px;}
+    .plan-box{border:1.5px solid #e2e8f0;border-radius:4px;padding:8px;min-height:50px;}
+    .sign{display:flex;gap:16px;margin-top:16px;}
+    .sign-box{flex:1;border-top:1.5px solid #1e293b;padding-top:6px;text-align:center;font-size:10px;color:#64748b;}
+    @media print{@page{margin:10mm;}}</style>
+    </head><body>${content}</body></html>`);
+  iframe.contentDocument.close();
+  setTimeout(()=>{iframe.contentWindow.print();setTimeout(()=>document.body.removeChild(iframe),1000);},500);
+}
+
+// ===== QRコード =====
+function showQR(date,slot,name){
+  const w=['日','月','火','水','木','金','土'];
+  const dt=new Date(date);
+  const info=date.replace(/-/g,'/')+'('+w[dt.getDay()]+') '+slot+' '+name;
+  document.getElementById('qr-title').textContent='予約確認 QRコード';
+  document.getElementById('qr-info').textContent=date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+slot+'〜　'+(name||'')+'様';
+  // QRコードの内容はシンプルなテキストのみ（住所・電話番号を除外）
+  // 院名を含めるとGoogleマイビジネスが開くため、予約情報のみのテキストにする
+  const text=encodeURIComponent('予約: '+info+' (倉治整骨院)');
+  document.getElementById('qr-img').src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+text;
+  const modal=document.getElementById('qrModal');
+  modal.style.display='flex';
+}
+function downloadQR(){
+  const img=document.getElementById('qr-img');
+  const a=document.createElement('a');a.href=img.src;a.download='予約QR.png';a.click();
+}
+
+// ===== 月次レポート生成（PDF印刷） =====
+function generateMonthlyReport(){
+  const now=new Date();
+  const yr=now.getFullYear();
+  const mo=now.getMonth()+1;
+  // 月の売上集計
+  let hoken=0,jhi=0,jiko=0,bussan=0,other=0,total=0;
+  let days=0;
+  const payCount={};
+  Object.entries(uriage).forEach(([d,u])=>{
+    const dt=new Date(d+'T00:00:00');
+    if(dt.getFullYear()!==yr||dt.getMonth()+1!==mo)return;
+    hoken+=u.hoken||0;jhi+=u.jhi||0;jiko+=u.jiko||0;bussan+=u.bussan||0;other+=u.other||0;
+    total+=(u.hoken||0)+(u.jhi||0)+(u.jiko||0)+(u.bussan||0)+(u.other||0);
+    days++;
+    (u.pay||[]).forEach(p=>{payCount[p]=(payCount[p]||0)+1;});
+  });
+  // 来院数集計
+  let visitTotal=0,visitHoken=0,visitJhi=0,visitJiko=0,visitNew=0;
+  Object.entries(bookings).forEach(([d,slots])=>{
+    const dt=new Date(d+'T00:00:00');
+    if(dt.getFullYear()!==yr||dt.getMonth()+1!==mo)return;
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cont||bk.cancelled)return;
+      visitTotal++;
+      const kl=bk.kubunList||[bk.kubun||''];
+      if(kl.includes('保険'))visitHoken++;
+      if(kl.includes('自費'))visitJhi++;
+      if(kl.includes('交通事故'))visitJiko++;
+      if(kl.includes('新規'))visitNew++;
+    });
+  });
+  const avgPay=visitTotal?Math.round(total/visitTotal):0;
+  // PDF印刷用ウィンドウ
+  // モーダルで表示（ポップアップブロック不要）
+  const reportHtml='<div style="text-align:center;margin-bottom:16px">'+
+    '<div style="font-size:10px;color:#64748b">倉治整骨院　大阪府交野市倉治3丁目</div>'+
+    '<div style="font-size:18px;font-weight:bold">'+yr+'年'+mo+'月 月次レポート</div>'+
+    '<div style="font-size:10px;color:#64748b;margin-top:4px">作成日：'+new Date().toLocaleDateString('ja-JP')+'</div></div>'+
+    '<div class="kpi-grid">'+
+      '<div class="kpi"><div class="n">'+total.toLocaleString()+'円</div><div class="l">月間総売上</div></div>'+
+      '<div class="kpi"><div class="n">'+visitTotal+'名</div><div class="l">月間来院数</div></div>'+
+      '<div class="kpi"><div class="n">'+visitNew+'名</div><div class="l">新患数</div></div>'+
+      '<div class="kpi"><div class="n">'+avgPay.toLocaleString()+'円</div><div class="l">1来院平均単価</div></div>'+
+    '</div>'+
+    '<h2>売上内訳</h2>'+
+    '<table><tr><th>区分</th><th>金額</th><th>割合</th></tr>'+
+      '<tr><td>保険</td><td>'+hoken.toLocaleString()+'円</td><td>'+(total?Math.round(hoken/total*100):0)+'%</td></tr>'+
+      '<tr><td>自費</td><td>'+jhi.toLocaleString()+'円</td><td>'+(total?Math.round(jhi/total*100):0)+'%</td></tr>'+
+      '<tr><td>交通事故</td><td>'+jiko.toLocaleString()+'円</td><td>'+(total?Math.round(jiko/total*100):0)+'%</td></tr>'+
+      '<tr><td>物販</td><td>'+bussan.toLocaleString()+'円</td><td>'+(total?Math.round(bussan/total*100):0)+'%</td></tr>'+
+      '<tr><td>その他</td><td>'+other.toLocaleString()+'円</td><td>'+(total?Math.round(other/total*100):0)+'%</td></tr>'+
+      '<tr class="total"><td>合計</td><td>'+total.toLocaleString()+'円</td><td>100%</td></tr>'+
+    '</table>'+
+    '<h2>来院数内訳</h2>'+
+    '<table><tr><th>区分</th><th>人数</th></tr>'+
+      '<tr><td>保険</td><td>'+visitHoken+'名</td></tr>'+
+      '<tr><td>自費</td><td>'+visitJhi+'名</td></tr>'+
+      '<tr><td>交通事故</td><td>'+visitJiko+'名</td></tr>'+
+      '<tr><td>新患</td><td>'+visitNew+'名</td></tr>'+
+      '<tr class="total"><td>合計</td><td>'+visitTotal+'名</td></tr>'+
+    '</table>'+
+    '<h2>支払方法別</h2>'+
+    '<table><tr><th>支払方法</th><th>件数</th></tr>'+
+      Object.entries(payCount).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+e[1]+'件</td></tr>';}).join('')+
+    '</table>';
+  showPrintModal(yr+'年'+mo+'月 月次レポート', reportHtml);
+}
+function generateCarePlan(){
+  const input=prompt('施術計画書を作成する患者の診察券Noを入力してください：');
+  if(!input)return;
+  const p=patients.find(x=>x.id===input.trim()||x.name===input.trim());
+  if(!p){alert('患者が見つかりません');return;}
+  const history=[];
+  Object.entries(bookings).sort().forEach(function(entry){
+    const d=entry[0],slots=entry[1];
+    Object.values(slots).forEach(function(bk){
+      if(!bk||bk.cont||bk.cancelled)return;
+      if(bk.name===p.name||bk.cardId===p.id){
+        history.push({date:d,kubun:bk.kubun,symptom:bk.symptom,memo:bk.nextMemo||bk.nextNote});
+      }
+    });
+  });
+  const latest=history[history.length-1]||{};
+  const today=new Date().toLocaleDateString('ja-JP');
+  const html=
+    '<div style="text-align:center;font-size:10px;color:#64748b;margin-bottom:8px">倉治整骨院　大阪府交野市倉治3丁目　Tel: 0728-91-1234</div>'+
+    '<div style="text-align:center;font-size:16px;font-weight:bold;margin-bottom:16px;border-bottom:2px solid #1e293b;padding-bottom:8px">施術計画書</div>'+
+    '<h2>患者情報</h2>'+
+    '<div class="row"><div class="label">診察券No</div><div class="value">'+p.id+'</div></div>'+
+    '<div class="row"><div class="label">氏名</div><div class="value">'+p.name+'　様</div></div>'+
+    '<div class="row"><div class="label">生年月日</div><div class="value">'+(p.dob||'未記入')+'</div></div>'+
+    '<div class="row"><div class="label">住所</div><div class="value">'+(p.city||'未記入')+'</div></div>'+
+    '<div class="row"><div class="label">電話番号</div><div class="value">'+(p.tel||'未記入')+'</div></div>'+
+    '<div class="row"><div class="label">初診日</div><div class="value">'+(history[0]?history[0].date:'未記入')+'</div></div>'+
+    '<div class="row"><div class="label">来院回数</div><div class="value">'+(p.count||0)+'回</div></div>'+
+    '<div class="row"><div class="label">最終来院</div><div class="value">'+(p.last||'未記入')+'</div></div>'+
+    '<h2>症状・訴え</h2>'+
+    '<div class="plan-box">'+(p.symptom||latest.symptom||'　')+'</div>'+
+    '<h2>施術方針・計画</h2>'+
+    '<div class="plan-box">・週　　回のペースで施術を行います<br>・目標期間：　　ヶ月<br>・主な施術：<br>・注意事項：'+(latest.memo||'')+'</div>'+
+    '<h2>来院履歴（直近10回）</h2>'+
+    history.slice(-10).map(function(h){return '<div class="row"><div class="label">'+h.date+'</div><div class="value">'+h.kubun+(h.symptom?' / '+h.symptom:'')+'</div></div>';}).join('')+
+    '<div class="row" style="margin-top:8px"><div class="label">作成日</div><div class="value">'+today+'</div></div>'+
+    '<div class="sign">'+
+      '<div class="sign-box">患者署名<br><br><br>（自署）</div>'+
+      '<div class="sign-box">施術者<br><br><br>倉治整骨院 院長</div>'+
+    '</div>';
+  showPrintModal('施術計画書 - '+p.name+'様', html);
+}
+
+// ===== 通院履歴モーダル =====
+function openPatientHistory(patientId){
+  const p=patients.find(x=>x.id===patientId);
+  if(!p){alert('患者が見つかりません');return;}
+  const history=[];
+  Object.keys(bookings).sort().forEach(date=>{
+    const slots=bookings[date]||{};
+    Object.values(slots).forEach(bk=>{
+      if(!bk||bk.cancelled)return;
+      if(bk.name===p.name||bk.cardId===p.id){
+        history.push({
+          date,
+          time:bk.time||'',
+          kubun:bk.kubun||'',
+          symptom:bk.symptom||bk.menu||'',
+          payAmount:parseInt(bk.payAmount)||0,
+          isCont:!!bk.cont
+        });
+      }
+    });
+  });
+  // 継続枠（同じ来院の2枠目以降）は合計・回数に含めない
+  const realVisits=history.filter(h=>!h.isCont);
+  const total=realVisits.reduce((s,h)=>s+h.payAmount,0);
+  const last=realVisits.length?realVisits[realVisits.length-1].date:(p.last||'−');
+
+  document.getElementById('ph-title').textContent=`📋 ${p.name} 様（#${p.id}）の通院履歴`;
+  document.getElementById('ph-last').textContent=last;
+  document.getElementById('ph-count').textContent=realVisits.length+'回';
+  document.getElementById('ph-total').textContent=yen(total);
+  const tbody=document.getElementById('ph-body');
+  if(!realVisits.length){
+    tbody.innerHTML='<tr><td colspan="4" class="empty">通院履歴が見つかりません</td></tr>';
+  }else{
+    tbody.innerHTML=[...realVisits].reverse().map(h=>
+      `<tr>
+        <td style="font-size:0.78rem">${h.date}</td>
+        <td style="font-size:0.78rem">${h.kubun||'−'}</td>
+        <td style="font-size:0.78rem">${h.symptom||'−'}</td>
+        <td style="font-size:0.78rem;font-weight:bold;color:${h.payAmount>0?'#16a34a':'#94a3b8'}">${h.payAmount>0?yen(h.payAmount):'−'}</td>
+      </tr>`
+    ).join('');
+  }
+  document.getElementById('patientHistoryModal').classList.add('on');
+}
+
+// ===== 誕生日クーポン管理 =====
+let bdayLogCache=null;
+function openBirthdayMgmt(){
+  document.getElementById('bdayMgmtModal').classList.add('on');
+  switchBdayTab('upcoming');
+}
+function switchBdayTab(tab){
+  ['upcoming','off','log'].forEach(t=>{
+    const btn=document.getElementById('bdt-tab-'+t);
+    if(btn){ btn.style.borderBottomColor = (t===tab)?'#db2777':'transparent'; btn.style.color=(t===tab)?'#db2777':'#64748b'; }
+  });
+  if(tab==='upcoming') renderBdayUpcoming();
+  else if(tab==='off') renderBdayOffList();
+  else renderBdayLog();
+}
+// 今日から60日以内に誕生日が来る患者（クーポン送信予定）を計算して表示
+function renderBdayUpcoming(){
+  const el=document.getElementById('bdt-content');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const list=patients.filter(p=>p.dob && p.birthdaySend!==false).map(p=>{
+    const m=p.dob.match(/^\d{4}-(\d{2})-(\d{2})$/);
+    if(!m) return null;
+    let next=new Date(today.getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
+    if(next<today) next=new Date(today.getFullYear()+1, parseInt(m[1])-1, parseInt(m[2]));
+    const diffDays=Math.round((next-today)/(1000*60*60*24));
+    return {name:p.name, id:p.id, next, diffDays};
+  }).filter(x=>x && x.diffDays<=60).sort((a,b)=>a.diffDays-b.diffDays);
+  if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">60日以内に誕生日を迎える方はいません</p>'; return; }
+  el.innerHTML=list.map(x=>{
+    const dateStr=`${x.next.getMonth()+1}月${x.next.getDate()}日`;
+    const badge=x.diffDays===0?'<span style="background:#fce7f3;color:#db2777;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">🎉本日</span>':`<span style="color:#94a3b8;font-size:0.72rem">あと${x.diffDays}日</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9">
+      <div><b style="font-size:0.85rem">${x.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">#${x.id}</span></div>
+      <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.8rem">${dateStr}</span>${badge}</div>
+    </div>`;
+  }).join('');
+}
+function renderBdayOffList(){
+  const el=document.getElementById('bdt-content');
+  const list=patients.filter(p=>p.birthdaySend===false);
+  if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">対象外に設定されている患者様はいません</p>'; return; }
+  el.innerHTML=`<p style="font-size:0.75rem;color:#64748b;margin-bottom:8px">解除したい場合は、患者一覧からその方の編集画面を開いて「送る」に戻してください。</p>`+
+    list.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9">
+      <div><b style="font-size:0.85rem">${p.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">#${p.id}</span></div>
+      <button class="btn be bsm" onclick="openPEdit('${p.id}');document.getElementById('bdayMgmtModal').classList.remove('on')">編集</button>
+    </div>`).join('');
+}
+async function renderBdayLog(){
+  const el=document.getElementById('bdt-content');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getBirthdayLog&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    bdayLogCache=d.list||[];
+    if(!bdayLogCache.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">送信履歴はまだありません</p>'; return; }
+    el.innerHTML=bdayLogCache.map(h=>{
+      const badge=h.result==='送信済み'?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅送信済み</span>'
+        :h.result==='未登録'?'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜LINE未登録</span>'
+        :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⚠️送信失敗</span>';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #f1f5f9">
+        <div><b style="font-size:0.85rem">${h.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${h.date}</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.72rem;color:#64748b">有効期限:${h.expireUntil}</span>${badge}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+
+async function sendTestEmail(){
+  const email=prompt('テストメールを送るアドレスを入力してください', 'kurazi0510@yahoo.co.jp');
+  if(!email)return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'sendTestEmailTo',email})
+    });
+    const d=await res.json();
+    alert(d.ok?`✅ ${email} 宛にテストメールを送信しました。届いているか確認してください（迷惑メールフォルダもご確認ください）`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+// ===== Web予約枠 手動ブロック管理 =====
+const BS_SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10',
+  '15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
+async function showAllBlockedDebug(){
+  const el=document.getElementById('bs-content');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getAllBlockedSlotsDebug&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const rows=d.rows||[];
+    if(!rows.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">保存されているブロックデータは0件です</p>'; return; }
+    el.innerHTML=`<div style="background:#ede9fe;color:#5b21b6;font-weight:bold;padding:8px;border-radius:8px;margin-bottom:8px;text-align:center">現在 ${rows.length}件のブロックデータが保存されています</div>`+
+      rows.map(r=>`<div style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:0.82rem"><b>${r.date}</b>　${r.time}　<span style="color:#94a3b8;font-size:0.72rem">${r.note}</span></div>`).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+function openBlockSlots(){
+  document.getElementById('blockSlotsModal').classList.add('on');
+  const dEl=document.getElementById('blk-date');
+  if(!dEl.value){
+    const t=new Date(); t.setDate(t.getDate()+1);
+    // ★タイムゾーンのズレ(1日前後する不具合)を防ぐため、UTC変換を使わず日本時間のまま日付文字列を作る
+    const y=t.getFullYear(), m=String(t.getMonth()+1).padStart(2,'0'), d=String(t.getDate()).padStart(2,'0');
+    dEl.value=`${y}-${m}-${d}`;
+  }
+  loadBlockSlotsForDate();
+}
+let bsBlockedSet=new Set();
+async function loadBlockSlotsForDate(){
+  const date=document.getElementById('blk-date').value;
+  const el=document.getElementById('bs-content');
+  if(!date){ el.innerHTML=''; return; }
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getBlockedSlotsForDate&date='+date+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    bsBlockedSet=new Set(d.blocked||[]);
+    renderBlockSlots(date);
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+function renderBlockSlots(date){
+  const el=document.getElementById('bs-content');
+  const am=BS_SLOTS.filter(s=>s<'13:00'), pm=BS_SLOTS.filter(s=>s>='13:00');
+  const cell=s=>{
+    const blocked=bsBlockedSet.has(s);
+    return `<div onclick="toggleBlockSlot('${date}','${s}')" style="padding:8px 2px;text-align:center;border:1.6px solid ${blocked?'#dc2626':'#e2e8f0'};border-radius:8px;font-size:0.78rem;cursor:pointer;background:${blocked?'#fee2e2':'#f8fafc'};color:${blocked?'#b91c1c':'#334155'};font-weight:${blocked?'bold':'normal'}">${s}${blocked?'<br>🚫':''}</div>`;
+  };
+  el.innerHTML=`
+    <div style="background:#fef3c7;color:#92400e;font-weight:bold;text-align:center;padding:8px;border-radius:8px;margin-bottom:10px;font-size:0.9rem">📅 今表示している日付：${date}（現在 ${bsBlockedSet.size}件ブロック中）</div>
+    <div style="font-size:0.72rem;color:#a08a6d;font-weight:bold;margin:6px 0 4px">午前</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${am.map(cell).join('')}</div>
+    <div style="font-size:0.72rem;color:#a08a6d;font-weight:bold;margin:10px 0 4px">午後</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${pm.map(cell).join('')}</div>
+  `;
+}
+async function toggleBlockSlot(date,time){
+  const willBlock=!bsBlockedSet.has(time);
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'toggleBlockedSlot',date,time,block:willBlock})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 更新に失敗しました'); return; }
+    if(willBlock) bsBlockedSet.add(time); else bsBlockedSet.delete(time);
+    renderBlockSlots(date);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+// ===== Web予約リクエスト一覧 =====
+// ===== Web予約リクエストの新着通知（音＋バッジ。個人スマホを使わずデスクトップだけで気づけるように） =====
+let webReqKnownIds=new Set(); // これまでに確認済みの未対応リクエスト（rowIdx）
+let lastPendingBookingCount=0; // 直近チェック時点の未対応Web予約件数（問診票を開いた時の即時再計算に使う）
+let webReqFirstCheck=true;
+function getNotifyVolume(){
+  const v=parseFloat(localStorage.getItem('kj_notify_vol'));
+  return isNaN(v)?0.25:v; // デフォルト音量（内部値。1.0=100%、最大3.0=300%まで設定可能）
+}
+function beepNotify(){
+  try{
+    const vol=getNotifyVolume();
+    if(vol<=0)return; // 0＝ミュート
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    // ★音割れを防ぎつつ大音量でも聞き取りやすくするコンプレッサーを挟む
+    const comp=ctx.createDynamicsCompressor();
+    comp.threshold.value=-16; comp.knee.value=12; comp.ratio.value=8;
+    comp.attack.value=0.003; comp.release.value=0.15;
+    comp.connect(ctx.destination);
+    // ★sine単体より遠くまで聞こえやすいsquare波を使い、複数の音を重ねて厚みのある音にする
+    [0,0.22,0.44].forEach(t=>{
+      [880,1320].forEach((freq,fi)=>{
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type='square'; o.frequency.value=freq;
+        o.connect(g); g.connect(comp);
+        const peak=Math.min(vol,3)*(fi===0?0.5:0.28); // 倍音を少し弱めに重ねる
+        g.gain.setValueAtTime(0.0001,ctx.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(peak,ctx.currentTime+t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+t+0.2);
+        o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.22);
+      });
+    });
+  }catch(e){}
+}
+async function setNotifyVolume(){
+  const cur=Math.round(getNotifyVolume()*100);
+  const input=prompt('新着通知の音量を0〜300で入力してください（100が今までの最大、それ以上でさらに大きくなります。0でミュート）', cur);
+  if(input===null)return;
+  const num=parseInt(input);
+  if(isNaN(num)||num<0||num>300){ alert('0〜300の数字で入力してください'); return; }
+  localStorage.setItem('kj_notify_vol', String(num/100));
+  beepNotify(); // 設定した音量ですぐ試し鳴らし
+  alert(`✅ 音量を${num}に設定しました（今、その音量で鳴らしてみました）`);
+}
+let mondoKnownIds=new Set(), mondoKotsuKnownIds=new Set(), mondoFirstCheck=true;
+let waitlistKnownIds=new Set(), waitlistFirstCheck=true;
+let mondoUnseenCount=parseInt(localStorage.getItem('kj_mondo_unseen')||'0')||0;
+// ★診断用：問診票の通知が正しく動いているか、その場で確認できるボタン★
+// ★テスト用：今ある問診票を「全部新着」として扱い、通知(バッジ・音・フローティング)を強制的に発火させる★
+// これで実際に見た目・音が動くかを、新規データを待たずにその場で確認できる
+async function forceMondoNotifyTest(){
+  if(!confirm('「最後に確認した時刻」を大昔にリセットして、今ある問診票を全て「未確認」として扱い、通知をテスト表示します。よろしいですか？'))return;
+  localStorage.setItem('kj_mondo_last_seen','2000-01-01 00:00:00');
+  mondoKnownIds=new Set();
+  mondoKotsuKnownIds=new Set();
+  mondoFirstCheck=false;
+  await checkNewWebRequests();
+  // ★実際にJavaScriptが設定した値を、そのまま数値で報告する（見た目の不具合か、値そのものの不具合かを切り分けるため）
+  const mondoBadgeEl=document.getElementById('mondoReqBadge');
+  const sec2DotEl=document.getElementById('sec2-dot');
+  const floatEl=document.getElementById('floatingMondoBadge');
+  let report='【実際に設定された値】\n\n';
+  report+=`mondoUnseenCount = ${mondoUnseenCount}\n\n`;
+  report+=`①一覧ボタンの赤丸：display=${mondoBadgeEl?mondoBadgeEl.style.display:'要素が見つかりません'}, 中身=${mondoBadgeEl?mondoBadgeEl.textContent:'-'}\n\n`;
+  report+=`②見出しの赤丸：display=${sec2DotEl?sec2DotEl.style.display:'要素が見つかりません'}\n\n`;
+  report+=`③右下フローティング：${floatEl?('display='+floatEl.style.display+', 中身='+floatEl.textContent):'要素がまだ作られていません'}`;
+  alert(report);
+}
+async function debugCheckMondoNotify(){
+  let msg='【診断結果】\n\n';
+  try{
+    const mres=await fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'});
+    const md=await mres.json();
+    msg+=`通常問診票：ok=${md.ok}, 件数=${(md.list||[]).length}\n`;
+  }catch(e){ msg+=`通常問診票：通信エラー(${e.message})\n`; }
+  try{
+    const mkres=await fetch(GAS+'?action=getMondoshinKotsuList&t='+Date.now(),{cache:'no-store'});
+    const mkd=await mkres.json();
+    msg+=`交通事故問診票：ok=${mkd.ok}, 件数=${(mkd.list||[]).length}\n`;
+  }catch(e){ msg+=`交通事故問診票：通信エラー(${e.message})\n`; }
+  msg+=`\n現在の未確認件数（画面上）：${mondoUnseenCount}件\n`;
+  msg+=`現在の音量設定：${Math.round(getNotifyVolume()*100)}\n`;
+  alert(msg);
+  beepNotify();
+}
+async function checkNewWebRequests(silent){
+  // ★Web予約とWeb問診票、キャンセル待ち、それぞれ個別に取得する（片方が失敗してももう片方は動くように）
+  let pending=[], mondoList=[], mondoKotsuList=[], waitlist=[];
+  try{
+    const res=await fetch(GAS+'?action=getWebBookingRequests&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(d.ok) pending=(d.list||[]).filter(r=>r.status==='未対応');
+  }catch(e){}
+  try{
+    const mres=await fetch(GAS+'?action=getMondoshinList&t='+Date.now(),{cache:'no-store'});
+    const md=await mres.json();
+    if(md.ok) mondoList=md.list||[];
+  }catch(e){}
+  try{
+    const mkres=await fetch(GAS+'?action=getMondoshinKotsuList&t='+Date.now(),{cache:'no-store'});
+    const mkd=await mkres.json();
+    if(mkd.ok) mondoKotsuList=mkd.list||[];
+  }catch(e){}
+  try{
+    const wres=await fetch(GAS+'?action=getWaitlist&t='+Date.now(),{cache:'no-store'});
+    const wd=await wres.json();
+    if(wd.ok) waitlist=(wd.list||[]).filter(r=>r.status==='待機中');
+  }catch(e){}
+
+  // ---- Web予約リクエスト（オレンジ系） ----
+  const badge=document.getElementById('webReqBadge');
+  if(badge){
+    if(pending.length>0){ badge.textContent=pending.length>99?'99+':pending.length; badge.style.display='flex'; }
+    else{ badge.style.display='none'; }
+  }
+  let bookingNames=[];
+  if(!webReqFirstCheck){
+    bookingNames=pending.filter(r=>!webReqKnownIds.has(r.rowIdx)).map(r=>r.name+'様');
+  }
+  webReqKnownIds=new Set(pending.map(r=>r.rowIdx));
+  webReqFirstCheck=false;
+  lastPendingBookingCount=pending.length;
+  const sec3Dot=document.getElementById('sec3-dot');
+  if(sec3Dot) sec3Dot.style.display = pending.length>0?'inline-block':'none';
+
+  // ---- Web問診票（青系。通常・交通事故）----
+  // ★ページの再読み込みに左右されない、確実な仕組みに変更。
+  //   「最後に一覧を開いて確認した時刻」をlocalStorageに保存しておき、
+  //   それより後に届いた問診票の件数を毎回計算する（Web予約の「未対応」件数と同じ考え方）
+  const lastSeenMondo=localStorage.getItem('kj_mondo_last_seen')||'2000-01-01 00:00:00';
+  const unseenM=mondoList.filter(r=>r.createdAt>lastSeenMondo);
+  const unseenMK=mondoKotsuList.filter(r=>r.createdAt>lastSeenMondo);
+  mondoUnseenCount=unseenM.length+unseenMK.length;
+
+  let mondoNames=[];
+  if(!mondoFirstCheck){
+    const newM=mondoList.filter(r=>!mondoKnownIds.has(r.rowIdx));
+    const newMK=mondoKotsuList.filter(r=>!mondoKotsuKnownIds.has(r.rowIdx));
+    mondoNames=[...newM.map(r=>r.name+'様（問診票）'), ...newMK.map(r=>r.name+'様（交通事故問診票）')];
+  }
+  mondoKnownIds=new Set(mondoList.map(r=>r.rowIdx));
+  mondoKotsuKnownIds=new Set(mondoKotsuList.map(r=>r.rowIdx));
+  mondoFirstCheck=false;
+
+  const mondoBadge=document.getElementById('mondoReqBadge');
+  if(mondoBadge){
+    if(mondoUnseenCount>0){ mondoBadge.textContent=mondoUnseenCount>99?'99+':mondoUnseenCount; mondoBadge.style.display='flex'; }
+    else{ mondoBadge.style.display='none'; }
+  }
+  const sec2Dot=document.getElementById('sec2-dot');
+  if(sec2Dot) sec2Dot.style.display = mondoUnseenCount>0?'inline-block':'none';
+
+  // ---- キャンセル待ち（紫系） ----
+  const waitlistBadge=document.getElementById('waitlistBadge');
+  if(waitlistBadge){
+    if(waitlist.length>0){ waitlistBadge.textContent=waitlist.length>99?'99+':waitlist.length; waitlistBadge.style.display='flex'; }
+    else{ waitlistBadge.style.display='none'; }
+  }
+  let waitlistNames=[];
+  if(!waitlistFirstCheck){
+    waitlistNames=waitlist.filter(r=>!waitlistKnownIds.has(r.rowIdx)).map(r=>r.name+'様（'+r.date+' '+(r.time||'')+'〜）');
+  }
+  waitlistKnownIds=new Set(waitlist.map(r=>r.rowIdx));
+  waitlistFirstCheck=false;
+  const sec3WlDot=document.getElementById('sec3-wl-dot');
+  if(sec3WlDot) sec3WlDot.style.display = waitlist.length>0?'inline-block':'none';
+
+  // ---- フローティング通知バッジ（画面右下。オレンジ＝Web予約／青＝Web問診票／紫＝キャンセル待ち） ----
+  updateFloatingNotifyBadge(pending.length, mondoUnseenCount, waitlist.length);
+
+  // ---- 新着があれば、色分けした通知バナー＋音で知らせる ----
+  if(bookingNames.length>0 && !silent){
+    beepNotify();
+    showNotifyBanner(`📩 新しいWeb予約リクエスト：${bookingNames.join('、')}`, '#c98a4b', openWebRequests);
+  }
+  if(mondoNames.length>0 && !silent){
+    beepNotify();
+    showNotifyBanner(`📋 新しいWeb問診票：${mondoNames.join('、')}`, '#0891b2', openMondoList);
+  }
+  if(waitlistNames.length>0 && !silent){
+    beepNotify();
+    showNotifyBanner(`⏳ 新しいキャンセル待ち：${waitlistNames.join('、')}`, '#7e22ce', openWaitlist);
+  }
+}
+function showNotifyBanner(text, color, onClickFn){
+  const banner=document.createElement('div');
+  banner.textContent=text;
+  banner.style.cssText=`position:fixed;top:12px;left:50%;transform:translateX(-50%);background:${color};color:white;padding:12px 20px;border-radius:10px;font-weight:bold;font-size:0.9rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer;max-width:90vw;text-align:center`;
+  banner.onclick=()=>{ onClickFn(); banner.remove(); };
+  document.body.appendChild(banner);
+  setTimeout(()=>banner.remove(),15000);
+}
+// ★フローティング通知バッジ：画面右下に常時固定表示。Web予約(オレンジ)とWeb問診票(青)を分けて表示する
+function updateFloatingNotifyBadge(bookingCount, mondoCount, waitlistCount){
+  let wrap=document.getElementById('floatingNotifyWrap');
+  if(!wrap){
+    wrap=document.createElement('div');
+    wrap.id='floatingNotifyWrap';
+    wrap.style.cssText='position:fixed;right:18px;bottom:18px;z-index:9998;display:flex;flex-direction:column;gap:8px;align-items:flex-end;';
+    document.body.appendChild(wrap);
+    const style=document.createElement('style');
+    style.textContent='@keyframes notifyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.07);}}';
+    document.head.appendChild(style);
+  }
+  function makeBadge(id,color,onClick){
+    let el=document.getElementById(id);
+    if(!el){
+      el=document.createElement('div');
+      el.id=id;
+      el.style.cssText=`background:${color};color:white;border-radius:999px;padding:12px 18px;font-weight:bold;font-size:0.92rem;box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer;display:none;align-items:center;gap:8px;animation:notifyPulse 1.4s infinite;`;
+      el.onclick=onClick;
+      wrap.appendChild(el);
+    }
+    return el;
+  }
+  const bEl=makeBadge('floatingBookingBadge','#c98a4b',openWebRequests);
+  if(bookingCount>0){ bEl.innerHTML=`📩 未対応のWeb予約 ${bookingCount}件`; bEl.style.display='flex'; }
+  else{ bEl.style.display='none'; }
+
+  const mEl=makeBadge('floatingMondoBadge','#0891b2',openMondoList);
+  if(mondoCount>0){ mEl.innerHTML=`📋 未確認の問診票 ${mondoCount}件`; mEl.style.display='flex'; }
+  else{ mEl.style.display='none'; }
+
+  const wEl=makeBadge('floatingWaitlistBadge','#7e22ce',openWaitlist);
+  if(waitlistCount>0){ wEl.innerHTML=`⏳ キャンセル待ち ${waitlistCount}件`; wEl.style.display='flex'; }
+  else{ wEl.style.display='none'; }
+}
+checkNewWebRequests();
+setInterval(checkNewWebRequests, 120000); // 2分ごとに自動チェック
+// ★画面(タブ)が裏に回っている間はブラウザがタイマーを遅らせることがあるため、
+//   タブがまた表に戻ってきた瞬間にも必ず1回チェックする。
+//   ただし、長時間（5分以上）裏に回っていた場合は、その間に溜まっていた分をまとめて
+//   「新着」として音で知らせてしまわないよう、まず音を鳴らさずに現状だけ静かに同期する。
+let lastHiddenAt=null;
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden'){
+    lastHiddenAt=Date.now();
+  }else if(document.visibilityState==='visible'){
+    const hiddenMs=lastHiddenAt?(Date.now()-lastHiddenAt):0;
+    if(hiddenMs>5*60*1000){
+      checkNewWebRequests(true); // 5分以上裏に回っていた→音を鳴らさず静かに同期するだけ
+    }else{
+      checkNewWebRequests();
+    }
+    lastHiddenAt=null;
+  }
+});
+
+// ===== Web問診票一覧 =====
+let mondoCurrentTab='normal';
+function openMondoList(){
+  document.getElementById('mondoListModal').classList.add('on');
+  switchMondoTab('normal');
+  // 一覧を開いたことで確認済みとみなし、「最後に確認した時刻」を今の時刻で保存する
+  const nowStr=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0')+'-'+String(new Date().getDate()).padStart(2,'0')+' '+String(new Date().getHours()).padStart(2,'0')+':'+String(new Date().getMinutes()).padStart(2,'0')+':'+String(new Date().getSeconds()).padStart(2,'0');
+  localStorage.setItem('kj_mondo_last_seen', nowStr);
+  mondoUnseenCount=0;
+  const mondoBadge=document.getElementById('mondoReqBadge'); if(mondoBadge)mondoBadge.style.display='none';
+  const sec2Dot=document.getElementById('sec2-dot'); if(sec2Dot)sec2Dot.style.display='none';
+  updateFloatingNotifyBadge(lastPendingBookingCount, 0);
+}
+function switchMondoTab(tab){
+  mondoCurrentTab=tab;
+  const normalBtn=document.getElementById('mondo-tab-normal'), kotsuBtn=document.getElementById('mondo-tab-kotsu');
+  normalBtn.style.background=tab==='normal'?'#b45309':'#e5d5c5';
+  normalBtn.style.color=tab==='normal'?'white':'#7c4a2d';
+  kotsuBtn.style.background=tab==='kotsu'?'#b45309':'#e5d5c5';
+  kotsuBtn.style.color=tab==='kotsu'?'white':'#7c4a2d';
+  loadMondoList();
+}
+async function loadMondoList(){
+  const el=document.getElementById('mondoListContent');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  const isKotsu=mondoCurrentTab==='kotsu';
+  const action=isKotsu?'getMondoshinKotsuList':'getMondoshinList';
+  const printPage=isKotsu?adminPageUrl('MondoKotsuPrint'):adminPageUrl('MondoPrint');
+  try{
+    const res=await fetch(GAS+'?action='+action+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">問診票の提出はまだありません</p>'; return; }
+    el.innerHTML=list.map(q=>`<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><b style="font-size:0.9rem">${q.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:6px">（${q.kana}）</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn be bsm" onclick="window.open('${printPage}&id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
+          <button class="btn be bsm" onclick="deleteMondoEntry(${q.rowIdx},${isKotsu})" style="background:#fee2e2;color:#dc2626;border-color:#fee2e2">🗑 削除</button>
+        </div>
+      </div>
+      <div style="font-size:0.72rem;color:#64748b;margin-top:4px">📞 ${q.tel}</div>
+      <div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 ${(isKotsu?q.symptomDetail:q.symptom.split('|').join('、'))||'（未記入）'}</div>
+      <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${q.createdAt}</div>
+    </div>`).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+async function deleteMondoEntry(rowIdx, isKotsu){
+  if(!confirm('この問診票を削除しますか？（元に戻せません）'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:isKotsu?'deleteMondoshinKotsu':'deleteMondoshin',rowIdx})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました：'+(d.error||'')); return; }
+    loadMondoList();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+function openWebRequests(){
+  document.getElementById('webReqModal').classList.add('on');
+  loadWebRequests();
+}
+function openWaitlist(){
+  document.getElementById('waitlistModal').classList.add('on');
+  loadWaitlist();
+}
+async function sendWaitlistPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  const date=prompt('プレビュー用の希望日を入力（例：2026-09-05）', '2026-09-05');
+  const time=prompt('プレビュー用の希望時間を入力（例：15:00）', '15:00');
+  const menu=prompt('プレビュー用のメニューを入力', '整体（再診）');
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendWaitlistPreviewTo',name,date,time,menu})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function loadWaitlist(){
+  const box=document.getElementById('waitlistContent');
+  box.innerHTML='<p style="color:#94a3b8;font-size:0.78rem;text-align:center;padding:10px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getWaitlist&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ box.innerHTML='<p style="color:#94a3b8;font-size:0.78rem;text-align:center;padding:10px">キャンセル待ちの登録はありません</p>'; return; }
+    box.innerHTML=list.map(w=>`<div class="saved-row"><span style="flex:1">${w.date} ${w.time||''} <b>${w.name}</b>様（${w.tel}）${w.menu?'<br><small style="color:#64748b">'+w.menu+'</small>':''}<br><small style="color:${w.status==='待機中'?'#7e22ce':'#16a34a'}">${w.status}</small></span>${w.status==='待機中'?`<button class="mb" style="background:#ede9fe;color:#7e22ce;margin-right:4px" onclick="notifyWaitlistNow('${w.date}')">今すぐ通知</button>`:''}<button class="mb" style="background:#fee2e2;color:#dc2626" onclick="delWaitlistEntry(${w.rowIdx})">削除</button></div>`).join('');
+  }catch(e){ box.innerHTML='<p style="color:#dc2626;font-size:0.78rem">通信エラー：'+e.message+'</p>'; }
+}
+async function notifyWaitlistNow(date){
+  if(!confirm(date+'のキャンセル待ちに、今すぐ「空きが出ました」の通知を送ります。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'notifyWaitlistForDate',date})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${d.notified||0}件に通知しました${d.skipped&&d.skipped.length?'\n送れなかった方：'+d.skipped.join('、'):''}`:'❌ 失敗しました');
+    loadWaitlist();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function delWaitlistEntry(rowIdx){
+  if(!confirm('このキャンセル待ちを削除しますか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteWaitlistEntry',rowIdx})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました'); return; }
+    loadWaitlist();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function loadWebRequests(){
+  const el=document.getElementById('webReqContent');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getWebBookingRequests&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">リクエストはまだありません</p>'; return; }
+    // 未対応を先に表示
+    list.sort((a,b)=>(a.status==='未対応'?0:1)-(b.status==='未対応'?0:1));
+    el.innerHTML=list.map(r=>{
+      const badge=r.status==='未対応'
+        ?'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜未対応</span>'
+        :'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅対応済み</span>';
+      const cands=[[r.date1,r.time1,'第一'],[r.date2,r.time2,'第二'],[r.date3,r.time3,'第三']]
+        .filter(c=>c[0]&&c[1])
+        .map(c=>`<div style="font-size:0.8rem">${c[2]}希望：${c[0]} ${c[1]}〜</div>`).join('');
+      const contactBadge=r.hasLine
+        ?`<span onclick="openLineContact('${r.name.replace(/'/g,"")}')" style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;text-decoration:underline">💬 LINEで連絡可能（タップして開く）</span>`
+        :(r.email
+          ?`<span onclick="window.open('https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${encodeURIComponent(r.email)}&su=${encodeURIComponent('【倉治整骨院】ご予約について')}&authuser=kurazi0510@gmail.com','_blank')" style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;text-decoration:underline">✉️ メールで連絡（タップして開く）</span>`
+          :'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">📞 お電話で連絡</span>');
+      return `<div style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div><b style="font-size:0.9rem">${r.name}</b>${r.kana?'<span style="color:#94a3b8;font-size:0.7rem;margin-left:4px">（'+r.kana+'）</span>':''}<span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${r.menu||''}</span>${r.cardId?'<span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">診察券No:'+r.cardId+'</span>':''}</div>
+          ${badge}
+        </div>
+        ${cands}
+        <div style="font-size:0.72rem;color:#64748b;margin-top:4px">📞 ${r.tel}${r.email?' / ✉️ '+r.email:''}</div>
+        <div style="margin-top:4px">${contactBadge}</div>
+        ${r.symptom?'<div style="font-size:0.72rem;color:#64748b;margin-top:2px">💬 '+r.symptom+'</div>':''}
+        <div style="font-size:0.68rem;color:#94a3b8;margin-top:4px">受信：${r.createdAt}</div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          ${r.status==='未対応'?`<button class="btn be bsm" onclick="markWebRequestDone(${r.rowIdx})" style="background:#16a34a;color:white;border-color:#16a34a">✅ 対応済みにする</button>`:''}
+          <button class="btn be bsm" onclick="deleteWebRequestEntry(${r.rowIdx})" style="background:#fee2e2;color:#dc2626;border-color:#fee2e2">🗑 削除</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+async function deleteWebRequestEntry(rowIdx){
+  if(!confirm('このWeb予約リクエストを削除しますか？（元に戻せません）'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteWebBookingRequest',rowIdx})});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 削除に失敗しました：'+(d.error||'')); return; }
+    loadWebRequests();
+    checkNewWebRequests();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function openLineContact(name){
+  try{
+    await navigator.clipboard.writeText(name);
+    alert(`📋「${name}」をコピーしました。\n\n次の画面で検索窓に貼り付けて（Cmd+V）探してください。`);
+  }catch(e){
+    alert(`次の画面の検索窓に「${name}」と入力して探してください。`);
+  }
+  window.open('https://chat.line.biz/', '_blank');
+}
+async function markWebRequestDone(rowIdx){
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'updateWebBookingRequestStatus',rowIdx,status:'対応済み'})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 更新に失敗しました'); return; }
+    loadWebRequests();
+    checkNewWebRequests();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+// ===== Google口コミ依頼を個別に送信 =====
+async function sendReviewRequestPrompt(){
+  const name=prompt('Googleの口コミ依頼を送りたい患者様を入力してください\n\n【お名前】【診察券番号】【電話番号】のどれか1つでOKです');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendReviewRequestToOne',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${d.name||name}様に口コミ依頼を送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+// ===== 前日リマインド送信履歴 =====
+async function sendReminderToOnePrompt(){
+  const name=prompt('前日リマインドを送りたい患者様を入力してください\n\n【お名前】【診察券番号】【電話番号】のどれか1つでOKです\n（同じ苗字の方がいる場合は、診察券番号がおすすめです）');
+  if(!name)return;
+  const dateStr=prompt('ご予約日を入力してください（例：2026-08-26）', toLocalDateStr(new Date(Date.now()+86400000)));
+  if(!dateStr)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendReminderToOne',name,dateStr})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${d.name||name}様に${dateStr}の前日リマインドを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function openReminderLog(){
+  document.getElementById('reminderLogModal').classList.add('on');
+  const el=document.getElementById('reminderLogContent');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getReminderLog&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">履歴はまだありません</p>'; return; }
+    el.innerHTML=list.map(h=>{
+      const badge=h.result==='送信済み'?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅送信済み</span>':'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜LINE未連携</span>';
+      return `<div style="padding:8px 4px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><b style="font-size:0.85rem">${h.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">${h.targetDate}のご予約分</span></div>
+          ${badge}
+        </div>
+        <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px">送信日時：${h.date} ${h.time}　時間：${h.note||''}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+
+// ===== 17日/20日アラート履歴 =====
+async function emergencyStopDailyAlert(){
+  if(!confirm('17日/20日アラートの自動送信を今すぐ強制的に停止します。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'deleteTriggerByName',funcName:'dailyLineAlert'})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 失敗しました：'+(d.error||'')); return; }
+    if(d.deleted>0){
+      alert(`✅ 停止しました（${d.deleted}件のトリガーを削除）\n\n明日の朝からアラートは届きません。`);
+    }else{
+      alert('⚠️ このシステムには該当のトリガーが見つかりませんでした。\n\n別のGASプロジェクトから送信されている可能性があります。院長のLINEに届いているメッセージの送信元を確認する必要があるかもしれません。');
+    }
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function openAlertLog(){
+  document.getElementById('alertLogModal').classList.add('on');
+  const el=document.getElementById('alertLogContent');
+  el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getDailyAlertLog&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const list=d.list||[];
+    if(!list.length){ el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">履歴はまだありません</p>'; return; }
+    el.innerHTML=list.map(h=>{
+      const badge=h.type==='21日経過'?'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">🚨21日経過</span>':'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⚠️18日経過</span>';
+      return `<div style="padding:8px 4px;border-bottom:1px solid #f1f5f9">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><b style="font-size:0.85rem">${h.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:8px">#${h.id}</span></div>
+          ${badge}
+        </div>
+        <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px">判定日時：${h.date} ${h.time}　${h.note||''}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>'; }
+}
+
+// ===== 前日リマインド テストモード設定 =====
+async function openTestModeSettings(){
+  try{
+    const res=await fetch(GAS+'?action=getTestMode&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    const cur=d.testModeName||'';
+    const msg=cur
+      ? `現在のテストモード：「${cur}」のみに送信中です。\n\n・新しい名前に変えたい → 名前を入力してOK\n・テストモードを終了して全員に送信を再開する → 「解除」と入力\n・今の設定のままにする → キャンセル`
+      : `現在テストモードは無効（全員に送信されます）。\n\nテストしたい患者名を入力してください（例：郡）\n入力すると、前日リマインドはその名前を含む患者様にしか送られなくなります。`;
+    const input=prompt(msg, cur);
+    if(input===null)return; // キャンセル
+    const newName=(input.trim()==='解除')?'':input.trim();
+    const res2=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'setTestMode',name:newName})
+    });
+    const d2=await res2.json();
+    if(!d2.ok){ alert('❌ 設定に失敗しました'); return; }
+    if(d2.testModeName){
+      alert(`✅ テストモードON\n「${d2.testModeName}」を含む患者様にしか前日リマインドが送られなくなりました。\n\n下の「🧪 前日リマインドを今すぐテスト送信」ボタンで、19時を待たずにすぐ試せます。`);
+    }else{
+      alert('✅ テストモードOFF\n通常運用（全員に送信）に戻りました。');
+    }
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function checkTriggers(){
+  try{
+    const res=await fetch(GAS+'?action=getTriggerInfo&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 確認に失敗しました'); return; }
+    const names={dailyLineAlert:'17日/20日アラート(毎日8時)',sendDayBeforeReminders:'前日リマインド(毎日19時)',sendBirthdayMessages:'誕生日メッセージ(毎日9時)'};
+    const counts={};
+    d.list.forEach(t=>{counts[t.handler]=(counts[t.handler]||0)+1;});
+    let msg=`現在のトリガー数：${d.count}件\n\n`;
+    Object.keys(names).forEach(fn=>{
+      const c=counts[fn]||0;
+      msg += `${c===1?'✅':c===0?'❌未設定':'⚠️'+c+'件（重複）'}　${names[fn]}\n`;
+    });
+    msg += `\n※実際の時刻（19時など）はここでは確認できません。Apps Scriptの左メニューの時計アイコン「トリガー」から目視で確認してください。\n\n重複や未設定がある場合は「setupAllTriggers」をもう一度実行してください。`;
+    alert(msg);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendDormantPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendDormantOutreachTestTo',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendPointsPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendPointsMilestoneTestTo',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendBirthdayPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'sendBirthdayMessageTestTo',name})
+    });
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function setupReviewUrl(){
+  let current='';
+  try{
+    const r=await fetch(GAS+'?action=getGoogleReviewUrl&t='+Date.now(),{cache:'no-store'});
+    const d=await r.json();
+    current=d.url||'';
+  }catch(e){}
+  const url=prompt('GoogleクチコミのURLを入力してください', current||'https://g.page/r/CZBfNKGrXbFyEBM/review');
+  if(!url)return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'setGoogleReviewUrl',url})
+    });
+    const d=await res.json();
+    alert(d.ok?'✅ 設定しました':'❌ 設定に失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function runDormantOutreachNow(){
+  if(!confirm('休眠患者への再来促進配信を今すぐ実行します。対象者に実際にLINEが送られます。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'runDormantOutreachNow'})});
+    const d=await res.json();
+    alert(d.ok?'✅ 実行しました。結果は院長のLINEに届きます':'❌ 失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function runPointsMilestoneNow(){
+  if(!confirm('通院回数ポイント特典を今すぐ実行します。対象者に実際にLINEが送られます。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'runPointsMilestoneNow'})});
+    const d=await res.json();
+    alert(d.ok?'✅ 実行しました。結果は院長のLINEに届きます':'❌ 失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendWebLineGreetingPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'sendWebLineGreetingPreviewTo',name})});
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function sendReviewPreview(){
+  const name=prompt('誰にプレビューを送りますか？(患者名を入力)', '郡');
+  if(!name)return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'sendReviewRequestTestTo',name})
+    });
+    const d=await res.json();
+    alert(d.ok?`✅ ${name}さんのLINEにプレビューを送信しました`:'❌ 送信失敗：'+(d.error||''));
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function runReminderTestNow(){
+  if(!confirm('前日リマインドを今すぐ実行します。テストモード中でなければ全員に届いてしまいます。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'runDayBeforeRemindersNow'})
+    });
+    const d=await res.json();
+    alert(d.ok?'✅ 実行しました。院長のLINEに結果が届きます。':'❌ 実行に失敗しました');
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+async function runBirthdayTestNow(){
+  if(!confirm('本日誕生日の患者様全員にお祝いLINEを今すぐ送信します。よろしいですか？'))return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'runBirthdayMessagesNow'})
+    });
+    const d=await res.json();
+    alert(d.ok?'✅ 実行しました。院長のLINEに結果が届きます(本日誕生日の方がいない場合は何も届きません)。':'❌ 実行に失敗しました');
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+// ===== LINE電話番号 登録状況一覧 =====
+async function showDuplicateLineUsers(){
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'findDuplicateLineUsers'})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 確認に失敗しました\n\n詳細：'+(d.error||'')); return; }
+    if(!d.duplicates||!d.duplicates.length){ alert('✅ 重複している人は見つかりませんでした'); return; }
+    const msg=d.duplicates.map(dup=>{
+      const lines=dup.entries.map(e=>`　行${e.row}：${e.name||'(名前なし)'} / 電話:${e.phone||'未登録'} / 診察券:${e.cardId||'-'}`).join('\n');
+      return `【${dup.userId.slice(0,8)}...】\n${lines}`;
+    }).join('\n\n');
+    alert(`⚠️ ${d.duplicates.length}人分、重複が見つかりました\n\n${msg}\n\n※ここでは自動で消しません。データが消える事故を防ぐため、内容を確認しながら「LINE電話番号 登録状況一覧」の中で、不要な行を手動で削除してください（各行を編集して電話番号・名前を空にし保存すれば実質無効化できます）。`);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+let lineUsersCache=[];
+function openLineUsersModal(){
+  document.getElementById('lineUsersModal').classList.add('on');
+  loadLineUsers();
+}
+async function loadLineUsers(){
+  document.getElementById('lu-list').innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
+  try{
+    const res=await fetch(GAS+'?action=getLineUsers&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ document.getElementById('lu-list').innerHTML='<p style="color:#dc2626">取得に失敗しました</p>'; return; }
+    lineUsersCache=d.users||[];
+    renderLineUsers();
+  }catch(e){
+    document.getElementById('lu-list').innerHTML='<p style="color:#dc2626">通信エラー：'+e.message+'</p>';
+  }
+}
+function renderLineUsers(){
+  const kw=(document.getElementById('lu-search')?.value||'').trim();
+  let list=lineUsersCache;
+  if(kw) list=list.filter(u=>u.name.includes(kw)||(u.cardId||'').includes(kw));
+  const okCount=lineUsersCache.filter(u=>u.registered).length;
+  const ngCount=lineUsersCache.length-okCount;
+  document.getElementById('lu-count-ok').textContent=okCount;
+  document.getElementById('lu-count-ng').textContent=ngCount;
+  // 登録済みの人を先に表示
+  list=[...list].sort((a,b)=>(a.registered===b.registered)?0:(a.registered?-1:1));
+  if(!list.length){ document.getElementById('lu-list').innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">該当する友だちがいません</p>'; return; }
+  document.getElementById('lu-list').innerHTML=list.map(u=>{
+    const badge=u.registered?'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">✅登録済み</span>':'<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-weight:bold">⬜未登録</span>';
+    const uidSafe=u.userId.replace(/'/g,"");
+    return `<div style="display:flex;align-items:center;gap:6px;padding:8px 4px;border-bottom:1px solid #f1f5f9;flex-wrap:wrap">
+      <div style="flex:1;min-width:140px">
+        <input type="text" value="${(u.name||'').replace(/"/g,'&quot;')}" placeholder="お名前を修正" class="lu-name" data-uid="${uidSafe}" style="width:100%;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.82rem;font-weight:bold;margin-bottom:3px" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
+        <div style="font-size:0.68rem;color:#94a3b8">最終メッセージ：${(u.lastMsg||'').slice(0,20)}</div>
+      </div>
+      <input type="text" value="${u.cardId||''}" placeholder="診察券No" class="lu-card" data-uid="${uidSafe}" style="width:90px;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.8rem" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
+      <input type="text" value="${u.phone||''}" placeholder="電話番号を手入力" class="lu-phone" data-uid="${uidSafe}" style="width:140px;border:1.5px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.8rem" onkeydown="if(event.key==='Enter')saveLineUserRow('${uidSafe}')">
+      <button onclick="saveLineUserRow('${uidSafe}')" style="padding:6px 10px;border:none;border-radius:6px;background:#1e293b;color:white;font-size:0.72rem;cursor:pointer">保存</button>
+      ${badge}
+    </div>`;
+  }).join('');
+}
+async function saveLineUserRow(userId){
+  const nameEl=document.querySelector(`.lu-name[data-uid="${userId}"]`);
+  const phoneEl=document.querySelector(`.lu-phone[data-uid="${userId}"]`);
+  const cardEl=document.querySelector(`.lu-card[data-uid="${userId}"]`);
+  const name=nameEl?nameEl.value:'';
+  const phone=phoneEl?phoneEl.value:'';
+  const cardId=cardEl?cardEl.value:'';
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveLineUserPhoneManual',userId,phone,name,cardId})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ 保存に失敗：'+(d.error||'')); return; }
+    await loadLineUsers();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+// ===== 名前で予約を一括削除（テストデータ整理用） =====
+async function deleteBookingsByNamePrompt(){
+  const name=prompt('削除したい患者名を入力してください（前方一致で全部消えます。例：「郡」と入れると「郡」「郡 雄一朗」などが全部消えます）');
+  if(!name)return;
+  if(!confirm(`「${name}」で始まる予約を全部削除します。元に戻せません。よろしいですか？`))return;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'deleteBookingsByName',namePrefix:name})
+    });
+    const d=await res.json();
+    if(!d.ok){ alert('❌ GAS側の削除に失敗：'+(d.error||'')); return; }
+    // ローカルデータからも同じ条件で削除
+    let localDeleted=0;
+    Object.keys(bookings).forEach(date=>{
+      Object.keys(bookings[date]).forEach(slot=>{
+        const bk=bookings[date][slot];
+        const bkName=String(bk?.name||'').trim();
+        if(bkName && (bkName===name.trim() || bkName.indexOf(name.trim())===0)){
+          delete bookings[date][slot];
+          localDeleted++;
+        }
+      });
+    });
+    save();
+    renderSched();
+    alert(`✅ 削除しました\nスプレッドシート側：${d.deleted}件\n画面表示側：${localDeleted}件`);
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+
+// ===== Web予約フォーム用：自費メニューをGASに同期 =====
+async function syncMenuMasterToGAS(){
+  try{
+    const sm=JSON.parse(localStorage.getItem('kj_sm')||'[]');
+    const rows=sm.map(m=>[m.name, m.price, m.unit||'']);
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveMenuMaster',rows})
+    });
+    const d=await res.json();
+    alert(d.ok?'✅ Web予約フォームにメニューを反映しました':'❌ 失敗：'+(d.error||''));
+  }catch(e){alert('❌ 通信エラー：'+e.message);}
+}
+
+// ===== 日本の祝日データ（外部の公式祝日カレンダーAPIから取得。1日1回のみ取得しキャッシュ） =====
+let jpHolidays={};
+async function loadJpHolidays(){
+  try{
+    const cache=JSON.parse(localStorage.getItem('kj_holidays_cache')||'null');
+    const oneDayMs=24*60*60*1000;
+    if(cache && cache.fetchedAt && (Date.now()-cache.fetchedAt)<oneDayMs){
+      jpHolidays=cache.data||{};
+      return;
+    }
+    const res=await fetch('https://holidays-jp.github.io/api/v1/date.json',{cache:'no-store'});
+    const data=await res.json();
+    jpHolidays=data||{};
+    localStorage.setItem('kj_holidays_cache',JSON.stringify({fetchedAt:Date.now(),data:jpHolidays}));
+  }catch(e){
+    // 取得失敗時はキャッシュがあればそれを使う
+    const cache=JSON.parse(localStorage.getItem('kj_holidays_cache')||'null');
+    if(cache) jpHolidays=cache.data||{};
+  }
+}
+
+// ===== 営業時間設定 =====
+const BIZ_DOW_LABELS=['日','月','火','水','木','金','土'];
+let bizHours=JSON.parse(localStorage.getItem('kj_biz_hours')||'null')||{
+  weekly:{
+    0:{closed:true,am:['',''],pm:['','']},
+    1:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    2:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    3:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    4:{closed:false,am:['08:30','12:30'],pm:['','']},
+    5:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']},
+    6:{closed:false,am:['08:30','12:30'],pm:['','']}
+  },
+  overrides:{}
+};
+async function openIntervalModal(){
+  document.getElementById('intervalModal').classList.add('on');
+  try{
+    const res=await fetch(GAS+'?action=getIntervalSetting&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    document.getElementById('interval-minutes').value=String(d.minutes||0);
+  }catch(e){}
+}
+async function saveIntervalSettingUI(){
+  const minutes=document.getElementById('interval-minutes').value;
+  try{
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveIntervalSetting',minutes})});
+    const d=await res.json();
+    alert(d.ok?'✅ 設定を保存しました（※まだ試験運用のため、実際の空き状況には反映されません）':'❌ 保存に失敗しました');
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+function openBizHoursModal(){
+  renderBizWeekly();
+  renderBizOverrides();
+  document.getElementById('bizmodal').classList.add('on');
+}
+function closeBizHoursModal(){document.getElementById('bizmodal').classList.remove('on');}
+function renderBizWeekly(){
+  const area=document.getElementById('biz-weekly-area');
+  area.innerHTML=[1,2,3,4,5,6,0].map(dow=>{
+    const c=bizHours.weekly[dow]||{closed:true,am:['',''],pm:['','']};
+    return `<div style="display:grid;grid-template-columns:36px 1fr 1fr auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
+      <div style="font-weight:bold;font-size:0.82rem">${BIZ_DOW_LABELS[dow]}</div>
+      <div style="display:flex;gap:3px"><input type="time" class="inp" id="biz-w-${dow}-am-s" value="${c.am?c.am[0]:''}" style="font-size:0.72rem;padding:5px"><input type="time" class="inp" id="biz-w-${dow}-am-e" value="${c.am?c.am[1]:''}" style="font-size:0.72rem;padding:5px"></div>
+      <div style="display:flex;gap:3px"><input type="time" class="inp" id="biz-w-${dow}-pm-s" value="${c.pm?c.pm[0]:''}" style="font-size:0.72rem;padding:5px"><input type="time" class="inp" id="biz-w-${dow}-pm-e" value="${c.pm?c.pm[1]:''}" style="font-size:0.72rem;padding:5px"></div>
+      <label style="font-size:0.68rem;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" id="biz-w-${dow}-closed" ${c.closed?'checked':''} style="width:auto">休診</label>
+    </div>`;
+  }).join('')+'<div style="font-size:0.65rem;color:#a08a6d;margin-top:6px">午前・午後どちらかを空欄にすると、その時間帯は休診になります</div>';
+}
+function toggleBizOvFields(){
+  document.getElementById('biz-ov-fields').style.display=document.getElementById('biz-ov-closed').checked?'none':'grid';
+}
+function renderBizOverrides(){
+  const list=document.getElementById('biz-ov-list');
+  const dates=Object.keys(bizHours.overrides).sort();
+  if(!dates.length){list.innerHTML='<p style="font-size:0.72rem;color:#a08a6d">上書き設定はありません</p>';return;}
+  list.innerHTML=dates.map(d=>{
+    const o=bizHours.overrides[d];
+    const desc=o.closed?'休診':`午前${o.am&&o.am[0]?o.am[0]+'〜'+o.am[1]:'なし'}／午後${o.pm&&o.pm[0]?o.pm[0]+'〜'+o.pm[1]:'なし'}`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fef9f0;border-radius:7px;margin-bottom:4px;font-size:0.76rem">
+      <div style="flex:1"><b>${d}</b>　${desc}${o.note?'　'+o.note:''}</div>
+      <button onclick="removeBizOverride('${d}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:4px 8px;font-size:0.68rem;font-weight:bold;cursor:pointer">削除</button>
+    </div>`;
+  }).join('');
+}
+function addBizOverride(){
+  const date=document.getElementById('biz-ov-date').value;
+  if(!date){alert('日付を選択してください');return;}
+  const closed=document.getElementById('biz-ov-closed').checked;
+  bizHours.overrides[date]=closed
+    ? {closed:true,am:null,pm:null,note:document.getElementById('biz-ov-note').value.trim()}
+    : {closed:false,
+       am:[document.getElementById('biz-ov-am-s').value,document.getElementById('biz-ov-am-e').value],
+       pm:[document.getElementById('biz-ov-pm-s').value,document.getElementById('biz-ov-pm-e').value],
+       note:document.getElementById('biz-ov-note').value.trim()};
+  renderBizOverrides();
+  document.getElementById('biz-ov-note').value='';
+}
+function removeBizOverride(date){
+  delete bizHours.overrides[date];
+  renderBizOverrides();
+}
+async function saveBizHours(){
+  // 曜日設定を画面から読み取る
+  [0,1,2,3,4,5,6].forEach(dow=>{
+    const closed=document.getElementById('biz-w-'+dow+'-closed').checked;
+    const amS=document.getElementById('biz-w-'+dow+'-am-s').value, amE=document.getElementById('biz-w-'+dow+'-am-e').value;
+    const pmS=document.getElementById('biz-w-'+dow+'-pm-s').value, pmE=document.getElementById('biz-w-'+dow+'-pm-e').value;
+    bizHours.weekly[dow]={closed, am:(amS&&amE)?[amS,amE]:null, pm:(pmS&&pmE)?[pmS,pmE]:null};
+  });
+  localStorage.setItem('kj_biz_hours',JSON.stringify(bizHours));
+  // GASに同期（Web予約フォームに反映）
+  try{
+    const weeklyRows=[0,1,2,3,4,5,6].map(dow=>{
+      const c=bizHours.weekly[dow];
+      return [dow, c.closed, c.am?c.am[0]:'', c.am?c.am[1]:'', c.pm?c.pm[0]:'', c.pm?c.pm[1]:''];
+    });
+    const overrideRows=Object.keys(bizHours.overrides).map(d=>{
+      const o=bizHours.overrides[d];
+      return [d, o.closed, o.am?o.am[0]:'', o.am?o.am[1]:'', o.pm?o.pm[0]:'', o.pm?o.pm[1]:'', o.note||''];
+    });
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBizHoursWeekly',rows:weeklyRows})});
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBizHoursOverride',rows:overrideRows})});
+    alert('✅ 営業時間を保存し、Web予約フォームにも反映しました');
+    closeBizHoursModal();
+    renderSched();
+  }catch(e){
+    alert('⚠️ ローカルには保存しましたが、Web予約フォームへの反映に失敗しました：'+e.message);
+  }
+}
+// 指定日の設定を取得（上書き優先→曜日設定→従来デフォルト）
+function getBizDayConfig(dateStr){
+  if(bizHours.overrides[dateStr]) return bizHours.overrides[dateStr];
+  const dow=new Date(dateStr+'T00:00:00').getDay();
+  if(bizHours.weekly[dow]) return bizHours.weekly[dow];
+  return dow===0?{closed:true,am:null,pm:null}:(dow===4||dow===6)?{closed:false,am:['08:30','12:30'],pm:null}:{closed:false,am:['08:30','12:30'],pm:['15:00','20:00']};
+}
+function genSlotsFromRange(startStr,endStr){
+  if(!startStr||!endStr) return [];
+  if(!/^\d{1,2}:\d{2}$/.test(startStr)||!/^\d{1,2}:\d{2}$/.test(endStr)) return []; // 形式が壊れている場合は空扱いにしてNaN表示を防ぐ
+  let [h,m]=startStr.split(':').map(Number);
+  const [eh,em]=endStr.split(':').map(Number);
+  if(isNaN(h)||isNaN(m)||isNaN(eh)||isNaN(em)) return [];
+  const out=[]; let guard=0;
+  while(!(h===eh&&m===em)&&guard<100){
+    out.push(pad(h)+':'+pad(m));
+    m+=20; if(m>=60){m-=60;h++;}
+    guard++;
+  }
+  return out;
+}
+// 時刻文字列を安全な"HH:MM"形式に変換（スプレッドシート側で日付型に化けた値も復元する）
+function toHHMM(v){
+  if(v===null||v===undefined||v==='') return '';
+  const m=String(v).match(/(\d{1,2}):(\d{2})/);
+  if(m) return (m[1].length<2?'0'+m[1]:m[1])+':'+m[2];
+  return '';
+}
+async function syncBizHoursFromGAS(){
+  try{
+    const res=await fetch(GAS+'?action=getBizHours&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok) return;
+    if(d.weekly && d.weekly.length){
+      const w={};
+      d.weekly.forEach(r=>{
+        const dow=Number(r[0]);
+        const closed=r[1]===true||r[1]==='TRUE';
+        const amS=toHHMM(r[2]),amE=toHHMM(r[3]),pmS=toHHMM(r[4]),pmE=toHHMM(r[5]);
+        w[dow]={closed, am:(amS&&amE)?[amS,amE]:null, pm:(pmS&&pmE)?[pmS,pmE]:null};
+      });
+      bizHours.weekly={...bizHours.weekly,...w};
+    }
+    if(d.overrides && d.overrides.length){
+      const o={};
+      d.overrides.forEach(r=>{
+        const closed=r[1]===true||r[1]==='TRUE';
+        const amS=toHHMM(r[2]),amE=toHHMM(r[3]),pmS=toHHMM(r[4]),pmE=toHHMM(r[5]);
+        o[String(r[0])]={closed, am:(amS&&amE)?[amS,amE]:null, pm:(pmS&&pmE)?[pmS,pmE]:null, note:r[6]||''};
+      });
+      bizHours.overrides=o;
+    }
+    localStorage.setItem('kj_biz_hours',JSON.stringify(bizHours));
+    renderSched();
+  }catch(e){ /* 取得失敗時はローカル設定のまま */ }
+}
+
+// ===== LINE Notify =====
+// ★セキュリティ対策：LINEチャンネルアクセストークンはブラウザ側では一切保持・送信しない。
+//   実際の送信に使うトークンは、GAS側のスクリプトプロパティ(LINE_TOKEN)からのみ読み込む（lineNotifyV2アクション側）。
+//   ここではLINEの送信先(userId)だけを扱う。
+async function sendLineNotify(msg){
+  const userId=localStorage.getItem('kj_line_userid')||'';
+  if(!userId)return false;
+  try{
+    const res=await fetch(GAS,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'lineNotifyV2',userId,message:msg}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res.text());
+    return d.ok;
+  }catch(e){console.error('LINE error:',e);return false;}
+}
+async function testLineNotify2(){
+  const userId=localStorage.getItem('kj_line_userid')||'';
+  const st=document.getElementById('line-token-status');
+  if(!userId){if(st)st.innerHTML='❌ 送信先(LINEユーザーID)が未設定です。セットアップしてください';return;}
+  if(st)st.innerHTML='📤 送信中...';
+  const ok=await sendLineNotify('\n【倉治整骨院 管理システム】\nLINE通知テスト✅\n'+new Date().toLocaleString('ja-JP'));
+  if(st)st.innerHTML=ok?'✅ 送信成功！LINEを確認してください':'❌ 送信失敗';
+}
+// 起動時に設定状況をフォームに反映
+function loadLineTokenUI(){
+  const userId=localStorage.getItem('kj_line_userid')||'';
+  const st=document.getElementById('line-token-status');
+  if(st){
+    if(userId)st.innerHTML='✅ LINE通知設定済み（ユーザーID: '+userId.slice(0,8)+'...）';
+    else st.innerHTML='❌ 未設定';
+  }
+}
+// ══════════════════════════════════════════════════════
+// 17日アラート（予約表ベース・予約済み患者は除外）
+// ══════════════════════════════════════════════════════
+// ★予約表から各患者の最終来院日を集計（患者マスタのlastは使わない）
+function calcLastVisitFromBookings(){
+  const lastMap={}; // {cardId: 'YYYY-MM-DD'}
+  Object.keys(bookings).sort().forEach(date=>{
+    Object.keys(bookings[date]).forEach(slot=>{
+      const b=bookings[date][slot];
+      if(!b||b.cancelled)return; // キャンセルは除外
+      const id=String(b.cardId||'').trim();
+      if(!id)return;
+      if(!lastMap[id]||date>lastMap[id]) lastMap[id]=date;
+    });
+  });
+  return lastMap;
+}
+
+// ★今日以降（本日含む）に予約が入っている患者のIDセットを返す
+function calcFutureBookedIds(todayStr){
+  const ids=new Set();
+  Object.keys(bookings).forEach(date=>{
+    if(date<todayStr)return; // 過去は無視
+    Object.keys(bookings[date]).forEach(slot=>{
+      const b=bookings[date][slot];
+      if(!b||b.cancelled)return;
+      const id=String(b.cardId||'').trim();
+      if(id) ids.add(id);
+    });
+  });
+  return ids;
+}
+
+async function checkElapsedAlert(todayStr){
+  const lineUserId=localStorage.getItem('kj_line_userid')||'';if(!lineUserId)return;
+
+  // 予約表から最終来院日を集計
+  const lastMap=calcLastVisitFromBookings();
+  // 今日以降に予約済みの患者ID
+  const futureIds=calcFutureBookedIds(todayStr);
+
+  const alerts=[];
+  patients.forEach(p=>{
+    const id=String(p.id||'').trim();
+    // 「送らない」設定の患者は除外
+    if(p.notifyReminder===false)return;
+    // 今日以降に予約あり → 送らない
+    if(futureIds.has(id))return;
+    // 予約表から最終来院日を取得（なければ患者マスタのlastを使う）
+    const lastDate=lastMap[id]||p.last||'';
+    if(!lastDate||isGarbageData(lastDate))return;
+    const days=elapsed(lastDate);
+    // 17日目ちょうどのみ通知（1度だけ）
+    if(days!==17)return;
+    alerts.push({name:p.name,id,last:lastDate,days});
+  });
+
+  if(!alerts.length)return;
+
+  const msg='\n【倉治整骨院 管理システム】\n📅 17日目アラート（'+todayStr+'）\n'+
+    alerts.map(a=>'・'+a.name+'（'+a.id+'号）最終来院:'+a.last+'\n　→ 次回来院が21日を超えると初診料が発生します').join('\n')+
+    '\n\n※次回予約済みの患者は除外済みです';
+  await sendLineNotify(msg);
+}
+// 患者個別LINEテスト送信
+async function testPatientLine(){
+  const uid=document.getElementById('pe-line-uid')?.value.trim();
+  const name=document.getElementById('pe-nm')?.value.trim()||'患者様';
+  if(!uid){alert('LINEユーザーIDを入力してください');return;}
+  // GASに保存されているトークンを使用（localStorageになくてもOK）
+  // ★GAS側でスクリプトプロパティのトークンのみを使用するため、クライアント側でトークンを保持・送信しない
+  const msg='【倉治整骨院】\n'+name+'様\nLINE連携のテスト送信です✅\n正常に届いていれば設定完了です。';
+  try{
+    const res=await fetch('https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec',{
+      method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'lineNotifyV2',userId:uid,message:msg}),
+      redirect:'follow'
+    });
+    const d=JSON.parse(await res.text());
+    alert(d.ok?'✅ 送信成功！'+name+'様のLINEを確認してください':'❌ 送信失敗：'+JSON.stringify(d));
+  }catch(e){alert('❌ エラー：'+e.message);}
+}
+function toggleBtnSection(id){
+  const t=document.getElementById(id+'-t'), r=document.getElementById(id+'-r');
+  if(!t||!r)return;
+  t.classList.toggle('closed');
+  r.classList.toggle('closed');
+}
+function toggleDayMemo(){
+  const area=document.getElementById('day-memo-area');
+  area.style.display=area.style.display==='none'?'block':'none';
+  if(area.style.display==='block'){
+    const date=document.getElementById('yoyaku-date').value;
+    const memo=JSON.parse(localStorage.getItem('kj_day_memos')||'{}');
+    document.getElementById('day-memo-text').value=memo[date]||'';
+  }
+}
+function saveDayMemo(){
+  const date=document.getElementById('yoyaku-date').value;
+  const text=document.getElementById('day-memo-text').value;
+  const memos=JSON.parse(localStorage.getItem('kj_day_memos')||'{}');
+  if(text)memos[date]=text;else delete memos[date];
+  localStorage.setItem('kj_day_memos',JSON.stringify(memos));
+}
+function loadDayMemo(date){
+  const memos=JSON.parse(localStorage.getItem('kj_day_memos')||'{}');
+  const text=memos[date]||'';
+  const btn=document.querySelector('[onclick="toggleDayMemo()"]');
+  if(btn)btn.style.background=text?'#fbbf24':'#fef3c7';
+  const el=document.getElementById('day-memo-text');
+  if(el)el.value=text;
+}
+function dayType(d){
+  const cfg=getBizDayConfig(d);
+  if(cfg.closed) return 'nichi';
+  if(cfg.am&&cfg.am[0]&&cfg.pm&&cfg.pm[0]) return 'hei';
+  if(cfg.am&&cfg.am[0]) return 'moku';
+  if(cfg.pm&&cfg.pm[0]) return 'gogo';
+  return 'nichi';
+}
+function getSlots(dt,d){
+  const cfg=d?getBizDayConfig(d):null;
+  let mo,af;
+  if(cfg){
+    if(cfg.closed) return [];
+    mo=genSlotsFromRange(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
+    af=genSlotsFromRange(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
+  }else{
+    // フォールバック（従来ロジック・dのみ渡された旧呼び出しへの互換用）
+    if(dt==='nichi')return[];
+    mo=[];let h=8,m=30;while(!(h===12&&m===30)){mo.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
+    if(dt==='moku')return mo;
+    af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
+  }
+  // ★院長がその日だけ手動で追加した特別枠（昼休みなど）を、時系列順の正しい位置に挿入する
+  const extra=(d===document.getElementById('selDate')?.value)?extraSlotsForCurrentDate:[];
+  if(extra && extra.length){
+    const moPlusExtra=[...new Set([...mo, ...extra])].sort();
+    if(moPlusExtra.length&&af.length) return [...moPlusExtra,'BREAK',...af];
+    if(moPlusExtra.length) return moPlusExtra;
+    if(af.length) return af;
+    return [];
+  }
+  if(mo.length&&af.length) return [...mo,'BREAK',...af];
+  if(mo.length) return mo;
+  if(af.length) return af;
+  return [];
+}
+
+// ★その日に追加されている特別枠（昼休みなど）をGASから取得してから予約表を再描画する
+async function loadExtraSlotsThenRender(){
+  const date=document.getElementById('selDate').value;
+  renderSched(); // まず今ある情報で即座に表示（体感速度優先）
+  if(!date)return;
+  try{
+    const res=await fetch(GAS+'?action=getExtraSlotsForDate&date='+date+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();
+    extraSlotsForCurrentDate=d.ok?(d.extra||[]):[];
+  }catch(e){ extraSlotsForCurrentDate=[]; }
+  renderSched(); // 特別枠が届いたら反映して再描画
+}
+// 昼休みの時間帯として選べる候補（20分刻み・12:30〜14:50）
+const LUNCH_CANDIDATE_SLOTS=['12:30','12:50','13:10','13:30','13:50','14:10','14:30','14:50'];
+function openExtraSlotModal(){
+  const date=document.getElementById('selDate').value;
+  if(!date){ alert('先に日付を選んでください'); return; }
+  document.getElementById('extraSlotDateLabel').textContent=date;
+  renderExtraSlotButtons();
+  document.getElementById('extraSlotModal').classList.add('on');
+}
+function renderExtraSlotButtons(){
+  const box=document.getElementById('extraSlotButtons');
+  box.innerHTML=LUNCH_CANDIDATE_SLOTS.map(t=>{
+    const on=extraSlotsForCurrentDate.includes(t);
+    return `<button class="btn bsm" style="background:${on?'#0f766e':'#f1f5f9'};color:${on?'white':'#475569'};border-color:${on?'#0f766e':'#e2e8f0'}" onclick="toggleExtraSlotUI('${t}')">${t}${on?' ✓':''}</button>`;
+  }).join('');
+}
+async function toggleExtraSlotUI(time){
+  const date=document.getElementById('selDate').value;
+  const isOn=extraSlotsForCurrentDate.includes(time);
+  try{
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'toggleExtraSlot',date,time,add:!isOn})});
+    if(isOn) extraSlotsForCurrentDate=extraSlotsForCurrentDate.filter(t=>t!==time);
+    else extraSlotsForCurrentDate.push(time);
+    renderExtraSlotButtons();
+    renderSched();
+  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+}
+function closeExtraSlotModal(){ document.getElementById('extraSlotModal').classList.remove('on'); }
+function renderSched(){
+  const date=document.getElementById('selDate').value;if(!date)return;
+  statOverride={}; // 日付が変わったら手動入力をリセット
+  const dt=dayType(date);
+  const badge=document.getElementById('daybadge');
+  const holidayName=jpHolidays[date]||'';
+  badge.textContent=({hei:'終日診療',moku:'午前のみ診療',gogo:'午後のみ診療',nichi:'休診日'}[dt]||dt)+(holidayName?`　🎌${holidayName}`:'');
+  badge.style.color=holidayName?'#dc2626':'';
+  badge.className='day-b '+({hei:'d-hei',moku:'d-moku',gogo:'d-gogo',nichi:'d-nichi'}[dt]||'d-nichi');
+  const sl=getSlots(dt,date),tbody=document.getElementById('sbody');
+  const bkDate0=bookings[date]||{};
+  // ★昼休みに食い込む継続枠（12:30・12:50など）に実際に予約が入っている場合、
+  //   BREAKの直前に挿入して表示する（データはあるのに表に出ないと院長が見落とすため）
+  const breakIdx=sl.indexOf('BREAK');
+  if(breakIdx>-1){
+    const lastAm=sl[breakIdx-1];
+    if(lastAm){
+      let extra=lastAm;
+      const toInsert=[];
+      for(let i=0;i<2;i++){
+        let [eh,em]=extra.split(':').map(Number);
+        em+=20;if(em>=60){em-=60;eh++;}
+        extra=pad(eh)+':'+pad(em);
+        if(bkDate0[extra]) toInsert.push(extra); else break;
+      }
+      if(toInsert.length) sl.splice(breakIdx,0,...toInsert);
+    }
+  }
+  tbody.innerHTML='';
+  if(dt==='nichi'){tbody.innerHTML='<tr><td colspan="10" class="empty">本日は休診日です</td></tr>';updateStats(date,[]);return;}
+  const bkDate=bookings[date]||{};
+  sl.forEach(s=>{
+    if(s==='BREAK'){const tr=document.createElement('tr');tr.className='brk';tr.innerHTML='<td colspan="10">── 昼休み ──</td>';tbody.appendChild(tr);return;}
+    const bk=bkDate[s]||null,tr=document.createElement('tr');
+    if(bk&&bk.cont){
+      tr.className='cont';
+      tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb k-ct">↑継続中</span></td><td><span style="color:var(--muted);font-size:0.75rem">↑${bk.name||''}</span></td><td colspan="6"></td><td><button class="btn bd bsm" onclick="delBk('${date}','${s}')">削除</button></td>`;
+    }else if(bk&&bk.cancelled){
+      tr.className='cancelled';
+      const reason=bk.cancelReason||'';
+      const rebookedBy=bk.reBookedBy||'';
+      tr.innerHTML=`<td class="tc">${s}</td>
+        <td><span class="kb k-cancel">キャンセル</span></td>
+        <td><span style="color:#dc2626;text-decoration:line-through;font-size:0.8rem">${bk.name||''}</span></td>
+        <td colspan="4"><span class="cancel-badge">理由: ${reason||'未記入'}</span>${rebookedBy?'<span class="rebook-badge">→'+rebookedBy+'に変更</span>':''}</td>
+        <td colspan="3"><button class="btn ba bsm" onclick="openModal('${date}','${s}')">＋新規予約</button> <button class="btn bd bsm" onclick="delBk('${date}','${s}')" style="margin-top:2px">🗑 完全に削除</button></td>`;
+    }else if(bk){
+      const kubunList=bk.kubunList||[bk.kubun||''];
+      const kubunHtml=kubunList.map(k=>{const kc=k==='保険'?'k-ho':k==='自費'?'k-ji':k==='交通事故'?'k-ko':k==='新規'?'k-sh':'k-ji';return`<span class="kb ${kc}">${k}</span>`;}).join('+');
+      const rc=bk.route==='次回予約'?'r-ji':bk.route==='飛び込み'?'r-to':bk.route==='LINE'?'r-li':'r-te';
+      const sh=bk.shochi||[];
+      const buiHtml=(bk.bui||[]).map(v=>`<span class="bui-badge">${v}</span>`).join('');
+      const shHtml=sh.map(s=>`<span class="sh-badge">${s.name}${s.qty>1?'×'+s.qty:''}</span>`).join('');
+      const bs=bk.bussan||[];
+      const bsHtml=bs.filter(b=>b.qty>0).map(b=>`<span class="sh-badge" style="background:#fef3c7;color:#92400e">${b.name}×${b.qty}</span>`).join('');
+      const pays=bk.pay||[];
+      const payHtml=pays.map(p=>{const pc=p==='現金'?'pb-cash':p==='クレジット'?'pb-card':p==='PayPay'?'pb-pp':p==='d払い'?'pb-d':p==='au Pay'?'pb-au':'pb-ot';return`<span class="pay-badge ${pc}">${p}</span>`;}).join('');
+      tr.innerHTML=`<td class="tc">${s}</td>
+        <td>${kubunHtml}</td>
+        <td><strong style="font-size:0.8rem">${bk.name}</strong>${bk.menu?'<br><span style="font-size:0.65rem;color:var(--accent)">'+bk.menu+'</span>':''}</td>
+        <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td>
+        <td><span class="rt ${rc}">${bk.route||''}</span>${(()=>{
+  if(bk.route!=='次回予約')return '';
+  const allD=Object.keys(bookings).sort();
+  for(const nd of allD){
+    if(nd<date)continue;
+    for(const ns of Object.keys(bookings[nd]).sort()){
+      const nb=bookings[nd][ns];
+      if(!nb||nb.cont||nb.cancelled)continue;
+      if(nd===date&&ns<=s)continue;
+      if(nb.name===bk.name||(bk.cardId&&nb.cardId===bk.cardId)){
+        const w=['日','月','火','水','木','金','土'];
+        const dt=new Date(nd);
+        return '<br><span style="color:#1e40af;font-size:0.68rem;font-weight:bold">📅'+nd.slice(5).replace('-','/')+'('+w[dt.getDay()]+') '+ns+'</span>';
+      }
+    }
+  }
+  return '<br><span style="color:#dc2626;font-size:0.65rem">未入力</span>';
+})()}</td>
+        <td style="font-size:0.72rem">${bk.visitCount||''}</td>
+        <td style="font-size:0.72rem;font-weight:700;${bk.elapsed&&parseInt(bk.elapsed)>=20?'color:#dc2626;background:#fee2e2;border-radius:4px;padding:2px 5px':bk.elapsed&&parseInt(bk.elapsed)>=14?'color:#d97706':"color:var(--accent2)"}">${bk.elapsed?bk.elapsed+'日':''}${bk.elapsed&&parseInt(bk.elapsed)>=20?' ⚠️初診料':''}</td>
+        <td>${buiHtml?buiHtml+'<br>':''} ${shHtml||'-'}${bsHtml?'<br>'+bsHtml:''}</td>
+        <td>${payHtml||'-'}${bk.payAmount&&parseInt(bk.payAmount)>0?'<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>':(()=>{
+  const list=bk.kubunList||[bk.kubun||''];
+  const isJiko=list.includes('交通事故')&&!list.includes('自費')&&!list.includes('保険');
+  const hasPay=bk.payAmount&&parseInt(bk.payAmount)>0;
+  if(isJiko)return '';// 交通事故は未会計表示しない
+  if(hasPay)return '<br><span style="font-size:0.72rem;color:#16a34a;font-weight:700">✅ '+yen(parseInt(bk.payAmount))+'</span>';
+  return '<br><span style="font-size:0.68rem;color:#f97316">💴 未会計</span>';
+})()}</td>
+        <td style="white-space:nowrap">
+          <button class="btn bc bsm" onclick="editBk('${date}','${s}')">編集</button>
+          <button class="btn bp bsm" onclick="showQR('${date}','${s}','${bk.name||""}')" style="background:#7c3aed;border-color:#7c3aed;color:white;margin-top:2px">QR</button>
+          <button class="btn bcancel bsm" onclick="openCancelModal('${date}','${s}')" style="margin-top:2px">ｷｬﾝｾﾙ</button>
+          <button class="btn bd bsm" onclick="delBk('${date}','${s}')" style="margin-top:2px">削除</button>
+        </td>`;
+    }else{
+      tr.innerHTML=`<td class="tc">${s}</td><td></td><td><span style="color:#ccc;font-size:0.7rem">空き</span></td><td colspan="6"></td><td><button class="btn ba bsm" onclick="openModal('${date}','${s}')">＋予約</button></td>`;
+    }
+    tbody.appendChild(tr);
+  });
+  updateStats(date,sl.filter(s=>s!=='BREAK'));
+}
+
+let statOverride={};
+function editStat(idx){
+  const labels=['予約数','保険','自費','交通事故','新規'];
+  const cur=document.getElementById('s'+idx).textContent;
+  const val=prompt(labels[idx]+'の数を入力してください（空欄で自動計算に戻す）',cur==='0'?'':cur);
+  if(val===null)return;
+  if(val.trim()===''){delete statOverride[idx];}
+  else{statOverride[idx]=val.trim();}
+  const date=document.getElementById('selDate').value;
+  if(date)updateStats(date,getSlots(dayType(date),date).filter(s=>s!=='BREAK'));
+}
+function updateStats(date,sl){
+  const e=Object.values(bookings[date]||{}).filter(b=>!b.cont&&!b.cancelled);
+  const ho=e.filter(b=>(b.kubunList||[b.kubun]).includes('保険')).length;
+  const ji=e.filter(b=>(b.kubunList||[b.kubun]).includes('自費')).length;
+  const ko=e.filter(b=>(b.kubunList||[b.kubun]).includes('交通事故')).length;
+  const sh=e.filter(b=>(b.kubunList||[b.kubun]).includes('新規')).length;
+  const used=e.reduce((a,b)=>{const list=b.kubunList||[b.kubun||''];const slots=list.includes('新規')?3:list.includes('自費')&&list.includes('保険')?3:list.includes('自費')?2:1;return a+slots;},0);
+  document.getElementById('s0').textContent=statOverride[0]!==undefined?statOverride[0]:e.length;
+  document.getElementById('s1').textContent=statOverride[1]!==undefined?statOverride[1]:ho;
+  document.getElementById('s2').textContent=statOverride[2]!==undefined?statOverride[2]:ji;
+  document.getElementById('s3').textContent=statOverride[3]!==undefined?statOverride[3]:ko;
+  document.getElementById('s4').textContent=statOverride[4]!==undefined?statOverride[4]:sh;
+  document.getElementById('s5').textContent=(sl.length?Math.round(used/sl.length*100):0)+'%';
+  // 未会計件数
+  const uncounted=e.filter(b=>{
+    const kl=b.kubunList||[b.kubun||''];
+    const isJiko=kl.includes('交通事故')&&!kl.includes('自費')&&!kl.includes('保険');
+    if(isJiko)return false;// 交通事故（患者支払いなし）は未会計から除外
+    return !(b.payAmount&&parseInt(b.payAmount)>0);
+  }).length;
+  const s6=document.getElementById('s6');
+  if(s6){s6.textContent=uncounted;s6.closest('.sbox').style.background=uncounted>0?'rgba(249,115,22,0.15)':'';s6.style.color=uncounted>0?'#f97316':'inherit';}
+}
+
+// ===== キャンセル =====
+function openCancelModal(date,slot){
+  const bk=bookings[date]?.[slot];if(!bk)return;
+  cancelDate=date;cancelSlot=slot;cancelReasonVal='';
+  document.getElementById('cancel-info').innerHTML=`<strong>${date} ${slot}</strong><br>${bk.name||''} 様`;
+  document.querySelectorAll('#cancel-reason-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('cancel-note').value='';
+  const sel=document.getElementById('cancel-reason-sel');
+  if(sel)sel.value='';
+  cancelReasonVal='';
+  const nw=document.getElementById('cancel-note-wrap');
+  if(nw)nw.style.display='none';
+  document.getElementById('cancelModal').classList.add('on');
+}
+function closeCancelModal(){document.getElementById('cancelModal').classList.remove('on');cancelDate=null;cancelSlot=null;}
+function selectCancelReason(btn){
+  document.querySelectorAll('#cancel-reason-btns .pay-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  cancelReasonVal=btn.getAttribute('data-v');
+}
+function onCancelReasonSel(){
+  const sel=document.getElementById('cancel-reason-sel');
+  cancelReasonVal=sel.value==='other'?'':sel.value;
+  const noteWrap=document.getElementById('cancel-note-wrap');
+  if(noteWrap)noteWrap.style.display=sel.value===''?'none':'block';
+}
+async function execCancel(){
+  if(!cancelDate||!cancelSlot)return;
+  const bk=bookings[cancelDate]?.[cancelSlot];if(!bk)return;
+  const sel=document.getElementById('cancel-reason-sel');
+  const selVal=sel?sel.value==='other'?'':sel.value:cancelReasonVal;
+  const note=document.getElementById('cancel-note').value.trim();
+  const reason=(selVal||cancelReasonVal)+(note?'：'+note:'');
+  const name=bk.name||'';
+  const cardId=bk.cardId||'';
+  // 継続枠も削除
+  const sl=getSlots(dayType(cancelDate),cancelDate),idx=sl.indexOf(cancelSlot);
+  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'&&bookings[cancelDate]?.[sl[ni]]?.cont)delete bookings[cancelDate][sl[ni]];else break;}
+  // キャンセル記録に変換（空き枠として再利用可能にする）
+  bookings[cancelDate][cancelSlot]={cancelled:true,name,cardId,cancelReason:reason,reBookedBy:''};
+  // ★closeCancelModal()がcancelDate/cancelSlotをnullにリセットしてしまうため、その前に必ず値を退避しておく
+  const cancelledDateForWaitlist=cancelDate, cancelledSlotForLog=cancelSlot;
+  save();closeCancelModal();renderSched();await pushB();
+  // ★このキャンセル日にキャンセル待ちの方がいれば、自動でLINE通知する
+  try{
+    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'notifyWaitlistForDate',date:cancelledDateForWaitlist})});
+  }catch(e){}
+  // LINE Notify送信
+  const lineUserId=localStorage.getItem('kj_line_userid')||'';
+  if(lineUserId){
+    const msg='\n【倉治整骨院】\n❌ キャンセル発生\n患者: '+name+'（'+cardId+'号）\n日時: '+cancelledDateForWaitlist+' '+cancelledSlotForLog+'\n理由: '+(reason||'未記入')+'\n→ 空き枠が発生しました';
+    sendLineNotify(msg);
+  }
+}
+
+// ===== モーダルタブ =====
+function switchMTab(tab){
+  const tabs=['basic','shochi','bussan','pay'];
+  document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',tabs[i]===tab));
+  document.querySelectorAll('.mpane').forEach((p,i)=>p.classList.toggle('on',tabs[i]===tab));
+  if(tab==='pay'){
+    updateMTotal();
+    // 確実に最新の処置・物販金額で明細を更新
+    requestAnimationFrame(()=>requestAnimationFrame(()=>updatePayDetailSummary()));
+  }
+}
+
+function renderMShochiBtns(){
+  // 処置テーブルを全マスタ分、最初から全行表示する
+  // 金額欄に数字を入れたら選択扱い、0または空で非選択
+  if(!window.mShochiPrice)window.mShochiPrice={};
+  if(!window.mShochiFree)window.mShochiFree=[];
+  buildShochiDirectTable();
+}
+
+function buildShochiDirectTable(){
+  const tbl=document.getElementById('shochi-direct-table');
+  if(!tbl)return;
+  tbl.innerHTML='';
+
+  // ヘッダー
+  const hdr=document.createElement('tr');
+  hdr.innerHTML='<th style="text-align:left;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0">処置名</th>'+
+    '<th style="text-align:center;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:60px">個数</th>'+
+    '<th style="text-align:right;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:110px">金額（円）</th>';
+  tbl.appendChild(hdr);
+
+  // マスタ全件表示
+  shochiMaster.forEach(sh=>{
+    const price=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:
+                (mShochiSel[sh.id]>0?sh.price:0);
+    const isSelected=(mShochiSel[sh.id]||0)>0;
+    const tr=document.createElement('tr');
+    tr.style.background=isSelected?'#f0fdf4':'white';
+    tr.style.borderBottom='1px solid #f1f5f9';
+
+    const nameTd=document.createElement('td');
+    nameTd.style.cssText='padding:6px 4px;font-size:0.82rem;font-weight:'+(isSelected?'700':'400')+';color:'+(isSelected?'#166534':'#334155')+';cursor:pointer';
+    nameTd.textContent=(isSelected?'✅ ':'')+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
+    nameTd.onclick=function(){
+      const tr=this.closest('tr');
+      const priceInp=tr.querySelector('input[data-shid="'+sh.id+'"]');
+      const qtyInp=tr.querySelectorAll('input[type=number]')[0];
+      if((mShochiSel[sh.id]||0)>0){
+        // 解除
+        mShochiSel[sh.id]=0;
+        delete window.mShochiPrice[sh.id];
+        if(priceInp){priceInp.value='';priceInp.style.borderColor='#e2e8f0';}
+        tr.style.background='white';
+        this.style.fontWeight='400';this.style.color='#334155';
+        this.textContent=sh.name+'（定価'+sh.price.toLocaleString()+'円）';
+      }else{
+        // 選択（定価で選択）
+        const q=qtyInp?parseInt(qtyInp.value)||1:1;
+        mShochiSel[sh.id]=q;
+        window.mShochiPrice[sh.id]=sh.price;
+        if(priceInp){priceInp.value=sh.price;priceInp.style.borderColor='#4ade80';}
+        tr.style.background='#f0fdf4';
+        this.style.fontWeight='700';this.style.color='#166534';
+        this.textContent='✅ '+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
+      }
+      calcMShochiTotal();
+    };
+
+    // 個数セル（全処置で入力可能）
+    const qtyTd=document.createElement('td');
+    qtyTd.style.cssText='padding:4px;text-align:center';
+    const qtyInp=document.createElement('input');
+    qtyInp.type='number';qtyInp.min='1';
+    qtyInp.value=Math.max(1,mShochiSel[sh.id]||1);
+    qtyInp.dataset.shid=sh.id;
+    qtyInp.style.cssText='width:50px;padding:5px 4px;border:1.5px solid #94a3b8;border-radius:8px;font-size:0.9rem;font-weight:700;text-align:center';
+    qtyInp.oninput=function(){
+      const id=this.dataset.shid;
+      const q=parseInt(this.value)||1;
+      // 金額が入っていれば選択済みとして個数更新
+      if((window.mShochiPrice[id]!=null&&window.mShochiPrice[id]>0)){
+        mShochiSel[id]=q;
+        calcMShochiTotal();
+      }
+    };
+    qtyTd.appendChild(qtyInp);
+
+    // 金額セル
+    const priceTd=document.createElement('td');
+    priceTd.style.cssText='padding:4px;text-align:right';
+
+    const inp=document.createElement('input');
+    inp.type='number';
+    inp.min='0';
+    inp.placeholder='0';
+    inp.value=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
+    inp.dataset.shid=sh.id;
+    inp.dataset.defprice=sh.price;
+    inp.style.cssText='width:90px;padding:5px 8px;border:2px solid '+(isSelected?'#4ade80':'#e2e8f0')+';border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
+    inp.oninput=function(){
+      const id=this.dataset.shid;
+      const val=parseInt(this.value)||0;
+      const defPrice=parseInt(this.dataset.defprice)||0;
+      if(val>0){
+        // 個数欄の値を取得して反映
+        const qtyEl=this.closest('tr').querySelector('input[type=number][data-shid]');
+        const q=qtyEl&&qtyEl!==this?parseInt(qtyEl.value)||1:mShochiSel[id]||1;
+        mShochiSel[id]=q;
+        window.mShochiPrice[id]=val;
+        this.style.borderColor='#4ade80';
+      }else{
+        mShochiSel[id]=0;
+        delete window.mShochiPrice[id];
+        this.style.borderColor='#e2e8f0';
+      }
+      calcMShochiTotal();
+      this.closest('tr').style.background=val>0?'#f0fdf4':'white';
+    };
+
+    priceTd.appendChild(inp);
+    tr.appendChild(nameTd);
+    tr.appendChild(qtyTd);
+    tr.appendChild(priceTd);
+    tbl.appendChild(tr);
+  });
+
+  // 自由入力行
+  const freeRows=window.mShochiFree||[];
+  freeRows.forEach((row,i)=>{
+    const tr=document.createElement('tr');
+    tr.style.cssText='border-bottom:1px solid #f1f5f9;background:#fffbeb';
+
+    const nameTd=document.createElement('td');
+    nameTd.style.padding='4px';
+    const nameInp=document.createElement('input');
+    nameInp.type='text';nameInp.placeholder='処置名を入力';nameInp.value=row.name||'';
+    nameInp.style.cssText='width:100%;padding:5px 8px;border:2px solid #fbbf24;border-radius:8px;font-size:0.82rem';
+    nameInp.oninput=function(){window.mShochiFree[i].name=this.value;calcMShochiTotal();};
+
+    const priceTd=document.createElement('td');
+    priceTd.style.cssText='padding:4px;text-align:right;white-space:nowrap';
+    const priceInp=document.createElement('input');
+    priceInp.type='number';priceInp.placeholder='金額';priceInp.value=row.price||'';priceInp.min='0';
+    priceInp.style.cssText='width:80px;padding:5px 8px;border:2px solid #fbbf24;border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
+    priceInp.oninput=function(){window.mShochiFree[i].price=parseInt(this.value)||0;calcMShochiTotal();};
+    const delBtn=document.createElement('button');
+    delBtn.textContent='削除';
+    delBtn.style.cssText='margin-left:4px;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 6px;font-size:0.72rem;cursor:pointer';
+    delBtn.onclick=function(){window.mShochiFree.splice(i,1);buildShochiDirectTable();calcMShochiTotal();};
+
+    nameTd.appendChild(nameInp);
+    priceTd.appendChild(priceInp);priceTd.appendChild(delBtn);
+    tr.appendChild(nameTd);tr.appendChild(priceTd);
+    tbl.appendChild(tr);
+  });
+
+  // 自由入力追加ボタン行
+  const addTr=document.createElement('tr');
+  const addTd=document.createElement('td');
+  addTd.colSpan=2;addTd.style.padding='6px 4px';
+  const addBtn=document.createElement('button');
+  addBtn.textContent='＋ マスタにない処置を追加';
+  addBtn.style.cssText='background:#f59e0b;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:0.78rem;cursor:pointer';
+  addBtn.onclick=function(){window.mShochiFree.push({name:'',price:0});buildShochiDirectTable();};
+  addTd.appendChild(addBtn);addTr.appendChild(addTd);
+  tbl.appendChild(addTr);
+}
+
+function updateShochiPriceTable(){buildShochiDirectTable();}
+function addShochiFreeRow(){window.mShochiFree.push({name:'',price:0});buildShochiDirectTable();}
+
+
+function updateShochiNet(){
+  const totalEl=document.getElementById('m-shochi-total');
+  const disc=parseInt(document.getElementById('m-shochi-discount')?.value)||0;
+  const total=parseInt(totalEl?.textContent?.replace(/[^0-9]/g,'')||0);
+  const net=Math.max(0,total-disc);
+  const netEl=document.getElementById('m-shochi-net');
+  if(netEl)netEl.textContent=disc>0?'→ 実際 '+net.toLocaleString()+'円':'';
+}
+function updateBussanNet(){
+  const totalEl=document.getElementById('m-bussan-total');
+  const disc=parseInt(document.getElementById('m-bussan-discount')?.value)||0;
+  const total=parseInt(totalEl?.textContent?.replace(/[^0-9]/g,'')||0);
+  const net=Math.max(0,total-disc);
+  const netEl=document.getElementById('m-bussan-net');
+  if(netEl)netEl.textContent=disc>0?'→ 実際 '+net.toLocaleString()+'円':'';
+}
+function calcMShochiTotal(){
+  let total=0;
+  const selected=[];
+  shochiMaster.forEach(sh=>{
+    const q=mShochiSel[sh.id]||0;
+    const p=window.mShochiPrice&&window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
+    total+=p*q;
+    if(q>0)selected.push(sh.name+(q>1?'×'+q:'')+(p!==sh.price?'('+yen(p)+')':'')+'='+yen(p*q));
+  });
+  (window.mShochiFree||[]).forEach(row=>{
+    if(row.name&&row.price>0){total+=row.price;selected.push(row.name+'('+yen(row.price)+')');}
+  });
+  document.getElementById('m-shochi-total').textContent=yen(total);
+  const menuEl=document.getElementById('m-menu');
+  const menuPriceEl=document.getElementById('m-menu-price');
+  if(menuEl&&selected.length>0){menuEl.value=selected.join('・');if(menuPriceEl)menuPriceEl.value=total;updateMenuTotal();}
+  updateMTotal();
+  updatePayDetailSummary();
+}
+function toggleDiscInput(id, btn){
+  const inp = document.getElementById('disc-input-'+id);
+  if(!inp) return;
+  const isShown = inp.style.display!=='none';
+  inp.style.display = isShown?'none':'flex';
+  if(isShown){
+    mBussanDisc[id]=0;
+    btn.textContent='割引を入力';
+    const netEl=document.getElementById('disc-net-'+id);
+    if(netEl)netEl.textContent='';
+    calcMBussanTotal();
+  }
+}
+function clearDisc(id){
+  mBussanDisc[id]=0;
+  calcMBussanTotal();
+  renderMBussanItems();
+}
+function updateDiscNet(id, price, disc){
+  const netEl=document.getElementById('disc-net-'+id);
+  const btn=document.querySelector('[onclick*="toggleDiscInput(\''+id+'\',this)"]');
+  const net=Math.max(0,price-disc);
+  if(netEl)netEl.textContent=disc>0?'→ 実質'+yen(net):'';
+  if(btn)btn.textContent=disc>0?'割引: '+disc+'円':'割引を入力';
+}
+function renderMBussanItems(){
+  const area=document.getElementById('m-bussan-items');area.innerHTML='';
+  bussanMaster.forEach(bs=>{
+    const qty=mBussanQty[bs.id]||0;
+    const disc=mBussanDisc[bs.id]||0;
+    // 金額上書き（個別に変更された場合）
+    const overridePrice=mBussanPrice&&mBussanPrice[bs.id]!=null?mBussanPrice[bs.id]:bs.price;
+    const netPrice=Math.max(0,overridePrice-disc);
+    const div=document.createElement('div');div.className='bussan-item';div.style.flexWrap='wrap';
+    div.innerHTML=`<span style="flex:1;font-size:0.8rem;font-weight:600">${bs.name}</span>
+      <span style="font-size:0.7rem;color:var(--muted);margin-right:4px">
+        <input type="number" min="0" value="${overridePrice}" style="width:70px;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:0.75rem;text-align:right"
+          oninput="if(!mBussanPrice)mBussanPrice={};mBussanPrice['${bs.id}']=parseInt(this.value)||0;calcMBussanTotal();">円/${bs.unit}
+      </span>`;
+    const inp=document.createElement('input');inp.type='number';inp.min='0';inp.value=qty||0;inp.className='bussan-qty';
+    inp.oninput=function(){mBussanQty[bs.id]=parseInt(this.value)||0;renderMBussanItems();calcMBussanTotal();};
+    div.appendChild(inp);
+    if(qty>0){
+      const discWrap=document.createElement('div');
+      discWrap.style.cssText='display:flex;align-items:center;gap:4px;margin-top:4px;width:100%';
+      discWrap.innerHTML=`<button onclick="toggleDiscInput('${bs.id}',this)" style="background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:0.7rem;color:#64748b;cursor:pointer">${disc>0?'割引: '+disc+'円':'割引を入力'}</button>
+        <span id="disc-net-${bs.id}" style="font-size:0.72rem;color:#16a34a;white-space:nowrap">${disc>0?'→ 実質'+yen(netPrice):''}</span>
+        <div id="disc-input-${bs.id}" style="display:${disc>0?'flex':'none'};align-items:center;gap:4px;margin-top:4px">
+          <input type="number" class="inp" style="width:80px;padding:3px 8px;font-size:0.78rem"
+            placeholder="0" value="${disc}" min="0"
+            oninput="mBussanDisc['${bs.id}']=parseInt(this.value)||0;calcMBussanTotal();updateDiscNet('${bs.id}',${overridePrice},parseInt(this.value)||0)">
+          <button onclick="clearDisc('${bs.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:2px 6px;font-size:0.7rem;cursor:pointer">×</button>
+        </div>`;
+      div.appendChild(discWrap);
+      if(disc>0){
+        const tag=document.createElement('div');
+        tag.style.cssText='font-size:0.68rem;color:#dc2626;margin-top:2px';
+        tag.textContent='割引適用: -'+yen(disc)+'（小計'+yen(netPrice*qty)+'円）';
+        div.appendChild(tag);
+      }
+    }
+    area.appendChild(div);
+  });
+  // ── 自由入力枠 ──
+  if(!window.mBussanFree)window.mBussanFree=[];
+  const freeWrap=document.createElement('div');
+  freeWrap.style.cssText='margin-top:10px;padding:8px;background:#f0f9ff;border-radius:8px;border:1px dashed #7dd3fc';
+  freeWrap.innerHTML='<div style="font-size:0.72rem;color:#0369a1;font-weight:700;margin-bottom:6px">＋ 自由入力（マスタにない物販）</div>';
+  // 既存の自由入力行を描画
+  window.mBussanFree.forEach((row,i)=>{
+    const rowDiv=document.createElement('div');
+    rowDiv.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap';
+    rowDiv.innerHTML=`
+      <input type="text" placeholder="商品名" value="${row.name||''}" style="flex:1;min-width:100px;padding:4px 8px;border:1px solid #bae6fd;border-radius:6px;font-size:0.8rem"
+        oninput="window.mBussanFree[${i}].name=this.value;calcMBussanTotal()">
+      <input type="number" placeholder="金額" value="${row.price||''}" style="width:80px;padding:4px 8px;border:1px solid #bae6fd;border-radius:6px;font-size:0.8rem;text-align:right"
+        oninput="window.mBussanFree[${i}].price=parseInt(this.value)||0;calcMBussanTotal()">円
+      <input type="number" placeholder="個数" value="${row.qty||1}" min="1" style="width:50px;padding:4px 6px;border:1px solid #bae6fd;border-radius:6px;font-size:0.8rem;text-align:center"
+        oninput="window.mBussanFree[${i}].qty=parseInt(this.value)||1;calcMBussanTotal()">
+      <button onclick="window.mBussanFree.splice(${i},1);renderMBussanItems();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 8px;font-size:0.75rem;cursor:pointer">削除</button>`;
+    freeWrap.appendChild(rowDiv);
+  });
+  const addBtn=document.createElement('button');
+  addBtn.style.cssText='background:#0ea5e9;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;margin-top:2px';
+  addBtn.textContent='＋ 行を追加';
+  addBtn.onclick=()=>{window.mBussanFree.push({name:'',price:0,qty:1});renderMBussanItems();};
+  freeWrap.appendChild(addBtn);
+  area.appendChild(freeWrap);
+  renderFreeGivenItems();
+}
+// ===== 無償提供分（在庫品を施術中に無料で使う分。売上にはならないが在庫は減らす） =====
+function renderFreeGivenItems(){
+  const area=document.getElementById('m-free-given-items');
+  if(!area)return;
+  if(!window.mFreeGiven)window.mFreeGiven=[];
+  area.innerHTML='';
+  window.mFreeGiven.forEach((row,i)=>{
+    const rowDiv=document.createElement('div');
+    rowDiv.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap';
+    const options=stockData.map(s=>`<option value="${s.id}" ${row.stockId===s.id?'selected':''}>${s.name}（在庫${s.qty}${s.unit}）</option>`).join('');
+    rowDiv.innerHTML=`
+      <select style="flex:1;min-width:140px;padding:4px 8px;border:1px solid #fca5a5;border-radius:6px;font-size:0.8rem"
+        onchange="window.mFreeGiven[${i}].stockId=this.value">
+        <option value="">選択してください</option>${options}
+      </select>
+      <input type="number" placeholder="数量" value="${row.qty||1}" min="1" style="width:56px;padding:4px 6px;border:1px solid #fca5a5;border-radius:6px;font-size:0.8rem;text-align:center"
+        oninput="window.mFreeGiven[${i}].qty=parseInt(this.value)||1">
+      <button onclick="window.mFreeGiven.splice(${i},1);renderFreeGivenItems();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 8px;font-size:0.75rem;cursor:pointer">削除</button>`;
+    area.appendChild(rowDiv);
+  });
+  const addBtn2=document.createElement('button');
+  addBtn2.style.cssText='background:#dc2626;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;margin-top:2px';
+  addBtn2.textContent='＋ 無償提供分を追加';
+  addBtn2.onclick=()=>{window.mFreeGiven.push({stockId:'',qty:1});renderFreeGivenItems();};
+  area.appendChild(addBtn2);
+}
+function calcMBussanTotal(){
+  let total=0;
+  bussanMaster.forEach(bs=>{
+    const q=mBussanQty[bs.id]||0;
+    const disc=mBussanDisc[bs.id]||0;
+    const overridePrice=mBussanPrice&&mBussanPrice[bs.id]!=null?mBussanPrice[bs.id]:bs.price;
+    total+=Math.max(0,overridePrice-disc)*q;
+  });
+  // 自由入力分
+  (window.mBussanFree||[]).forEach(row=>{total+=(row.price||0)*(row.qty||1);});
+  document.getElementById('m-bussan-total').textContent=yen(total);updateMTotal();
+}
+function updateMTotal(){
+  let sh=0,bs=0;
+  shochiMaster.forEach(s=>{const op=window.mShochiPrice&&window.mShochiPrice[s.id]!=null?window.mShochiPrice[s.id]:s.price;sh+=op*(mShochiSel[s.id]||0);});
+  bussanMaster.forEach(b=>{
+    const disc=mBussanDisc[b.id]||0;
+    bs+=Math.max(0,b.price-disc)*(mBussanQty[b.id]||0);
+  });
+  const el=document.getElementById('m-total-sum');if(el)el.textContent=yen(sh+bs);
+  updatePayDetailSummary();
+}
+function toggleMPay(btn){
+  btn.classList.toggle('on');
+  const v=btn.getAttribute('data-v');
+  if(btn.classList.contains('on')){
+    if(!mPaySel.includes(v))mPaySel.push(v);
+    // 回数券ONになったら患者マスターから有効期限を自動セット
+    if(v==='回数券') syncCouponFromPatient();
+  }else{
+    mPaySel=mPaySel.filter(x=>x!==v);
+  }
+}
+function resetMPay(){mPaySel=[];document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));document.getElementById('m-pay-amount').value='';}
+function loadMPay(pays,amount){resetMPay();(pays||[]).forEach(p=>{const btn=document.querySelector(`#m-pay-btns .pay-btn[data-v="${p}"]`);if(btn){btn.classList.add('on');mPaySel.push(p);}});document.getElementById('m-pay-amount').value=amount||'';}
+
+function resetKubun(){
+  mKubunSel=[];
+  document.querySelectorAll('.kubun-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('kubun-display').style.display='none';
+  // 区分別料金エリアは常に表示
+  // document.getElementById('kubun-fee-area').style.display='none';
+}
+function loadKubun(kubunList){
+  resetKubun();
+  (kubunList||[]).forEach(v=>{const btn=document.querySelector(`.kubun-btn[data-v="${v}"]`);if(btn){btn.classList.add('on');mKubunSel.push(v);}});
+  updateKubunDisplay();
+}
+
+// ===== モーダル開閉 =====
+function openModal(date,slot){
+  editDate=date;editSlot=slot;
+  document.getElementById('mtitle').textContent='予約入力 '+slot;
+  ['m-id','m-nm','m-sym','m-opt','m-menu','m-menu-price','m-opt-price','m-psearch','m-next-memo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['m-menu-sel','m-opt-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  mSlotCount=1;setSlotCount(1);updateMenuTotal();mBussanDisc={};
+  ['m-shochi-discount','m-bussan-discount'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['m-shochi-net','m-bussan-net'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
+  // 交通事故トグルリセット
+  const jikoT=document.getElementById('jiko-pay-toggle');
+  if(jikoT)jikoT.style.display='none';
+  const amtEl=document.getElementById('m-pay-amount');
+  if(amtEl)amtEl.disabled=false;
+  const peditBtn2=document.getElementById('pedit-btn');if(peditBtn2)peditBtn2.style.display='none';
+  const karteBtn2=document.getElementById('karte-btn');if(karteBtn2)karteBtn2.style.display='none';
+  const payArea=document.getElementById('m-pay-btns');
+  if(payArea)payArea.style.opacity='1';
+  // 自費メニュープルダウンを処置マスターから動的生成
+  const menuSel=document.getElementById('m-menu-sel');
+  if(menuSel){
+    menuSel.innerHTML='<option value="">── プルダウンから選択 ──</option>';
+    shochiMaster.forEach(s=>{
+      const op=document.createElement('option');
+      op.value=s.name+':'+s.price;
+      op.textContent=s.name+'（'+s.price.toLocaleString()+'円）';
+      menuSel.appendChild(op);
+    });
+    const custom=document.createElement('option');
+    custom.value='custom';
+    custom.textContent='── 自由入力 ──';
+    menuSel.appendChild(custom);
+  }
+  document.getElementById('m-rt').value='LINE';
+  const nbcb0=document.getElementById('m-nextbook-cb');if(nbcb0)nbcb0.checked=false;
+  const awrap0=document.getElementById('m-arrival-wrap');if(awrap0)awrap0.style.display='block';
+  document.getElementById('m-patient-list').style.display='none';
+  document.getElementById('m-selected-info').style.display='none';
+  resetKubun();resetBui();
+  mShochiSel={};mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=[];window.mBussanPrice={};window.mShochiPrice={};window.mShochiDisc={};renderMShochiBtns();renderMBussanItems();resetMPay();
+  document.getElementById('hist-btn').style.display='none';
+  switchMTab('basic');
+  document.getElementById('bmodal').classList.add('on');
+}
+
+function editBk(date,slot){
+  const bk=bookings[date]?.[slot];if(!bk||bk.cont||bk.cancelled)return;
+  editDate=date;editSlot=slot;
+  document.getElementById('mtitle').textContent='予約編集 '+slot;
+  document.getElementById('m-id').value=bk.cardId||'';
+  document.getElementById('m-nm').value=bk.name||'';
+  const isNB=(bk.route||'LINE')==='次回予約';
+  const nbcb=document.getElementById('m-nextbook-cb');if(nbcb)nbcb.checked=isNB;
+  document.getElementById('m-rt').value=isNB?'LINE':(bk.route||'LINE');
+  const awrap=document.getElementById('m-arrival-wrap');if(awrap)awrap.style.display=isNB?'none':'block';
+  // 次回予約の場合は自動でフォームを表示
+  if(isNB)setTimeout(onRouteChange,100);
+  document.getElementById('m-sym').value=bk.symptom||'';
+  const nmEl=document.getElementById('m-next-memo');if(nmEl)nmEl.value=bk.nextMemo||bk.nextNote||'';
+  document.getElementById('m-opt').value=bk.option||'';
+  document.getElementById('m-menu').value=bk.menu||'';
+  document.getElementById('m-psearch').value='';
+  document.getElementById('m-patient-list').style.display='none';
+  loadKubun(bk.kubunList||[bk.kubun||'保険']);
+  loadBui(bk.bui||[]);
+  mShochiSel={};(bk.shochi||[]).forEach(s=>{mShochiSel[s.id]=(s.qty||1);});renderMShochiBtns();
+  if(bk.shochiMemo)document.getElementById('m-shochi-memo').value=bk.shochiMemo;
   else document.getElementById('m-shochi-memo').value='';
   mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=(bk.freeGiven||[]).map(f=>({stockId:f.stockId,qty:f.qty}));window.mBussanPrice={};window.mShochiPrice={};
   (bk.bussan||[]).forEach(b=>{
