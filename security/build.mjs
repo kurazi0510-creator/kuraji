@@ -68,7 +68,7 @@ function adminSpreadsheet_(){
   if(!id)throw new Error('SPREADSHEET_ID is not configured');
   return SpreadsheetApp.openById(id);
 }
-var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,MondoPrint:true,MondoKotsuPrint:true};
+var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,Salary:true,MondoPrint:true,MondoKotsuPrint:true};
 function doGet(e){
   var page=e&&e.parameter&&e.parameter.page||'Admin';
   if(typeof page!=='string'||!Object.prototype.hasOwnProperty.call(ADMIN_PAGES_,page))throw new Error('Unknown page');
@@ -88,17 +88,33 @@ function adminRequest(request){
   return output.getContent();
 }
 `;
+admin+='\n'+fs.readFileSync(path.join(root,'security/salary_admin.gs'),'utf8');
 writeGenerated('Admin.gs', admin);
 
 const bridgeTag = `<script>\nwindow.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;\nwindow.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;\nfunction adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}\n${bridge}\n</script>\n`;
 const pages = {
   Admin: 'kanri.html', Karte: 'karte.html', TodaySplit: 'today_split.html',
   LineSetup: 'line_setup.html', TriggerSetup: 'gas_trigger_setup.html',
-  Uriage: 'uriage.html', MondoPrint: 'mondo_print.html', MondoKotsuPrint: 'mondo_kotsu_print.html',
+  Uriage: 'uriage.html', Salary: 'murao_salary.html', MondoPrint: 'mondo_print.html', MondoKotsuPrint: 'mondo_kotsu_print.html',
 };
 const publicPages = ['book.html', 'confirm.html', 'consent.html', 'symptom.html', 'line_template.html', 'gas_update.html', 'gas_copy.html'];
 for (const [name, filename] of Object.entries(pages)) {
   let html = fs.readFileSync(path.join(root, filename), 'utf8');
+  if(name==='Admin')html=html.replace('<div class="nav-t" onclick="location.href=\'uriage.html\'" style="background:#22c55e;color:white">✍️ 売上入力</div>', '<div class="nav-t" onclick="location.href=\'uriage.html\'" style="background:#22c55e;color:white">✍️ 売上入力</div>\n  <div class="nav-t" onclick="window.open(adminPageUrl(\'Salary\'),\'_top\')">💴 給与管理</div>');
+  if(name==='Salary'){
+    const transfer=fs.readFileSync(path.join(root,'security/salary_transfer.js'),'utf8');
+    const client=fs.readFileSync(path.join(root,'security/salary_private_client.js'),'utf8');
+    html=html.replace(/const GAS_URL = "[^"]+";/, '// Salary data stays in the owner-only project.');
+    html=html.replace(/async function gasUpload\(\)\{[\s\S]*?(?=function setSyncStatus)/,client+'\n');
+    html=html.replace(/async function gasAutoBackup\(\)\{[\s\S]*?(?=function saveMonth)/,'');
+    html=html.replace("const res = await fetch(GAS_URL+'?action=loadMurao&t='+Date.now());\n      const json = await res.json();",'const json = await salaryLoad();');
+    html=html.replace('<script src="security/salary_transfer.js"></script>','');
+    html=html.replace('<!-- ① GAS同期バー -->',`<p class="hide-on-print"><a href="<?!= webAppUrl ?>?page=Admin" target="_top">← 管理画面へ戻る</a></p>\n<!-- ① GAS同期バー -->`);
+    // Define transfer helpers before the startup loader runs.
+    html=html.replace('<script>', '<script>\n'+transfer+'\n');
+    html=html.replace('※ デスクトップで入力後「⬆保存」→ iPhone/iPad で「⬇取得」すると反映されます','※ 入力内容を共有するには「保存」を押してください。旧画面からはバックアップで引き継げます。');
+    if(/GAS_URL|action=(?:load|save)Murao/.test(html))throw new Error('Salary still has a legacy network route');
+  }
   html=html.replaceAll('new URLSearchParams(location.search)','new URLSearchParams(window.KURAJI_PAGE_PARAMS)');
   if(name==='Karte'){
     const diagrams=fs.readFileSync(path.join(root,'security/body_diagrams.json'),'utf8');

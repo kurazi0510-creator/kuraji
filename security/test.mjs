@@ -80,6 +80,34 @@ adminCtx.HtmlService.createTemplateFromFile=()=>template={evaluate:()=>({setTitl
 adminCtx.doGet({parameter:{page:'Karte',name:'</script><script>alert(1)</script>'}});
 assert.equal(template.pageParamsJson.includes('<'),false);
 assert.equal(JSON.parse(template.pageParamsJson).name,'</script><script>alert(1)</script>');
+// Salary is available only through the owner's private RPC, with atomic snapshots
+// and stale-write rejection. Test real persistence behavior and failure recovery.
+const salaryProps=new Map();let salaryFail=false,salaryId=0;
+adminCtx.PropertiesService.getScriptProperties=()=>({
+  getProperty:k=>salaryProps.get(k)??null,
+  setProperty(k,v){salaryProps.set(k,v);},
+  setProperties(values){for(const [k,v] of Object.entries(values)){salaryProps.set(k,v);if(salaryFail)throw new Error('storage full');}},
+  deleteProperty:k=>salaryProps.delete(k),
+});
+adminCtx.LockService={getScriptLock:()=>({waitLock(){},releaseLock(){}})};
+adminCtx.Utilities={getUuid:()=>String(++salaryId),newBlob:s=>({getBytes:()=>Buffer.from(s)})};
+const salaryData={murao_settings:JSON.stringify({staffName:'給与テスト🙂',hourlyRate:1180}),murao_salary_2026_9:JSON.stringify({_note:'あ'.repeat(2000)+'🙂'.repeat(1000)})};
+assert.equal(adminCtx.salaryRequest({action:'load'}).revision,'');
+const salarySaved=adminCtx.salaryRequest({action:'save',data:salaryData,revision:''});
+assert.equal(JSON.stringify(adminCtx.salaryRequest({action:'load'}).data),JSON.stringify(salaryData));
+assert.throws(()=>adminCtx.salaryRequest({action:'save',data:{},revision:''}),/別の画面/);
+assert.throws(()=>adminCtx.salaryRequest({action:'save',data:{patients:'[]'},revision:salarySaved.revision}),/項目/);
+salaryFail=true;
+assert.throws(()=>adminCtx.salaryRequest({action:'save',data:{murao_settings:'{}'},revision:salarySaved.revision}),/storage full/);
+salaryFail=false;
+assert.equal(adminCtx.salaryRequest({action:'load'}).revision,salarySaved.revision);
+assert.equal(JSON.stringify(adminCtx.salaryRequest({action:'load'}).data),JSON.stringify(salaryData));
+const salaryPage=fs.readFileSync(path.join(dist,'Salary.html'),'utf8');
+assert.doesNotMatch(salaryPage,/GAS_URL|action=(?:save|load)Murao/);
+assert.match(salaryPage,/\.salaryRequest\(request\)/);
+assert.match(salaryPage,/kuraji-salary-backup-v1/);
+assert.equal(source.includes('function salaryRequest('),false);
+for(const action of ['loadMurao','saveMurao','salaryRequest']){assert.equal(get({action}).ok,false);assert.equal(post({action,data:salaryData}).ok,false);}
 for (const action of ['lineNotifyV2','testLineOwner','saveBookings','deletePatientByCardId','runDayBeforeRemindersNow']) {
   assert.equal(post({action,userId:'attacker',message:'test'}).ok, false, `POST ${action} must fail`);
 }

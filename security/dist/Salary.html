@@ -167,6 +167,34 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 @media(min-width:768px){body{max-width:780px;margin:0 auto;padding:24px 20px}.settings-grid{grid-template-columns:repeat(4,1fr)}.rate-info{grid-column:1/-1}}
 @media(max-width:480px){.totals-grid{grid-template-columns:1fr 1fr}.total-box.highlight{grid-column:1/-1}}
 </style>
+<script>
+window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+window.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;
+function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
+// Only runs inside an owner-only Apps Script HTML-service deployment.
+// The public GitHub copy of kanri.html must not be used after cutover.
+(() => {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init = {}) {
+    const url = typeof input === 'string' ? input : input.url;
+    const parsed = new URL(url, location.href);
+    if (parsed.hostname !== 'script.google.com' ||
+        !/^\/macros\/s\/[^/]+\/exec$/.test(parsed.pathname) ||
+        parsed.pathname !== '/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec') {
+      return nativeFetch(input, init);
+    }
+    const method = (init.method || (input.method || 'GET')).toUpperCase();
+    const request = method === 'GET'
+      ? {method, params: Object.fromEntries(parsed.searchParams)}
+      : {method, body: JSON.parse(init.body || '{}')};
+    const data = await new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).adminRequest(request);
+    });
+    return new Response(data, {status: 200, headers: {'Content-Type': 'application/json'}});
+  };
+})();
+
+</script>
 </head>
 <body>
 
@@ -175,6 +203,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
   <div class="header-right"><span class="badge">村尾 さん</span></div>
 </div>
 
+<p class="hide-on-print"><a href="<?!= webAppUrl ?>?page=Admin" target="_top">← 管理画面へ戻る</a></p>
 <!-- ① GAS同期バー -->
 <div class="card" id="syncCard">
   <div class="card-title">☁️ デバイス間データ共有（GAS同期）</div>
@@ -187,7 +216,7 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
     <input type="file" id="salaryImportFile" accept="application/json,.json" hidden onchange="salaryImport(this.files[0]);this.value=''">
   </div>
   <p style="font-size:.72rem;color:var(--muted);margin-top:4px">
-    ※ デスクトップで入力後「⬆保存」→ iPhone/iPad で「⬇取得」すると反映されます
+    ※ 入力内容を共有するには「保存」を押してください。旧画面からはバックアップで引き継げます。
   </p>
 </div>
 
@@ -270,6 +299,42 @@ td select.abs-sel.abs-hol{background:#fff5f5 !important;color:var(--holiday-red)
 </div>
 
 <script>
+function salaryLocalData(){
+  const data={};
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(/^(murao_settings|murao_rest_periods|murao_salary_\d{4}_(?:[0-9]|1[01]))$/.test(key))data[key]=localStorage.getItem(key);
+  }
+  return data;
+}
+function salaryExport(){
+  localStorage.setItem(MK(currentYear,currentMonth),JSON.stringify(collectData()));
+  const blob=new Blob([JSON.stringify({format:'kuraji-salary-backup-v1',data:salaryLocalData()},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download='kuraji-salary-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+async function salaryImport(file){
+  if(!file)return;
+  try{
+    const backup=JSON.parse(await file.text());
+    const data=backup.format==='kuraji-salary-backup-v1'?backup.data:backup;
+    if(!data||typeof data!=='object'||Array.isArray(data)||!Object.keys(data).length)throw new Error('給与バックアップを選んでください');
+    for(const [key,value] of Object.entries(data)){
+      if(!/^(murao_settings|murao_rest_periods|murao_salary_\d{4}_(?:[0-9]|1[01]))$/.test(key)||typeof value!=='string')throw new Error('バックアップの形式が違います');
+      const parsed=JSON.parse(value);
+      if(!parsed||typeof parsed!=='object')throw new Error('バックアップの内容が違います');
+    }
+    if(!confirm('現在のデータをバックアップしてから、同じ月・設定のデータを取り込みます。続けますか？'))return;
+    salaryExport();
+    for(const [key,value] of Object.entries(data))localStorage.setItem(key,value);
+    loadSettings();renderRestTags();buildTable(currentYear,currentMonth);renderHistory();
+    setSyncStatus('✅ 取り込み完了。内容を確認してから「保存」を押してください');
+  }catch(err){setSyncStatus('❌ 取り込み失敗: '+err.message);}
+}
+
+
 // ═══════════════════════════════════
 // 祝日マスタ 2025〜2026
 // ═══════════════════════════════════
@@ -294,386 +359,44 @@ const HOLIDAYS = {
 // ═══════════════════════════════════
 // GAS エンドポイント（kanri.html と同じ）
 // ═══════════════════════════════════
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzorfItbYeqxLbcJrxJMhpFu9lyO6q6W4EkCiQ0Bd72Rz-jorS5mRXEXdFlTABcVOe3qw/exec";
+// Salary data stays in the owner-only project.
 
+let salaryRevision=null;
+function salaryRpc(request){
+  return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).salaryRequest(request));
+}
+async function salaryLoad(){
+  const result=await salaryRpc({action:'load'});salaryRevision=result.revision;return result;
+}
+async function salarySave(){
+  if(salaryRevision===null){
+    const current=await salaryLoad();
+    if(Object.keys(current.data).length&&!confirm('保存済みの給与データを、この画面の内容で更新しますか？'))throw new Error('保存を取り消しました');
+  }
+  const result=await salaryRpc({action:'save',data:salaryLocalData(),revision:salaryRevision});
+  salaryRevision=result.revision;return result;
+}
 async function gasUpload(){
-  const btn = document.getElementById('btnUpload');
-  btn.disabled = true; btn.textContent = '⬆ 保存中…';
-  const payload = {};
-  for(let i=0;i<localStorage.length;i++){
-    const k = localStorage.key(i);
-    if(k.startsWith('murao_')) payload[k] = localStorage.getItem(k);
-  }
+  const btn=document.getElementById('btnUpload');btn.disabled=true;
   try{
-    // GASはCORSのためGET+URLエンコードで送信
-    const encoded = encodeURIComponent(JSON.stringify(payload));
-    const url = GAS_URL + '?action=saveMurao&data=' + encoded + '&t=' + Date.now();
-    const res = await fetch(url, {method:'GET', mode:'cors'});
-    const json = await res.json();
-    if(json.status === 'ok'){
-      setSyncStatus('✅ 保存完了 ' + nowStr());
-    } else {
-      setSyncStatus('⚠ 保存失敗: ' + JSON.stringify(json));
-    }
-  } catch(e){
-    setSyncStatus('❌ 通信エラー（GAS再デプロイ必要かも）: ' + e.message);
-  }
-  btn.disabled = false; btn.textContent = '⬆ このデバイスのデータを保存';
+    localStorage.setItem(MK(currentYear,currentMonth),JSON.stringify(collectData()));
+    await salarySave();setSyncStatus('✅ 管理専用画面に保存しました '+nowStr());
+  }catch(err){setSyncStatus('❌ 保存失敗: '+err.message);}
+  finally{btn.disabled=false;}
 }
-
 async function gasDownload(){
-  const btn = document.getElementById('btnDownload');
-  btn.disabled = true; btn.textContent = '⬇ 取得中…';
+  const btn=document.getElementById('btnDownload');btn.disabled=true;
   try{
-    const res = await fetch(GAS_URL + '?action=loadMurao&t=' + Date.now());
-    const json = await res.json();
-    if(json.status === 'ok' && json.data){
-      Object.entries(json.data).forEach(([k,v])=>{ if(k.startsWith('murao_')) localStorage.setItem(k,v); });
-      setSyncStatus('✅ 取得完了 ' + nowStr());
-      loadSettings();
-      renderRestTags();
-      buildTable(currentYear, currentMonth);
-      renderHistory();
-    } else {
-      setSyncStatus('⚠ データなし or 失敗');
-    }
-  } catch(e){
-    setSyncStatus('❌ 通信エラー: ' + e.message);
-  }
-  btn.disabled = false; btn.textContent = '⬇ 他デバイスのデータを取得';
-}
-
-function setSyncStatus(msg){ document.getElementById('syncStatus').textContent = msg; }
-function nowStr(){ const d=new Date(); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
-
-// ═══════════════════════════════════
-// 定数・状態
-// ═══════════════════════════════════
-const DAYS = ['日','月','火','水','木','金','土'];
-let currentYear  = new Date().getFullYear();
-let currentMonth = new Date().getMonth();
-
-const SK  = () => 'murao_settings';
-const RK  = () => 'murao_rest_periods';
-const MK  = (y,m) => `murao_salary_${y}_${m}`;
-
-// ═══════════════════════════════════
-// 基本勤務スケジュール（曜日デフォルト）
-//   水・金：開始 15:00 ／ 土：開始 8:30　※終了時刻は早上がり対応のため自動入力しない
-//   未入力の日のみ自動で反映（既存の入力・休暇は上書きしない）
-// ═══════════════════════════════════
-function getDefaultStartForDow(dow){
-  if(dow===3 || dow===5) return 15;   // 水・金
-  if(dow===6)            return 8.5;  // 土
-  return null;
-}
-
-// ═══════════════════════════════════
-// 祝日・休業判定
-// ═══════════════════════════════════
-function pad2(n){ return String(n).padStart(2,'0'); }
-function dateStr(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
-function getHoliday(y,m,d){ return HOLIDAYS[dateStr(y,m,d)] || null; }
-function getRestPeriods(){ return JSON.parse(localStorage.getItem(RK())||'[]'); }
-function getRestPeriod(y,m,d){
-  const ds = dateStr(y,m,d);
-  return getRestPeriods().find(r => r.from <= ds && ds <= r.to) || null;
-}
-
-// ═══════════════════════════════════
-// 休業期間
-// ═══════════════════════════════════
-function addRestPeriod(){
-  const type = document.getElementById('newRestType').value;
-  const from = document.getElementById('newRestFrom').value;
-  const to   = document.getElementById('newRestTo').value;
-  if(!from||!to){ showToast('⚠ 開始日・終了日を入力してください'); return; }
-  if(from>to){ showToast('⚠ 終了日は開始日以降にしてください'); return; }
-  const list = getRestPeriods();
-  list.push({id:Date.now(), type, from, to});
-  localStorage.setItem(RK(), JSON.stringify(list));
-  document.getElementById('newRestFrom').value = '';
-  document.getElementById('newRestTo').value   = '';
-  renderRestTags();
-  buildTable(currentYear, currentMonth);
-}
-function removeRestPeriod(id){
-  localStorage.setItem(RK(), JSON.stringify(getRestPeriods().filter(r=>r.id!==id)));
-  renderRestTags();
-  buildTable(currentYear, currentMonth);
-}
-function renderRestTags(){
-  const tags = document.getElementById('restTags');
-  const list = getRestPeriods();
-  tags.innerHTML = list.length===0
-    ? '<span style="font-size:.75rem;color:var(--muted)">登録なし</span>'
-    : list.map(r=>`<span class="rest-tag">${r.type}：${r.from}〜${r.to}
-        <button onclick="removeRestPeriod(${r.id})">✕</button></span>`).join('');
-}
-
-// ═══════════════════════════════════
-// 設定
-// ═══════════════════════════════════
-function loadSettings(){
-  const s = JSON.parse(localStorage.getItem(SK())||'{}');
-  if(s.staffName)        document.getElementById('staffName').value        = s.staffName;
-  if(s.hourlyRate)       document.getElementById('hourlyRate').value       = s.hourlyRate;
-  if(s.hourlyRateNight)  document.getElementById('hourlyRateNight').value  = s.hourlyRateNight;
-  if(s.transport!=null)  document.getElementById('transport').value        = s.transport;
-  updateRateDisplay();
-}
-function saveSettings(){
-  localStorage.setItem(SK(), JSON.stringify({
-    staffName:       document.getElementById('staffName').value,
-    hourlyRate:      +document.getElementById('hourlyRate').value,
-    hourlyRateNight: +document.getElementById('hourlyRateNight').value,
-    transport:       +document.getElementById('transport').value,
-  }));
-  updateRateDisplay();
-}
-function updateRateDisplay(){
-  document.getElementById('dispRate').textContent  = (+document.getElementById('hourlyRate').value||0).toLocaleString();
-  document.getElementById('dispNight').textContent = (+document.getElementById('hourlyRateNight').value||0).toLocaleString();
-}
-['staffName','hourlyRate','hourlyRateNight','transport'].forEach(id=>{
-  document.getElementById(id).addEventListener('change',()=>{ saveSettings(); recalc(); });
-});
-
-// ═══════════════════════════════════
-// セレクト生成
-// ═══════════════════════════════════
-function buildTimeOptions(sel){
-  let h = '<option value="">--</option>';
-  for(let hh=6;hh<=23;hh++){
-    for(let mm=0;mm<60;mm+=30){
-      if(hh===23 && mm>0) continue; // 23:00で打ち止め
-      const v   = hh + mm/60;
-      const lbl = `${pad2(hh)}:${mm===0?'00':'30'}`;
-      h += `<option value="${v}"${Math.abs(v-parseFloat(sel))<0.01?' selected':''}>${lbl}</option>`;
-    }
-  }
-  return h;
-}
-
-const ABS_OPTS = [
-  {v:'',       l:'－'},
-  {v:'clinic', l:'院都合'},
-  {v:'staff2', l:'スタッフ都合'},
-  {v:'staff',  l:'本人都合'},
-  {v:'hol',    l:'祝日休'},
-  {v:'nenki',  l:'年末年始'},
-  {v:'bon',    l:'盆休み'},
-  {v:'other',  l:'その他'},
-];
-function buildAbsOptions(val){
-  return ABS_OPTS.map(o=>`<option value="${o.v}"${o.v===val?' selected':''}>${o.l}</option>`).join('');
-}
-function styleAbsSel(sel){
-  sel.className = 'abs-sel';
-  if(sel.value==='staff' || sel.value==='staff2')  sel.classList.add('abs-staff');
-  else if(sel.value==='clinic') sel.classList.add('abs-clinic');
-  else if(['hol','nenki','bon'].includes(sel.value)) sel.classList.add('abs-hol');
-}
-
-// ═══════════════════════════════════
-// ★ 給与計算（修正済み）
-//   〜18:00 → 通常時給
-//   18:00以降 → 深夜時給（上限なし）
-// ═══════════════════════════════════
-function calcPay(s, e, rate, nRate){
-  const normalH = Math.max(0, Math.min(e, 18) - s);       // 〜18:00
-  const nightH  = e > 18 ? Math.max(0, e - Math.max(s, 18)) : 0; // 18:00〜
-  return Math.round(normalH * rate + nightH * nRate);
-}
-
-// ═══════════════════════════════════
-// テーブル構築
-// ═══════════════════════════════════
-function getDaysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
-
-function buildTable(y,m){
-  document.getElementById('monthLabel').textContent = `${y}年 ${m+1}月`;
-  const saved = JSON.parse(localStorage.getItem(MK(y,m))||'{}');
-  const tbody = document.getElementById('attendanceBody');
-  tbody.innerHTML = '';
-  const total = getDaysInMonth(y,m);
-
-  for(let d=1;d<=total;d++){
-    const dow     = new Date(y,m,d).getDay();
-    const hasRec  = Object.prototype.hasOwnProperty.call(saved, `d${d}`);
-    const holName = getHoliday(y,m,d);   // ← 祝日チェック
-    const closed  = getRestPeriod(y,m,d);
-    let rec;
-    if(hasRec){
-      rec = saved[`d${d}`];               // 既に入力・編集済みの日はそのまま使う
-    } else if(!holName && !closed){
-      const defStart = getDefaultStartForDow(dow);  // 未入力日は開始時刻だけ自動反映（終了は本人入力）
-      rec = defStart!=null ? {work:true, start:defStart, end:'', absType:'', absNote:''} : {};
-    } else {
-      rec = {};
-    }
-
-    // 曜日セル
-    let dayLabel, dayClass;
-    if(holName){
-      dayLabel = '祝';
-      dayClass = 'day-hol';          // 赤・太字
-    } else if(dow===0){
-      dayLabel = '日'; dayClass = 'day-sun';
-    } else if(dow===6){
-      dayLabel = '土'; dayClass = 'day-sat';
-    } else {
-      dayLabel = DAYS[dow]; dayClass = '';
-    }
-
-    // 勤怠行
-    const tr = document.createElement('tr');
-    if(holName)  tr.classList.add('hol-row');
-    if(closed)   tr.classList.add('closed-row');
-    tr.dataset.d = d;
-
-    const holTitle = holName ? ` title="${holName}"` : '';
-    tr.innerHTML = `
-      <td class="date-cell">${m+1}/${d}</td>
-      <td class="day-cell ${dayClass}"${holTitle}>${dayLabel}</td>
-      <td><input type="checkbox" data-d="${d}" class="chk"${rec.work?' checked':''}></td>
-      <td><select data-d="${d}" class="time-sel start">${buildTimeOptions(rec.start??'')}</select></td>
-      <td><select data-d="${d}" class="time-sel end">${buildTimeOptions(rec.end??'')}</select></td>
-      <td><select data-d="${d}" class="abs-sel" onchange="styleAbsSel(this);toggleAbsNote(${d});autoSaveDay();recalc()">${buildAbsOptions(rec.absType??'')}</select></td>
-      <td class="hours-calc" id="h${d}">-</td>
-      <td class="day-pay" id="p${d}">-</td>`;
-    tbody.appendChild(tr);
-    styleAbsSel(tr.querySelector('.abs-sel'));
-
-    // 休診理由行（abs-sel が '' 以外の時に表示）
-    const noteRow = document.createElement('tr');
-    noteRow.classList.add('abs-note-row');
-    noteRow.dataset.noteFor = d;
-    noteRow.style.display = rec.absType ? '' : 'none';
-    noteRow.innerHTML = `
-      <td colspan="8" style="padding:2px 8px 6px 32px">
-        <input type="text" data-d="${d}" class="abs-note"
-          placeholder="欠勤理由・メモ（例：体調不良のため欠勤）"
-          value="${rec.absNote||''}">
-      </td>`;
-    tbody.appendChild(noteRow);
-  }
-
-  document.getElementById('noteArea').value = saved._note||'';
-  tbody.querySelectorAll('input[type="checkbox"],select.time-sel').forEach(el=>{
-    el.addEventListener('change',()=>{ autoSaveDay(); recalc(); });
-  });
-  tbody.querySelectorAll('.abs-note').forEach(el=>{
-    el.addEventListener('input', autoSaveDay);
-  });
-  recalc();
-}
-
-function toggleAbsNote(d){
-  const sel     = document.querySelector(`.abs-sel[data-d="${d}"]`);
-  const noteRow = document.querySelector(`tr[data-note-for="${d}"]`);
-  if(!noteRow) return;
-  noteRow.style.display = sel.value ? '' : 'none';
-}
-
-// ═══════════════════════════════════
-// 再計算
-// ═══════════════════════════════════
-function recalc(){
-  const total = getDaysInMonth(currentYear, currentMonth);
-  const rate  = +document.getElementById('hourlyRate').value || 0;
-  const nRate = +document.getElementById('hourlyRateNight').value || 0;
-  const trans = +document.getElementById('transport').value || 0;
-  let sumDays=0, sumHours=0, sumPay=0;
-  const absCnt = {};
-
-  for(let d=1;d<=total;d++){
-    const chk  = document.querySelector(`.chk[data-d="${d}"]`);
-    const sEl  = document.querySelector(`.start[data-d="${d}"]`);
-    const eEl  = document.querySelector(`.end[data-d="${d}"]`);
-    const aEl  = document.querySelector(`.abs-sel[data-d="${d}"]`);
-    const hEl  = document.getElementById(`h${d}`);
-    const pEl  = document.getElementById(`p${d}`);
-    const tr   = document.querySelector(`tr[data-d="${d}"]`) || chk?.closest('tr');
-
-    if(aEl?.value){ absCnt[aEl.value] = (absCnt[aEl.value]||0) + 1; }
-
-    if(!chk||!chk.checked){ hEl.textContent='-'; pEl.textContent='-'; tr?.classList.remove('has-night'); continue; }
-    sumDays++;
-    const s = parseFloat(sEl.value), e = parseFloat(eEl.value);
-    if(!isNaN(s)&&!isNaN(e)&&e>s){
-      const hours = e - s;
-      const pay   = calcPay(s, e, rate, nRate) + trans;
-      hEl.textContent = hours.toFixed(1);
-      pEl.textContent = '¥' + pay.toLocaleString();
-      sumHours += hours; sumPay += pay;
-      if(e>18) tr?.classList.add('has-night'); else tr?.classList.remove('has-night');
-    } else {
-      hEl.textContent = sEl.value&&eEl.value?'?':'-'; pEl.textContent='-';
-      tr?.classList.remove('has-night');
-    }
-  }
-
-  document.getElementById('totalDays').textContent  = `${sumDays} 日`;
-  document.getElementById('totalHours').textContent = `${sumHours.toFixed(1)} h`;
-  document.getElementById('totalPay').textContent   = '¥' + sumPay.toLocaleString();
-
-  const labelMap = {staff:'本人都合',staff2:'スタッフ都合',clinic:'院都合',hol:'祝日休',nenki:'年末年始',bon:'盆休み',other:'その他'};
-  const colorMap = {staff:'#fff8e6',staff2:'#fff8e6',clinic:'#fff0f0',hol:'#fff5f5',nenki:'#fff5f5',bon:'#fff5f5',other:'#f3f0ec'};
-  const chips = document.getElementById('restChips');
-  chips.innerHTML = Object.entries(absCnt).map(([k,v])=>
-    `<span class="rest-chip" style="background:${colorMap[k]||'#f3f0ec'}">${labelMap[k]||k}：${v}日</span>`
-  ).join('');
-}
-
-// ═══════════════════════════════════
-// 保存・読み込み
-// ═══════════════════════════════════
-function collectData(){
-  const total = getDaysInMonth(currentYear, currentMonth);
-  const data  = {_note: document.getElementById('noteArea').value};
-  for(let d=1;d<=total;d++){
-    const chk  = document.querySelector(`.chk[data-d="${d}"]`);
-    const s    = document.querySelector(`.start[data-d="${d}"]`);
-    const e    = document.querySelector(`.end[data-d="${d}"]`);
-    const a    = document.querySelector(`.abs-sel[data-d="${d}"]`);
-    const note = document.querySelector(`.abs-note[data-d="${d}"]`);
-    data[`d${d}`] = {
-      work:    chk?.checked||false,
-      start:   s?.value||'',
-      end:     e?.value||'',
-      absType: a?.value||'',
-      absNote: note?.value||''
-    };
-  }
-  return data;
-}
-function autoSaveDay(){
-  const data = collectData();
-  localStorage.setItem(MK(currentYear,currentMonth), JSON.stringify(data));
-  // GASにも自動バックアップ（サイレント・エラーは無視）
-  clearTimeout(window._gasTimer);
-  window._gasTimer = setTimeout(()=>{ gasAutoBackup(); }, 2000);
-}
-
-async function gasAutoBackup(){
-  try{
-    const payload = {};
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k.startsWith('murao_')) payload[k]=localStorage.getItem(k);
-    }
-    const encoded = encodeURIComponent(JSON.stringify(payload));
-    const url = GAS_URL+'?action=saveMurao&data='+encoded+'&t='+Date.now();
-    const res = await fetch(url,{method:'GET',mode:'cors'});
-    const json = await res.json();
-    if(json.status==='ok'){
-      setSyncStatus('✅ 自動バックアップ完了 '+nowStr());
-    }
-  }catch(e){
-    // サイレントエラー（通信失敗時はlocalStorageに残る）
-    setSyncStatus('⚠ バックアップ失敗（ローカルには保存済）');
-  }
+    const result=await salaryLoad();
+    if(!Object.keys(result.data).length){setSyncStatus('保存済みデータはありません。旧画面のバックアップを取り込めます');return;}
+    if(!confirm('この画面のデータをバックアップしてから、保存済みデータを取得しますか？'))return;
+    salaryExport();
+    Object.keys(salaryLocalData()).forEach(k=>localStorage.removeItem(k));
+    Object.entries(result.data).forEach(([k,v])=>localStorage.setItem(k,v));
+    loadSettings();renderRestTags();buildTable(currentYear,currentMonth);renderHistory();
+    setSyncStatus('✅ 最新データを取得しました '+nowStr());
+  }catch(err){setSyncStatus('❌ 取得失敗: '+err.message);}
+  finally{btn.disabled=false;}
 }
 function saveMonth(){ autoSaveDay(); renderHistory(); showToast('💾 保存しました！'); }
 function changeMonth(delta){
@@ -764,8 +487,7 @@ renderHistory();
   if(!hasMuraoData){
     setSyncStatus('🔄 クラウドからデータ取得中…');
     try{
-      const res = await fetch(GAS_URL+'?action=loadMurao&t='+Date.now());
-      const json = await res.json();
+      const json = await salaryLoad();
       if(json.status==='ok' && json.data && Object.keys(json.data).length>0){
         Object.entries(json.data).forEach(([k,v])=>{ if(k.startsWith('murao_')) localStorage.setItem(k,v); });
         setSyncStatus('✅ クラウドからデータ復元 '+nowStr());
@@ -782,6 +504,6 @@ renderHistory();
   }
 })();
 </script>
-<script src="security/salary_transfer.js"></script>
+
 </body>
 </html>

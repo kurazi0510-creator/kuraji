@@ -1,4 +1,11 @@
-## 2026-10-01 11:00 JST checkpoint（最新）
+## 2026-10-01 11:52 JST checkpoint（最新）
+
+- 11:45の写真で元のGASのアクティブが3件。v1〜7の旧公開先をアーカイブ後、v97（現行）、v30（給与）、v24（修復ツール）を残した状態。
+- 11:47に給与ページは使いたいが未完成との回答。v30はデータ引継ぎまで保留。v24だけのアーカイブを案内したが、完了報告はまだない。
+- 管理専用の給与画面とバックアップ機能をコードで準備し検証。Google/GitHub Pagesの実環境へは未反映。詳しくは [SALARY_CUTOVER.md](SALARY_CUTOVER.md)。
+- 給与用v30を閉じる前に旧ブラウザ・旧Script Propertiesのデータを引き継ぐ。全体移行完了とはしない。
+
+## 2026-10-01 11:00 JST checkpoint
 
 - 中継URLのキー33文字／GAS64文字の不一致を修正し、LINE検証は09:44に成功。
 - Workerに ctx.waitUntil を追加した版を反映。09:55の実際のLINEテストで upstream 200、accepted:true、denied:false を写真で確認。永続キューや再送保証ではない。
