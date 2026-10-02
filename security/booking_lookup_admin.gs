@@ -5,7 +5,9 @@ function bookingLookupAdminRequest(request){
   if(request.action==='list'){
     var links={},rows=sheet?sheet.getDataRange().getValues():[];
     rows.slice(1).forEach(function(r){links[String(r[0])]={tel:String(r[0]),uid:String(r[1]),cardId:String(r[2]),name:String(r[3]),active:String(r[4])==='有効'};});
-    return {users:getLineUsers().users||[],links:Object.keys(links).map(function(k){return links[k];})};
+    var patientsSheet=ss.getSheetByName('患者');
+    var candidates=patientsSheet?patientsSheet.getDataRange().getValues().slice(1).map(function(r){return {cardId:String(r[0]).trim(),name:String(r[1]||''),tel:fixPhoneLeadingZero_(r[4])};}).filter(function(p){return p.cardId&&p.name&&p.tel;}):[];
+    return {version:'line-registration-20261001',patients:candidates,users:getLineUsers().users||[],links:Object.keys(links).map(function(k){return links[k];})};
   }
   var tel=String(request.tel||'').replace(/\D/g,'');
   if(!/^0\d{9,10}$/.test(tel))throw new Error('電話番号を確認してください');
@@ -26,6 +28,13 @@ function bookingLookupAdminRequest(request){
   try{
     sheet=ss.getSheetByName('予約確認連携');
     if(!sheet){sheet=ss.insertSheet('予約確認連携');sheet.appendRow(['tel','uid','cardId','name','status','verifiedAt']);}
+    if(request.action==='verify'){
+      var saved=saveLineUserPhoneManual(uid,tel,name,cardId);
+      if(!saved||!saved.ok)throw new Error(saved&&saved.error||'LINE電話番号の保存に失敗しました');
+      var previous=sheet.getDataRange().getValues(),latest={};
+      previous.slice(1).forEach(function(r){latest[String(r[0])]=r;});
+      Object.keys(latest).forEach(function(key){var r=latest[key];if(key!==tel&&String(r[1])===uid&&String(r[4])==='有効')sheet.appendRow([key,'','','','無効',Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd HH:mm:ss')]);});
+    }
     var row=[tel,uid,cardId,name,request.action==='verify'?'有効':'無効',Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd HH:mm:ss')];
     sheet.getRange(sheet.getLastRow()+1,1,1,6).setNumberFormat('@').setValues([row]);
     return {ok:true};
