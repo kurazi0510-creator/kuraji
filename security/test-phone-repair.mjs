@@ -1,0 +1,32 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const header=['診察券No','患者名','電話番号'];
+let patients=[header,['1','確認 太郎','09012345678']];
+let writes=0;
+const sheet={getDataRange:()=>({getValues:()=>structuredClone(patients)}),getRange:(r,c)=>({setNumberFormat(){return this;},setValue(v){patients[r-1][c-1]=v;writes++;return this;}})};
+const backupRows=[['診察券No','患者名','修正前電話番号','修正後電話番号'],['1','確認 太郎','0901234567','09012345678']];
+const old={getName:()=> '電話番号修正前_20261001_105010',getDataRange:()=>({getValues:()=>[backupRows[0],['1','確認 太郎','0901234567','09012345679']]})};
+const current={getName:()=> '電話番号修正前_20261002_105010',getDataRange:()=>({getValues:()=>backupRows})};
+const ss={getSheetByName:n=>n==='患者'?sheet:null,getSheets:()=>[current,old]};
+const context={SpreadsheetApp:{getActiveSpreadsheet:()=>ss,flush(){}},LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},Logger:{log(){}}};
+vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../gas_full_v5.gs',import.meta.url),'utf8'),context);
+context.getPatientTombstones_=()=>({});context.saveSheet=(name,rows)=>{assert.equal(name,'患者');patients=rows;};
+context.saveCustomersSafe([header,['1','確認 太郎','0901234567']]);
+assert.equal(patients[1][2],'09012345678','stale truncated value cannot replace a valid mobile');
+context.saveCustomersSafe([header,['1','確認 太郎','08099999999']]);
+assert.equal(patients[1][2],'08099999999','legitimate correction remains possible');
+patients=[header,['1','確認 太郎','0901234567']];
+context.previewRestorePhoneNumbers();assert.equal(writes,0,'preview does not write');
+context.runRestorePhoneNumbers();assert.equal(patients[1][2],'09012345678','newest backup chosen by timestamp, not sheet order');
+context.runRestorePhoneNumbers();assert.equal(writes,1,'repeat is safe');
+patients[1][2]='08099999999';context.runRestorePhoneNumbers();assert.equal(patients[1][2],'08099999999','later correction kept');
+patients[1][2]='0901234567';patients[1][1]='別の患者';context.runRestorePhoneNumbers();assert.equal(writes,1,'wrong patient skipped');
+patients=[header,['1','確認 太郎','0901234567'],['1','確認 太郎','0901234567']];context.runRestorePhoneNumbers();assert.equal(writes,1,'duplicate card skipped');
+assert.equal(context.scanTruncatedMobileNumbers().length,2);
+for(const name of ['Admin.gs','Public.gs']){
+ const source=fs.readFileSync(new URL('./dist/'+name,import.meta.url),'utf8');
+ for(const fn of ['scanTruncatedMobileNumbers','previewRestorePhoneNumbers','runRestorePhoneNumbers'])assert.ok(source.includes('function '+fn+'('));
+ assert.ok(source.includes('var telColIdx=header.map'));
+}
+console.log('Phone repair: stale overwrite prevention, legitimate corrections, preview, latest backup, idempotence, name and duplicate checks; both bundles passed.');
