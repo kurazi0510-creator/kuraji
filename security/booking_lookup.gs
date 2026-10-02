@@ -1,4 +1,4 @@
-// Shared reader. Only the owner-only project can write verified links.
+// Shared reader. Links are written by the owner or the signed LINE registration webhook.
 function verifiedBookingLookupLink_(tel){
   var ss=SpreadsheetApp.getActiveSpreadsheet(),sheet=ss.getSheetByName('予約確認連携');
   if(sheet){
