@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>倉治整骨院｜売上管理</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0f172a;--card:#1e293b;--border:#334155;
+  --text:#f1f5f9;--muted:#94a3b8;--accent:#f97316;
+  --hoken:#3b82f6;--jishi:#f97316;--kureka:#8b5cf6;--bussan:#22c55e;
+}
+body{font-family:'Hiragino Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px;}
+
+.hdr{background:var(--card);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:100;}
+.hdr h1{font-size:0.88rem;font-weight:bold;color:var(--accent);}
+.back{background:var(--border);border:none;color:var(--muted);padding:5px 10px;border-radius:6px;font-size:0.75rem;cursor:pointer;}
+
+/* 表示モード切替 */
+.mode-btns{display:flex;gap:0;background:var(--card);border-bottom:1px solid var(--border);padding:8px 14px;}
+.mode-btn{flex:1;padding:8px;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-size:0.8rem;cursor:pointer;font-weight:bold;}
+.mode-btn:first-child{border-radius:8px 0 0 8px;}
+.mode-btn:last-child{border-radius:0 8px 8px 0;}
+.mode-btn.on{background:var(--accent);border-color:var(--accent);color:white;}
+
+/* 日付ナビ */
+.date-nav{display:flex;gap:6px;padding:10px 14px;align-items:center;background:var(--card);border-bottom:1px solid var(--border);}
+.dnav-btn{background:var(--border);border:none;color:var(--text);padding:7px 12px;border-radius:7px;font-size:0.78rem;cursor:pointer;white-space:nowrap;}
+.dnav-btn.today{background:var(--accent);color:white;}
+input[type=date],input[type=month]{background:var(--card);border:1.5px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-size:0.82rem;flex:1;}
+
+/* 入力エリア（日別） */
+.day-input{padding:12px 14px;}
+.sec{background:var(--card);border-radius:12px;padding:14px;margin-bottom:10px;border-left:4px solid;}
+.sec-hoken{border-color:var(--hoken);}
+.sec-jishi{border-color:var(--jishi);}
+.sec-kureka{border-color:var(--kureka);}
+.sec-bussan{border-color:var(--bussan);}
+.sec-title{font-size:0.75rem;font-weight:bold;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.amounts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.amt-btn{padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:0.8rem;cursor:pointer;font-weight:bold;}
+.amt-btn:active{opacity:0.7;}
+.custom-row{display:flex;gap:6px;align-items:center;}
+.custom-row input{flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:0.9rem;text-align:right;}
+.custom-row input:focus{outline:none;border-color:var(--accent);}
+.add-btn{background:var(--accent);border:none;color:white;padding:8px 14px;border-radius:8px;font-size:0.8rem;cursor:pointer;white-space:nowrap;}
+.entries{margin-top:8px;}
+.entry{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:0.82rem;}
+.entry-del{background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:0.72rem;}
+.entry-sum{font-size:0.78rem;color:var(--muted);text-align:right;margin-top:4px;}
+.entry-sum strong{color:var(--text);}
+
+/* 合計バー */
+.total-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(15,23,42,0.97);border-top:2px solid var(--accent);padding:10px 14px;}
+.totals-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:8px;}
+.total-item{text-align:center;background:var(--card);border-radius:8px;padding:6px 4px;}
+.total-item .lbl{font-size:0.62rem;color:var(--muted);}
+.total-item .val{font-size:0.85rem;font-weight:bold;}
+.grand-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.grand-lbl{font-size:0.82rem;font-weight:bold;color:var(--muted);}
+.grand-val{font-size:1.2rem;font-weight:bold;color:var(--accent);}
+.save-btn{width:100%;padding:10px;background:var(--accent);border:none;border-radius:9px;color:white;font-size:0.9rem;font-weight:bold;cursor:pointer;}
+
+/* 月次ビュー */
+.month-view{padding:12px 14px;display:none;}
+.month-hdr{display:flex;justify-content:space-between;font-size:0.72rem;color:var(--muted);padding:4px 8px;margin-bottom:4px;}
+.day-row{background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;}
+.day-row:active{opacity:0.8;}
+.day-row-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.day-name{font-size:0.82rem;font-weight:bold;}
+.day-total{font-size:0.9rem;font-weight:bold;color:var(--accent);}
+.day-breakdown{display:flex;gap:6px;flex-wrap:wrap;}
+.brk{font-size:0.68rem;padding:2px 7px;border-radius:10px;color:white;}
+.brk-h{background:var(--hoken);}
+.brk-j{background:var(--jishi);}
+.brk-k{background:var(--kureka);}
+.brk-b{background:var(--bussan);}
+.month-total-bar{background:var(--card);border-radius:10px;padding:12px;margin-top:8px;}
+.month-totals{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.mt-item{display:flex;justify-content:space-between;font-size:0.8rem;padding:6px 8px;background:var(--bg);border-radius:6px;}
+.mt-grand{font-size:1rem;font-weight:bold;color:var(--accent);text-align:right;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.no-data{color:var(--muted);font-size:0.82rem;text-align:center;padding:24px;}
+.saved{color:#22c55e;font-size:0.75rem;text-align:center;padding:3px;display:none;}
+</style>
+<script>
+window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+window.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;
+function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
+// Only runs inside an owner-only Apps Script HTML-service deployment.
+// The public GitHub copy of kanri.html must not be used after cutover.
+(() => {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init = {}) {
+    const url = typeof input === 'string' ? input : input.url;
+    const parsed = new URL(url, location.href);
+    if (parsed.hostname !== 'script.google.com' ||
+        !/^\/macros\/s\/[^/]+\/exec$/.test(parsed.pathname) ||
+        parsed.pathname !== '/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec') {
+      return nativeFetch(input, init);
+    }
+    const method = (init.method || (input.method || 'GET')).toUpperCase();
+    const request = method === 'GET'
+      ? {method, params: Object.fromEntries(parsed.searchParams)}
+      : {method, body: JSON.parse(init.body || '{}')};
+    const data = await new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).adminRequest(request);
+    });
+    return new Response(data, {status: 200, headers: {'Content-Type': 'application/json'}});
+  };
+})();
+
+</script>
+</head>
+<body>
+<div class="hdr">
+  <button class="back" onclick="window.open(adminPageUrl('Admin'),'_top')">← 戻る</button>
+  <h1>💴 売上管理</h1>
+</div>
+
+<div class="mode-btns">
+  <button class="mode-btn on" id="mode-day" onclick="setMode('day')">📅 日別入力</button>
+  <button class="mode-btn" id="mode-month" onclick="setMode('month')">📊 月次集計</button>
+</div>
+
+<div class="date-nav" id="nav-day">
+  <button class="dnav-btn" onclick="moveDay(-1)">◀ 前日</button>
+  <input type="date" id="sel-date" onchange="onDateChange()">
+  <button class="dnav-btn today" onclick="moveDay(0)">今日</button>
+  <button class="dnav-btn" onclick="moveDay(1)">翌日 ▶</button>
+</div>
+<div class="date-nav" id="nav-month" style="display:none">
+  <button class="dnav-btn" onclick="moveMonth(-1)">◀ 前月</button>
+  <input type="month" id="sel-month" onchange="onMonthChange()">
+  <button class="dnav-btn today" onclick="moveMonth(0)">今月</button>
+  <button class="dnav-btn" onclick="moveMonth(1)">翌月 ▶</button>
+</div>
+
+<!-- 日別入力 -->
+<div class="day-input" id="view-day">
+
+  <div class="sec sec-hoken">
+    <div class="sec-title" style="color:var(--hoken)">🏥 窓口負担（保険）</div>
+    <div class="amounts">
+      <button class="amt-btn" style="color:var(--hoken);border-color:var(--hoken)" onclick="quickAdd('hoken',300)">¥300</button>
+      <button class="amt-btn" style="color:var(--hoken);border-color:var(--hoken)" onclick="quickAdd('hoken',600)">¥600</button>
+      <button class="amt-btn" style="color:var(--hoken);border-color:var(--hoken)" onclick="quickAdd('hoken',900)">¥900</button>
+      <button class="amt-btn" style="color:var(--hoken);border-color:var(--hoken)" onclick="quickAdd('hoken',1200)">¥1,200</button>
+      <button class="amt-btn" style="color:var(--hoken);border-color:var(--hoken)" onclick="quickAdd('hoken',2000)">¥2,000</button>
+    </div>
+    <div class="custom-row">
+      <input type="number" id="inp-hoken" placeholder="金額を入力" inputmode="numeric">
+      <button class="add-btn" style="background:var(--hoken)" onclick="addCustom('hoken')">＋追加</button>
+    </div>
+    <div class="entries" id="entries-hoken"></div>
+    <div class="entry-sum" id="sum-hoken">合計: <strong>¥0</strong></div>
+  </div>
+
+  <div class="sec sec-jishi">
+    <div class="sec-title" style="color:var(--jishi)">💴 自費（現金）</div>
+    <div class="amounts">
+      <button class="amt-btn" style="color:var(--jishi);border-color:var(--jishi)" onclick="quickAdd('jishi',3980)">¥3,980</button>
+      <button class="amt-btn" style="color:var(--jishi);border-color:var(--jishi)" onclick="quickAdd('jishi',5500)">¥5,500</button>
+      <button class="amt-btn" style="color:var(--jishi);border-color:var(--jishi)" onclick="quickAdd('jishi',3500)">¥3,500</button>
+      <button class="amt-btn" style="color:var(--jishi);border-color:var(--jishi)" onclick="quickAdd('jishi',3480)">¥3,480</button>
+      <button class="amt-btn" style="color:var(--jishi);border-color:var(--jishi)" onclick="quickAdd('jishi',2000)">¥2,000</button>
+    </div>
+    <div class="custom-row">
+      <input type="number" id="inp-jishi" placeholder="金額を入力" inputmode="numeric">
+      <button class="add-btn" onclick="addCustom('jishi')">＋追加</button>
+    </div>
+    <div class="entries" id="entries-jishi"></div>
+    <div class="entry-sum" id="sum-jishi">合計: <strong>¥0</strong></div>
+  </div>
+
+  <div class="sec sec-kureka">
+    <div class="sec-title" style="color:var(--kureka)">💳 自費（クレカ・QR）</div>
+    <div class="amounts">
+      <button class="amt-btn" style="color:var(--kureka);border-color:var(--kureka)" onclick="quickAdd('kureka',3980)">¥3,980</button>
+      <button class="amt-btn" style="color:var(--kureka);border-color:var(--kureka)" onclick="quickAdd('kureka',5500)">¥5,500</button>
+      <button class="amt-btn" style="color:var(--kureka);border-color:var(--kureka)" onclick="quickAdd('kureka',39600)">¥39,600</button>
+      <button class="amt-btn" style="color:var(--kureka);border-color:var(--kureka)" onclick="quickAdd('kureka',55000)">¥55,000</button>
+    </div>
+    <div class="custom-row">
+      <input type="number" id="inp-kureka" placeholder="金額を入力" inputmode="numeric">
+      <button class="add-btn" style="background:var(--kureka)" onclick="addCustom('kureka')">＋追加</button>
+    </div>
+    <div class="entries" id="entries-kureka"></div>
+    <div class="entry-sum" id="sum-kureka">合計: <strong>¥0</strong></div>
+  </div>
+
+  <div class="sec sec-bussan">
+    <div class="sec-title" style="color:var(--bussan)">🛍 物販</div>
+    <div class="amounts">
+      <button class="amt-btn" style="color:var(--bussan);border-color:var(--bussan)" onclick="quickAdd('bussan',300,'クラウドテープS')">テープS ¥300</button>
+      <button class="amt-btn" style="color:var(--bussan);border-color:var(--bussan)" onclick="quickAdd('bussan',500,'クラウドテープL')">テープL ¥500</button>
+      <button class="amt-btn" style="color:var(--bussan);border-color:var(--bussan)" onclick="quickAdd('bussan',39600,'枕')">枕 ¥39,600</button>
+      <button class="amt-btn" style="color:var(--bussan);border-color:var(--bussan)" onclick="quickAdd('bussan',5500,'シリカアンカール')">アンカール ¥5,500</button>
+      <button class="amt-btn" style="color:var(--bussan);border-color:var(--bussan)" onclick="quickAdd('bussan',8800,'エラスチン')">エラスチン ¥8,800</button>
+      <button class="amt-btn" style="color:var(--bussan);border-color:var(--bussan)" onclick="quickAdd('bussan',55000,'整体10回券')">10回券 ¥55,000</button>
+    </div>
+    <div class="custom-row">
+      <input type="number" id="inp-bussan" placeholder="金額を入力" inputmode="numeric">
+      <button class="add-btn" style="background:var(--bussan)" onclick="addCustom('bussan')">＋追加</button>
+    </div>
+    <div class="entries" id="entries-bussan"></div>
+    <div class="entry-sum" id="sum-bussan">合計: <strong>¥0</strong></div>
+  </div>
+
+</div>
+
+<!-- 月次ビュー -->
+<div class="month-view" id="view-month"></div>
+
+<!-- 合計バー（日別） -->
+<div class="total-bar" id="bar-day">
+  <div class="totals-grid">
+    <div class="total-item"><div class="lbl">窓口負担</div><div class="val" id="tb-hoken" style="color:var(--hoken)">¥0</div></div>
+    <div class="total-item"><div class="lbl">自費現金</div><div class="val" id="tb-jishi" style="color:var(--jishi)">¥0</div></div>
+    <div class="total-item"><div class="lbl">クレカ/QR</div><div class="val" id="tb-kureka" style="color:var(--kureka)">¥0</div></div>
+    <div class="total-item"><div class="lbl">物販</div><div class="val" id="tb-bussan" style="color:var(--bussan)">¥0</div></div>
+  </div>
+  <div class="grand-row">
+    <span class="grand-lbl">本日合計</span>
+    <span class="grand-val" id="tb-total">¥0</span>
+  </div>
+  <div class="saved" id="saved-msg">✅ 保存しました</div>
+  <button class="save-btn" onclick="saveDay()">💾 保存する</button>
+</div>
+
+<script>
+const STORE_KEY='kj_uriage_v2';
+let db={};// {YYYY-MM-DD:{hoken:[],jishi:[],kureka:[],bussan:[]}}
+let curDate='',curMonth='',mode='day';
+
+function td(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function tm(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function today(){return td(new Date());}
+function thisMonth(){return tm(new Date());}
+function yn(n){return'¥'+n.toLocaleString();}
+function load(){try{const s=localStorage.getItem(STORE_KEY);if(s)db=JSON.parse(s);}catch(e){}}
+function save(){localStorage.setItem(STORE_KEY,JSON.stringify(db));}
+function ensure(date){if(!db[date])db[date]={hoken:[],jishi:[],kureka:[],bussan:[]};['hoken','jishi','kureka','bussan'].forEach(t=>{if(!db[date][t])db[date][t]=[];});}
+function getSum(date,type){ensure(date);return db[date][type].reduce((s,v)=>s+v,0);}
+function getDayTotal(date){return['hoken','jishi','kureka','bussan'].reduce((s,t)=>s+getSum(date,t),0);}
+
+function init(){
+  load();
+  curDate=today();curMonth=thisMonth();
+  document.getElementById('sel-date').value=curDate;
+  document.getElementById('sel-month').value=curMonth;
+  renderDay();
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById('mode-day').classList.toggle('on',m==='day');
+  document.getElementById('mode-month').classList.toggle('on',m==='month');
+  document.getElementById('view-day').style.display=m==='day'?'block':'none';
+  document.getElementById('view-month').style.display=m==='month'?'block':'none';
+  document.getElementById('bar-day').style.display=m==='day'?'block':'none';
+  document.getElementById('nav-day').style.display=m==='day'?'flex':'none';
+  document.getElementById('nav-month').style.display=m==='month'?'flex':'none';
+  if(m==='month')renderMonth();
+}
+
+function moveDay(n){
+  if(n===0){curDate=today();}
+  else{const d=new Date(curDate+'T00:00:00');d.setDate(d.getDate()+n);curDate=td(d);}
+  document.getElementById('sel-date').value=curDate;
+  renderDay();
+}
+function onDateChange(){curDate=document.getElementById('sel-date').value;renderDay();}
+function moveMonth(n){
+  if(n===0){curMonth=thisMonth();}
+  else{const d=new Date(curMonth+'-01T00:00:00');d.setMonth(d.getMonth()+n);curMonth=tm(d);}
+  document.getElementById('sel-month').value=curMonth;
+  renderMonth();
+}
+function onMonthChange(){curMonth=document.getElementById('sel-month').value;renderMonth();}
+
+function quickAdd(type,amount,label){
+  ensure(curDate);
+  db[curDate][type].push(amount);
+  renderDay();
+}
+function addCustom(type){
+  const el=document.getElementById('inp-'+type);
+  const v=parseInt(el.value)||0;
+  if(!v)return;
+  ensure(curDate);
+  db[curDate][type].push(v);
+  el.value='';
+  renderDay();
+}
+function removeEntry(type,idx){
+  ensure(curDate);
+  db[curDate][type].splice(idx,1);
+  renderDay();
+}
+
+function renderDay(){
+  ensure(curDate);
+  const dn=['日','月','火','水','木','金','土'];
+  const d=new Date(curDate+'T00:00:00');
+  ['hoken','jishi','kureka','bussan'].forEach(type=>{
+    const entries=db[curDate][type]||[];
+    const container=document.getElementById('entries-'+type);
+    const sumEl=document.getElementById('sum-'+type);
+    const total=entries.reduce((s,v)=>s+v,0);
+    container.innerHTML=entries.map((v,i)=>`
+      <div class="entry">
+        <span>${yn(v)}</span>
+        <button class="entry-del" onclick="removeEntry('${type}',${i})">✕</button>
+      </div>`).join('');
+    sumEl.innerHTML=`合計: <strong>${yn(total)}</strong>（${entries.length}件）`;
+    document.getElementById('tb-'+type).textContent=yn(total);
+  });
+  const total=getDayTotal(curDate);
+  document.getElementById('tb-total').textContent=yn(total);
+}
+
+function saveDay(){
+  save();
+  const msg=document.getElementById('saved-msg');
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',2000);
+}
+
+function renderMonth(){
+  const container=document.getElementById('view-month');
+  const [y,m]=curMonth.split('-').map(Number);
+  const daysInMonth=new Date(y,m,0).getDate();
+  const dn=['日','月','火','水','木','金','土'];
+  let totalH=0,totalJ=0,totalK=0,totalB=0;
+  let rows='';
+  let hasData=false;
+  for(let i=1;i<=daysInMonth;i++){
+    const date=curMonth+'-'+String(i).padStart(2,'0');
+    const h=getSum(date,'hoken'),j=getSum(date,'jishi'),k=getSum(date,'kureka'),b=getSum(date,'bussan');
+    const dayTotal=h+j+k+b;
+    if(!dayTotal)continue;
+    hasData=true;
+    totalH+=h;totalJ+=j;totalK+=k;totalB+=b;
+    const wd=new Date(date+'T00:00:00').getDay();
+    const wColor=wd===0?'#dc2626':wd===6?'#2563eb':'var(--text)';
+    rows+=`<div class="day-row" onclick="goToDay('${date}')">
+      <div class="day-row-top">
+        <span class="day-name" style="color:${wColor}">${m}/${i}（${dn[wd]}）</span>
+        <span class="day-total">${yn(dayTotal)}</span>
+      </div>
+      <div class="day-breakdown">
+        ${h?`<span class="brk brk-h">窓口 ${yn(h)}</span>`:''}
+        ${j?`<span class="brk brk-j">自費現 ${yn(j)}</span>`:''}
+        ${k?`<span class="brk brk-k">クレカ ${yn(k)}</span>`:''}
+        ${b?`<span class="brk brk-b">物販 ${yn(b)}</span>`:''}
+      </div>
+    </div>`;
+  }
+  const grand=totalH+totalJ+totalK+totalB;
+  container.innerHTML=(!hasData?`<div class="no-data">この月のデータはまだありません</div>`:rows)+`
+    <div class="month-total-bar">
+      <div style="font-size:0.78rem;font-weight:bold;color:var(--muted);margin-bottom:8px">${y}年${m}月の合計</div>
+      <div class="month-totals">
+        <div class="mt-item"><span style="color:var(--hoken)">🏥 窓口負担</span><strong>${yn(totalH)}</strong></div>
+        <div class="mt-item"><span style="color:var(--jishi)">💴 自費現金</span><strong>${yn(totalJ)}</strong></div>
+        <div class="mt-item"><span style="color:var(--kureka)">💳 クレカ/QR</span><strong>${yn(totalK)}</strong></div>
+        <div class="mt-item"><span style="color:var(--bussan)">🛍 物販</span><strong>${yn(totalB)}</strong></div>
+      </div>
+      <div class="mt-grand">月合計：${yn(grand)}</div>
+    </div>`;
+}
+
+function goToDay(date){
+  curDate=date;
+  document.getElementById('sel-date').value=date;
+  setMode('day');
+  renderDay();
+}
+
+init();
+</script>
+</body>
+</html>

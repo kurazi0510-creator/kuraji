@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const uid='U'+'a'.repeat(32),other='U'+'b'.repeat(32),tel='09012345678';
+let patients,links,saves=[],replies=[],phones={};
+const range=(row)=>({setNumberFormat(){return this;},setValues(values){links[row-1]=values[0];return this;}});
+const linkSheet={getDataRange:()=>({getValues:()=>links}),getLastRow:()=>links.length,getRange:range,appendRow:r=>links.push(r)};
+const ss={getSheetByName:n=>n==='患者'?{getDataRange:()=>({getValues:()=>patients})}:n==='予約確認連携'&&links?linkSheet:null,insertSheet:n=>{assert.equal(n,'予約確認連携');links=[];return linkSheet;}};
+const ctx={SpreadsheetApp:{getActiveSpreadsheet:()=>ss,flush(){}},Utilities:{formatDate:()=> '2026-10-02 15:50:00'},PropertiesService:{getScriptProperties:()=>({getProperty:()=> 'token'})},UrlFetchApp:{fetch:(url,options)=>{if(url.includes('/profile/'))return {getResponseCode:()=>200,getContentText:()=>JSON.stringify({displayName:'まる'})};replies.push(JSON.parse(options.payload));return {getResponseCode:()=>200};}}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync(new URL('./dist/Public.gs',import.meta.url),'utf8'),ctx);
+ctx.saveLinePhone_=(u,t)=>{phones[u]=t;};ctx.findPhoneByUid_=u=>phones[u]||'';
+ctx.saveLineUserPhoneManual=(u,t,n,c)=>{saves.push({u,t,n,c});return {ok:true};};
+function reset(){patients=[['診察券No','患者名','ふりがな','性別','電話番号'],['123','確認 太郎','','',tel]];links=null;saves=[];replies=[];phones={};}
+function event(text,source={type:'user',userId:uid}){return {type:'message',source,replyToken:'reply',message:{type:'text',text}};}
+assert.equal(ctx.lineRegistrationParsePhone_('０９０－１２３４－５６７８'),tel);
+assert.equal(ctx.lineRegistrationParsePhone_('電話番号：090-1234-5678'),tel);
+assert.equal(ctx.lineRegistrationParsePhone_('0901234567'),'invalid');
+assert.equal(ctx.lineRegistrationParsePhone_('10月2日09012345678'),'');
+reset();assert.equal(ctx.handleLinePhoneRegistrationEvent_(event(tel)),true);assert.equal(phones[uid],tel);assert.equal(links[1][2],'123');assert.equal(saves[0].n,'確認 太郎');assert.match(replies[0].messages[0].text,/連携が完了/);
+ctx.handleLinePhoneRegistrationEvent_(event(tel));assert.equal(links.length,2,'redelivery does not append another active registration');
+reset();patients.push(['124','確認 子供','','',tel]);ctx.handleLinePhoneRegistrationEvent_(event(tel));assert.equal(links,null);assert.match(replies[0].messages[0].text,/診察券番号/);
+ctx.handleLinePhoneRegistrationEvent_(event('診察券番号：124'));assert.equal(links[1][2],'124','family selection uses card, not display name');
+reset();links=[['tel','uid','cardId','name','status'],[tel,other,'123','確認 太郎','有効']];ctx.handleLinePhoneRegistrationEvent_(event(tel));assert.equal(saves.length,0);assert.equal(links[1][1],other,'cannot take over another LINE');
+links[1]=[tel,uid,'123','確認 太郎','無効'];ctx.handleLinePhoneRegistrationEvent_(event(tel));assert.equal(links.length,2,'revocation is preserved');
+reset();patients.push(['123','別の人','','','08099999999']);ctx.handleLinePhoneRegistrationEvent_(event(tel));assert.equal(links,null,'duplicate patient card requires correction');
+reset();ctx.handleLinePhoneRegistrationEvent_(event('0901234567'));assert.equal(phones[uid],undefined);assert.equal(links,null);
+reset();patients[1][4]='08099999999';ctx.handleLinePhoneRegistrationEvent_(event(tel));assert.equal(phones[uid],tel);assert.equal(links,null,'unmatched phone saved without guessing');
+reset();ctx.handleLinePhoneRegistrationEvent_(event(tel,{type:'group',userId:uid}));assert.equal(replies.length,0);assert.equal(phones[uid],undefined);
+reset();assert.equal(ctx.handleLinePhoneRegistrationEvent_(event('予約を希望します')),false);
+const source=fs.readFileSync(new URL('./dist/Public.gs',import.meta.url),'utf8');
+assert.match(source,/if\(handleLinePhoneRegistrationEvent_\(ev\)\)\{if\(eventKey\)/);
+assert.doesNotMatch(source,/PUBLIC_POST_ACTIONS_=[^\n]*lineRegistrationAutoLink/);
+// Test the actual public entry point: signatures, replies and retry suppression.
+ctx.ContentService={MimeType:{JSON:'json'},createTextOutput(content){return {getContent:()=>content,setMimeType(){return this;}};}};
+ctx.Logger={log(){}};ctx.LockService={getScriptLock:()=>({waitLock(){},releaseLock(){}})};
+const cache=new Map();ctx.CacheService={getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})};
+ctx.bookingLookupCacheKey_=s=>s;ctx.PropertiesService.getScriptProperties=()=>({getProperty:k=>k==='LINE_WEBHOOK_FORWARD_KEY'?'key':'token'});
+reset();const body={events:[{...event(tel),webhookEventId:'test-id'}]};
+const post=key=>JSON.parse(ctx.doPost({postData:{contents:JSON.stringify(body)},parameter:{webhookKey:key}}).getContent());
+assert.equal(post('wrong').ok,false);assert.equal(links,null);
+assert.equal(post('key').ok,true);assert.equal(links[1][2],'123');assert.equal(replies.length,1);
+assert.equal(post('key').ok,true);assert.equal(replies.length,1,'successful phone replies participate in retry deduplication');
+console.log('Automatic phone registration: parsing, unique patient, family card, conflicts, revocation, retries, invalid numbers and groups passed');

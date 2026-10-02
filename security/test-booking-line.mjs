@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const uid='U'+'a'.repeat(32), other='U'+'b'.repeat(32), tel='09012345678';
+let rows=[['tel','uid','card','name','status'],[tel,uid,'123','確認 太郎','有効']],calls=[],readCalls=[];
+let result={ok:true,list:[{date:'2099-10-01',time:'08:30',menu:'整体'}],requests:[{menu:'整体',candidates:[{date:'2099-10-02',time:'10:00',order:1}]}]};
+const ctx={SpreadsheetApp:{getActiveSpreadsheet:()=>({getSheetByName:()=>({getDataRange:()=>({getValues:()=>rows})})})},
+PropertiesService:{getScriptProperties:()=>({getProperty:()=> 'test-token'})},
+UrlFetchApp:{fetch:(url,options)=>{calls.push({url,body:JSON.parse(options.payload)});return {getResponseCode:()=>200};}}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync(new URL('./dist/Public.gs',import.meta.url),'utf8'),ctx);
+ctx.lookupVerifiedBookings_=t=>{readCalls.push(t);return result;};
+const event={type:'message',source:{type:'user',userId:uid},replyToken:'test-reply',message:{type:'text',text:'予約確認'}};
+assert.equal(ctx.handleBookingLookupLineEvent_(event),true);
+assert.deepEqual(readCalls,[tel]);assert.match(calls[0].url,/\/reply$/);assert.equal(calls[0].body.replyToken,'test-reply');
+assert.match(calls[0].body.messages[0].text,/2099-10-01 08:30/);assert.match(calls[0].body.messages[0].text,/未確定/);
+assert.doesNotMatch(calls[0].body.messages[0].text,/09012345678/);
+assert.equal(ctx.handleBookingLookupLineEvent_({...event,message:{type:'text',text:' 予約を確認 '}}),true);
+calls=[];readCalls=[];
+ctx.handleBookingLookupLineEvent_({...event,source:{type:'group',userId:uid,groupId:'g'}});
+assert.equal(calls.length,0);assert.equal(readCalls.length,0,'no patient data read for groups');
+ctx.handleBookingLookupLineEvent_({...event,source:{type:'user',userId:other}});
+assert.equal(readCalls.length,0);assert.match(calls[0].body.messages[0].text,/本人確認登録/);
+rows.push([tel,uid,'123','確認 太郎','無効']);assert.equal(ctx.bookingLookupTelForUid_(uid),'');
+rows.push([tel,other,'123','確認 太郎','有効']);assert.equal(ctx.bookingLookupTelForUid_(uid),'','reassignment invalidates old uid');
+rows.push([tel,uid,'123','確認 太郎','有効'],['09099999999',uid,'124','別人','有効']);
+assert.equal(ctx.bookingLookupTelForUid_(uid),'','ambiguous links must not guess');
+rows.pop();result={ok:false};calls=[];ctx.handleBookingLookupLineEvent_(event);assert.match(calls[0].body.messages[0].text,/本人確認登録/);
+assert.equal(ctx.handleBookingLookupLineEvent_({...event,message:{type:'text',text:'予約確認の登録を希望'}}),false,'normal enquiries remain unchanged');
+calls=[];assert.equal(ctx.sendBookingLookupCode_('test-token',uid,'1234ABCD').ok,true);
+const actions=calls[0].body.messages[0].template.actions;assert.equal(actions[0].type,'clipboard');assert.equal(actions[0].clipboardText,'1234ABCD');assert.equal(actions[1].text,'予約確認');
+ctx.UrlFetchApp.fetch=()=>({getResponseCode:()=>500});assert.equal(ctx.sendBookingLookupCode_('token',uid,'1234ABCD').ok,false);
+assert.throws(()=>ctx.handleBookingLookupLineEvent_(event),/返信/);
+const src=fs.readFileSync(new URL('./dist/Public.gs',import.meta.url),'utf8');
+assert.match(src,/if\(handleBookingLookupLineEvent_\(ev\)\)\{if\(eventKey\)/,'successful replies participate in duplicate suppression');
+assert.doesNotMatch(src,/PUBLIC_POST_ACTIONS_=[^\n]*handleBookingLookup/,'userId lookup must not be public POST action');
+console.log('LINE booking: verified uid, revocation, groups, ambiguous links, reply failures and clipboard action passed');
