@@ -20,6 +20,8 @@ function doPost(e){
       try{ lock.waitLock(10000); }catch(lockErr){ /* ロック取得失敗時もそのまま続行（最悪重複の可能性は残るが処理は止めない） */ }
       body.events.forEach(function(ev){
         try{
+          if(handleLinePhoneRegistrationEvent_(ev))return;
+          if(handleBookingLookupLineEvent_(ev))return;
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
             // ★LINE公式アカウントマネージャー側の「あいさつメッセージ」を使用しているため、
             //   ここでの自動送信はしない（重複して2通届いてしまうのを防ぐ）。
@@ -97,6 +99,8 @@ function doPost(e){
       else if(action==="resetBookings"){resetBookings();result={ok:true};}
       else if(action==="lineNotifyV2")result=sendLineMessagingAPI(PropertiesService.getScriptProperties().getProperty("LINE_TOKEN"),body.userId,body.message); // ★セキュリティ対策：クライアントから送られてきたトークンは使わず、必ずサーバー側の設定値だけを使う
       else if(action==="testLineOwner")result=testLineOwner(); // ★院長本人へのテスト送信専用。token/userIdをクライアントから一切受け取らない
+      else if(action==="requestBookingLookupCode")result=requestBookingLookupCode(body.tel);
+      else if(action==="verifyBookingLookupCode")result=verifyBookingLookupCode(body.tel,body.code);
       else if(action==="getLineUsers")result=getLineUsers();
       else if(action==="saveWebBooking")result=saveWebBooking(body.data);
       else if(action==="saveWebBookingRequest")result=saveWebBookingRequest(body.data);
@@ -307,8 +311,8 @@ function testLineOwner(){
 // ============================================================
 // ★電話番号「末尾1桁欠け」の修復・監視ツール（新規追加）
 //   症状：090/080/070で始まる携帯番号なのに、なぜか10桁しかない（正しくは11桁）。
-//   原因はコードではなく、過去のデータ入力・移行時点にあると判明（現行フォームはmaxlength等の
-//   切り捨て処理が無く、安全を確認済み）。LINE等から復元できた正しい番号だけ、ここで安全に書き戻す。
+//   初回欠落の原因は未特定。古い管理画面からの保存で復元後の番号が戻る経路は別途保護する。
+//   LINE等から確認できた正しい番号だけ、ここで安全に書き戻す。
 // ============================================================
 
 // 現在「患者」シートで、携帯番号なのに10桁しかない（末尾1桁欠けの疑い）人を一覧表示する（確認のみ・書き換えなし）
@@ -336,33 +340,42 @@ function previewRestorePhoneNumbers(){ return restorePhoneNumbers_(true); }
 function runRestorePhoneNumbers(){ return restorePhoneNumbers_(false); }
 
 function restorePhoneNumbers_(dryRun){
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var backupSheet=null;
   ss.getSheets().forEach(function(sh){
-    if(/^電話番号修正前_/.test(sh.getName())) backupSheet=sh; // 一番最近作られたものを優先
+    if(/^電話番号修正前_\d{8}_\d{6}$/.test(sh.getName()) && (!backupSheet || sh.getName()>backupSheet.getName())) backupSheet=sh;
   });
   if(!backupSheet) return ["バックアップシート（電話番号修正前_...）が見つかりません"];
 
   var brows=backupSheet.getDataRange().getValues();
   var bh=brows[0].map(function(h){return String(h||"").trim();});
   var bCard=bh.indexOf("診察券No"), bName=bh.indexOf("患者名"), bBefore=bh.indexOf("修正前電話番号"), bAfter=bh.indexOf("修正後電話番号");
-  if(bCard<0||bAfter<0) return ["バックアップシートの列（診察券No／修正後電話番号）が見つかりません"];
+  if(bCard<0||bName<0||bBefore<0||bAfter<0) throw new Error('バックアップの診察券No・患者名・修正前電話番号・修正後電話番号を確認してください');
 
   var ps=ss.getSheetByName("患者");
+  if(!ps)throw new Error('患者シートがありません');
   var pdata=ps.getDataRange().getValues();
   var ph=pdata[0].map(function(h){return String(h||"").trim();});
   var pCard=ph.indexOf("診察券No"), pTel=ph.indexOf("電話番号"), pName=ph.indexOf("患者名");
+  if(pCard<0||pTel<0||pName<0)throw new Error('患者シートの見出しを確認してください');
+  var normalizePatientName=function(v){return String(v||'').replace(/\s/g,'');};
 
   var out=[];
   for(var i=1;i<brows.length;i++){
     var card=String(brows[i][bCard]||"").trim();
     var correct=String(brows[i][bAfter]||"").replace(/[^0-9]/g,"");
-    if(!card||!correct) continue;
-    var found=-1;
-    for(var r=1;r<pdata.length;r++){ if(String(pdata[r][pCard]||"").trim()===card){found=r;break;} }
+    var before=String(brows[i][bBefore]||'').replace(/[^0-9]/g,'');
+    if(!card||!/^0[789]0[0-9]{8}$/.test(correct)||before!==correct.slice(0,10)){out.push('診察券'+card+'：復元元の番号が不正です（スキップ）');continue;}
+    var found=-1, count=0;
+    for(var r=1;r<pdata.length;r++){ if(String(pdata[r][pCard]||"").trim()===card){found=r;count++;} }
+    if(count>1){out.push('診察券'+card+'：患者が重複しています（スキップ）');continue;}
     if(found<0){ out.push("診察券"+card+"：患者シートに見つかりません（スキップ）"); continue; }
     var curTel=String(pdata[found][pTel]||"").replace(/[^0-9]/g,"");
+    if(normalizePatientName(pdata[found][pName])!==normalizePatientName(brows[i][bName])){out.push('診察券'+card+'：患者名が一致しません（スキップ）');continue;}
     if(curTel===correct){ out.push("診察券"+card+"（"+String(pdata[found][pName]).replace(/\u3000/g," ")+"）：すでに正しい値です"); continue; }
+    if(curTel!==before){out.push('診察券'+card+'：現在の番号が修正前と異なるため保持しました');continue;}
     var nm=String(pdata[found][pName]||"").replace(/\u3000/g," ");
     var msg="診察券"+card+"（"+nm+"）："+curTel+" → "+correct;
     if(dryRun){ out.push("【確認のみ・未実行】"+msg); continue; }
@@ -370,7 +383,9 @@ function restorePhoneNumbers_(dryRun){
     out.push("【修正完了】"+msg);
   }
   out.forEach(function(x){Logger.log(x);});
+  if(!dryRun)SpreadsheetApp.flush();
   return out;
+  }finally{lock.releaseLock();}
 }
 
 function findPendingWebRequestByName_(msgText){
@@ -2976,25 +2991,52 @@ function saveWebBooking(data){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 
-// 予約確認ページ(confirm.html)用：電話番号から今後の予約を検索
-function lookupBooking(tel){
-  var digits=String(tel||"").replace(/[^0-9]/g,"");
-  if(!digits) return {ok:false, error:"電話番号を入力してください"};
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var meta=ss.getSheetByName("web_yoyaku_meta");
-  if(!meta) return {ok:true, list:[]};
-  var rows=meta.getDataRange().getValues();
-  var today=new Date();today.setHours(0,0,0,0);
-  var list=[];
-  for(var i=1;i<rows.length;i++){
-    var rTel=String(rows[i][3]||"").replace(/[^0-9]/g,"");
-    if(rTel!==digits) continue;
-    var d=new Date(String(rows[i][0]));
-    if(isNaN(d.getTime())||d<today) continue;
-    list.push({date:String(rows[i][0]), time:String(rows[i][1]), name:String(rows[i][2]), menu:String(rows[i][5])});
-  }
-  list.sort(function(a,b){return (a.date+a.time)<(b.date+b.time)?-1:1;});
-  return {ok:true, list:list};
+// Authenticated lookup reads current bookings, never stale web booking copies.
+function lookupBooking(tel){return lookupVerifiedBookings_(String(tel||'').replace(/\D/g,''));}
+
+// 公開ページの電話番号だけでは予約を開示しない。登録済みLINEへ短時間の確認コードを送る。
+function bookingLookupCacheKey_(tel){
+  var digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(tel));
+  return 'lookup_'+Utilities.base64EncodeWebSafe(digest).replace(/=/g,'');
+}
+// 自己申告の電話番号は本人確認にならない。院側で確認した対応表だけを照会に使う。
+// JSON {"電話番号":"LINE userId"} をサーバーのプロパティに設定する。未設定は非開示。
+function verifiedBookingLookupUid_(tel){
+  var link=verifiedBookingLookupLink_(tel);
+  return link?link.uid:'';
+}
+function requestBookingLookupCode(tel){
+  var digits=String(tel||'').replace(/\D/g,'');
+  if(!/^0\d{9,10}$/.test(digits))return {ok:false,error:'電話番号を確認してください'};
+  var generic={ok:true,message:'LINEに確認コードが届いた場合は入力してください。届かない場合は院へお問い合わせください。'};
+  var cache=CacheService.getScriptCache(),key=bookingLookupCacheKey_(digits);
+  if(cache.get(key))return generic; // 5分間、同一番号への再送を止める
+  var uid=verifiedBookingLookupUid_(digits),token=PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
+  if(!uid||!token)return generic; // 登録有無を外部に知らせない
+  var code=Utilities.getUuid().replace(/-/g,'').slice(0,8).toUpperCase();
+  cache.put(key,JSON.stringify({code:code,tries:0,uid:uid,expiresAt:Date.now()+300000}),300);
+  var sent=sendBookingLookupCode_(token,uid,code);
+  if(!sent||!sent.ok)cache.remove(key);
+  return generic;
+}
+function verifyBookingLookupCode(tel,code){
+  var digits=String(tel||'').replace(/\D/g,'');
+  var supplied=String(code||'').trim().toUpperCase();
+  if(!/^0\d{9,10}$/.test(digits)||!(/^[0-9A-F]{8}$/).test(supplied))return {ok:false,error:'確認コードが違うか期限切れです'};
+  var cache=CacheService.getScriptCache(),key=bookingLookupCacheKey_(digits);
+  var lock=LockService.getScriptLock();
+  lock.waitLock(10000);
+  try{
+    var raw=cache.get(key);
+    if(!raw)return {ok:false,error:'確認コードが違うか期限切れです'};
+    var state=JSON.parse(raw);
+    if(!state.uid||state.uid!==verifiedBookingLookupUid_(digits)||!state.expiresAt||Date.now()>=state.expiresAt){cache.remove(key);return {ok:false,error:'確認コードが違うか期限切れです'};}
+    if(state.tries>=4){cache.remove(key);return {ok:false,error:'確認回数を超えました。しばらくしてから再度お試しください'};}
+    state.tries++;
+    if(state.code!==supplied){cache.put(key,JSON.stringify(state),60);return {ok:false,error:'確認コードが違うか期限切れです'};}
+    cache.remove(key);
+    return lookupBooking(digits);
+  }finally{lock.releaseLock();}
 }
 
 // ★メール送信の権限をGoogleに許可させるためのテスト用関数★
