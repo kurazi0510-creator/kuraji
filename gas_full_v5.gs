@@ -738,6 +738,7 @@ function saveCustomersSafe(rows){
   var s=ss.getSheetByName("患者");
   var existing=s?s.getDataRange().getValues():[];
   var header=(existing.length?existing[0]:(rows.length?rows[0]:[]));
+  var telColIdx=header.map(function(h){return String(h||"").trim();}).indexOf("電話番号"); // ★末尾1桁欠け対策の対象列
   var existingById={};
   for(var i=1;i<existing.length;i++){
     var id=String(existing[i][0]||"").trim();
@@ -755,6 +756,18 @@ function saveCustomersSafe(rows){
     var base=existingById[id];
     var mergedRow=incoming.map(function(val,colIdx){
       var v=(val===null||val===undefined)?"":String(val).trim();
+      // ★電話番号だけは特別扱い：正しい11桁の携帯番号(090/080/070)が、
+      //   末尾1桁だけ欠けた10桁の値（=既存値の先頭10桁と一致）で上書きされそうな場合は、既存の11桁を優先する。
+      //   これは「過去に起きた末尾1桁欠けバグ」と全く同じ形の書き換えだけを防ぐもので、
+      //   全く別の正しい番号への訂正（上書き）は今まで通り通す。
+      if(colIdx===telColIdx && v!==""){
+        var incomingDigits=v.replace(/[^0-9]/g,"");
+        var baseDigits=(base&&base[colIdx]!==undefined)?String(base[colIdx]).replace(/[^0-9]/g,""):"";
+        if(/^(090|080|070)/.test(baseDigits) && baseDigits.length===11 &&
+           incomingDigits.length===10 && baseDigits.indexOf(incomingDigits)===0){
+          return base[colIdx]; // 末尾1桁欠けパターンと判定し、既存の正しい11桁を維持
+        }
+      }
       if(v!=="") return val; // 新しい値が入っていればそちらを優先
       if(base && base[colIdx]!==undefined && String(base[colIdx]).trim()!=="") return base[colIdx]; // 空なら既存データを残す（消さない）
       return val;
