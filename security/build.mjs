@@ -8,7 +8,7 @@ const out = path.join(root, 'security', 'dist');
 fs.mkdirSync(out, { recursive: true });
 const writeGenerated = (filename, contents) =>
   fs.writeFileSync(path.join(out, filename), contents.replace(/[\t ]+$/gm, ''));
-const core = fs.readFileSync(path.join(root, 'gas_full_v5.gs'), 'utf8')+'\n'+fs.readFileSync(path.join(root,'security/booking_lookup.gs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'security/booking_lookup_line.gs'),'utf8');
+const core = fs.readFileSync(path.join(root, 'gas_full_v5.gs'), 'utf8')+'\n'+fs.readFileSync(path.join(root,'security/booking_lookup.gs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'security/booking_lookup_line.gs'),'utf8')+'\n'+fs.readFileSync(path.join(root,'security/line_phone_registration.gs'),'utf8');
 const bridge = fs.readFileSync(path.join(root, 'security', 'admin_fetch_bridge.js'), 'utf8');
 
 const publicGet = ['getPublicSecurityStatus', 'getMenuMaster', 'getBizHours', 'getAvailableSlots', 'getAvailableSlotsRange'];
@@ -29,7 +29,7 @@ let pub = publicPrelude + core;
 pub = pub.replace('function doGet(e){', `function doGet(e){
   var publicAction=(e&&e.parameter&&e.parameter.action)||'';
   if(typeof publicAction!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_GET_ACTIONS_,publicAction))return publicReject_();
-  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',bookingLookupVersion:'verified-card-20261001',bookingLineVersion:'one-tap-20261001',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
+  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',bookingLookupVersion:'verified-card-20261001',bookingLineVersion:'one-tap-20261001',phoneRegistrationVersion:'auto-phone-20261002',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
   if(e.parameter.callback&&!/^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$/.test(e.parameter.callback))return publicReject_();
   if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));`);
 pub = pub.replace('function doPost(e){', `function doPost(e){
@@ -50,6 +50,7 @@ pub=pub.replace('body.events.forEach(function(ev){\n        try{', `body.events.
           var eventKey=ev&&ev.webhookEventId?bookingLookupCacheKey_('webhook:'+ev.webhookEventId):'';
           if(eventKey&&CacheService.getScriptCache().get(eventKey))return;`);
 pub=pub.replace('if(handleBookingLookupLineEvent_(ev))return;', "if(handleBookingLookupLineEvent_(ev)){if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);return;}");
+pub=pub.replace('if(handleLinePhoneRegistrationEvent_(ev))return;', "if(handleLinePhoneRegistrationEvent_(ev)){if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);return;}");
 pub=pub.replace('}catch(err){webhookFailed=true;Logger.log("event error:"+err);}', `if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);
         }catch(err){webhookFailed=true;Logger.log("event error:"+err);}`);
 pub=pub.replace('try{ lock.releaseLock(); }catch(relErr){}', `try{ lock.releaseLock(); }catch(relErr){}
@@ -117,6 +118,26 @@ for (const [name, filename] of Object.entries(pages)) {
     html=html.replace('<script>', '<script>\n'+transfer+'\n');
     html=html.replace('※ デスクトップで入力後「⬆保存」→ iPhone/iPad で「⬇取得」すると反映されます','※ 入力内容を共有するには「保存」を押してください。旧画面からはバックアップで引き継げます。');
     if(/GAS_URL|action=(?:load|save)Murao/.test(html))throw new Error('Salary still has a legacy network route');
+  }
+  if(name==='Admin'){
+    const lineCounts=/<div style="display:flex;gap:16px;margin-bottom:10px;font-size:0\.82rem">\s*<div>✅ 登録済み：<b id="lu-count-ok">0<\/b>人<\/div>\s*<div>⬜ 未登録：<b id="lu-count-ng">0<\/b>人<\/div>\s*<\/div>/;
+    if(!lineCounts.test(html))throw new Error('LINE registration count block was not found');
+    html=html.replace(lineCounts,`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:0.82rem">
+      <div style="color:#166534">✅ 予約確認 連携済み：<b id="lu-count-linked">0</b>人</div>
+      <div style="color:#92400e">🟠 電話番号のみ登録：<b id="lu-count-ok">0</b>人</div>
+      <div style="color:#4b5563">⬜ 電話番号未登録：<b id="lu-count-ng">0</b>人</div>
+    </div>
+    <label style="display:block;margin-bottom:10px">表示する状態：
+      <select id="lu-status-filter" onchange="renderLineUsers()" style="padding:7px;max-width:100%">
+        <option value="all">すべて</option>
+        <option value="phone">電話番号のみ登録（予約確認は未連携）</option>
+        <option value="linked">予約確認 連携済み</option>
+        <option value="missing">電話番号未登録</option>
+      </select>
+    </label>`);
+    const end=html.lastIndexOf('</body>');
+    if(end<0)throw new Error('Admin body terminator missing');
+    html=html.slice(0,end)+'<script>\n'+fs.readFileSync(path.join(root,'security/line_registration_client.js'),'utf8')+'\n</script>\n'+html.slice(end);
   }
   html=html.replaceAll('new URLSearchParams(location.search)','new URLSearchParams(window.KURAJI_PAGE_PARAMS)');
   if(name==='Karte'){
