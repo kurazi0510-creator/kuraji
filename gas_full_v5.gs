@@ -304,6 +304,75 @@ function testLineOwner(){
   var r=sendLineMessagingAPI(token,ownerId,msg);
   return (r&&r.ok) ? {ok:true} : {ok:false, error:"LINE送信に失敗しました"};
 }
+// ============================================================
+// ★電話番号「末尾1桁欠け」の修復・監視ツール（新規追加）
+//   症状：090/080/070で始まる携帯番号なのに、なぜか10桁しかない（正しくは11桁）。
+//   原因はコードではなく、過去のデータ入力・移行時点にあると判明（現行フォームはmaxlength等の
+//   切り捨て処理が無く、安全を確認済み）。LINE等から復元できた正しい番号だけ、ここで安全に書き戻す。
+// ============================================================
+
+// 現在「患者」シートで、携帯番号なのに10桁しかない（末尾1桁欠けの疑い）人を一覧表示する（確認のみ・書き換えなし）
+function scanTruncatedMobileNumbers(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("患者");
+  if(!s) return [];
+  var data=s.getDataRange().getValues();
+  var hd=data[0].map(function(h){return String(h||"").trim();});
+  var ci=hd.indexOf("診察券No"), ni=hd.indexOf("患者名"), ti=hd.indexOf("電話番号");
+  var out=[];
+  for(var i=1;i<data.length;i++){
+    var tel=String(data[i][ti]||"").replace(/[^0-9]/g,"");
+    if(/^(090|080|070)/.test(tel) && tel.length===10){
+      out.push({cardId:String(data[i][ci]||""), name:String(data[i][ni]||"").replace(/\u3000/g," "), tel:tel});
+    }
+  }
+  out.forEach(function(x){Logger.log(x.cardId+" "+x.name+" "+x.tel+"（末尾1桁不明）");});
+  Logger.log("合計 "+out.length+"件。正しい番号が分かり次第、患者シートを直接修正するか、バックアップシートに記録してrunRestorePhoneNumbers()系の仕組みを使ってください。");
+  return out;
+}
+
+// 「電話番号修正前_」で始むバックアップシートの記録をもとに、患者シートへ正しい番号を書き戻す（安全装置つき）
+function previewRestorePhoneNumbers(){ return restorePhoneNumbers_(true); }
+function runRestorePhoneNumbers(){ return restorePhoneNumbers_(false); }
+
+function restorePhoneNumbers_(dryRun){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var backupSheet=null;
+  ss.getSheets().forEach(function(sh){
+    if(/^電話番号修正前_/.test(sh.getName())) backupSheet=sh; // 一番最近作られたものを優先
+  });
+  if(!backupSheet) return ["バックアップシート（電話番号修正前_...）が見つかりません"];
+
+  var brows=backupSheet.getDataRange().getValues();
+  var bh=brows[0].map(function(h){return String(h||"").trim();});
+  var bCard=bh.indexOf("診察券No"), bName=bh.indexOf("患者名"), bBefore=bh.indexOf("修正前電話番号"), bAfter=bh.indexOf("修正後電話番号");
+  if(bCard<0||bAfter<0) return ["バックアップシートの列（診察券No／修正後電話番号）が見つかりません"];
+
+  var ps=ss.getSheetByName("患者");
+  var pdata=ps.getDataRange().getValues();
+  var ph=pdata[0].map(function(h){return String(h||"").trim();});
+  var pCard=ph.indexOf("診察券No"), pTel=ph.indexOf("電話番号"), pName=ph.indexOf("患者名");
+
+  var out=[];
+  for(var i=1;i<brows.length;i++){
+    var card=String(brows[i][bCard]||"").trim();
+    var correct=String(brows[i][bAfter]||"").replace(/[^0-9]/g,"");
+    if(!card||!correct) continue;
+    var found=-1;
+    for(var r=1;r<pdata.length;r++){ if(String(pdata[r][pCard]||"").trim()===card){found=r;break;} }
+    if(found<0){ out.push("診察券"+card+"：患者シートに見つかりません（スキップ）"); continue; }
+    var curTel=String(pdata[found][pTel]||"").replace(/[^0-9]/g,"");
+    if(curTel===correct){ out.push("診察券"+card+"（"+String(pdata[found][pName]).replace(/\u3000/g," ")+"）：すでに正しい値です"); continue; }
+    var nm=String(pdata[found][pName]||"").replace(/\u3000/g," ");
+    var msg="診察券"+card+"（"+nm+"）："+curTel+" → "+correct;
+    if(dryRun){ out.push("【確認のみ・未実行】"+msg); continue; }
+    ps.getRange(found+1,pTel+1).setNumberFormat("@").setValue(correct);
+    out.push("【修正完了】"+msg);
+  }
+  out.forEach(function(x){Logger.log(x);});
+  return out;
+}
+
 function findPendingWebRequestByName_(msgText){
   try{
     var target=normalizeName_(msgText);
