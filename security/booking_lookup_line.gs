@@ -15,7 +15,7 @@ function bookingLookupTelForUid_(uid){
   return found.length===1?found[0]:'';
 }
 function bookingLookupLineText_(result){
-  if(!result||!result.ok||result.needsLink)return '予約確認の本人確認登録が必要です。このLINEで「予約確認の登録を希望」とご連絡ください。';
+  if(!result||!result.ok||result.needsLink)return "📅 予約確認のご利用について\n\nこのLINEとご予約情報を結びつける、初回の本人確認登録がまだ完了していません。\n\n当院で、これまでのLINEのやり取りや登録情報を確認して連携します。お名前・電話番号をすでにお知らせいただいている方は、送り直す必要はありません。\n\nこのLINEに「予約確認の登録を希望」とお送りください。情報が不足している場合のみ、当院から確認のご連絡をいたします。\n\n登録完了後は、メニューの「予約確認」を押すだけで、ご予約日時を確認できます。対応までお時間をいただく場合があります。";
   var lines=['【倉治整骨院】ご予約内容'];
   if(result.list.length){
     lines.push('','■ 確定したご予約');
