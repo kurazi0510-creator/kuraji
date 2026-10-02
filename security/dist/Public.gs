@@ -12,7 +12,7 @@ function webhookAllowed_(e){
 function doGet(e){
   var publicAction=(e&&e.parameter&&e.parameter.action)||'';
   if(typeof publicAction!=='string'||!Object.prototype.hasOwnProperty.call(PUBLIC_GET_ACTIONS_,publicAction))return publicReject_();
-  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',bookingLookupVersion:'verified-card-20261001',bookingLineVersion:'one-tap-20261001',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
+  if(publicAction==='getPublicSecurityStatus')return ContentService.createTextOutput(JSON.stringify({ok:true,version:'kuraji-public-boundary-20260930',bookingLookupVersion:'verified-card-20261001',bookingLineVersion:'one-tap-20261001',phoneRegistrationVersion:'auto-phone-20261002',managementAccess:false,webhookRequiresRelay:true})).setMimeType(ContentService.MimeType.JSON);
   if(e.parameter.callback&&!/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(e.parameter.callback))return publicReject_();
   if(publicAction==='getAvailableSlotsRange')e.parameter.numDays=Math.min(7,Math.max(1,parseInt(e.parameter.numDays,10)||7));
   var action=(e&&e.parameter&&e.parameter.action)||"getAll";
@@ -44,6 +44,7 @@ function doPost(e){
         try{
           var eventKey=ev&&ev.webhookEventId?bookingLookupCacheKey_('webhook:'+ev.webhookEventId):'';
           if(eventKey&&CacheService.getScriptCache().get(eventKey))return;
+          if(handleLinePhoneRegistrationEvent_(ev)){if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);return;}
           if(handleBookingLookupLineEvent_(ev)){if(eventKey)CacheService.getScriptCache().put(eventKey,'done',21600);return;}
           if(ev.type==="follow"&&ev.source&&ev.source.userId){
             // ★LINE公式アカウントマネージャー側の「あいさつメッセージ」を使用しているため、
@@ -333,6 +334,86 @@ function testLineOwner(){
   var r=sendLineMessagingAPI(token,ownerId,msg);
   return (r&&r.ok) ? {ok:true} : {ok:false, error:"LINE送信に失敗しました"};
 }
+// ============================================================
+// ★電話番号「末尾1桁欠け」の修復・監視ツール（新規追加）
+//   症状：090/080/070で始まる携帯番号なのに、なぜか10桁しかない（正しくは11桁）。
+//   初回欠落の原因は未特定。古い管理画面からの保存で復元後の番号が戻る経路は別途保護する。
+//   LINE等から確認できた正しい番号だけ、ここで安全に書き戻す。
+// ============================================================
+
+// 現在「患者」シートで、携帯番号なのに10桁しかない（末尾1桁欠けの疑い）人を一覧表示する（確認のみ・書き換えなし）
+function scanTruncatedMobileNumbers(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var s=ss.getSheetByName("患者");
+  if(!s) return [];
+  var data=s.getDataRange().getValues();
+  var hd=data[0].map(function(h){return String(h||"").trim();});
+  var ci=hd.indexOf("診察券No"), ni=hd.indexOf("患者名"), ti=hd.indexOf("電話番号");
+  var out=[];
+  for(var i=1;i<data.length;i++){
+    var tel=String(data[i][ti]||"").replace(/[^0-9]/g,"");
+    if(/^(090|080|070)/.test(tel) && tel.length===10){
+      out.push({cardId:String(data[i][ci]||""), name:String(data[i][ni]||"").replace(/\u3000/g," "), tel:tel});
+    }
+  }
+  out.forEach(function(x){Logger.log(x.cardId+" "+x.name+" "+x.tel+"（末尾1桁不明）");});
+  Logger.log("合計 "+out.length+"件。正しい番号が分かり次第、患者シートを直接修正するか、バックアップシートに記録してrunRestorePhoneNumbers()系の仕組みを使ってください。");
+  return out;
+}
+
+// 「電話番号修正前_」で始むバックアップシートの記録をもとに、患者シートへ正しい番号を書き戻す（安全装置つき）
+function previewRestorePhoneNumbers(){ return restorePhoneNumbers_(true); }
+function runRestorePhoneNumbers(){ return restorePhoneNumbers_(false); }
+
+function restorePhoneNumbers_(dryRun){
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var backupSheet=null;
+  ss.getSheets().forEach(function(sh){
+    if(/^電話番号修正前_\d{8}_\d{6}$/.test(sh.getName()) && (!backupSheet || sh.getName()>backupSheet.getName())) backupSheet=sh;
+  });
+  if(!backupSheet) return ["バックアップシート（電話番号修正前_...）が見つかりません"];
+
+  var brows=backupSheet.getDataRange().getValues();
+  var bh=brows[0].map(function(h){return String(h||"").trim();});
+  var bCard=bh.indexOf("診察券No"), bName=bh.indexOf("患者名"), bBefore=bh.indexOf("修正前電話番号"), bAfter=bh.indexOf("修正後電話番号");
+  if(bCard<0||bName<0||bBefore<0||bAfter<0) throw new Error('バックアップの診察券No・患者名・修正前電話番号・修正後電話番号を確認してください');
+
+  var ps=ss.getSheetByName("患者");
+  if(!ps)throw new Error('患者シートがありません');
+  var pdata=ps.getDataRange().getValues();
+  var ph=pdata[0].map(function(h){return String(h||"").trim();});
+  var pCard=ph.indexOf("診察券No"), pTel=ph.indexOf("電話番号"), pName=ph.indexOf("患者名");
+  if(pCard<0||pTel<0||pName<0)throw new Error('患者シートの見出しを確認してください');
+  var normalizePatientName=function(v){return String(v||'').replace(/\s/g,'');};
+
+  var out=[];
+  for(var i=1;i<brows.length;i++){
+    var card=String(brows[i][bCard]||"").trim();
+    var correct=String(brows[i][bAfter]||"").replace(/[^0-9]/g,"");
+    var before=String(brows[i][bBefore]||'').replace(/[^0-9]/g,'');
+    if(!card||!/^0[789]0[0-9]{8}$/.test(correct)||before!==correct.slice(0,10)){out.push('診察券'+card+'：復元元の番号が不正です（スキップ）');continue;}
+    var found=-1, count=0;
+    for(var r=1;r<pdata.length;r++){ if(String(pdata[r][pCard]||"").trim()===card){found=r;count++;} }
+    if(count>1){out.push('診察券'+card+'：患者が重複しています（スキップ）');continue;}
+    if(found<0){ out.push("診察券"+card+"：患者シートに見つかりません（スキップ）"); continue; }
+    var curTel=String(pdata[found][pTel]||"").replace(/[^0-9]/g,"");
+    if(normalizePatientName(pdata[found][pName])!==normalizePatientName(brows[i][bName])){out.push('診察券'+card+'：患者名が一致しません（スキップ）');continue;}
+    if(curTel===correct){ out.push("診察券"+card+"（"+String(pdata[found][pName]).replace(/\u3000/g," ")+"）：すでに正しい値です"); continue; }
+    if(curTel!==before){out.push('診察券'+card+'：現在の番号が修正前と異なるため保持しました');continue;}
+    var nm=String(pdata[found][pName]||"").replace(/\u3000/g," ");
+    var msg="診察券"+card+"（"+nm+"）："+curTel+" → "+correct;
+    if(dryRun){ out.push("【確認のみ・未実行】"+msg); continue; }
+    ps.getRange(found+1,pTel+1).setNumberFormat("@").setValue(correct);
+    out.push("【修正完了】"+msg);
+  }
+  out.forEach(function(x){Logger.log(x);});
+  if(!dryRun)SpreadsheetApp.flush();
+  return out;
+  }finally{lock.releaseLock();}
+}
+
 function findPendingWebRequestByName_(msgText){
   try{
     var target=normalizeName_(msgText);
@@ -698,6 +779,7 @@ function saveCustomersSafe(rows){
   var s=ss.getSheetByName("患者");
   var existing=s?s.getDataRange().getValues():[];
   var header=(existing.length?existing[0]:(rows.length?rows[0]:[]));
+  var telColIdx=header.map(function(h){return String(h||"").trim();}).indexOf("電話番号"); // ★末尾1桁欠け対策の対象列
   var existingById={};
   for(var i=1;i<existing.length;i++){
     var id=String(existing[i][0]||"").trim();
@@ -715,6 +797,18 @@ function saveCustomersSafe(rows){
     var base=existingById[id];
     var mergedRow=incoming.map(function(val,colIdx){
       var v=(val===null||val===undefined)?"":String(val).trim();
+      // ★電話番号だけは特別扱い：正しい11桁の携帯番号(090/080/070)が、
+      //   末尾1桁だけ欠けた10桁の値（=既存値の先頭10桁と一致）で上書きされそうな場合は、既存の11桁を優先する。
+      //   これは「過去に起きた末尾1桁欠けバグ」と全く同じ形の書き換えだけを防ぐもので、
+      //   全く別の正しい番号への訂正（上書き）は今まで通り通す。
+      if(colIdx===telColIdx && v!==""){
+        var incomingDigits=v.replace(/[^0-9]/g,"");
+        var baseDigits=(base&&base[colIdx]!==undefined)?String(base[colIdx]).replace(/[^0-9]/g,""):"";
+        if(/^(090|080|070)/.test(baseDigits) && baseDigits.length===11 &&
+           incomingDigits.length===10 && baseDigits.indexOf(incomingDigits)===0){
+          return base[colIdx]; // 末尾1桁欠けパターンと判定し、既存の正しい11桁を維持
+        }
+      }
       if(v!=="") return val; // 新しい値が入っていればそちらを優先
       if(base && base[colIdx]!==undefined && String(base[colIdx]).trim()!=="") return base[colIdx]; // 空なら既存データを残す（消さない）
       return val;
@@ -3062,7 +3156,7 @@ function deleteBookingsByName(namePrefix){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 
-// Shared reader. Only the owner-only project can write verified links.
+// Shared reader. Links are written by the owner or the signed LINE registration webhook.
 function verifiedBookingLookupLink_(tel){
   var ss=SpreadsheetApp.getActiveSpreadsheet(),sheet=ss.getSheetByName('予約確認連携');
   if(sheet){
@@ -3140,7 +3234,7 @@ function bookingLookupTelForUid_(uid){
   return found.length===1?found[0]:'';
 }
 function bookingLookupLineText_(result){
-  if(!result||!result.ok||result.needsLink)return '予約確認の本人確認登録が必要です。このLINEで「予約確認の登録を希望」とご連絡ください。';
+  if(!result||!result.ok||result.needsLink)return "📅 予約確認のご利用について\n\nこのLINEとご予約情報を結びつける、初回の本人確認登録がまだ完了していません。\n\n当院で、これまでのLINEのやり取りや登録情報を確認して連携します。お名前・電話番号をすでにお知らせいただいている方は、送り直す必要はありません。\n\nこのLINEに「予約確認の登録を希望」とお送りください。情報が不足している場合のみ、当院から確認のご連絡をいたします。\n\n登録完了後は、メニューの「予約確認」を押すだけで、ご予約日時を確認できます。対応までお時間をいただく場合があります。";
   var lines=['【倉治整骨院】ご予約内容'];
   if(result.list.length){
     lines.push('','■ 確定したご予約');
@@ -3184,4 +3278,74 @@ function sendBookingLookupCode_(token,uid,code){
     });
     return {ok:res.getResponseCode()===200};
   }catch(err){return {ok:false};}
+}
+
+// Only invoked inside the signature-verified, locked LINE webhook.
+// Never expose this writer as a public GET/POST action.
+function lineRegistrationParsePhone_(text){
+  var value=String(text||'').trim().replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);});
+  value=value.replace(/^(?:電話番号|携帯番号|TEL)\s*[:：]?\s*/i,'').replace(/[-‐－ー―\s()（）]/g,'');
+  if(!/^0\d{9,10}$/.test(value))return '';
+  // A mobile number missing its final digit must never be used for matching.
+  if(/^0[789]0/.test(value)&&value.length!==11)return 'invalid';
+  return value;
+}
+function lineRegistrationAutoLink_(uid,tel,requestedCard){
+  if(!/^U[0-9a-f]{32}$/i.test(String(uid))||!/^0\d{9,10}$/.test(String(tel)))return 'review';
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),patientSheet=ss.getSheetByName('患者');
+  var rows=patientSheet?patientSheet.getDataRange().getValues():[];
+  var header=rows[0]||[],cardCol=header.indexOf('診察券No'),nameCol=header.indexOf('患者名'),telCol=header.indexOf('電話番号');
+  if(cardCol<0||nameCol<0||telCol<0)return 'review';
+  var candidates=rows.slice(1).filter(function(r){return fixPhoneLeadingZero_(r[telCol])===tel;});
+  if(requestedCard)candidates=candidates.filter(function(r){return String(r[cardCol]).trim()===requestedCard;});
+  if(candidates.length!==1)return candidates.length>1?'family':'unmatched';
+  var patient=candidates[0],card=String(patient[cardCol]).trim(),name=String(patient[nameCol]||'').trim();
+  if(!card||!name||rows.slice(1).filter(function(r){return String(r[cardCol]).trim()===card;}).length!==1)return 'review';
+  var sheet=ss.getSheetByName('予約確認連携'),links=sheet?sheet.getDataRange().getValues():[],latest=Object.create(null);
+  links.slice(1).forEach(function(r){latest[String(r[0])]=r;});
+  var same=latest[tel];
+  // Keep revoked links, conflicting LINE accounts and other existing identities
+  // for staff correction. A newly submitted phone must not silently replace them.
+  if(same&&(String(same[4])!=='有効'||String(same[1])!==uid||String(same[2]).trim()!==card))return 'review';
+  if(Object.keys(latest).some(function(k){var r=latest[k];return k!==tel&&String(r[1])===uid&&String(r[4])==='有効';}))return 'review';
+  if(same&&normalizeName_(same[3])!==normalizeName_(name))return 'review';
+  var saved=saveLineUserPhoneManual(uid,tel,name,card);
+  if(!saved||!saved.ok)throw new Error('LINE登録を保存できませんでした');
+  if(!same){
+    if(!sheet){sheet=ss.insertSheet('予約確認連携');sheet.appendRow(['tel','uid','cardId','name','status','verifiedAt']);}
+    sheet.getRange(sheet.getLastRow()+1,1,1,6).setNumberFormat('@').setValues([[tel,uid,card,name,'有効',Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd HH:mm:ss')]]);
+  }
+  SpreadsheetApp.flush();
+  return 'linked';
+}
+function handleLinePhoneRegistrationEvent_(ev){
+  if(!ev||ev.type!=='message'||!ev.message||ev.message.type!=='text')return false;
+  var tel=lineRegistrationParsePhone_(ev.message.text),cardMatch=String(ev.message.text||'').trim().match(/^診察券(?:番号|No)\s*[:：]?\s*([0-9]+)$/i);
+  if(!tel&&!cardMatch)return false;
+  if(!ev.source||ev.source.type!=='user')return true;
+  var uid=String(ev.source.userId||'');
+  if(!/^U[0-9a-f]{32}$/i.test(uid))return true;
+  var token=PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
+  if(!token||!ev.replyToken)throw new Error('電話番号登録の返信設定を確認してください');
+  var text;
+  if(tel==='invalid')text='携帯電話番号は11桁です。番号をご確認のうえ、もう一度お送りください。';
+  else{
+    if(cardMatch)tel=findPhoneByUid_(uid);
+    if(!tel)text='先にお電話番号をお送りください。';
+    else{
+      if(!cardMatch){
+        var displayName='';
+        var profile=UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/'+uid,{headers:{Authorization:'Bearer '+token},muteHttpExceptions:true});
+        if(profile.getResponseCode()===200)displayName=JSON.parse(profile.getContentText()).displayName||'';
+        saveLinePhone_(uid,tel,displayName);
+      }
+      var outcome=lineRegistrationAutoLink_(uid,tel,cardMatch?cardMatch[1]:'');
+      if(outcome==='linked')text='📱 お電話番号と予約確認の連携が完了しました。\nメニューの「予約確認」から、ご予約日時をご確認いただけます。\n登録内容に誤りがある場合は、このLINEでお知らせください。';
+      else if(outcome==='family')text='📱 お電話番号を登録しました。\nご家族などで同じ番号を使用されているため、確認したい方の診察券番号を「診察券番号：123」の形式でお送りください。診察券番号がわからない場合は、お名前をお知らせください。当院で確認します。';
+      else text='📱 お電話番号を受け付けました。\n当院で患者情報を確認して、予約確認の連携を行います。すでにお知らせいただいた情報を送り直す必要はありません。';
+    }
+  }
+  var response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply',{method:'post',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},payload:JSON.stringify({replyToken:ev.replyToken,messages:[{type:'text',text:text}]}),muteHttpExceptions:true});
+  if(response.getResponseCode()!==200)throw new Error('電話番号登録の返信に失敗しました');
+  return true;
 }
