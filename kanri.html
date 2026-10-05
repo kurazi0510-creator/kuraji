@@ -301,7 +301,7 @@ function printThisPage(pageId){
         <button class="btn bp bsm" onclick="openWaitlist()" style="background:#7e22ce;color:white;border-color:#7e22ce;position:relative">⏳ キャンセル待ち一覧<span id="waitlistBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
         <button class="btn bp bsm" onclick="sendWaitlistPreview()" style="background:#a78bfa;color:white;border-color:#a78bfa">👀 キャンセル待ちメッセージのプレビューを送る</button>
         <button class="btn bp bsm" onclick="openBlockSlots()" style="background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
-        <button class="btn bp bsm" onclick="openExtraSlotModal()" style="background:#0f766e;color:white;border-color:#0f766e">🍚 特別枠を追加/削除(昼休みなど・今表示中の日付だけ)</button>
+        <button class="btn bp bsm" onclick="openExtraSlotModal()" style="background:#0f766e;color:white;border-color:#0f766e">🍚 特別枠を追加/削除(早朝・昼休みなど・今表示中の日付だけ)</button>
         <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
         <button class="btn bp bsm" onclick="openBizHoursModal()" style="background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
         <button class="btn bp bsm" onclick="openIntervalModal()" style="background:#0369a1;color:white;border-color:#0369a1">⏱ インターバル設定(施術の準備時間)</button>
@@ -4429,7 +4429,7 @@ async function loadExtraSlotsThenRender(){
   renderSched(); // 特別枠が届いたら反映して再描画
 }
 // 昼休みの時間帯として選べる候補（20分刻み・12:30〜14:50）
-const LUNCH_CANDIDATE_SLOTS=['12:30','12:50','13:10','13:30','13:50','14:10','14:30','14:50'];
+const LUNCH_CANDIDATE_SLOTS=['08:10','12:30','12:50','13:10','13:30','13:50','14:10','14:30','14:50'];
 function openExtraSlotModal(){
   const date=document.getElementById('selDate').value;
   if(!date){ alert('先に日付を選んでください'); return; }
