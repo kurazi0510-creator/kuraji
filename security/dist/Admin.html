@@ -2470,12 +2470,7 @@ function setStat(cls,txt){const el=document.getElementById('sbadge');el.classNam
 async function syncAll(){
   setStat('s-ing','🔄 同期中...');
   const _syncFromGAS=async()=>{
-    if(typeof google!=='undefined'&&google.script?.run){
-      const repair=await new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).repairTomitaCard2085());
-      if(!repair?.ok)throw new Error(repair?.error||'診察券番号の整理に失敗しました');
-      patients=patients.filter(p=>String(p.name||'').replace(/[\s　]/g,'')!=='冨田茉香那'||String(p.id).trim()==='2085');
-      for(const day of Object.values(bookings))for(const b of Object.values(day))if(String(b.name||'').replace(/[\s　]/g,'')==='冨田茉香那')b.cardId='2085';
-    }
+
     const controller=new AbortController();
     const tid=setTimeout(()=>controller.abort(),12000);
     try{
@@ -2484,7 +2479,12 @@ async function syncAll(){
       if(!res.ok)throw new Error('HTTP '+res.status);
       const data=JSON.parse(await res.text());
       if(!data.ok)throw new Error('GAS error');
+      if(typeof google!=='undefined'&&google.script?.run){
+        patients=patients.filter(p=>String(p.name||'').replace(/[\s　]/g,'')!=='冨田茉香那'||String(p.id).trim()==='2085');
+        for(const day of Object.values(bookings))for(const b of Object.values(day))if(String(b.name||'').replace(/[\s　]/g,'')==='冨田茉香那')b.cardId='2085';
+      }
       if(data.extraSlotsByDate&&typeof data.extraSlotsByDate==='object'){
+        extraSlotsLoadedFromServer=true;
         extraSlotsByDate=data.extraSlotsByDate;
         extraSlotsForCurrentDate=extraSlotsByDate[document.getElementById('selDate').value]||[];
       }
@@ -4448,11 +4448,12 @@ function getSlots(dt,d){
 }
 
 // ★その日に追加されている特別枠（昼休みなど）をGASから取得してから予約表を再描画する
-async function loadExtraSlotsThenRender(){
+let extraSlotsLoadedFromServer=false;
+async function loadExtraSlotsThenRender(useSynced=false){
   const date=document.getElementById('selDate').value;
   extraSlotsForCurrentDate=(extraSlotsByDate[date]||[]).slice();
   renderSched();
-  if(!date)return;
+  if(!date||(useSynced&&extraSlotsLoadedFromServer))return;
   try{
     const res=await fetch(GAS+'?action=getExtraSlotsForDate&date='+encodeURIComponent(date)+'&t='+Date.now(),{cache:'no-store'});
     const data=await res.json();
@@ -5713,7 +5714,8 @@ async function saveBk(){
       save();renderSched();renderPatients();alert('予約を保存できませんでした。入力画面は残しています。最新データを確認して再度保存してください。');return;
     }
     save();renderSched();renderPatients();closeModal();
-    if(p)await pushP();pushStock();
+    if(p&&JSON.stringify(patients)!==beforeSave.patients)await pushP();
+    if(JSON.stringify(stockData)!==beforeSave.stock)pushStock();
   }finally{btn.textContent='予約を登録';btn.disabled=false;}
 }
 
@@ -5975,21 +5977,24 @@ function fixAllVisitCounts(){
   renderPatients();
   alert('✅ 来院回数の再計算完了！\n' + updated + '名の回数を更新しました。\n\n※予約データから実際の来院日数を正確に計算しました。');
 }
-function recalcAllVisitCounts(){
-  let updated = 0;
-  patients.forEach(p=>{
-    const realCount = calcVisitCount(p.name, p.id);
-    if(parseInt(p.count||0) !== realCount){
-      p.count = realCount;
-      updated++;
-    }
-    p.last = getLastVisitDate(p.name, p.id);
-  });
-  if(updated > 0){
-    save();
-    console.log('来院回数更新: '+updated+'名');
+function buildVisitDateIndex(){
+  const byId=new Map(),byName=new Map(),td=today();
+  const add=(map,key,date)=>{if(!key)return;if(!map.has(key))map.set(key,new Set());map.get(key).add(date);};
+  for(const [date,slots] of Object.entries(bookings)){
+    if(date>td)continue;
+    for(const bk of Object.values(slots))if(bk&&!bk.cont&&!bk.cancelled){add(byId,bk.cardId,date);add(byName,bk.name,date);}
   }
-  return updated;
+  return {byId,byName};
+}
+function recalcAllVisitCounts(){
+  const {byId,byName}=buildVisitDateIndex();let updated=0,lastChanged=false;
+  for(const p of patients){
+    const dates=new Set([...(byId.get(p.id)||[]),...(byName.get(p.name)||[])]);
+    const realCount=dates.size,last=dates.size?[...dates].sort().at(-1):'';
+    if(parseInt(p.count||0)!==realCount){p.count=realCount;updated++;}
+    if(p.last!==last){p.last=last;lastChanged=true;}
+  }
+  if(updated||lastChanged)save();return updated;
 }
 
 // 最終来院日を取得
@@ -8336,9 +8341,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
   pageRenderVersion.patients=dataRenderVersion;
   loadJpHolidays().then(()=>{renderWeekDayTabs();renderSched();});
   // GAS同期は起動時1回のみ（自動上書きしない）
-  await syncAll();
-  await syncBizHoursFromGAS();
-  await loadExtraSlotsThenRender();
+  await Promise.allSettled([syncAll(),syncBizHoursFromGAS()]);
+  await loadExtraSlotsThenRender(true);
   // ふりがな入力IME対策初期化
   setupKanaInput('c-kana');
   setupKanaInput('pe-kana');
@@ -8360,7 +8364,8 @@ document.getElementById('histModal').addEventListener('click',function(e){if(e.t
   // ★childList(要素の追加・削除)は監視しない。一覧の描画で要素が大量に追加されるたびに
   //   発火してしまい、モーダルを開いた直後の描画が極端に遅くなっていたため。
   //   class属性の変化（モーダルの開閉）だけを監視すれば十分。
-  new MutationObserver(syncModalOpen).observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true});
+  const modalObserver=new MutationObserver(syncModalOpen);
+  document.querySelectorAll('.modal-ov').forEach(modal=>modalObserver.observe(modal,{attributes:true,attributeFilter:['class']}));
   syncModalOpen();
 })();
 </script>

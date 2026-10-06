@@ -3348,6 +3348,7 @@ function adminRequest(request){
   if(!request||!request.method)throw new Error('Invalid request');
   var output;
   if(request.method==='GET'){
+    if(request.params&&request.params.action==='getAll'){var repair=repairTomitaCard2085();if(!repair.ok)throw new Error(repair.error);}
     output=adminApiGet_({parameter:request.params||{}});
   }else if(request.method==='POST'){
     output=adminApiPost_({postData:{contents:JSON.stringify(request.body||{})},parameter:{}});
@@ -3357,6 +3358,8 @@ function adminRequest(request){
 
 // Owner-only repair requested for this named patient. Preserve all records and backup first.
 function repairTomitaCard2085(){
+  var props=PropertiesService.getScriptProperties();
+  if(props.getProperty('TOMITA_2085_REPAIR_DONE')==='v1')return {ok:true,changed:0};
   var lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
     var ss=adminSpreadsheet_(),ps=ss.getSheetByName('患者');
@@ -3379,7 +3382,7 @@ function repairTomitaCard2085(){
       for(var j=1;j<data.length;j++)if(normal(data[j][nc])===target&&String(data[j][ic]).trim()!==keep)plans.push({sheet:sheet,row:j+1,col:ic+1,before:data[j]});
     });
     var changed=matches.some(function(i){return String(rows[i][0]).trim()!==keep;})||matches.length>1||plans.length;
-    if(!changed)return {ok:true,changed:0};
+    if(!changed){props.setProperty('TOMITA_2085_REPAIR_DONE','v1');return {ok:true,changed:0};}
     var backup=ss.getSheetByName('patient_identity_backup')||ss.insertSheet('patient_identity_backup');
     if(!backup.getLastRow())backup.appendRow(['日時','シート','元の行番号','元データ(JSON)']);
     matches.forEach(function(i){backup.appendRow([new Date(),'患者',i+1,JSON.stringify(rows[i])]);});
@@ -3391,6 +3394,7 @@ function repairTomitaCard2085(){
     ps.getRange(canonical+1,1,1,merged.length).setValues([merged]);
     matches.slice().sort(function(a,b){return b-a;}).forEach(function(i){if(i!==canonical)ps.deleteRow(i+1);});
     Object.keys(oldIds).forEach(function(id){if(!rows.some(function(r,i){return i>0&&normal(r[1])!==target&&String(r[0]).trim()===id;}))addPatientTombstone_(id);});
+    props.setProperty('TOMITA_2085_REPAIR_DONE','v1');
     return {ok:true,changed:matches.length+plans.length};
   }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
 }

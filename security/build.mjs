@@ -83,6 +83,7 @@ function adminRequest(request){
   if(!request||!request.method)throw new Error('Invalid request');
   var output;
   if(request.method==='GET'){
+    if(request.params&&request.params.action==='getAll'){var repair=repairTomitaCard2085();if(!repair.ok)throw new Error(repair.error);}
     output=adminApiGet_({parameter:request.params||{}});
   }else if(request.method==='POST'){
     output=adminApiPost_({postData:{contents:JSON.stringify(request.body||{})},parameter:{}});
