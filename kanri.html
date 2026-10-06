@@ -301,7 +301,7 @@ function printThisPage(pageId){
         <button class="btn bp bsm" onclick="openWaitlist()" style="background:#7e22ce;color:white;border-color:#7e22ce;position:relative">⏳ キャンセル待ち一覧<span id="waitlistBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
         <button class="btn bp bsm" onclick="sendWaitlistPreview()" style="background:#a78bfa;color:white;border-color:#a78bfa">👀 キャンセル待ちメッセージのプレビューを送る</button>
         <button class="btn bp bsm" onclick="openBlockSlots()" style="background:#57534e;color:white;border-color:#57534e">🚫 Web予約枠を手動で潰す/戻す</button>
-        <button class="btn bp bsm" onclick="openExtraSlotModal()" style="background:#0f766e;color:white;border-color:#0f766e">🍚 特別枠を追加/削除(昼休みなど・今表示中の日付だけ)</button>
+        <button class="btn bp bsm" onclick="openExtraSlotModal()" style="background:#0f766e;color:white;border-color:#0f766e">🍚 特別枠を追加/削除(早朝・昼休みなど・今表示中の日付だけ)</button>
         <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
         <button class="btn bp bsm" onclick="openBizHoursModal()" style="background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
         <button class="btn bp bsm" onclick="openIntervalModal()" style="background:#0369a1;color:white;border-color:#0369a1">⏱ インターバル設定(施術の準備時間)</button>
@@ -1568,16 +1568,19 @@ function printThisPage(pageId){
     <div id="print-content" style="padding:24px;font-family:'Hiragino Sans',sans-serif;font-size:12px;color:#1e293b"></div>
   </div>
 </div>
-<!-- QRコードモーダル -->
-<div id="qrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center">
-  <div style="background:white;border-radius:16px;padding:24px;max-width:340px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
-    <div style="font-size:0.9rem;font-weight:bold;color:#1e293b;margin-bottom:4px" id="qr-title">予約確認QRコード</div>
-    <div style="font-size:0.78rem;color:#64748b;margin-bottom:12px" id="qr-info"></div>
-    <img id="qr-img" style="width:200px;height:200px;border:1px solid #e2e8f0;border-radius:8px" src="">
-    <div style="font-size:0.72rem;color:#94a3b8;margin-top:8px">このQRコードをiPhoneで読み取ると<br>予約内容のメモが確認できます</div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="document.getElementById('qrModal').style.display='none'" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;background:white;cursor:pointer;font-weight:bold">閉じる</button>
-      <button onclick="downloadQR()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#1e293b;color:white;cursor:pointer;font-weight:bold">📥 保存</button>
+<!-- 予約日時変更モーダル -->
+<div class="modal-ov" id="moveBookingModal">
+  <div class="modal" style="max-width:420px">
+    <div class="mtitle">📅 予約日時を変更</div>
+    <div id="move-booking-info" style="font-size:0.82rem;color:var(--muted);margin-bottom:12px;padding:10px;background:#f8f6f1;border-radius:8px"></div>
+    <div class="fgrid" style="grid-template-columns:1fr 1fr;margin-bottom:8px">
+      <div class="fg"><label>変更後の日付</label><input class="inp" id="move-booking-date" type="date" onchange="loadMoveBookingTimes()"></div>
+      <div class="fg"><label>変更後の時間</label><select class="sel" id="move-booking-time"><option value="">読み込み中...</option></select></div>
+    </div>
+    <div id="move-booking-note" style="font-size:0.72rem;color:#64748b;margin:8px 0 14px">患者情報・区分・施術内容はそのまま引き継ぎます。</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn bc" onclick="closeMoveBookingModal()">戻る</button>
+      <button class="btn bp" id="move-booking-submit" onclick="execMoveBooking()" style="background:#2563eb;border-color:#2563eb;color:white">この日時に変更</button>
     </div>
   </div>
 </div>
@@ -2201,6 +2204,7 @@ let ticketMaster=[], patientTickets=[]; // 回数券・パックマスター、�
 let mBussanDisc={}; // 物販個別割引 {id: 割引額}
 let mBussanPrice={}; // 物販個別金額上書き {id: 金額}
 let editDate=null, editSlot=null;
+let moveBookingDate=null, moveBookingSlot=null;
 let mKubunSel=[], mBuiSel=[], mShochiSel={}, mBussanQty={}, mPaySel=[];
 let bsPaySel=[], uPaySel=[];
 let bsSelectedPatient=null, editPatientId=null;
@@ -2925,25 +2929,6 @@ function printContent(){
     </head><body>${content}</body></html>`);
   iframe.contentDocument.close();
   setTimeout(()=>{iframe.contentWindow.print();setTimeout(()=>document.body.removeChild(iframe),1000);},500);
-}
-
-// ===== QRコード =====
-function showQR(date,slot,name){
-  const w=['日','月','火','水','木','金','土'];
-  const dt=new Date(date);
-  const info=date.replace(/-/g,'/')+'('+w[dt.getDay()]+') '+slot+' '+name;
-  document.getElementById('qr-title').textContent='予約確認 QRコード';
-  document.getElementById('qr-info').textContent=date.replace(/-/g,'/')+'（'+w[dt.getDay()]+'） '+slot+'〜　'+(name||'')+'様';
-  // QRコードの内容はシンプルなテキストのみ（住所・電話番号を除外）
-  // 院名を含めるとGoogleマイビジネスが開くため、予約情報のみのテキストにする
-  const text=encodeURIComponent('予約: '+info+' (倉治整骨院)');
-  document.getElementById('qr-img').src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+text;
-  const modal=document.getElementById('qrModal');
-  modal.style.display='flex';
-}
-function downloadQR(){
-  const img=document.getElementById('qr-img');
-  const a=document.createElement('a');a.href=img.src;a.download='予約QR.png';a.click();
 }
 
 // ===== 月次レポート生成（PDF印刷） =====
@@ -4547,10 +4532,10 @@ function renderSched(){
   return '<br><span style="font-size:0.68rem;color:#f97316">💴 未会計</span>';
 })()}</td>
         <td style="white-space:nowrap">
-          <button class="btn bc bsm" onclick="editBk('${date}','${s}')">編集</button>
-          <button class="btn bp bsm" onclick="showQR('${date}','${s}','${bk.name||""}')" style="background:#7c3aed;border-color:#7c3aed;color:white;margin-top:2px">QR</button>
-          <button class="btn bcancel bsm" onclick="openCancelModal('${date}','${s}')" style="margin-top:2px">ｷｬﾝｾﾙ</button>
-          <button class="btn bd bsm" onclick="delBk('${date}','${s}')" style="margin-top:2px">削除</button>
+          <button class="btn bc bsm" onclick="editBk('${date}','${s}')" title="患者情報・区分・施術内容などを編集">内容編集</button>
+          <button class="btn bp bsm" onclick="openMoveBookingModal('${date}','${s}')" style="background:#2563eb;border-color:#2563eb;color:white;margin-top:2px">日時変更</button>
+          <button class="btn bcancel bsm" onclick="openCancelModal('${date}','${s}')" style="margin-top:2px" title="理由と履歴を残してキャンセル">ｷｬﾝｾﾙ</button>
+          <button class="btn bd bsm" onclick="delBk('${date}','${s}')" style="margin-top:2px" title="誤登録を予約表から完全に削除">完全削除</button>
         </td>`;
     }else{
       tr.innerHTML=`<td class="tc">${s}</td><td></td><td><span style="color:#ccc;font-size:0.7rem">空き</span></td><td colspan="6"></td><td><button class="btn ba bsm" onclick="openModal('${date}','${s}')">＋予約</button></td>`;
@@ -4593,6 +4578,109 @@ function updateStats(date,sl){
   }).length;
   const s6=document.getElementById('s6');
   if(s6){s6.textContent=uncounted;s6.closest('.sbox').style.background=uncounted>0?'rgba(249,115,22,0.15)':'';s6.style.color=uncounted>0?'#f97316':'inherit';}
+}
+
+// ===== 予約日時変更 =====
+function moveTimeBy20(slot,steps){
+  let [h,m]=String(slot).split(':').map(Number);
+  m+=20*steps;
+  h+=Math.floor(m/60);m=((m%60)+60)%60;
+  return pad(h)+':'+pad(m);
+}
+function bookingSpanCount(date,slot,bk){
+  let count=1;
+  for(let i=1;i<=2;i++){
+    const next=bookings[date]?.[moveTimeBy20(slot,i)];
+    if(next?.cont&&((bk.cardId&&next.cardId===bk.cardId)||(!bk.cardId&&next.name===bk.name)))count++;
+    else break;
+  }
+  return count;
+}
+function openMoveBookingModal(date,slot){
+  const bk=bookings[date]?.[slot];
+  if(!bk||bk.cont||bk.cancelled)return;
+  moveBookingDate=date;moveBookingSlot=slot;
+  document.getElementById('move-booking-info').innerHTML='<strong>'+bk.name+' 様</strong><br>現在：'+date.replace(/-/g,'/')+' '+slot+'〜';
+  document.getElementById('move-booking-date').value=date;
+  document.getElementById('moveBookingModal').classList.add('on');
+  loadMoveBookingTimes(slot);
+}
+function closeMoveBookingModal(){
+  document.getElementById('moveBookingModal').classList.remove('on');
+  moveBookingDate=null;moveBookingSlot=null;
+}
+async function loadMoveBookingTimes(preferred){
+  const date=document.getElementById('move-booking-date').value;
+  const sel=document.getElementById('move-booking-time');
+  if(!date){sel.innerHTML='<option value="">日付を選択してください</option>';return;}
+  sel.disabled=true;sel.innerHTML='<option value="">読み込み中...</option>';
+  let extra=[];
+  try{
+    const res=await fetch(GAS+'?action=getExtraSlotsForDate&date='+encodeURIComponent(date)+'&t='+Date.now(),{cache:'no-store'});
+    const d=await res.json();if(d.ok)extra=d.extra||[];
+  }catch(e){}
+  let slots=getSlots(dayType(date),date).filter(s=>s!=='BREAK');
+  slots=[...new Set([...slots,...extra])].sort();
+  const oldBk=bookings[moveBookingDate]?.[moveBookingSlot];
+  if(oldBk){
+    const span=bookingSpanCount(moveBookingDate,moveBookingSlot,oldBk);
+    const sourceKeys=new Set();
+    for(let i=0;i<span;i++)sourceKeys.add(moveBookingDate+'|'+moveTimeBy20(moveBookingSlot,i));
+    slots=slots.filter(slot=>{
+      for(let i=0;i<span;i++){
+        const time=moveTimeBy20(slot,i), existing=bookings[date]?.[time];
+        if(existing&&!existing.cancelled&&!sourceKeys.has(date+'|'+time))return false;
+      }
+      return true;
+    });
+  }
+  if(!slots.length){sel.innerHTML='<option value="">予約可能な時間がありません</option>';sel.disabled=false;return;}
+  sel.innerHTML='<option value="">時間を選択</option>'+slots.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+  const wanted=preferred||'';
+  if(wanted&&slots.includes(wanted))sel.value=wanted;
+  sel.disabled=false;
+}
+async function execMoveBooking(){
+  if(!moveBookingDate||!moveBookingSlot)return;
+  const newDate=document.getElementById('move-booking-date').value;
+  const newSlot=document.getElementById('move-booking-time').value;
+  if(!newDate||!newSlot){alert('変更後の日付と時間を選択してください');return;}
+  if(newDate===moveBookingDate&&newSlot===moveBookingSlot){alert('現在と同じ日時です');return;}
+  const oldDate=moveBookingDate, oldSlot=moveBookingSlot;
+  const oldBk=bookings[oldDate]?.[oldSlot];
+  if(!oldBk||oldBk.cont||oldBk.cancelled){alert('元の予約が見つかりません。最新データを取得して確認してください。');return;}
+  const span=bookingSpanCount(oldDate,oldSlot,oldBk);
+  const sourceKeys=new Set();
+  for(let i=0;i<span;i++)sourceKeys.add(oldDate+'|'+moveTimeBy20(oldSlot,i));
+  for(let i=0;i<span;i++){
+    const t=moveTimeBy20(newSlot,i), existing=bookings[newDate]?.[t];
+    if(existing&&!existing.cancelled&&!sourceKeys.has(newDate+'|'+t)){
+      alert('変更先の '+t+' は、すでに別の予約で使用されています。別の時間を選択してください。');return;
+    }
+  }
+  if(!confirm((oldBk.name||'患者')+'様の予約日時を変更します。\n\n'+oldDate+' '+oldSlot+'\n　↓\n'+newDate+' '+newSlot+'\n\nよろしいですか？'))return;
+  const before=JSON.stringify(bookings);
+  const btn=document.getElementById('move-booking-submit');
+  btn.disabled=true;btn.textContent='変更中...';
+  try{
+    for(let i=0;i<span;i++)delete bookings[oldDate][moveTimeBy20(oldSlot,i)];
+    if(!bookings[newDate])bookings[newDate]={};
+    bookings[newDate][newSlot]={...oldBk};
+    for(let i=1;i<span;i++)bookings[newDate][moveTimeBy20(newSlot,i)]={cont:true,name:oldBk.name||'',cardId:oldBk.cardId||''};
+    save();
+    const ok=await pushB();
+    if(!ok)throw new Error('予約表を保存できませんでした');
+    const movedName=oldBk.name||'';
+    document.getElementById('selDate').value=newDate;
+    closeMoveBookingModal();
+    await loadExtraSlotsThenRender();
+    alert('✅ '+movedName+'様の予約を\n'+oldDate+' '+oldSlot+' から\n'+newDate+' '+newSlot+' に変更しました');
+  }catch(e){
+    bookings=JSON.parse(before);save();renderSched();
+    alert('❌ 日時変更に失敗しました。元の予約はそのまま残しています。\n'+e.message);
+  }finally{
+    btn.disabled=false;btn.textContent='この日時に変更';
+  }
 }
 
 // ===== キャンセル =====
