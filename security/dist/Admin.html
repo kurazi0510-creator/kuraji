@@ -2240,6 +2240,7 @@ const DEFAULT_STOCK=[
 ];
 
 let patients=[], bookings={}, uriage={}, bussanLog=[], lp=[];
+let extraSlotsByDate={};
 let extraSlotsForCurrentDate=[]; // 表示中の日付に追加されている特別枠（GASから取得）
 let bussanMaster=[], shochiMaster=[], stockData=[];
 let ticketMaster=[], patientTickets=[]; // 回数券・パックマスター、患者ごとの購入・残数データ
@@ -2259,6 +2260,7 @@ const pageRenderVersion=Object.create(null);
 
 function save(){
   try{
+    localStorage.setItem('kj_extra_slots',JSON.stringify(extraSlotsByDate));
     localStorage.setItem('kj_p',JSON.stringify(patients));
     localStorage.setItem('kj_b',JSON.stringify(bookings));
     localStorage.setItem('kj_u',JSON.stringify(uriage));
@@ -2276,6 +2278,9 @@ function save(){
 }
 function load(){
   try{
+    extraSlotsByDate=JSON.parse(localStorage.getItem('kj_extra_slots')||'{}');
+    if(!extraSlotsByDate||Array.isArray(extraSlotsByDate)||typeof extraSlotsByDate!=='object')extraSlotsByDate={};
+    extraSlotsForCurrentDate=extraSlotsByDate[document.getElementById('selDate')?.value]||[];
     patients=JSON.parse(localStorage.getItem('kj_p')||'[]');
     // kj_bとkj_b_bakを比較して多い方を使う（データ消失防止）
     const bMain=JSON.parse(localStorage.getItem('kj_b')||'{}');
@@ -2344,25 +2349,7 @@ function fmtDate(v){
 }
 function fmtTime(v){
   if(v===null||v===undefined||v==='')return'';
-  const SLOTS=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50',
-    '11:10','11:30','11:50','12:10','15:00','15:20','15:40','16:00',
-    '16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40',
-    '19:00','19:20','19:40'];
-  const snapSlot=min=>{
-    // 完全一致を最優先チェック
-    const exact=pad(Math.floor(min/60)%24)+':'+pad(min%60);
-    if(SLOTS.includes(exact))return exact;
-    // 次に最近接スロット（10分以内のみ）
-    let best=null,bestDiff=9999;
-    SLOTS.forEach(s=>{
-      const[sh,sm]=s.split(':').map(Number);
-      const d=Math.abs(sh*60+sm-min);
-      if(d<bestDiff){bestDiff=d;best=s;}
-    });
-    if(bestDiff<=10)return best;
-    // それ以外はそのまま返す
-    return exact;
-  };
+  const snapSlot=min=>{const n=((Math.round(min)%1440)+1440)%1440;return pad(Math.floor(n/60))+':'+pad(n%60);};
   if(typeof v==='string'){
     // GASのExcelシリアル値バグ: 1899-12-30 or 1899-12-31 形式
     // JST時刻 + 510分 = GAS UTC分。逆変換: GAS分 - 510 = JST分
@@ -2380,12 +2367,7 @@ function fmtTime(v){
     if(m){
       const hh=parseInt(m[1]),mm=parseInt(m[2]);
       const exact=pad(hh)+':'+pad(mm);
-      if(SLOTS.includes(exact))return exact;
-      // スロットにない場合のみ最近接（20分以内）
-      const min2=hh*60+mm;
-      let best2=null,bd2=9999;
-      SLOTS.forEach(s=>{const[sh,sm]=s.split(':').map(Number);const d=Math.abs(sh*60+sm-min2);if(d<bd2){bd2=d;best2=s;}});
-      return bd2<=20?best2:exact;
+      return hh>=0&&hh<24&&mm>=0&&mm<60?exact:'';
     }
     return v.trim();
   }
@@ -2487,6 +2469,10 @@ async function syncAll(){
       if(!res.ok)throw new Error('HTTP '+res.status);
       const data=JSON.parse(await res.text());
       if(!data.ok)throw new Error('GAS error');
+      if(data.extraSlotsByDate&&typeof data.extraSlotsByDate==='object'){
+        extraSlotsByDate=data.extraSlotsByDate;
+        extraSlotsForCurrentDate=extraSlotsByDate[document.getElementById('selDate').value]||[];
+      }
 
       // 患者データ（GAS優先）
       const prows=data.customers||[];
@@ -2754,7 +2740,7 @@ async function pushB(){
     setStat('s-ing','🔄 保存中...');
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveBookings',rows:JSON.stringify(rows)}),redirect:'follow'});
     const d=JSON.parse(await res.text());
-    setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');return d.ok;
+    setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ '+(d.error||'保存エラー'));return d.ok;
   }catch(e){setStat('s-err','⚠ 保存エラー');return false;}
 }
 
@@ -4422,9 +4408,8 @@ function getSlots(dt,d){
   const cfg=d?getBizDayConfig(d):null;
   let mo,af;
   if(cfg){
-    if(cfg.closed) return [];
-    mo=genSlotsFromRange(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
-    af=genSlotsFromRange(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
+    mo=cfg.closed?[]:genSlotsFromRange(cfg.am&&cfg.am[0],cfg.am&&cfg.am[1]);
+    af=cfg.closed?[]:genSlotsFromRange(cfg.pm&&cfg.pm[0],cfg.pm&&cfg.pm[1]);
   }else{
     // フォールバック（従来ロジック・dのみ渡された旧呼び出しへの互換用）
     if(dt==='nichi')return[];
@@ -4433,7 +4418,7 @@ function getSlots(dt,d){
     af=[];h=15;m=0;while(!(h===20&&m===0)){af.push(pad(h)+':'+pad(m));m+=20;if(m>=60){m-=60;h++;}}
   }
   // ★院長がその日だけ手動で追加した特別枠（昼休みなど）を、時系列順の正しい位置に挿入する
-  const extra=(d===document.getElementById('selDate')?.value)?extraSlotsForCurrentDate:[];
+  const extra=extraSlotsByDate[d]||((d===document.getElementById('selDate')?.value)?extraSlotsForCurrentDate:[]);
   if(extra && extra.length){
     const moPlusExtra=[...new Set([...mo, ...extra])].sort();
     if(moPlusExtra.length&&af.length) return [...moPlusExtra,'BREAK',...af];
@@ -4450,17 +4435,22 @@ function getSlots(dt,d){
 // ★その日に追加されている特別枠（昼休みなど）をGASから取得してから予約表を再描画する
 async function loadExtraSlotsThenRender(){
   const date=document.getElementById('selDate').value;
-  renderSched(); // まず今ある情報で即座に表示（体感速度優先）
+  extraSlotsForCurrentDate=(extraSlotsByDate[date]||[]).slice();
+  renderSched();
   if(!date)return;
   try{
-    const res=await fetch(GAS+'?action=getExtraSlotsForDate&date='+date+'&t='+Date.now(),{cache:'no-store'});
-    const d=await res.json();
-    extraSlotsForCurrentDate=d.ok?(d.extra||[]):[];
-  }catch(e){ extraSlotsForCurrentDate=[]; }
-  renderSched(); // 特別枠が届いたら反映して再描画
+    const res=await fetch(GAS+'?action=getExtraSlotsForDate&date='+encodeURIComponent(date)+'&t='+Date.now(),{cache:'no-store'});
+    const data=await res.json();
+    if(!data.ok||!Array.isArray(data.extra))throw new Error(data.error||'特別枠を取得できませんでした');
+    extraSlotsByDate[date]=[...new Set(data.extra.map(fmtTime).filter(Boolean))].sort();
+    localStorage.setItem('kj_extra_slots',JSON.stringify(extraSlotsByDate));
+    if(document.getElementById('selDate').value!==date)return;
+    extraSlotsForCurrentDate=extraSlotsByDate[date].slice();
+  }catch(e){setStat('s-err','⚠ 特別枠の取得に失敗しました。保存済みの枠・予約を表示しています');}
+  if(document.getElementById('selDate').value===date)renderSched();
 }
 // 通常時間外の特別枠として選べる候補（早朝・昼休み）
-const LUNCH_CANDIDATE_SLOTS=['07:50','08:10','12:30','12:50','13:10','13:30','13:50','14:10','14:30','14:50'];
+const LUNCH_CANDIDATE_SLOTS=['07:50','08:10','12:30','12:50','13:10','13:30','13:50','14:00','14:20','14:40'];
 function openExtraSlotModal(){
   const date=document.getElementById('selDate').value;
   if(!date){ alert('先に日付を選んでください'); return; }
@@ -4476,18 +4466,27 @@ function renderExtraSlotButtons(){
     return `<button class="btn bsm" style="background:${on?'#0f766e':'#f1f5f9'};color:${on?'white':'#475569'};border-color:${on?'#0f766e':'#e2e8f0'}" onclick="toggleExtraSlotUI('${t}')">${t}${on?' ✓':''}</button>`;
   }).join('')).join('');
 }
+let extraSlotWrites=new Set();
 async function toggleExtraSlotUI(time){
-  const date=document.getElementById('selDate').value;
-  const isOn=extraSlotsForCurrentDate.includes(time);
+  const date=document.getElementById('selDate').value,key=date+'|'+time;
+  if(extraSlotWrites.has(key))return;
+  const current=extraSlotsByDate[date]||extraSlotsForCurrentDate.slice();
+  const isOn=current.includes(time),booking=bookings[date]?.[time];
+  if(isOn&&booking&&(!booking.cancelled||booking.holdGroup)){alert('予約・確保中の枠は削除できません。先に予約を変更してください。');return;}
+  extraSlotWrites.add(key);
   try{
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'toggleExtraSlot',date,time,add:!isOn})});
     const result=await res.json();
     if(!result.ok)throw new Error(result.error||'特別枠を保存できませんでした');
-    if(isOn) extraSlotsForCurrentDate=extraSlotsForCurrentDate.filter(t=>t!==time);
-    else extraSlotsForCurrentDate.push(time);
-    renderExtraSlotButtons();
-    renderSched();
-  }catch(e){ alert('❌ 通信エラー：'+e.message); }
+    const latest=extraSlotsByDate[date]||current;
+    extraSlotsByDate[date]=[...new Set(isOn?latest.filter(t=>t!==time):[...latest,time])].sort();
+    localStorage.setItem('kj_extra_slots',JSON.stringify(extraSlotsByDate));
+    if(document.getElementById('selDate').value===date){
+      extraSlotsForCurrentDate=extraSlotsByDate[date].slice();
+      renderExtraSlotButtons();renderSched();
+    }
+  }catch(e){alert('❌ 保存できませんでした：'+e.message);}
+  finally{extraSlotWrites.delete(key);}
 }
 function closeExtraSlotModal(){ document.getElementById('extraSlotModal').classList.remove('on'); }
 function renderSched(){
@@ -4524,7 +4523,7 @@ function renderSched(){
     }
   }
   tbody.innerHTML='';
-  if(dt==='nichi'){tbody.innerHTML='<tr><td colspan="10" class="empty">本日は休診日です</td></tr>';updateStats(date,[]);return;}
+  if(dt==='nichi'&&!sl.length){tbody.innerHTML='<tr><td colspan="10" class="empty">本日は休診日です</td></tr>';updateStats(date,[]);return;}
   const bkDate=bookings[date]||{};
   sl.forEach(s=>{
     if(s==='BREAK'){const tr=document.createElement('tr');tr.className='brk';tr.innerHTML='<td colspan="10">── 昼休み ──</td>';tbody.appendChild(tr);return;}
@@ -4820,6 +4819,7 @@ async function execCancel(){
   const note=document.getElementById('cancel-note').value.trim();
   const reason=(selVal||cancelReasonVal)+(note?'：'+note:'');
   if(bk.groupId){const ok=await removeFamilyBookingMember(cancelDate,cancelSlot,reason||'キャンセル');if(ok)closeCancelModal();return;}
+  const before=JSON.stringify(bookings);
   const name=bk.name||'';
   const cardId=bk.cardId||'';
   // 継続枠も削除
@@ -4829,7 +4829,8 @@ async function execCancel(){
   bookings[cancelDate][cancelSlot]={cancelled:true,name,cardId,cancelReason:reason,reBookedBy:''};
   // ★closeCancelModal()がcancelDate/cancelSlotをnullにリセットしてしまうため、その前に必ず値を退避しておく
   const cancelledDateForWaitlist=cancelDate, cancelledSlotForLog=cancelSlot;
-  save();closeCancelModal();renderSched();await pushB();
+  if(!await pushB()){bookings=JSON.parse(before);save();renderSched();alert('キャンセルを保存できませんでした。元の予約を維持しています。');return;}
+  save();closeCancelModal();renderSched();
   // ★このキャンセル日にキャンセル待ちの方がいれば、自動でLINE通知する
   try{
     await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'notifyWaitlistForDate',date:cancelledDateForWaitlist})});
@@ -5539,6 +5540,18 @@ async function saveBk(){
   if(group&&String(previous.cardId)!==String(cardId)){alert('同時来院予約の患者様を入れ替える場合は、新しく予約を登録してください。');return;}
   const anchor=group?group.anchor:slot;
   if(group&&mSlotCount!==group.span){alert('登録済みの同時来院予約の枠数は、日時変更では維持されます。枠数を変更する場合は一度キャンセルして再登録してください。');return;}
+  if(!group){
+    const excluded=new Set([slot]);
+    if(previous&&!previous.cancelled)for(let i=1;i<bookingSpanCount(date,slot,previous);i++)excluded.add(moveTimeBy20(slot,i));
+    for(let i=0;i<mSlotCount;i++){
+      const target=moveTimeBy20(slot,i),n=target.split(':').map(Number),minute=n[0]*60+n[1];
+      const conflict=Object.entries(bookings[date]).find(([t,b])=>{
+        if(excluded.has(t)||!b||b.cancelled&&!b.holdGroup)return false;
+        const v=t.split(':').map(Number);return Math.abs(minute-(v[0]*60+v[1]))<20;
+      });
+      if(conflict){alert(conflict[0]+'の予約と時間が重なります。開始時間か枠数を変更してください。');return;}
+    }
+  }
   const extra=(group?bookingSpanCount(date,slot,previous):mSlotCount)-1;
   // 他の患者様の予約があれば、保存前に止める。途中までの枠だけ保存しない。
   for(let i=0;i<=(group?0:extra);i++){
@@ -5625,10 +5638,13 @@ async function saveBk(){
 async function delBk(date,slot){
   if(bookings[date]?.[slot]?.groupId){await removeFamilyBookingMember(date,slot,'完全削除');return;}
   if(!confirm('この予約を完全に削除しますか？'))return;
+  const before=JSON.stringify(bookings);
   const bk=bookings[date]?.[slot];
   const span=bookingSpanCount(date,slot,bk||{});
   for(let i=1;i<span;i++)delete bookings[date][moveTimeBy20(slot,i)];
-  delete bookings[date][slot];save();renderSched();await pushB();
+  delete bookings[date][slot];
+  if(!await pushB()){bookings=JSON.parse(before);save();renderSched();alert('削除を保存できませんでした。元の予約を維持しています。');return;}
+  save();renderSched();
 }
 
 // ===== 自費メニュー・オプションプリセット =====
@@ -8226,6 +8242,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   // GAS同期は起動時1回のみ（自動上書きしない）
   await syncAll();
   await syncBizHoursFromGAS();
+  await loadExtraSlotsThenRender();
   // ふりがな入力IME対策初期化
   setupKanaInput('c-kana');
   setupKanaInput('pe-kana');

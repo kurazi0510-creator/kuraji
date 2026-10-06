@@ -569,7 +569,7 @@ function saveLineUserPhoneManual(userId,phone,name,cardId){
 function getAllData(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var b=ss.getSheetByName("予約表"),c=ss.getSheetByName("患者"),u=ss.getSheetByName("売上");
-  return{ok:true,bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
+  return{ok:true,extraSlotsByDate:getAllExtraSlots_(),bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
 }
 function saveSheet(name,rows){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -597,6 +597,10 @@ function saveSheet(name,rows){
 function bookingRowDetail_(row){try{var m=JSON.parse(String(row[20]||'{}'));return m&&typeof m==='object'&&!Array.isArray(m)?m:{};}catch(e){return {};}}
 function bookingResourceTime_(row){return String(bookingRowDetail_(row).resourceSlot||row[1]||'').trim();}
 function bookingRowOccupied_(row){return String(row[3]||'').trim()!==''&&(String(row[2]||'').indexOf('キャンセル')<0||bookingRowDetail_(row).holdGroup===true);}
+function slotOverlaps_(time,occupied){
+  var a=String(time).split(':'),minute=Number(a[0])*60+Number(a[1]);
+  return Object.keys(occupied).some(function(t){var b=t.split(':');return occupied[t]&&Math.abs(minute-(Number(b[0])*60+Number(b[1])))<20;});
+}
 function saveBookingsSafe(rows){
   var lock=LockService.getScriptLock();if(!lock.tryLock(30000))throw new Error('別の保存処理が実行中です。再度保存してください');
   try{
@@ -619,6 +623,13 @@ function saveBookingsSafe(rows){
         if(copy[15]===''&&base[15]!==undefined)copy[15]=base[15];
       }
       while(copy.length<header.length)copy.push('');out.push(copy);
+    });
+    var occupiedByDate={};
+    out.slice(1).forEach(function(r){
+      if(!bookingRowOccupied_(r))return;
+      var d=String(r[0]),t=bookingResourceTime_(r);if(!occupiedByDate[d])occupiedByDate[d]={};
+      if(slotOverlaps_(t,occupiedByDate[d]))throw new Error('予約時間が重なっています: '+d+' '+t);
+      occupiedByDate[d][t]=true;
     });
     saveSheet('予約表',out);
   }finally{lock.releaseLock();}
@@ -793,8 +804,9 @@ function saveCustomersSafe(rows){
 function resetBookings(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("予約表")||ss.insertSheet("予約表");
+  if(s.getDataRange().getValues().slice(1).some(function(r){return r.some(function(v){return v!==''&&v!==null;});}))throw new Error("予約が残っているためリセットできません。画面の再読込は予約を削除しません");
   s.clearContents();
-  s.getRange(1,1,1,20).setValues([["日付","時間","区分","患者名","診察券No","予約ルート","来院回数","経過日数","症状","オプション","自費メニュー","処置(JSON)","処置メモ","物販(JSON)","支払方法","支払金額","区分リスト","再予約情報","キャンセル理由","施術部位"]]);
+  s.getRange(1,1,1,21).setValues([["日付","時間","区分","患者名","診察券No","予約ルート","来院回数","経過日数","症状","オプション","自費メニュー","処置(JSON)","処置メモ","物販(JSON)","支払方法","支払金額","区分リスト","再予約情報","キャンセル理由","施術部位","予約詳細(JSON)"]]);
 }
 
 function dailyLineAlert(){
@@ -2044,7 +2056,7 @@ function getSlotsForDate_(dateStr){
 var EXT_SLOTS_=["12:30","12:50","20:00","20:20"];
 function addExtensionSlots_(available, occupied, blocked){
   EXT_SLOTS_.forEach(function(t){
-    if(!occupied[t] && !blocked[t] && available.indexOf(t)<0) available.push(t);
+    if(!slotOverlaps_(t,occupied) && !blocked[t] && available.indexOf(t)<0) available.push(t);
   });
   return available;
 }
@@ -2074,14 +2086,14 @@ function getAvailableSlots(dateStr){
     var blocked=getBlockedSlotsSet_(dateStr);
     // ★インターバル設定：施術終了後の指定分数ぶんも予約不可にする（準備時間の確保）
     var intervalBlocked=getIntervalBlockedSlots_(dateStr, occupied);
-    var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t] && !intervalBlocked[t];});
-    available=addExtensionSlots_(available, occupied, blocked);
+    var available=validSlots.filter(function(t){return !slotOverlaps_(t,occupied) && !blocked[t] && !intervalBlocked[t];});
+    available=addExtensionSlots_(available, occupied, blocked).filter(function(t){return !slotOverlaps_(t,occupied)&&!blocked[t]&&!intervalBlocked[t];});
     // ★院長がその日だけ手動で追加した特別枠（昼休みなど）も、埋まっていなければ空きとして追加する
     var extraSlots=getExtraSlotsSet_(dateStr);
     Object.keys(extraSlots).forEach(function(t){
-      if(!occupied[t] && !blocked[t] && !intervalBlocked[t] && available.indexOf(t)<0) available.push(t);
+      if(!slotOverlaps_(t,occupied) && !blocked[t] && !intervalBlocked[t] && available.indexOf(t)<0) available.push(t);
     });
-    return {ok:true, closed:false, available:available};
+    return {ok:true, closed:false, available:available.sort()};
   }catch(err){ return {ok:false, error:err.message}; }
 }
 // 予約が入っている枠の直後に、インターバル設定の分数ぶんの枠も予約不可として返す
@@ -2106,17 +2118,20 @@ function getIntervalBlockedSlots_(dateStr, occupied){
   return blocked;
 }
 // 指定日に追加されている特別枠のセットを返す
+function getAllExtraSlots_(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),sheet=ss.getSheetByName('extra_slots'),out={};
+  if(!sheet)return out;
+  sheet.getDataRange().getValues().slice(1).forEach(function(r){
+    var d=r[0] instanceof Date?Utilities.formatDate(r[0],'Asia/Tokyo','yyyy-MM-dd'):String(r[0]||'').trim();
+    var t=toHHMM_(r[1]);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t))return;
+    if(!out[d])out[d]=[];
+    if(out[d].indexOf(t)<0)out[d].push(t);
+  });
+  Object.keys(out).forEach(function(d){out[d].sort();});return out;
+}
 function getExtraSlotsSet_(dateStr){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var es=ss.getSheetByName("extra_slots");
-  var extra={};
-  if(es){
-    var ed=es.getDataRange().getValues();
-    for(var j=1;j<ed.length;j++){
-      if(String(ed[j][0])===String(dateStr)) extra[String(ed[j][1])]=true;
-    }
-  }
-  return extra;
+  var extra={};(getAllExtraSlots_()[dateStr]||[]).forEach(function(t){extra[t]=true;});return extra;
 }
 // 指定日にブロック（手動で潰した）されている時間のセットを返す
 function getBlockedSlotsSet_(dateStr){
@@ -2162,13 +2177,13 @@ function getAvailableSlotsRange(startDateStr,numDays){
       var occupied=allBooked[dateStr]||{};
       var blocked=getBlockedSlotsSet_(dateStr);
       var intervalBlocked=getIntervalBlockedSlots_(dateStr, occupied);
-      var available=validSlots.filter(function(t){return !occupied[t] && !blocked[t] && !intervalBlocked[t];});
-      available=addExtensionSlots_(available, occupied, blocked);
+      var available=validSlots.filter(function(t){return !slotOverlaps_(t,occupied) && !blocked[t] && !intervalBlocked[t];});
+      available=addExtensionSlots_(available, occupied, blocked).filter(function(t){return !slotOverlaps_(t,occupied)&&!blocked[t]&&!intervalBlocked[t];});
       var extraSlots=getExtraSlotsSet_(dateStr);
       Object.keys(extraSlots).forEach(function(t){
-        if(!occupied[t] && !blocked[t] && !intervalBlocked[t] && available.indexOf(t)<0) available.push(t);
+        if(!slotOverlaps_(t,occupied) && !blocked[t] && !intervalBlocked[t] && available.indexOf(t)<0) available.push(t);
       });
-      result[dateStr]={closed:false, available:available};
+      result[dateStr]={closed:false, available:available.sort()};
     }
     return {ok:true, days:result};
   }catch(err){ return {ok:false, error:err.message}; }
@@ -2387,40 +2402,29 @@ function getIntervalSetting(){
 // ★特別枠（昼休みなど、通常の診療時間外の時間帯に、その日だけ枠を追加できる機能）★
 // ═══════════════════════════════════════
 function toggleExtraSlot(dateStr,timeStr,add){
+  var lock=LockService.getScriptLock(),locked=false;
   try{
-    if(!dateStr||!timeStr) return {ok:false, error:"日付・時間を指定してください"};
-    var ss=SpreadsheetApp.getActiveSpreadsheet();
-    var s=ss.getSheetByName("extra_slots");
-    if(!s){ s=ss.insertSheet("extra_slots"); s.getRange(1,1,1,3).setValues([["date","time","note"]]); }
-    var data=s.getDataRange().getValues();
-    var foundRow=-1;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr))||!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(timeStr))||typeof add!=='boolean')return {ok:false,error:'日付・時間・追加/解除の指定が不正です'};
+    if(!lock.tryLock(30000))return {ok:false,error:'別の保存処理が実行中です。再度操作してください'};
+    locked=true;
+    var ss=SpreadsheetApp.getActiveSpreadsheet(),s=ss.getSheetByName('extra_slots');
+    if(!add){
+      var b=ss.getSheetByName('予約表');
+      if(b&&b.getDataRange().getValues().slice(1).some(function(r){return String(r[0])===dateStr&&bookingResourceTime_(r)===timeStr&&bookingRowOccupied_(r);}))return {ok:false,error:'予約・確保中の枠は削除できません。先に予約を変更してください'};
+    }
+    if(!s){if(!add)return {ok:true};s=ss.insertSheet('extra_slots');s.getRange(1,1,1,3).setValues([['date','time','note']]);}
+    var data=s.getDataRange().getValues(),found=[];
     for(var i=1;i<data.length;i++){
-      if(String(data[i][0])===String(dateStr) && String(data[i][1])===String(timeStr)){ foundRow=i+1; break; }
+      var d=data[i][0] instanceof Date?Utilities.formatDate(data[i][0],'Asia/Tokyo','yyyy-MM-dd'):String(data[i][0]);
+      if(d===dateStr&&toHHMM_(data[i][1])===timeStr)found.push(i+1);
     }
-    if(add){
-      if(foundRow<0){
-        var newIdx=s.getLastRow()+1;
-        var rng=s.getRange(newIdx,1,1,3);
-        rng.setNumberFormat("@");
-        rng.setValues([[dateStr,timeStr,"院長がその日だけ追加した特別枠"]]);
-      }
-    }else{
-      if(foundRow>0) s.deleteRow(foundRow);
-    }
+    if(add&&!found.length){var rng=s.getRange(s.getLastRow()+1,1,1,3);rng.setNumberFormat('@');rng.setValues([[dateStr,timeStr,'院長がその日だけ追加した特別枠']]);}
+    if(!add)found.reverse().forEach(function(row){s.deleteRow(row);});
     return {ok:true};
-  }catch(err){ return {ok:false, error:err.message}; }
+  }catch(err){return {ok:false,error:err.message};}
+  finally{if(locked)lock.releaseLock();}
 }
-function getExtraSlotsForDate(dateStr){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var s=ss.getSheetByName("extra_slots");
-  if(!s) return {ok:true, extra:[]};
-  var data=s.getDataRange().getValues();
-  var extra=[];
-  for(var i=1;i<data.length;i++){
-    if(String(data[i][0])===String(dateStr)) extra.push(String(data[i][1]));
-  }
-  return {ok:true, extra:extra};
-}
+function getExtraSlotsForDate(dateStr){return {ok:true,extra:getAllExtraSlots_()[dateStr]||[]};}
 function toggleBlockedSlot(dateStr,timeStr,block){
   try{
     if(!dateStr||!timeStr) return {ok:false, error:"日付・時間を指定してください"};
