@@ -17,7 +17,7 @@ console.log('PASS: getAll deletion state, tombstone-safe merge, intentional 2089
 
 const syncPrefix=html.slice(html.indexOf("      if(Array.isArray(data.deletedPatientIds))"),html.indexOf("      if(prows.length>1){"));
 const partial={data:{customers:[['診察券No','患者名'],['2071','既存患者']],deletedPatientIds:['2500','3000','2089','2090']},patients:[{id:'2071'},{id:'2072',name:'未同期の患者'},{id:'2088',name:'木元'},{id:'2090',name:'削除済み'}],deletedPatientIds:new Set(),freshPatientRegistrations:new Map(),syncStartedAt:Date.now(),Set,String,Array};
-partial.purgeDeletedCardCaches=()=>{partial.patients=partial.patients.filter(p=>!partial.deletedPatientIds.has(p.id));};vm.createContext(partial);vm.runInContext(syncPrefix,partial);
+partial.purgeDeletedCardCaches=()=>{partial.patients=partial.patients.filter(p=>!partial.deletedPatientIds.has(p.id));};vm.createContext(partial);vm.runInContext(fn('normalizePatientTableRows'),partial);vm.runInContext(syncPrefix,partial);
 assert.ok(partial.patients.some(p=>p.id==='2072'),'missing from server is not proof of deletion');
 assert.ok(partial.patients.some(p=>p.id==='2088'),'keep locally saved patient during incomplete server response');
 assert.equal(partial.patients.some(p=>p.id==='2090'),false,'explicit tombstone still removes deleted patient');
