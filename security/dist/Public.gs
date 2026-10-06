@@ -307,8 +307,8 @@ function findLineUidByCardId_(card){
 function findLineUidForPatient_(pt){
   var tid="";
   var tel=pt.tel||getTelByPatientName_(pt.name);
-  if(tel) tid=findLineUidByPhone_(tel);
-  if(!tid){ for(var i=0;i<(pt.cards||[]).length&&!tid;i++) tid=findLineUidByCardId_(pt.cards[i]); }
+  for(var i=0;i<(pt.cards||[]).length&&!tid;i++) tid=findLineUidByCardId_(pt.cards[i]);
+  if(!tid&&tel) tid=findLineUidByPhone_(tel);
   if(!tid){
     var ls=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
     if(ls){
@@ -334,14 +334,6 @@ function testLineOwner(){
   var r=sendLineMessagingAPI(token,ownerId,msg);
   return (r&&r.ok) ? {ok:true} : {ok:false, error:"LINE送信に失敗しました"};
 }
-// ============================================================
-// ★電話番号「末尾1桁欠け」の修復・監視ツール（新規追加）
-//   症状：090/080/070で始まる携帯番号なのに、なぜか10桁しかない（正しくは11桁）。
-//   初回欠落の原因は未特定。古い管理画面からの保存で復元後の番号が戻る経路は別途保護する。
-//   LINE等から確認できた正しい番号だけ、ここで安全に書き戻す。
-// ============================================================
-
-// 現在「患者」シートで、携帯番号なのに10桁しかない（末尾1桁欠けの疑い）人を一覧表示する（確認のみ・書き換えなし）
 function scanTruncatedMobileNumbers(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("患者");
@@ -505,11 +497,12 @@ function findLineUidByPhone_(phone){
   var s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
   if(!s) return "";
   var data=s.getDataRange().getValues();
+  var hits={};
   for(var i=1;i<data.length;i++){
     var p=fixPhoneLeadingZero_(data[i][4]);
-    if(p&&p===digits) return String(data[i][0]);
+    if(p&&p===digits&&data[i][0]) hits[String(data[i][0])]=true;
   }
-  return "";
+  var ids=Object.keys(hits);return ids.length===1?ids[0]:"";
 }
 // 患者名から電話番号を検索（患者シートから）。dailyLineAlert/sendDayBeforeReminders用
 // 患者名の表記ゆれ（全角/半角スペース、"坂上(上坂)香織"のような旧姓の括弧書きなど）を
@@ -627,32 +620,34 @@ function saveSheet(name,rows){
 // 他の端末が入力した支払い情報などが空欄で上書きされて消えてしまう」事故を防ぐ。
 // 日付＋時間をキーに、送られてきた値が空の項目は既存のサーバー側の値を残す方式にする。
 // （行そのものが送られてこなかった場合＝意図的な削除の可能性があるため、行の削除自体は妨げない）
+function bookingRowDetail_(row){try{var m=JSON.parse(String(row[20]||'{}'));return m&&typeof m==='object'&&!Array.isArray(m)?m:{};}catch(e){return {};}}
+function bookingResourceTime_(row){return String(bookingRowDetail_(row).resourceSlot||row[1]||'').trim();}
+function bookingRowOccupied_(row){return String(row[3]||'').trim()!==''&&(String(row[2]||'').indexOf('キャンセル')<0||bookingRowDetail_(row).holdGroup===true);}
 function saveBookingsSafe(rows){
-  var ss=SpreadsheetApp.getActiveSpreadsheet();
-  var s=ss.getSheetByName("予約表");
-  var existing=s?s.getDataRange().getValues():[];
-  var header=(existing.length?existing[0]:(rows.length?rows[0]:[]));
-  var existingByKey={};
-  for(var i=1;i<existing.length;i++){
-    var key=String(existing[i][0]||"")+"|"+String(existing[i][1]||"");
-    if(key==="|") continue;
-    existingByKey[key]=existing[i];
-  }
-  var merged=[header];
-  for(var j=1;j<rows.length;j++){
-    var incoming=rows[j];
-    var key=String(incoming[0]||"")+"|"+String(incoming[1]||"");
-    if(key==="|") continue;
-    var base=existingByKey[key];
-    var mergedRow=incoming.map(function(val,colIdx){
-      var v=(val===null||val===undefined)?"":String(val).trim();
-      if(v!=="") return val; // 新しい値が入っていればそちらを優先
-      if(base && base[colIdx]!==undefined && String(base[colIdx]).trim()!=="") return base[colIdx]; // 空なら既存データを残す（消さない）
-      return val;
+  var lock=LockService.getScriptLock();if(!lock.tryLock(30000))throw new Error('別の保存処理が実行中です。再度保存してください');
+  try{
+    var ss=SpreadsheetApp.getActiveSpreadsheet(),sheet=ss.getSheetByName('予約表');
+    var existing=sheet?sheet.getDataRange().getValues():[];
+    if(!Array.isArray(rows)||!rows.length)throw new Error('予約表データが不正です');
+    // Old browser tabs must not erase same-time records or payment detail metadata.
+    if(rows[0][20]!=='予約詳細(JSON)'&&existing.slice(1).some(function(r){return !!r[20];}))throw new Error('予約画面が古いバージョンです。再読み込みして最新データを取得してください');
+    var header=rows[0].slice(),keys={},out=[header],prior={};
+    existing.slice(1).forEach(function(r){prior[String(r[0]||'')+'|'+bookingResourceTime_(r)+'|'+String(r[4]||'')]=r;});
+    rows.slice(1).forEach(function(row){
+      var key=String(row[0]||'')+'|'+bookingResourceTime_(row);
+      if(key==='|')return;
+      if(keys[key])throw new Error('占有枠が重複しています: '+key);
+      keys[key]=true;
+      var copy=row.slice(),base=prior[key+'|'+String(row[4]||'')];
+      // Keep the existing clinical-detail safety merge, without mixing two patients sharing arrival time.
+      if(base&&String(base[2])===String(row[2])&&String(row[2]).indexOf('キャンセル')<0&&String(row[2]).indexOf('継続')<0){
+        [8,9,10,11,12,13,19].forEach(function(col){if((copy[col]===undefined||copy[col]==='')&&base[col]!==undefined)copy[col]=base[col];});
+        if(copy[15]===''&&base[15]!==undefined)copy[15]=base[15];
+      }
+      while(copy.length<header.length)copy.push('');out.push(copy);
     });
-    merged.push(mergedRow);
-  }
-  saveSheet("予約表", merged);
+    saveSheet('予約表',out);
+  }finally{lock.releaseLock();}
 }
 // ★患者を確実に削除する専用関数★
 // saveCustomersSafeの「送られてこなかった患者は保持する」という安全設計のせいで、
@@ -1008,7 +1003,7 @@ function sendReminderToOne(name, dateStr){
 
   var nl=String.fromCharCode(10);
   var dispDate=Utilities.formatDate(new Date(dateStr+"T00:00:00"),"Asia/Tokyo","M月d日(E)");
-  var msg="🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+dispDate+nl+"⏰ "+times.join("・")+nl+"━━━━━━━━━━"+nl+nl+"ご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
+  var msg="🔔 ご予約リマインド"+nl+target+" 様"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+dispDate+nl+"⏰ "+times.join("・")+nl+"━━━━━━━━━━"+nl+nl+"ご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
   var r=sendLineMessagingAPI(token,tid,msg);
   if(!r.ok) return {ok:false, error:"送信に失敗しました"};
 
@@ -1049,27 +1044,29 @@ function sendDayBeforeReminders(){
     var k=String(r[ki]||"");
     if(k.indexOf("継続")>-1||k.indexOf("キャンセル")>-1||dv!==tmrStr)return;
     var n=String(r[ni]||"").trim(),t=String(r[ti]||"").trim();
-    if(!n||!t||seen[n+"_"+t])return;
+    var ci=bh.indexOf("診察券No"),card=ci>=0?String(r[ci]||"").trim():"",key=card?card+"|"+n:n;
+    if(!n||!t||seen[key+"_"+t])return;
     if(testModeName && n.indexOf(testModeName)<0)return; // テストモード中は対象外の患者をスキップ
-    seen[n+"_"+t]=true;
-    if(!bp[n])bp[n]=[];
-    bp[n].push(t);
+    seen[key+"_"+t]=true;
+    if(!bp[key]){bp[key]=[];bp[key].patientName=n;bp[key].card=card;}
+    bp[key].push(t);
   });
   if(!Object.keys(bp).length)return;
   var sent=0,skip=[],sentNames=[];
   Object.keys(bp).forEach(function(name){
-    var tid="";
+    var pt=resolvePatientKey_(bp[name].card||bp[name].patientName);
+    var tid=findLineUidForPatient_(pt);
     // ①電話番号ベースの照合（最優先）：括弧書きの旧姓併記などの表記ゆれはnormalizeName_で吸収済み。
     //   患者ごとに別々の電話番号がLINE連携されていれば、これが最も確実に本人を特定できる。
-    var tel=getTelByPatientName_(name);
-    if(tel) tid=findLineUidByPhone_(tel);
+    var tel=getTelByPatientName_(bp[name].patientName);
+    if(!tid&&tel) tid=findLineUidByPhone_(tel);
     // ②電話番号で見つからない場合のみ、LINE_IDsシートの名前と完全一致するか確認
     if(!tid){
-      tid=findLineUidSafely_(name,lu);
+      tid=findLineUidSafely_(bp[name].patientName,lu);
     }
     // ※姓だけが同じ別の方（ご家族等）へは絶対に送らない。見つからなければ「未登録」として先生へ報告する
     if(!tid){skip.push(name);return;}
-    var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
+    var msg=(testModeName?"【テスト送信】"+nl:"")+"🔔 ご予約リマインド"+nl+bp[name].patientName+" 様"+nl+nl+"━━━━━━━━━━"+nl+"📅 "+tmrDisp+nl+"⏰ "+bp[name].join("・")+nl+"━━━━━━━━━━"+nl+nl+"明日のご予約が近づいてまいりました。"+nl+"お気をつけてお越しくださいませ😊"+nl+nl+"倉治整骨院"+nl+"(このメッセージへの返信は不要です)";
     if(sendLineMessagingAPI(token,tid,msg).ok){sent++;sentNames.push(name);}else{skip.push(name);}
   });
 
@@ -1080,7 +1077,7 @@ function sendDayBeforeReminders(){
   var todayStr3=Utilities.formatDate(today,"Asia/Tokyo","yyyy-MM-dd");
   var logRows=Object.keys(bp).map(function(name){
     var isSent=sentNames.indexOf(name)>-1;
-    return [todayStr3, nowStr, name, tmrStr, isSent?"送信済み":"未登録(LINE連携なし)", bp[name].join("・")];
+    return [todayStr3, nowStr, bp[name].patientName, tmrStr, isSent?"送信済み":"未登録(LINE連携なし)", bp[name].join("・")];
   });
   if(logRows.length){
     var logIdx=log.getLastRow()+1;
@@ -2093,9 +2090,9 @@ function getAvailableSlots(dateStr){
       for(var i=1;i<rows.length;i++){
         var kubun=String(rows[i][2]||"");
         // ★キャンセルになった枠は、患者名の欄が残っていても「空き」として扱う
-        if(kubun.indexOf("キャンセル")>-1) continue;
+        if(!bookingRowOccupied_(rows[i])) continue;
         if(String(rows[i][0])===String(dateStr) && String(rows[i][3]||"").trim()!==""){
-          occupied[String(rows[i][1])]=true;
+          occupied[bookingResourceTime_(rows[i])]=true;
         }
       }
     }
@@ -2173,11 +2170,11 @@ function getAvailableSlotsRange(startDateStr,numDays){
       for(var i=1;i<rows.length;i++){
         var kubun2=String(rows[i][2]||"");
         // ★キャンセルになった枠は、患者名の欄が残っていても「空き」として扱う
-        if(kubun2.indexOf("キャンセル")>-1){continue;}
+        if(!bookingRowOccupied_(rows[i])){continue;}
         if(String(rows[i][3]||"").trim()===""){continue;}
         var dd=String(rows[i][0]);
         if(!allBooked[dd])allBooked[dd]={};
-        allBooked[dd][String(rows[i][1])]=true;
+        allBooked[dd][bookingResourceTime_(rows[i])]=true;
       }
     }
     var result={};
@@ -2939,8 +2936,8 @@ function saveWebBooking(data){
     var rows=s.getDataRange().getValues();
     for(var i=1;i<rows.length;i++){
       var rowKubun=String(rows[i][2]||"");
-      if(rowKubun.indexOf("キャンセル")>-1) continue; // キャンセル済みの枠は空きとして扱う
-      if(String(rows[i][0])===String(data.date) && slotsToUse.indexOf(String(rows[i][1]))>-1){
+      if(!bookingRowOccupied_(rows[i])) continue; // キャンセル済みの枠は空きとして扱う
+      if(String(rows[i][0])===String(data.date) && slotsToUse.indexOf(bookingResourceTime_(rows[i]))>-1){
         if(String(rows[i][3]||"").trim()!==""){
           return {ok:false, error:"ご指定の時間帯は既にご予約が入っています。別の時間をお選びください。"};
         }

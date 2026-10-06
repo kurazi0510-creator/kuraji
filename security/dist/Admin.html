@@ -1395,11 +1395,14 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
           </div>
         </div>
         <div class="fg" style="grid-column:1/-1">
-          <label>予約枠数</label>
+          <label>予約枠数（同時来院の場合は2名合計）</label>
+          <div id="family-booking-area" style="margin:8px 0"><label>同じ時刻に来院する2人目</label><select class="inp" id="m-family-patient"><option value="">なし（1名）</option></select><small>患者様ごとの会計は、保存後それぞれの「内容編集」から入力できます。日時変更は2名まとめて変更します。</small></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="pay-btn" id="slot-btn-1" onclick="setSlotCount(1)" style="min-width:50px">1枠</button>
             <button class="pay-btn" id="slot-btn-2" onclick="setSlotCount(2)" style="min-width:50px">2枠</button>
             <button class="pay-btn" id="slot-btn-3" onclick="setSlotCount(3)" style="min-width:50px">3枠</button>
+            <button class="pay-btn" id="slot-btn-4" onclick="setSlotCount(4)" style="min-width:50px">4枠</button>
+            <button class="pay-btn" id="slot-btn-5" onclick="setSlotCount(5)" style="min-width:50px">5枠</button>
           </div>
         </div>
         <div class="fg" style="grid-column:1/-1"><label>本日の症状</label><input class="inp" id="m-sym" placeholder="腰痛・肩こりなど"></div>
@@ -2640,7 +2643,7 @@ async function syncAll(){
         const newB={};
         brows.slice(1).forEach(r=>{
           if(!r[0]&&r[0]!==0)return;
-          const date=fmtDate(r[0]),slot=fmtTime(r[1]);
+          const date=fmtDate(r[0]),detail=bookingDetail(r[20]),slot=detail.resourceSlot||fmtTime(r[1]);
           if(!date||!slot)return;
           if(!newB[date])newB[date]={};
           const kubunStr=String(r[2]||'').trim();
@@ -2659,6 +2662,7 @@ async function syncAll(){
             payAmount:String(r[15]||'').trim()
           };}
         });
+        brows.slice(1).forEach(r=>{const d=fmtDate(r[0]),m=bookingDetail(r[20]),t=m.resourceSlot||fmtTime(r[1]);if(newB[d]?.[t])Object.assign(newB[d][t],m);});
         // ★予約マージルール（localStorage保護版）
         // GASにあってlocalStorageにない日付 → GASから追加
         // localStorageにある日付 → localStorageを優先（消えない）
@@ -2707,7 +2711,7 @@ async function pushB(){
   // [0]日付,[1]時間,[2]区分,[3]患者名,[4]診察券No,[5]予約ルート,[6]来院回数,[7]経過日数
   // [8]症状,[9]オプション,[10]自費メニュー,[11]処置JSON,[12]処置メモ,[13]物販JSON
   // [14]支払方法,[15]支払金額,[16]区分リスト,[17]再予約情報,[18]キャンセル理由,[19]施術部位
-  const hdr=['日付','時間','区分','患者名','診察券No','予約ルート','来院回数','経過日数','症状','オプション','自費メニュー','処置(JSON)','処置メモ','物販(JSON)','支払方法','支払金額','区分リスト','再予約情報','キャンセル理由','施術部位'];
+  const hdr=['日付','時間','区分','患者名','診察券No','予約ルート','来院回数','経過日数','症状','オプション','自費メニュー','処置(JSON)','処置メモ','物販(JSON)','支払方法','支払金額','区分リスト','再予約情報','キャンセル理由','施術部位','予約詳細(JSON)'];
   const rows=[hdr];
   Object.keys(bookings).sort().forEach(date=>{
     Object.keys(bookings[date]).sort().forEach(slot=>{
@@ -2741,6 +2745,9 @@ async function pushB(){
           (b.bui||[]).join(','),                   // [19] 施術部位
         ]);
       }
+      const row=rows[rows.length-1];
+      row[1]=b.cont?slot:(b.appointmentTime||slot);
+      row[20]=JSON.stringify({...bookingDetailsForSave(b),resourceSlot:slot});
     });
   });
   try{
@@ -4491,6 +4498,11 @@ function renderSched(){
   badge.className='day-b '+({hei:'d-hei',moku:'d-moku',gogo:'d-gogo',nichi:'d-nichi'}[dt]||'d-nichi');
   const sl=getSlots(dt,date),tbody=document.getElementById('sbody');
   const bkDate0=bookings[date]||{};
+  // 管理者が時間外まで確保した継続枠も表示する。公開側の受付時間は変更しない。
+  Object.keys(bkDate0).filter(t=>/^\d{2}:\d{2}$/.test(t)&&!sl.includes(t)).sort().forEach(t=>{
+    const before=sl.findIndex(s=>s!=='BREAK'&&s>t);
+    if(before<0)sl.push(t);else sl.splice(before,0,t);
+  });
   // ★昼休みに食い込む継続枠（12:30・12:50など）に実際に予約が入っている場合、
   //   BREAKの直前に挿入して表示する（データはあるのに表に出ないと院長が見落とすため）
   const breakIdx=sl.indexOf('BREAK');
@@ -4503,7 +4515,7 @@ function renderSched(){
         let [eh,em]=extra.split(':').map(Number);
         em+=20;if(em>=60){em-=60;eh++;}
         extra=pad(eh)+':'+pad(em);
-        if(bkDate0[extra]) toInsert.push(extra); else break;
+        if(bkDate0[extra]&&!sl.includes(extra)) toInsert.push(extra); else break;
       }
       if(toInsert.length) sl.splice(breakIdx,0,...toInsert);
     }
@@ -4516,9 +4528,10 @@ function renderSched(){
     const bk=bkDate[s]||null,tr=document.createElement('tr');
     if(bk&&bk.cont){
       tr.className='cont';
-      tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb k-ct">↑継続中</span></td><td><span style="color:var(--muted);font-size:0.75rem">↑${bk.name||''}</span></td><td colspan="6"></td><td><button class="btn bd bsm" onclick="delBk('${date}','${s}')">削除</button></td>`;
+      tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb k-ct">↑継続中</span></td><td><span style="color:var(--muted);font-size:0.75rem">↑${bk.name||''}</span></td><td colspan="6"></td><td>${bk.groupId?'同時来院の確保枠':`<button class="btn bd bsm" onclick="delBk('${date}','${s}')">削除</button>`}</td>`;
     }else if(bk&&bk.cancelled){
       tr.className='cancelled';
+      if(bk.holdGroup){tr.innerHTML='<td>'+s+'</td><td>同時来院枠・確保中</td><td colspan=8>1名キャンセル済み。残る患者様のため枠を確保しています。</td>';tbody.appendChild(tr);return;}
       const reason=bk.cancelReason||'';
       const rebookedBy=bk.reBookedBy||'';
       tr.innerHTML=`<td class="tc">${s}</td>
@@ -4537,7 +4550,7 @@ function renderSched(){
       const bsHtml=bs.filter(b=>b.qty>0).map(b=>`<span class="sh-badge" style="background:#fef3c7;color:#92400e">${b.name}×${b.qty}</span>`).join('');
       const pays=bk.pay||[];
       const payHtml=pays.map(p=>{const pc=p==='現金'?'pb-cash':p==='クレジット'?'pb-card':p==='PayPay'?'pb-pp':p==='d払い'?'pb-d':p==='au Pay'?'pb-au':'pb-ot';return`<span class="pay-badge ${pc}">${p}</span>`;}).join('');
-      tr.innerHTML=`<td class="tc">${s}</td>
+      tr.innerHTML=`<td class="tc">${bk.appointmentTime||s}${bk.groupId?'<br><small>同時来院・合計'+bk.groupSpan+'枠</small>':''}</td>
         <td>${kubunHtml}</td>
         <td><strong style="font-size:0.8rem">${bk.name}</strong>${bk.menu?'<br><span style="font-size:0.65rem;color:var(--accent)">'+bk.menu+'</span>':''}</td>
         <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td>
@@ -4619,6 +4632,43 @@ function updateStats(date,sl){
   if(s6){s6.textContent=uncounted;s6.closest('.sbox').style.background=uncounted>0?'rgba(249,115,22,0.15)':'';s6.style.color=uncounted>0?'#f97316':'inherit';}
 }
 
+// ===== 同時来院・会計詳細 =====
+function bookingDetail(raw){try{const v=JSON.parse(raw||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch(e){return {};}}
+function bookingDetailsForSave(b){const m={};for(const k of ['appointmentTime','groupId','groupSpan','holdGroup','kubunFee','payItems','couponData','freeGiven','menuPrice','optPrice','nextMemo','nextNote'])if(b[k]!==undefined)m[k]=b[k];return m;}
+function initFamilyBooking(b){
+  const sel=document.getElementById('m-family-patient');sel.replaceChildren(new Option('なし（1名）',''));
+  patients.filter(p=>p.id).forEach(p=>sel.add(new Option(p.name+'／診察券 '+p.id,String(p.id))));
+  sel.value='';sel.disabled=!!b?.groupId;
+  if(b?.groupId){const other=Object.values(bookings[editDate]||{}).find(x=>x.groupId===b.groupId&&!x.cont&&!x.cancelled&&x.cardId!==b.cardId);if(other)sel.value=String(other.cardId);}
+}
+function familyBookingBlock(date,slot){
+  const b=bookings[date]?.[slot];if(!b?.groupId)return null;
+  const entries=Object.entries(bookings[date]).filter(([t,x])=>x.groupId===b.groupId).sort(([a],[z])=>a.localeCompare(z));
+  return {anchor:b.appointmentTime||entries[0][0],span:b.groupSpan,entries,names:entries.filter(([t,x])=>!x.cont&&!x.cancelled).map(([t,x])=>x.name)};
+}
+async function removeFamilyBookingMember(date,slot,reason){
+  const group=familyBookingBlock(date,slot),b=bookings[date][slot];
+  if(!group||b.cont)return false;
+  if(!confirm(b.name+'様のみを'+reason+'にします。ほかの患者様の予約は残します。'))return false;
+  const before=JSON.stringify(bookings);
+  const activeOthers=group.entries.filter(([t,x])=>t!==slot&&!x.cont&&!x.cancelled);
+  if(!activeOthers.length){for(const [t,x] of group.entries){if(reason==='完全削除')delete bookings[date][t];else bookings[date][t]={cancelled:true,name:x.cont?'':x.name,cardId:x.cont?'':x.cardId,cancelReason:reason};}}
+  else if(reason==='完全削除'){
+    const survivor=activeOthers[0][1];
+    for(const [t,x] of group.entries)if(t===slot||x.cont)bookings[date][t]={cont:true,name:survivor.name,cardId:survivor.cardId,groupId:survivor.groupId,groupSpan:survivor.groupSpan,appointmentTime:survivor.appointmentTime};
+  }else bookings[date][slot]={...b,cancelled:true,holdGroup:true,cancelReason:reason,pay:[],payAmount:''};
+  save();if(!await pushB()){bookings=JSON.parse(before);save();renderSched();alert('保存できませんでした。元の予約を維持しています。');return false;}
+  renderSched();return true;
+}
+async function moveFamilyBooking(date,slot,newDate,newTime){
+  const g=familyBookingBlock(date,slot);if(!g)return;
+  const source=new Set(g.entries.map(([t])=>date+'|'+t));
+  for(let i=0;i<g.span;i++){const t=moveTimeBy20(newTime,i),b=bookings[newDate]?.[t];if(b&&(!b.cancelled||b.holdGroup)&&!source.has(newDate+'|'+t)){alert(t+'は別の予約で使用されています。');return;}}
+  if(!confirm(g.names.join('・')+'様の同時来院予約を全員まとめて'+newDate+' '+newTime+'へ変更しますか？'))return;
+  const before=JSON.stringify(bookings),btn=document.getElementById('move-booking-submit');btn.disabled=true;
+  try{for(const [t] of g.entries)delete bookings[date][t];if(!bookings[newDate])bookings[newDate]={};g.entries.forEach(([t,b],i)=>{bookings[newDate][moveTimeBy20(newTime,i)]={...b,appointmentTime:newTime};});save();if(!await pushB())throw Error('保存できませんでした');closeMoveBookingModal();document.getElementById('selDate').value=newDate;await loadExtraSlotsThenRender();}
+  catch(e){bookings=JSON.parse(before);save();renderSched();alert(e.message+'。元の予約を維持しています。');}finally{btn.disabled=false;}
+}
 // ===== 予約日時変更 =====
 function moveTimeBy20(slot,steps){
   let [h,m]=String(slot).split(':').map(Number);
@@ -4628,7 +4678,7 @@ function moveTimeBy20(slot,steps){
 }
 function bookingSpanCount(date,slot,bk){
   let count=1;
-  for(let i=1;i<=2;i++){
+  for(let i=1;i<=4;i++){
     const next=bookings[date]?.[moveTimeBy20(slot,i)];
     if(next?.cont&&((bk.cardId&&next.cardId===bk.cardId)||(!bk.cardId&&next.name===bk.name)))count++;
     else break;
@@ -4639,10 +4689,11 @@ function openMoveBookingModal(date,slot){
   const bk=bookings[date]?.[slot];
   if(!bk||bk.cont||bk.cancelled)return;
   moveBookingDate=date;moveBookingSlot=slot;
-  document.getElementById('move-booking-info').innerHTML='<strong>'+bk.name+' 様</strong><br>現在：'+date.replace(/-/g,'/')+' '+slot+'〜';
+  const family=familyBookingBlock(date,slot);
+  document.getElementById('move-booking-info').textContent=(family?family.names.join('・'):bk.name)+' 様　現在：'+date+' '+(bk.appointmentTime||slot)+(family?'（同時来院の全員を変更）':'');
   document.getElementById('move-booking-date').value=date;
   document.getElementById('moveBookingModal').classList.add('on');
-  loadMoveBookingTimes(slot);
+  loadMoveBookingTimes(bk.appointmentTime||slot);
 }
 function closeMoveBookingModal(){
   document.getElementById('moveBookingModal').classList.remove('on');
@@ -4662,13 +4713,15 @@ async function loadMoveBookingTimes(preferred){
   slots=[...new Set([...slots,...extra])].sort();
   const oldBk=bookings[moveBookingDate]?.[moveBookingSlot];
   if(oldBk){
-    const span=bookingSpanCount(moveBookingDate,moveBookingSlot,oldBk);
+    const family=familyBookingBlock(moveBookingDate,moveBookingSlot);
+    const origin=family?family.anchor:moveBookingSlot;
+    const span=family?family.span:bookingSpanCount(moveBookingDate,moveBookingSlot,oldBk);
     const sourceKeys=new Set();
-    for(let i=0;i<span;i++)sourceKeys.add(moveBookingDate+'|'+moveTimeBy20(moveBookingSlot,i));
+    for(let i=0;i<span;i++)sourceKeys.add(moveBookingDate+'|'+moveTimeBy20(origin,i));
     slots=slots.filter(slot=>{
       for(let i=0;i<span;i++){
         const time=moveTimeBy20(slot,i), existing=bookings[date]?.[time];
-        if(existing&&!existing.cancelled&&!sourceKeys.has(date+'|'+time))return false;
+        if(existing&&(!existing.cancelled||existing.holdGroup)&&!sourceKeys.has(date+'|'+time))return false;
       }
       return true;
     });
@@ -4685,6 +4738,8 @@ async function execMoveBooking(){
   const newSlot=document.getElementById('move-booking-time').value;
   if(!newDate||!newSlot){alert('変更後の日付と時間を選択してください');return;}
   if(newDate===moveBookingDate&&newSlot===moveBookingSlot){alert('現在と同じ日時です');return;}
+  const family=familyBookingBlock(moveBookingDate,moveBookingSlot);
+  if(family){await moveFamilyBooking(moveBookingDate,moveBookingSlot,newDate,newSlot);return;}
   const oldDate=moveBookingDate, oldSlot=moveBookingSlot;
   const oldBk=bookings[oldDate]?.[oldSlot];
   if(!oldBk||oldBk.cont||oldBk.cancelled){alert('元の予約が見つかりません。最新データを取得して確認してください。');return;}
@@ -4693,7 +4748,7 @@ async function execMoveBooking(){
   for(let i=0;i<span;i++)sourceKeys.add(oldDate+'|'+moveTimeBy20(oldSlot,i));
   for(let i=0;i<span;i++){
     const t=moveTimeBy20(newSlot,i), existing=bookings[newDate]?.[t];
-    if(existing&&!existing.cancelled&&!sourceKeys.has(newDate+'|'+t)){
+    if(existing&&(!existing.cancelled||existing.holdGroup)&&!sourceKeys.has(newDate+'|'+t)){
       alert('変更先の '+t+' は、すでに別の予約で使用されています。別の時間を選択してください。');return;
     }
   }
@@ -4755,11 +4810,12 @@ async function execCancel(){
   const selVal=sel?sel.value==='other'?'':sel.value:cancelReasonVal;
   const note=document.getElementById('cancel-note').value.trim();
   const reason=(selVal||cancelReasonVal)+(note?'：'+note:'');
+  if(bk.groupId){const ok=await removeFamilyBookingMember(cancelDate,cancelSlot,reason||'キャンセル');if(ok)closeCancelModal();return;}
   const name=bk.name||'';
   const cardId=bk.cardId||'';
   // 継続枠も削除
-  const sl=getSlots(dayType(cancelDate),cancelDate),idx=sl.indexOf(cancelSlot);
-  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'&&bookings[cancelDate]?.[sl[ni]]?.cont)delete bookings[cancelDate][sl[ni]];else break;}
+  const span=bookingSpanCount(cancelDate,cancelSlot,bk);
+  for(let i=1;i<span;i++)delete bookings[cancelDate][moveTimeBy20(cancelSlot,i)];
   // キャンセル記録に変換（空き枠として再利用可能にする）
   bookings[cancelDate][cancelSlot]={cancelled:true,name,cardId,cancelReason:reason,reBookedBy:''};
   // ★closeCancelModal()がcancelDate/cancelSlotをnullにリセットしてしまうため、その前に必ず値を退避しておく
@@ -5134,8 +5190,8 @@ function toggleMPay(btn){
     mPaySel=mPaySel.filter(x=>x!==v);
   }
 }
-function resetMPay(){mPaySel=[];document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));document.getElementById('m-pay-amount').value='';}
-function loadMPay(pays,amount){resetMPay();(pays||[]).forEach(p=>{const btn=document.querySelector(`#m-pay-btns .pay-btn[data-v="${p}"]`);if(btn){btn.classList.add('on');mPaySel.push(p);}});document.getElementById('m-pay-amount').value=amount||'';}
+function resetMPay(){mPaySel=[];document.querySelectorAll('#m-pay-btns .pay-btn').forEach(b=>b.classList.remove('on'));const el=document.getElementById('m-pay-amount');el.value='';el.disabled=false;delete el.dataset.manual;}
+function loadMPay(pays,amount){resetMPay();(pays||[]).forEach(p=>{const btn=document.querySelector(`#m-pay-btns .pay-btn[data-v="${p}"]`);if(btn){btn.classList.add('on');mPaySel.push(p);}});document.getElementById('m-pay-amount').value=amount??'';}
 
 function resetKubun(){
   mKubunSel=[];
@@ -5148,14 +5204,17 @@ function loadKubun(kubunList){
   resetKubun();
   (kubunList||[]).forEach(v=>{const btn=document.querySelector(`.kubun-btn[data-v="${v}"]`);if(btn){btn.classList.add('on');mKubunSel.push(v);}});
   updateKubunDisplay();
+  updateKubunFeeArea();
 }
 
 // ===== モーダル開閉 =====
 function openModal(date,slot){
+  if(bookings[date]?.[slot]?.holdGroup){alert('同時来院の患者様のため確保中の枠です。');return;}
   editDate=date;editSlot=slot;
   document.getElementById('mtitle').textContent='予約入力 '+slot;
   ['m-id','m-nm','m-sym','m-opt','m-menu','m-menu-price','m-opt-price','m-psearch','m-next-memo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['m-menu-sel','m-opt-sel'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  initFamilyBooking(null);
   mSlotCount=1;setSlotCount(1);updateMenuTotal();mBussanDisc={};
   ['m-shochi-discount','m-bussan-discount'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['m-shochi-net','m-bussan-net'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
@@ -5189,7 +5248,7 @@ function openModal(date,slot){
   document.getElementById('m-patient-list').style.display='none';
   document.getElementById('m-selected-info').style.display='none';
   resetKubun();resetBui();
-  mShochiSel={};mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=[];window.mBussanPrice={};window.mShochiPrice={};window.mShochiDisc={};renderMShochiBtns();renderMBussanItems();resetMPay();
+  mShochiSel={};mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=[];window.mBussanPrice={};window.mShochiPrice={};window.mShochiDisc={};renderMShochiBtns();renderMBussanItems();resetMPay();initPayItems(null);
   document.getElementById('hist-btn').style.display='none';
   switchMTab('basic');
   document.getElementById('bmodal').classList.add('on');
@@ -5197,8 +5256,12 @@ function openModal(date,slot){
 
 function editBk(date,slot){
   const bk=bookings[date]?.[slot];if(!bk||bk.cont||bk.cancelled)return;
+  const amtEl=document.getElementById('m-pay-amount');
+  if(amtEl){amtEl.disabled=false;delete amtEl.dataset.manual;}
+  const jikoToggle=document.getElementById('jiko-pay-toggle');
+  if(jikoToggle)jikoToggle.style.display='none';
   editDate=date;editSlot=slot;
-  document.getElementById('mtitle').textContent='予約編集 '+slot;
+  document.getElementById('mtitle').textContent='予約編集 '+(bk.appointmentTime||slot);
   document.getElementById('m-id').value=bk.cardId||'';
   document.getElementById('m-nm').value=bk.name||'';
   const isNB=(bk.route||'LINE')==='次回予約';
@@ -5214,6 +5277,9 @@ function editBk(date,slot){
   document.getElementById('m-psearch').value='';
   document.getElementById('m-patient-list').style.display='none';
   loadKubun(bk.kubunList||[bk.kubun||'保険']);
+  initFamilyBooking(bk);
+  setSlotCount(bk.groupSpan||bookingSpanCount(date,slot,bk));
+  Object.entries(bk.kubunFee||{}).forEach(([k,v])=>{const el=document.getElementById('fee-'+k);if(el)el.value=v;});
   loadBui(bk.bui||[]);
   mShochiSel={};(bk.shochi||[]).forEach(s=>{mShochiSel[s.id]=(s.qty||1);});renderMShochiBtns();
   if(bk.shochiMemo)document.getElementById('m-shochi-memo').value=bk.shochiMemo;
@@ -5230,6 +5296,7 @@ function editBk(date,slot){
   renderMBussanItems();
   loadMPay(bk.pay||[],bk.payAmount||'');
   setTimeout(()=>{
+    if(editDate!==date||editSlot!==slot)return;
     initPayItems(bk);
     // 患者の回数券情報を自動セット
     const hasCoupon = (bk.pay||[]).includes('回数券') || (bk.couponData?.session);
@@ -5406,6 +5473,7 @@ function closeHistModal(){document.getElementById('histModal').classList.remove(
 
 async function saveBk(){
   const date=editDate,slot=editSlot;
+  const beforeSave={bookings:JSON.stringify(bookings),patients:JSON.stringify(patients),stock:JSON.stringify(stockData)};
   if(!mKubunSel.length){alert('区分を選択してください');return;}
   const name=document.getElementById('m-nm').value.trim();
   const cardId=document.getElementById('m-id').value.trim();
@@ -5420,7 +5488,7 @@ async function saveBk(){
   const shochiDisc=parseInt(document.getElementById('m-shochi-discount')?.value)||0;
   const bussanDisc=parseInt(document.getElementById('m-bussan-discount')?.value)||0;
   // 支払い詳細データを収集
-  const finalPayItems = payItems.map(p=>({label:p.label||'',amount:parseInt(p.amount)||0,method:p.method||'現金'})).filter(p=>p.label||p.amount);
+  const finalPayItems = payItems.map(p=>({label:p.label||'',amount:parseInt(p.amount)||0,unitPrice:parseInt(p.unitPrice??p.amount)||0,qty:parseInt(p.qty)||1,menuVal:p.menuVal||'',method:p.method||'現金'})).filter(p=>p.label||p.amount);
   const finalCouponData = couponData.session ? {...couponData} : null;
   let payAmount=document.getElementById('m-pay-amount').value.trim();
   // 支払金額が空の場合は合計から割引を引いた値を自動セット
@@ -5453,7 +5521,24 @@ async function saveBk(){
   const vc = p ? (isNewBk ? currentCount + 1 : currentCount) : '';
   const kubun=getKubunPrimary();
   const kubunList=mKubunSel.slice();
-  const extra=mSlotCount-1;
+  const previous=bookings[date][slot];
+  const companionId=document.getElementById('m-family-patient').value;
+  const companion=patients.find(p=>String(p.id)===companionId);
+  if(companionId&&(!companion||!p||!cardId||String(cardId)===companionId)){alert('患者一覧に登録された、診察券番号の異なる2名を選択してください。');return;}
+  if(companion&&mSlotCount<2){alert('2名の予約は合計2枠以上を選択してください。');return;}
+  const group=previous?.groupId?familyBookingBlock(date,slot):null;
+  if(group&&String(previous.cardId)!==String(cardId)){alert('同時来院予約の患者様を入れ替える場合は、新しく予約を登録してください。');return;}
+  const anchor=group?group.anchor:slot;
+  if(group&&mSlotCount!==group.span){alert('登録済みの同時来院予約の枠数は、日時変更では維持されます。枠数を変更する場合は一度キャンセルして再登録してください。');return;}
+  const extra=(group?bookingSpanCount(date,slot,previous):mSlotCount)-1;
+  // 他の患者様の予約があれば、保存前に止める。途中までの枠だけ保存しない。
+  for(let i=0;i<=(group?0:extra);i++){
+    const t=moveTimeBy20(slot,i),existing=bookings[date][t];
+    if(i===0)continue;
+    if(existing&&(!existing.cancelled||existing.holdGroup)&&!(existing.cont&&existing.cardId===cardId&&existing.name===name)){
+      alert(t+'には別の予約があります。開始時間か枠数を変更してください。');return;
+    }
+  }
   // 区分別料金収集
   const kubunFee={};
   mKubunSel.forEach(k=>{const el=document.getElementById('fee-'+k);if(el&&el.value)kubunFee[k]=parseInt(el.value)||0;});
@@ -5462,22 +5547,31 @@ async function saveBk(){
   const wasCancel=prevBk&&prevBk.cancelled;
   const menuPrice=parseInt(document.getElementById('m-menu-price')?.value)||0;
   const optPrice=parseInt(document.getElementById('m-opt-price')?.value)||0;
-  bookings[date][slot]={kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo:nextMemo||nextNote,nextNote:nextMemo||nextNote,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,payItems:finalPayItems,couponData:finalCouponData,elapsed:el,visitCount:vc};
+  bookings[date][slot]={...bookingDetailsForSave(prevBk||{}),kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo:nextMemo||nextNote,nextNote:nextMemo||nextNote,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,payItems:finalPayItems,couponData:finalCouponData,elapsed:el,visitCount:vc};
   // 継続枠（安全版：空枠か自分のcont枠のみ設定。他の患者の予約は絶対に上書きしない）
   // ★時間を20分ずつ足して計算する方式（12:10など昼休み直前の枠から始めても、
   //   休憩マーカーに関係なく12:30・12:50への継続枠を作れるようにする）
   let contTime=slot;
-  for(let i=1;i<=2;i++){
+  for(let i=1;i<=Math.max(4,bookingSpanCount(date,slot,prevBk||{} )-1);i++){
     let [ch,cm]=contTime.split(':').map(Number);
     cm+=20; if(cm>=60){cm-=60;ch++;}
     contTime=pad(ch)+':'+pad(cm);
     const existing=bookings[date][contTime];
+    if(group)break;
     if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
-      if(!existing||(existing.cont&&existing.cardId===cardId)){bookings[date][contTime]={cont:true,name,cardId};}
+      if(!existing||existing.cancelled&&!existing.holdGroup||(existing.cont&&existing.cardId===cardId&&existing.name===name)){bookings[date][contTime]={cont:true,name,cardId};}
       // 他の患者が入っている場合は触らない（上書きしない）
     }else{// 継続枠が不要な範囲：自分のcont枠のみ削除（他の患者は触らない）
-      if(existing&&existing.cont&&existing.cardId===cardId)delete bookings[date][contTime];
+      if(existing&&existing.cont&&existing.cardId===cardId&&existing.name===name)delete bookings[date][contTime];
     }
+  }
+  if(companion&&!group){
+    const groupId='family_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+    const secondSlot=moveTimeBy20(slot,1);
+    const common={groupId,groupSpan:mSlotCount,appointmentTime:slot};
+    Object.assign(bookings[date][slot],common);
+    bookings[date][secondSlot]={...common,name:companion.name,cardId:String(companion.id),kubun,kubunList:kubunList.slice(),route,pay:[],payAmount:'',shochi:[],bussan:[]};
+    for(let i=2;i<mSlotCount;i++)bookings[date][moveTimeBy20(slot,i)]={cont:true,name:companion.name,cardId:String(companion.id),...common};
   }
   if(p){
     if(isNewBk) p.last=date;
@@ -5509,17 +5603,22 @@ async function saveBk(){
     stockData.map(s=>({id:s.id,stockId:s.id}))
   );
   const btn=document.getElementById('sbtn');btn.textContent='保存中...';btn.disabled=true;
-  save();renderSched();renderPatients();closeModal();
-  await pushB();if(p)await pushP();
-  pushStock();
-  btn.textContent='予約を登録';btn.disabled=false;
+  try{
+    if(!await pushB()){
+      bookings=JSON.parse(beforeSave.bookings);patients=JSON.parse(beforeSave.patients);stockData=JSON.parse(beforeSave.stock);
+      save();renderSched();renderPatients();alert('予約を保存できませんでした。入力画面は残しています。最新データを確認して再度保存してください。');return;
+    }
+    save();renderSched();renderPatients();closeModal();
+    if(p)await pushP();pushStock();
+  }finally{btn.textContent='予約を登録';btn.disabled=false;}
 }
 
 async function delBk(date,slot){
+  if(bookings[date]?.[slot]?.groupId){await removeFamilyBookingMember(date,slot,'完全削除');return;}
   if(!confirm('この予約を完全に削除しますか？'))return;
-  const sl=getSlots(dayType(date),date),idx=sl.indexOf(slot);
-  const delCardId=bookings[date]?.[slot]?.cardId;
-  for(let i=1;i<=2;i++){const ni=idx+i;if(ni>=0&&ni<sl.length&&sl[ni]!=='BREAK'){const ex=bookings[date]?.[sl[ni]];if(ex?.cont&&(!delCardId||ex.cardId===delCardId))delete bookings[date][sl[ni]];else break;}}
+  const bk=bookings[date]?.[slot];
+  const span=bookingSpanCount(date,slot,bk||{});
+  for(let i=1;i<span;i++)delete bookings[date][moveTimeBy20(slot,i)];
   delete bookings[date][slot];save();renderSched();await pushB();
 }
 
@@ -5731,7 +5830,7 @@ function showFutureBookings(){
         ${rs.map(r=>`
         <div style="background:#f8fafc;border-radius:6px;padding:8px 10px;margin-bottom:4px;border-left:3px solid ${r.bk.kubun==='自費'?'#f97316':r.bk.kubun==='交通事故'?'#dc2626':'#3b82f6'}">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:0.82rem;font-weight:bold">${r.slot}　${r.bk.name}</span>
+            <span style="font-size:0.82rem;font-weight:bold">${r.bk.appointmentTime||r.slot}　${r.bk.name}</span>
             <span style="font-size:0.72rem;background:${r.bk.kubun==='自費'?'#fef3c7':r.bk.kubun==='交通事故'?'#fee2e2':'#dbeafe'};padding:2px 7px;border-radius:10px">${r.bk.kubun||'-'}</span>
           </div>
           ${r.bk.symptom?`<div style="font-size:0.72rem;color:#64748b;margin-top:3px">症状: ${r.bk.symptom}</div>`:''}
@@ -5835,9 +5934,9 @@ let couponData = {}; // {session, purchaseDate}
 
 function addPayItem(label='', amount='', method='現金', menuVal=''){
   const id = 'pi-' + Date.now()+Math.random();
-  payItems.push({id, label, amount:String(amount), method, menuVal});
+  payItems.push({id, label, amount:String(amount), unitPrice:String(amount), qty:1, method, menuVal});
   renderPayItems();
-  recalcTotalPay();
+  recalcTotalPay(true);
 }
 
 function getPayMenuOptions(currentMenuVal, currentLabel, currentAmount){
@@ -5885,12 +5984,12 @@ function renderPayItems(){
         <span style="font-size:0.72rem;color:#64748b;white-space:nowrap">×個数</span>
         <input class="inp" type="number" placeholder="個" value="${item.qty||1}"
           style="font-size:0.78rem;width:48px;text-align:center" min="1"
-          oninput="updatePayItem('${item.id}','qty',parseInt(this.value)||1);recalcTotalPayWithQty()">
+          oninput="updatePayItem('${item.id}','qty',parseInt(this.value)||1);recalcTotalPayWithQty(true)">
         <span style="font-size:0.74rem;color:#64748b">¥</span>
-        <input class="inp" type="number" placeholder="単価" value="${item.unitPrice||item.amount}"
+        <input class="inp" type="number" placeholder="単価" value="${item.unitPrice??item.amount}"
           style="font-size:0.78rem;flex:1"
-          oninput="updatePayItem('${item.id}','unitPrice',this.value);updatePayItem('${item.id}','amount',String((parseInt(this.value)||0)*(item.qty||1)));recalcTotalPay()">
-        <span style="font-size:0.72rem;color:#166534;font-weight:bold;white-space:nowrap">=<span id="pi-sub-${item.id}">${((parseInt(item.unitPrice||item.amount)||0)*(item.qty||1)).toLocaleString()}</span>円</span>
+          oninput="updatePayItem('${item.id}','unitPrice',this.value);recalcTotalPayWithQty(true)">
+        <span style="font-size:0.72rem;color:#166534;font-weight:bold;white-space:nowrap">=<span id="pi-sub-${item.id}">${(parseInt(item.amount)||0).toLocaleString()}</span>円</span>
       </div>
     </div>
   `).join('');
@@ -5903,9 +6002,11 @@ function onPayMenuChange(id, val){
   const price = parts[1]||'';
   updatePayItem(id,'menuVal',val);
   updatePayItem(id,'label',label);
-  updatePayItem(id,'amount',price);
+  updatePayItem(id,'unitPrice',price);
+  const item=payItems.find(p=>p.id===id);
+  updatePayItem(id,'amount',String((parseInt(price)||0)*(item?.qty||1)));
   renderPayItems();
-  recalcTotalPay();
+  recalcTotalPay(true);
 }
 
 function updatePayItem(id, key, val){
@@ -5916,24 +6017,25 @@ function updatePayItem(id, key, val){
 function removePayItem(id){
   payItems = payItems.filter(p=>p.id!==id);
   renderPayItems();
-  recalcTotalPay();
+  recalcTotalPay(true);
 }
 
-function recalcTotalPayWithQty(){
+function recalcTotalPayWithQty(fromDetails=false){
   // 個数×単価で各itemのamountを更新してから合計計算
   payItems.forEach(item=>{
     const qty = parseInt(item.qty)||1;
-    const unitPrice = parseInt(item.unitPrice||item.amount)||0;
+    const unitPrice = parseInt(item.unitPrice??item.amount)||0;
     item.amount = String(unitPrice * qty);
   });
-  recalcTotalPay();
+  recalcTotalPay(fromDetails);
 }
-function recalcTotalPay(){
+function recalcTotalPay(fromDetails=false){
   const total = payItems.reduce((s,p)=>s+(parseInt(p.amount)||0), 0);
-  if(total > 0){
-    const amtEl = document.getElementById('m-pay-amount');
-    if(amtEl && !amtEl.dataset.manual) amtEl.value = total;
-  }
+  const amtEl = document.getElementById('m-pay-amount');
+  if(!amtEl)return;
+  if(fromDetails){delete amtEl.dataset.manual;amtEl.disabled=false;}
+  if(!amtEl.dataset.manual && (fromDetails||payItems.length))amtEl.value=String(total);
+  payItems.forEach(item=>{const sub=document.getElementById('pi-sub-'+item.id);if(sub)sub.textContent=(parseInt(item.amount)||0).toLocaleString();});
 }
 
 function syncPayAmount(){
@@ -6125,6 +6227,7 @@ function bookNextAppt(){
 
   // 既存予約がある場合は古いスロットを削除して新しいスロットに移動
   const prev=window._foundNextAppt;
+  if(prev?.bk?.groupId){alert('同時来院予約の変更は、予約表の「日時変更」から行ってください。2名をまとめて安全に変更できます。');return;}
   if(prev&&(prev.date!==d||prev.slot!==t)){
     // 日時が変わった場合：古い予約を削除
     if(bookings[prev.date]&&bookings[prev.date][prev.slot]){
@@ -6133,7 +6236,7 @@ function bookNextAppt(){
   }
 
   // 新しいスロットに既存の別患者の予約があるか確認
-  if(bookings[d]&&bookings[d][t]&&!bookings[d][t].cancelled){
+  if(bookings[d]&&bookings[d][t]&&(!bookings[d][t].cancelled||bookings[d][t].holdGroup)){
     const existing=bookings[d][t];
     if(existing.name!==name&&existing.cardId!==cardId){
       alert('❌ '+dayStr+' はすでに別の患者の予約が入っています。\n別の時間を選んでください。');
@@ -6189,8 +6292,8 @@ function bookNextAppt(){
   alert('✅ '+dayStr+' に次回予約を'+(prev?'変更':'追加')+'しました！');
 }
 function setSlotCount(n){
-  mSlotCount=n;
-  [1,2,3].forEach(i=>{
+  mSlotCount=Math.min(5,Math.max(1,Number(n)||1));
+  [1,2,3,4,5].forEach(i=>{
     const btn=document.getElementById('slot-btn-'+i);
     if(btn)btn.classList.toggle('on',i===n);
   });
@@ -6367,7 +6470,9 @@ function updateKubunFeeArea(){
   const inp=document.getElementById('kubun-fee-inputs');
   if(!mKubunSel.length){area.style.display='none';return;}
   area.style.display='block';
+  const oldFees={};mKubunSel.forEach(k=>{const el=document.getElementById('fee-'+k);if(el)oldFees[k]=el.value;});
   inp.innerHTML=mKubunSel.map(k=>`<div class="fg"><label style="font-size:0.72rem">${k}の料金（円）</label><input class="inp" id="fee-${k}" type="number" placeholder="0" inputmode="numeric"></div>`).join('');
+  mKubunSel.forEach(k=>{if(oldFees[k]!==undefined)document.getElementById('fee-'+k).value=oldFees[k];});
 }
 
 // ===== 和暦プレビュー =====
