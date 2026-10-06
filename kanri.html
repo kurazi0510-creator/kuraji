@@ -7019,13 +7019,14 @@ function sortPatients(list,sort){
 }
 
 function patientNumberRange(){
-  const numbers=patients.map(p=>String(p.id||'').trim()).filter(x=>/^\d+$/.test(x)).map(Number);
-  for(const day of Object.values(bookings))for(const b of Object.values(day)){const id=String(b.cardId||'').trim();if(/^\d+$/.test(id))numbers.push(Number(id));}
-  const max=Math.max(0,...numbers);return {max,next:max+1};
+  // 郡さんの10000番は専用番号として、通常の患者採番から除外する。
+  const numbers=patients.map(p=>String(p.id||'').trim()).filter(x=>/^\d+$/.test(x)&&Number(x)!==10000).map(Number);
+  for(const day of Object.values(bookings))for(const b of Object.values(day)){const id=String(b.cardId||'').trim();if(/^\d+$/.test(id)&&Number(id)!==10000)numbers.push(Number(id));}
+  const max=Math.max(0,...numbers);const next=max+1===10000?10001:max+1;return {max,next};
 }
 function renderPatientNumberGuide(){
   const {max,next}=patientNumberRange();
-  const text='登録済み最大番号：'+max+' ／ 次の診察券番号：'+next;
+  const text='登録済み最大番号：'+max+' ／ 次の診察券番号：'+next+'（郡さんの10000番は対象外）';
   const list=document.getElementById('patient-number-guide');if(list)list.textContent=text;
   const booking=document.getElementById('booking-number-guide');if(booking)booking.textContent=text+'。新規のお問い合わせは診察券番号を空欄にして、患者名だけで予約を保存できます。来院後に番号・メニューを登録してください。';
   const id=document.getElementById('c-id');if(id)id.placeholder='次の番号：'+next;
