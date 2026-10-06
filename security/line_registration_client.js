@@ -2,6 +2,15 @@
 let lineRegistrationState={patients:[],links:[]};
 function lineRegistrationRpc(request){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).bookingLookupAdminRequest(request));}
 function lineRegistrationPhone(value){let digits=String(value||'').replace(/\D/g,'');if(digits.length>=9&&digits.length<=10&&digits[0]!=='0')digits='0'+digits;return digits;}
+function lineRegistrationPatientSnapshot(card,name,phone,localPatients){
+ const id=String(card||'').normalize('NFKC').trim(),tel=lineRegistrationPhone(phone);
+ if(!/^\d+$/.test(id))throw new Error('診察券番号を数字で入力してください');
+ if(!/^0\d{9,10}$/.test(tel))throw new Error('電話番号を確認してください');
+ const local=(localPatients||[]).find(p=>String(p.id).trim()===id);
+ const patientName=String(local?.name||name||'').trim();
+ if(!patientName)throw new Error('患者様のお名前を入力してください');
+ return {...(local||{}),id,name:patientName,tel};
+}
 function lineRegistrationText(tag,text){const el=document.createElement(tag);el.textContent=text;return el;}
 loadLineUsers=async function(){
  const list=document.getElementById('lu-list');list.replaceChildren(lineRegistrationText('p','読み込み中…'));
@@ -48,7 +57,7 @@ renderLineUsers=function(){
    const existing=hits.find(p=>p.cardId===fields.cardId.value);
    const chosen=existing||(hits.length===1?hits[0]:null);
    if(chosen){select.value=chosen.cardId;fields.cardId.value=chosen.cardId;}
-   note.textContent=hits.length>1?'同じ電話番号の患者さんが複数います。名前・診察券番号をご確認ください。':hits.length===1?'候補の患者名と、このLINEがご本人のものか確認して登録してください。':'患者一覧の電話番号を確認してください。電話番号のみ保存することもできます。';
+   note.textContent=hits.length>1?'同じ電話番号の患者さんが複数います。名前・診察券番号をご確認ください。':hits.length===1?'候補の患者名と、このLINEがご本人のものか確認して登録してください。':'患者一覧に未保存の場合、本人確認して連携を押すと、入力した診察券番号・お名前・電話番号で患者情報も保存します。内容をご確認ください。';
   }
   fields.phone.addEventListener('input',updateCandidates);
   select.addEventListener('change',()=>{fields.cardId.value=select.value;});
@@ -56,7 +65,7 @@ renderLineUsers=function(){
   const status=lineRegistrationText('p',kind==='linked'?'予約確認を利用できます。':kind==='phone'?'電話番号は登録済みです。予約確認を利用するには、下のボタンで本人確認して連携してください。':'電話番号・患者情報を確認して登録してください。');row.append(status);
   function button(label,handler){const b=lineRegistrationText('button',label);b.style.cssText='padding:9px;margin:4px;cursor:pointer';b.onclick=async()=>{b.disabled=true;try{await handler();}catch(err){status.textContent='保存できませんでした：'+err.message;}finally{b.disabled=false;}};row.append(b);}
   button('本人確認して保存・予約確認を連携',async()=>{
-   const result=await lineRegistrationRpc({action:'verify',uid:user.userId,tel:lineRegistrationPhone(fields.phone.value),cardId:fields.cardId.value,confirmed:true,patient:patients.find(p=>String(p.id).trim()===String(fields.cardId.value).trim())||null});
+   const result=await lineRegistrationRpc({action:'verify',uid:user.userId,tel:lineRegistrationPhone(fields.phone.value),cardId:fields.cardId.value,confirmed:true,patient:lineRegistrationPatientSnapshot(fields.cardId.value,fields.name.value,fields.phone.value,patients)});
    if(!result.ok)throw new Error(result.error||'保存に失敗しました');
    await loadLineUsers();
   });
