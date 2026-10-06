@@ -217,6 +217,34 @@ function printThisPage(pageId){
   window.print();
 }
 </script>
+<script>
+window.KURAJI_ADMIN_URL=<?!= JSON.stringify(webAppUrl) ?>;
+window.KURAJI_PAGE_PARAMS=<?!= pageParamsJson ?>;
+function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURIComponent(page)}
+// Only runs inside an owner-only Apps Script HTML-service deployment.
+// The public GitHub copy of kanri.html must not be used after cutover.
+(() => {
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init = {}) {
+    const url = typeof input === 'string' ? input : input.url;
+    const parsed = new URL(url, location.href);
+    if (parsed.hostname !== 'script.google.com' ||
+        !/^\/macros\/s\/[^/]+\/exec$/.test(parsed.pathname) ||
+        parsed.pathname !== '/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec') {
+      return nativeFetch(input, init);
+    }
+    const method = (init.method || (input.method || 'GET')).toUpperCase();
+    const request = method === 'GET'
+      ? {method, params: Object.fromEntries(parsed.searchParams)}
+      : {method, body: JSON.parse(init.body || '{}')};
+    const data = await new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).adminRequest(request);
+    });
+    return new Response(data, {status: 200, headers: {'Content-Type': 'application/json'}});
+  };
+})();
+
+</script>
 </head>
 <body>
 <header>
@@ -230,15 +258,17 @@ function printThisPage(pageId){
   <div class="nav-t on" onclick="goPage('yoyaku')">📋 予約</div>
   <div class="nav-t" onclick="goPage('patients')">👥 患者</div>
   <div class="nav-t" onclick="goPage('uriage')">💰 売上</div>
-  <div class="nav-t" onclick="location.href='uriage.html'" style="background:#22c55e;color:white">✍️ 売上入力</div>
+  <div class="nav-t" onclick="window.open(adminPageUrl('BookingLookup'),'_top')">📋 予約確認の連携</div>
+  <div class="nav-t" onclick="window.open(adminPageUrl('Uriage'),'_top')" style="background:#22c55e;color:white">✍️ 売上入力</div>
+  <div class="nav-t" onclick="window.open(adminPageUrl('Salary'),'_top')">💴 給与管理</div>
   <div class="nav-t" onclick="goPage('bussan')">🛍 物販</div>
   <div class="nav-t" onclick="goPage('stock')">📦 在庫</div>
   <div class="nav-t" onclick="goPage('ltv')">📊 LTV</div>
   <div class="nav-t" onclick="goPage('master')">⚙️ マスター</div>
   <div class="nav-t" onclick="goPage('lottery')">🎉 抽選</div>
-  <div class="nav-t" onclick="location.href='symptom.html'">🩺 症状図</div>
-  <div class="nav-t" onclick="location.href='line_template.html'">💬 LINE雛形</div>
-  <div class="nav-t" onclick="location.href='gas_update.html'" style="background:#f97316;color:white">⚙️ GAS更新</div>
+  <div class="nav-t" onclick="location.href='https://kurazi0510-creator.github.io/kuraji/symptom.html'">🩺 症状図</div>
+  <div class="nav-t" onclick="location.href='https://kurazi0510-creator.github.io/kuraji/line_template.html'">💬 LINE雛形</div>
+  <div class="nav-t" onclick="location.href='https://kurazi0510-creator.github.io/kuraji/gas_update.html'" style="background:#f97316;color:white">⚙️ GAS更新</div>
 </div>
 
 <!-- 予約管理 -->
@@ -286,8 +316,8 @@ function printThisPage(pageId){
       <div class="btn-section-title" id="sec2-t" onclick="toggleBtnSection('sec2')">📋 記録・カルテ<span id="sec2-dot" style="display:none;width:10px;height:10px;background:#dc2626;border-radius:50%;margin-left:4px;animation:notifyPulse 1.4s infinite"></span><span class="chev">▼</span></div>
       <div class="btn-row" id="sec2-r">
         <button class="btn bp bsm" onclick="showSymptomList()" style="background:#0ea5e9;color:white;border-color:#0ea5e9">🩺 症状メモ一覧</button>
-        <button class="btn bp bsm" onclick="location.href='karte.html'" style="background:#0f766e;color:white;border-color:#0f766e">📋 電子カルテ</button>
-        <button class="btn bp bsm" onclick="window.open('consent.html','_blank')" style="background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
+        <button class="btn bp bsm" onclick="window.open(adminPageUrl('Karte'),'_top')" style="background:#0f766e;color:white;border-color:#0f766e">📋 電子カルテ</button>
+        <button class="btn bp bsm" onclick="window.open('https://kurazi0510-creator.github.io/kuraji/consent.html','_blank')" style="background:#8b5cf6;color:white;border-color:#8b5cf6">📝 電子同意書</button>
         <button class="btn bp bsm" onclick="openMondoList()" style="background:#b45309;color:white;border-color:#b45309;position:relative">📋 Web問診票一覧(内容確認・A4印刷)<span id="mondoReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
       </div>
     </div>
@@ -295,8 +325,8 @@ function printThisPage(pageId){
     <div class="btn-section">
       <div class="btn-section-title closed" id="sec3-t" onclick="toggleBtnSection('sec3')">🌐 Web予約管理<span id="sec3-dot" style="display:none;width:10px;height:10px;background:#dc2626;border-radius:50%;margin-left:4px;animation:notifyPulse 1.4s infinite"></span><span id="sec3-wl-dot" style="display:none;width:10px;height:10px;background:#7e22ce;border-radius:50%;margin-left:4px;animation:notifyPulse 1.4s infinite"></span><span class="chev">▼</span></div>
       <div class="btn-row closed" id="sec3-r">
-        <button class="btn bp bsm" onclick="window.open('book.html','_blank')" style="background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
-        <button class="btn bp bsm" onclick="window.open('confirm.html','_blank')" style="background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
+        <button class="btn bp bsm" onclick="window.open('https://kurazi0510-creator.github.io/kuraji/book.html','_blank')" style="background:#c98a4b;color:white;border-color:#c98a4b">🌐 Web予約フォームを開く(確認用)</button>
+        <button class="btn bp bsm" onclick="window.open('https://kurazi0510-creator.github.io/kuraji/confirm.html','_blank')" style="background:#4b8ac9;color:white;border-color:#4b8ac9">📋 予約確認ページを開く(確認用)</button>
         <button class="btn bp bsm" onclick="openWebRequests()" style="background:#c98a4b;color:white;border-color:#c98a4b;position:relative">📩 Web予約リクエスト一覧(未対応の確認・確定)<span id="webReqBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
         <button class="btn bp bsm" onclick="openWaitlist()" style="background:#7e22ce;color:white;border-color:#7e22ce;position:relative">⏳ キャンセル待ち一覧<span id="waitlistBadge" style="display:none;position:absolute;top:-8px;right:-8px;background:#dc2626;color:white;border-radius:999px;min-width:22px;height:22px;font-size:0.75rem;font-weight:bold;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 4px rgba(0,0,0,.2)"></span></button>
         <button class="btn bp bsm" onclick="sendWaitlistPreview()" style="background:#a78bfa;color:white;border-color:#a78bfa">👀 キャンセル待ちメッセージのプレビューを送る</button>
@@ -305,7 +335,7 @@ function printThisPage(pageId){
         <button class="btn bp bsm" onclick="syncMenuMasterToGAS()" style="background:#059669;color:white;border-color:#059669" title="自費メニューをWeb予約フォームに反映させます">📤 メニューをWeb予約に同期</button>
         <button class="btn bp bsm" onclick="openBizHoursModal()" style="background:#0891b2;color:white;border-color:#0891b2">⏰ 営業時間設定</button>
         <button class="btn bp bsm" onclick="openIntervalModal()" style="background:#0369a1;color:white;border-color:#0369a1">⏱ インターバル設定(施術の準備時間)</button>
-        <button class="btn bp bsm" onclick="window.open('today_split.html','_blank')" style="background:#0f766e;color:white;border-color:#0f766e">🧪 本日の施術画面プレビュー(予約×カルテ 左右分割)</button>
+        <button class="btn bp bsm" onclick="window.open(adminPageUrl('TodaySplit'),'_blank')" style="background:#0f766e;color:white;border-color:#0f766e">🧪 本日の施術画面プレビュー(予約×カルテ 左右分割)</button>
       </div>
     </div>
 
@@ -830,7 +860,7 @@ function printThisPage(pageId){
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <button class="btn bp bsm" onclick="generateMonthlyReport()" style="background:#1e293b;color:white;border-color:#1e293b">📊 月次レポート生成（PDF）</button>
         <button class="btn bp bsm" onclick="generateCarePlan()" style="background:#7c3aed;color:white;border-color:#7c3aed">📋 施術計画書作成</button>
-        <button class="btn bp bsm" onclick="location.href='gas_trigger_setup.html'" style="background:#f97316;color:white;border-color:#f97316">⏰ 自動通知設定</button>
+        <button class="btn bp bsm" onclick="window.open(adminPageUrl('TriggerSetup'),'_top')" style="background:#f97316;color:white;border-color:#f97316">⏰ 自動通知設定</button>
       </div>
       <div class="card">
         <div class="ctitle">💎 LTV分析（顧客生涯価値）</div>
@@ -973,7 +1003,7 @@ function printThisPage(pageId){
       <div class="ctitle">📱 LINE Notify設定</div>
       <div style="font-size:0.76rem;color:var(--muted);margin-bottom:10px">20日未来院（翌日初診料発生）・キャンセル発生時に自分のLINEに通知が届きます。初回はセットアップガイドで設定してください。</div>
       <div id="line-token-status" style="font-size:0.78rem;margin-bottom:8px"></div>
-      <button class="btn bp bsm" onclick="location.href='line_setup.html'" style="background:#22c55e;color:white;border-color:#22c55e">📱 LINE通知をセットアップする（5分）</button>
+      <button class="btn bp bsm" onclick="window.open(adminPageUrl('LineSetup'),'_top')" style="background:#22c55e;color:white;border-color:#22c55e">📱 LINE通知をセットアップする（5分）</button>
       <button class="btn bp bsm" onclick="testLineNotify2()" style="margin-top:6px">🧪 テスト送信</button>
     </div>
     <div class="card">
@@ -1082,10 +1112,19 @@ function printThisPage(pageId){
       <button class="btn bp bsm" onclick="showDuplicateLineUsers()" style="background:#f59e0b;color:white;border-color:#f59e0b">🔍 重複を見つける(表示のみ)</button>
       <input type="text" id="lu-search" placeholder="名前・診察券番号で検索" class="inp" style="flex:1" oninput="renderLineUsers()">
     </div>
-    <div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.82rem">
-      <div>✅ 登録済み：<b id="lu-count-ok">0</b>人</div>
-      <div>⬜ 未登録：<b id="lu-count-ng">0</b>人</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:0.82rem">
+      <div style="color:#166534">✅ 予約確認 連携済み：<b id="lu-count-linked">0</b>人</div>
+      <div style="color:#92400e">🟠 電話番号のみ登録：<b id="lu-count-ok">0</b>人</div>
+      <div style="color:#4b5563">⬜ 電話番号未登録：<b id="lu-count-ng">0</b>人</div>
     </div>
+    <label style="display:block;margin-bottom:10px">表示する状態：
+      <select id="lu-status-filter" onchange="renderLineUsers()" style="padding:7px;max-width:100%">
+        <option value="all">すべて</option>
+        <option value="phone">電話番号のみ登録（予約確認は未連携）</option>
+        <option value="linked">予約確認 連携済み</option>
+        <option value="missing">電話番号未登録</option>
+      </select>
+    </label>
     <div id="lu-list" style="max-height:60vh;overflow-y:auto"></div>
   </div>
 </div>
@@ -3512,7 +3551,7 @@ async function loadMondoList(){
   el.innerHTML='<p style="text-align:center;color:#94a3b8;padding:20px">読み込み中...</p>';
   const isKotsu=mondoCurrentTab==='kotsu';
   const action=isKotsu?'getMondoshinKotsuList':'getMondoshinList';
-  const printPage=isKotsu?'mondo_kotsu_print.html':'mondo_print.html';
+  const printPage=isKotsu?adminPageUrl('MondoKotsuPrint'):adminPageUrl('MondoPrint');
   try{
     const res=await fetch(GAS+'?action='+action+'&t='+Date.now(),{cache:'no-store'});
     const d=await res.json();
@@ -3522,7 +3561,7 @@ async function loadMondoList(){
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><b style="font-size:0.9rem">${q.name}</b><span style="color:#94a3b8;font-size:0.72rem;margin-left:6px">（${q.kana}）</span></div>
         <div style="display:flex;gap:6px">
-          <button class="btn be bsm" onclick="window.open('${printPage}?id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
+          <button class="btn be bsm" onclick="window.open('${printPage}&id=${q.rowIdx}','_blank')" style="background:#b45309;color:white;border-color:#b45309">🖨 A4で印刷</button>
           <button class="btn be bsm" onclick="deleteMondoEntry(${q.rowIdx},${isKotsu})" style="background:#fee2e2;color:#dc2626;border-color:#fee2e2">🗑 削除</button>
         </div>
       </div>
@@ -4994,8 +5033,8 @@ function renderMBussanItems(){
       discWrap.innerHTML=`<button onclick="toggleDiscInput('${bs.id}',this)" style="background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:0.7rem;color:#64748b;cursor:pointer">${disc>0?'割引: '+disc+'円':'割引を入力'}</button>
         <span id="disc-net-${bs.id}" style="font-size:0.72rem;color:#16a34a;white-space:nowrap">${disc>0?'→ 実質'+yen(netPrice):''}</span>
         <div id="disc-input-${bs.id}" style="display:${disc>0?'flex':'none'};align-items:center;gap:4px;margin-top:4px">
-          <input type="number" class="inp" style="width:80px;padding:3px 8px;font-size:0.78rem" 
-            placeholder="0" value="${disc}" min="0" 
+          <input type="number" class="inp" style="width:80px;padding:3px 8px;font-size:0.78rem"
+            placeholder="0" value="${disc}" min="0"
             oninput="mBussanDisc['${bs.id}']=parseInt(this.value)||0;calcMBussanTotal();updateDiscNet('${bs.id}',${overridePrice},parseInt(this.value)||0)">
           <button onclick="clearDisc('${bs.id}')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:2px 6px;font-size:0.7rem;cursor:pointer">×</button>
         </div>`;
@@ -5301,7 +5340,7 @@ function openKarteFromModal(){
   const cardId = document.getElementById('m-id')?.value.trim();
   const name = document.getElementById('m-nm')?.value.trim();
   if(!cardId&&!name){alert('診察券Noまたは患者名が入力されていません');return;}
-  window.open('karte.html?cardId='+encodeURIComponent(cardId)+'&name='+encodeURIComponent(name),'_blank');
+  window.open(adminPageUrl('Karte')+'&cardId='+encodeURIComponent(cardId)+'&name='+encodeURIComponent(name),'_blank');
 }
 async function loadVisitStatsSummary(cardId,name){
   const el=document.getElementById('visit-stats-summary');
@@ -6986,12 +7025,12 @@ function calcUriageFromBookings(){
       if(!totalAmount)return;
       if(!calc[date])calc[date]={hoken:0,jhi:0,jiko:0,bussan:0,other:0,pay:[],memo:''};
       const c=calc[date];
-      
+
       // 物販合計を計算
       const bussanArr=bk.bussan||[];
       const bussanTotal=bussanArr.reduce((s,b)=>s+b.price*(b.qty||1),0);
       c.bussan+=bussanTotal;
-      
+
       // 施術料 = 合計 - 物販
       const seturyoAmount=Math.max(0,totalAmount-bussanTotal);
       if(seturyoAmount>0){
@@ -7000,7 +7039,7 @@ function calcUriageFromBookings(){
         else if(kubunList.includes('交通事故'))c.jiko+=seturyoAmount;
         else c.jhi+=seturyoAmount;
       }
-      
+
       // 支払方法（重複なし）
       (bk.pay||[]).forEach(p=>{if(!c.pay.includes(p))c.pay.push(p);});
     });
@@ -7011,13 +7050,13 @@ async function syncUriageFromBookings(){
   const calc=calcUriageFromBookings();
   const dates=Object.keys(calc);
   if(!dates.length){alert('予約データに支払金額が入っているデータがありません。\n予約に支払金額を入力してから実行してください。');return;}
-  
+
   // 確認ダイアログ
   const msg='予約データから売上を集計します。\n\n'
     +dates.map(d=>{const c=calc[d];const total=(c.hoken+c.jhi+c.jiko+c.bussan);return d+': 合計'+total.toLocaleString()+'円';}).join('\n')
     +'\n\n既存の売上データは上書きされます。続けますか？';
   if(!confirm(msg))return;
-  
+
   // 対象日のデータを完全リセットしてから新しいデータをセット
   let updated=0;
   dates.forEach(d=>{
@@ -8057,7 +8096,7 @@ function goPage(id){
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded',async()=>{
   // ?clear=1 でlocalStorage完全リセット
-  if(new URLSearchParams(location.search).get('clear')==='1'){
+  if(new URLSearchParams(window.KURAJI_PAGE_PARAMS).get('clear')==='1'){
     ['kj_bookings','kj_patients','kj_uriage'].forEach(k=>localStorage.removeItem(k));
     bookings={};patients=[];uriage=[];
     history.replaceState(null,'',location.pathname);
@@ -8097,6 +8136,79 @@ document.getElementById('histModal').addEventListener('click',function(e){if(e.t
   new MutationObserver(syncModalOpen).observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true});
   syncModalOpen();
 })();
+</script>
+<script>
+// Owner-only enhancement. Registration never runs in the public manager copy.
+let lineRegistrationState={patients:[],links:[]};
+function lineRegistrationRpc(request){return new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).bookingLookupAdminRequest(request));}
+function lineRegistrationPhone(value){let digits=String(value||'').replace(/\D/g,'');if(digits.length>=9&&digits.length<=10&&digits[0]!=='0')digits='0'+digits;return digits;}
+function lineRegistrationText(tag,text){const el=document.createElement(tag);el.textContent=text;return el;}
+loadLineUsers=async function(){
+ const list=document.getElementById('lu-list');list.replaceChildren(lineRegistrationText('p','読み込み中…'));
+ try{
+  const result=await lineRegistrationRpc({action:'list'});
+  if(result.version!=='line-registration-20261001')throw new Error('管理用コードの更新が反映されていません。新バージョンでデプロイしてください。');
+  lineRegistrationState=result;lineUsersCache=result.users||[];renderLineUsers();
+ }catch(err){list.replaceChildren(lineRegistrationText('p',err.message));}
+};
+renderLineUsers=function(){
+ const search=document.getElementById('lu-search');search.placeholder='名前・電話番号・診察券・メッセージで検索';
+ const keyword=search.value.trim().replace(/\s/g,'').toLowerCase();
+ const compact=value=>String(value||'').replace(/\s/g,'').toLowerCase();
+ const candidates=user=>lineRegistrationState.patients.filter(p=>p.tel===lineRegistrationPhone(user.phone));
+ const active=user=>lineRegistrationState.links.find(link=>link.active&&link.uid===user.userId);
+ const category=user=>active(user)?'linked':lineRegistrationPhone(user.phone)?'phone':'missing';
+ const selected=document.getElementById('lu-status-filter').value||'all';
+ const filtered=lineUsersCache.filter(user=>(selected==='all'||category(user)===selected)&&(!keyword||[user.name,user.phone,user.cardId,user.lastMsg,...candidates(user).map(p=>p.name+' '+p.cardId)].some(value=>compact(value).includes(keyword))));
+ filtered.sort((a,b)=>Number(!!active(a))-Number(!!active(b)));
+ document.getElementById('lu-count-linked').textContent=lineUsersCache.filter(u=>category(u)==='linked').length;
+ document.getElementById('lu-count-ok').textContent=lineUsersCache.filter(u=>category(u)==='phone').length;
+ document.getElementById('lu-count-ng').textContent=lineUsersCache.filter(u=>category(u)==='missing').length;
+ const list=document.getElementById('lu-list');list.replaceChildren();
+ if(!filtered.length){list.append(lineRegistrationText('p','該当するLINEがありません'));return;}
+ filtered.forEach(user=>{
+  const row=document.createElement('section');row.style.cssText='padding:12px 4px;border-bottom:1px solid #ddd';
+  const kind=category(user);
+  const badge=lineRegistrationText('span',kind==='linked'?'✅ 予約確認 連携済み':kind==='phone'?'🟠 電話番号のみ登録':'⬜ 電話番号未登録');
+  badge.style.cssText='display:inline-block;padding:5px 9px;margin:0 0 6px 8px;border-radius:6px;font-size:0.85rem;font-weight:bold;'+(kind==='linked'?'background:#dcfce7;color:#166534':kind==='phone'?'background:#fef3c7;color:#92400e':'background:#f3f4f6;color:#4b5563');
+  row.append(lineRegistrationText('strong',user.name||'名前未登録'),badge,lineRegistrationText('p','最終メッセージ：'+String(user.lastMsg||'').slice(0,120)));
+  const fields={};
+  [['name','名前',user.name],['phone','電話番号',user.phone],['cardId','診察券番号',user.cardId]].forEach(([key,label,value])=>{
+   const input=document.createElement('input');input.value=value||'';input.placeholder=label;input.style.cssText='padding:8px;margin:4px;width:150px';
+   // Preserve the existing row-saving selectors.
+   input.className=({'name':'lu-name','phone':'lu-phone','cardId':'lu-card'})[key];input.dataset.uid=user.userId;
+   fields[key]=input;row.append(input);
+  });
+  const select=document.createElement('select');select.style.cssText='padding:8px;margin:4px;max-width:100%';
+  const note=lineRegistrationText('p','');
+  function updateCandidates(){
+   const hits=lineRegistrationState.patients.filter(p=>p.tel===lineRegistrationPhone(fields.phone.value));
+   select.replaceChildren(new Option(hits.length?'患者候補を選択':'電話番号に一致する患者がいません',''));
+   hits.forEach(p=>select.add(new Option(p.name+' ／ 診察券 '+p.cardId,p.cardId)));
+   const existing=hits.find(p=>p.cardId===fields.cardId.value);
+   const chosen=existing||(hits.length===1?hits[0]:null);
+   if(chosen){select.value=chosen.cardId;fields.cardId.value=chosen.cardId;}
+   note.textContent=hits.length>1?'同じ電話番号の患者さんが複数います。名前・診察券番号をご確認ください。':hits.length===1?'候補の患者名と、このLINEがご本人のものか確認して登録してください。':'患者一覧の電話番号を確認してください。電話番号のみ保存することもできます。';
+  }
+  fields.phone.addEventListener('input',updateCandidates);
+  select.addEventListener('change',()=>{fields.cardId.value=select.value;});
+  row.append(select,note);updateCandidates();
+  const status=lineRegistrationText('p',kind==='linked'?'予約確認を利用できます。':kind==='phone'?'電話番号は登録済みです。予約確認を利用するには、下のボタンで本人確認して連携してください。':'電話番号・患者情報を確認して登録してください。');row.append(status);
+  function button(label,handler){const b=lineRegistrationText('button',label);b.style.cssText='padding:9px;margin:4px;cursor:pointer';b.onclick=async()=>{b.disabled=true;try{await handler();}catch(err){status.textContent='保存できませんでした：'+err.message;}finally{b.disabled=false;}};row.append(b);}
+  button('本人確認して保存・予約確認を連携',async()=>{
+   const result=await lineRegistrationRpc({action:'verify',uid:user.userId,tel:lineRegistrationPhone(fields.phone.value),cardId:fields.cardId.value,confirmed:true});
+   if(!result.ok)throw new Error(result.error||'保存に失敗しました');
+   await loadLineUsers();
+  });
+  button('電話番号などのみ保存',async()=>{await saveLineUserRow(user.userId);});
+  if(active(user))button('予約確認の連携を解除',async()=>{
+   if(!confirm('このLINEの予約確認用の連携を解除しますか？'))return;
+   await lineRegistrationRpc({action:'revoke',tel:active(user).tel});await loadLineUsers();
+  });
+  list.append(row);
+ });
+};
+
 </script>
 </body>
 </html>
