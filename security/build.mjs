@@ -90,6 +90,7 @@ function adminRequest(request){
   return output.getContent();
 }
 `;
+admin+='\n'+fs.readFileSync(path.join(root,'security/patient_identity_admin.gs'),'utf8');
 admin+='\n'+fs.readFileSync(path.join(root,'security/salary_admin.gs'),'utf8');
 admin+='\n'+fs.readFileSync(path.join(root,'security/booking_lookup_admin.gs'),'utf8');
 writeGenerated('Admin.gs', admin);

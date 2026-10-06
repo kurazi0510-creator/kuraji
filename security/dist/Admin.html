@@ -412,7 +412,7 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
 <!-- 患者名簿 -->
 <div class="page" id="page-patients">
   <div class="card" style="margin-top:14px">
-    <div class="ctitle">新規患者登録</div>
+    <div class="ctitle">新規患者登録</div><div id="patient-number-guide" style="margin-bottom:10px;font-weight:700"></div>
     <div class="fgrid">
       <div class="fg"><label>診察券No</label><input class="inp" id="c-id" type="number" placeholder="例: 2025"></div>
       <div class="fg"><label>患者名</label><input class="inp" id="c-nm" placeholder="山田 太郎"></div>
@@ -1396,10 +1396,12 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
         </div>
         <div class="fg" style="grid-column:1/-1">
           <label>予約枠数（同時来院の場合は2名合計）</label>
+          <div id="booking-number-guide" style="font-size:0.78rem;margin-bottom:8px"></div>
           <div id="family-booking-area" style="margin:8px 0">
             <label for="m-family-search">同じ時刻に来院する2人目</label>
             <input type="hidden" id="m-family-patient" value="">
-            <input class="inp" id="m-family-search" placeholder="名前・ふりがな・診察券番号で検索" autocomplete="off" oninput="if(!event.isComposing)renderFamilyPatientResults()" oncompositionend="renderFamilyPatientResults()" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();selectFirstFamilyPatient()}" aria-controls="m-family-results">
+            <input class="inp" id="m-family-search" placeholder="名前・ふりがな・診察券番号で検索" autocomplete="off" oninput="renderFamilyPatientResults()" onchange="renderFamilyPatientResults()" onkeyup="renderFamilyPatientResults()" oncompositionend="renderFamilyPatientResults()" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();selectFirstFamilyPatient()}" aria-controls="m-family-results">
+            <button type="button" class="btn bc" onclick="renderFamilyPatientResults()" style="margin-top:6px;min-height:38px">2人目の候補を検索</button>
             <div id="m-family-results" style="max-height:230px;overflow-y:auto;margin-top:6px" aria-live="polite"></div>
             <div id="m-family-selected" style="margin-top:6px" aria-live="polite"></div>
             <small>2人目を選んだ後、下の枠数を2名分の合計にしてください。会計は保存後、各患者様の「内容編集」から入力できます。</small>
@@ -2468,6 +2470,12 @@ function setStat(cls,txt){const el=document.getElementById('sbadge');el.classNam
 async function syncAll(){
   setStat('s-ing','🔄 同期中...');
   const _syncFromGAS=async()=>{
+    if(typeof google!=='undefined'&&google.script?.run){
+      const repair=await new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).repairTomitaCard2085());
+      if(!repair?.ok)throw new Error(repair?.error||'診察券番号の整理に失敗しました');
+      patients=patients.filter(p=>String(p.name||'').replace(/[\s　]/g,'')!=='冨田茉香那'||String(p.id).trim()==='2085');
+      for(const day of Object.values(bookings))for(const b of Object.values(day))if(String(b.name||'').replace(/[\s　]/g,'')==='冨田茉香那')b.cardId='2085';
+    }
     const controller=new AbortController();
     const tid=setTimeout(()=>controller.abort(),12000);
     try{
@@ -4582,7 +4590,7 @@ function renderSched(){
       tr.innerHTML=`<td class="tc">${bk.appointmentTime||s}${bk.groupId?'<br><small>同時来院・合計'+bk.groupSpan+'枠</small>':''}</td>
         <td>${kubunHtml}</td>
         <td><strong style="font-size:0.8rem">${bk.name}</strong>${bk.menu?'<br><span style="font-size:0.65rem;color:var(--accent)">'+bk.menu+'</span>':''}</td>
-        <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||''}</td>
+        <td style="font-size:0.7rem;color:var(--muted)">${bk.cardId||'仮予約・番号未登録'}</td>
         <td><span class="rt ${rc}">${bk.route||''}</span>${(()=>{
   if(bk.route!=='次回予約')return '';
   const allD=Object.keys(bookings).sort();
@@ -4672,7 +4680,7 @@ function familyPatientMatches(query){
   const q=normalizeFamilyPatientQuery(query),first=String(document.getElementById('m-id').value||'');
   if(!q)return [];
   const terms=q.split(/[　 ]+/).filter(Boolean);
-  return patients.filter(p=>p.id&&String(p.id)!==first&&terms.every(term=>[p.name,p.kana,p.id].some(v=>normalizeFamilyPatientQuery(v).includes(term))))
+  return patients.filter(p=>p.id&&String(p.id).trim()!==first.trim()&&terms.every(term=>[p.name,p.kana,p.id].some(v=>normalizeFamilyPatientQuery(v).includes(term))))
     .sort((a,b)=>Number(normalizeFamilyPatientQuery(b.id)===q)-Number(normalizeFamilyPatientQuery(a.id)===q)||String(a.name||'').localeCompare(String(b.name||''),'ja'));
 }
 function renderFamilyPatientResults(){
@@ -4693,7 +4701,7 @@ function renderFamilyPatientResults(){
 }
 function renderFamilyPatientSelection(){
   const field=document.getElementById('m-family-patient'),box=document.getElementById('m-family-selected');
-  const p=patients.find(x=>String(x.id)===String(field.value));box.replaceChildren();
+  const p=patients.find(x=>String(x.id).trim()===String(field.value).trim());box.replaceChildren();
   if(!p){box.textContent=field.disabled?'登録済みの同時来院予約です。患者様の変更は再登録してください。':'現在：1名予約（2人目は未選択）';return;}
   const label=document.createElement('strong');label.textContent='選択中：'+p.name+' ／ 診察券 '+p.id;box.appendChild(label);
   if(!field.disabled){const button=document.createElement('button');button.type='button';button.className='btn bsm';button.textContent='選択を解除';button.style.marginLeft='8px';button.onclick=()=>selectFamilyPatient('');box.appendChild(button);}
@@ -4701,7 +4709,7 @@ function renderFamilyPatientSelection(){
 function selectFamilyPatient(id){
   const field=document.getElementById('m-family-patient');if(field.disabled)return;
   if(id&&String(document.getElementById('m-id').value)===String(id)){alert('1人目とは別の患者様を選んでください。');return;}
-  if(id&&!patients.some(p=>String(p.id)===String(id)))return;
+  if(id&&!patients.some(p=>String(p.id).trim()===String(id).trim()))return;
   field.value=String(id||'');document.getElementById('m-family-search').value='';
   document.getElementById('m-family-results').replaceChildren();
   if(id&&mSlotCount<2)setSlotCount(2);
@@ -5294,6 +5302,7 @@ function loadKubun(kubunList){
 
 // ===== モーダル開閉 =====
 function openModal(date,slot){
+  renderPatientNumberGuide();
   if(bookings[date]?.[slot]?.holdGroup){alert('同時来院の患者様のため確保中の枠です。');return;}
   editDate=date;editSlot=slot;
   document.getElementById('mtitle').textContent='予約入力 '+slot;
@@ -5561,9 +5570,10 @@ function closeHistModal(){document.getElementById('histModal').classList.remove(
 async function saveBk(){
   const date=editDate,slot=editSlot;
   const beforeSave={bookings:JSON.stringify(bookings),patients:JSON.stringify(patients),stock:JSON.stringify(stockData)};
-  if(!mKubunSel.length){alert('区分を選択してください');return;}
   const name=document.getElementById('m-nm').value.trim();
   const cardId=document.getElementById('m-id').value.trim();
+  if(!mKubunSel.length&&name&&!cardId)mKubunSel=['新規'];
+  if(!mKubunSel.length){alert('区分を選択してください');return;}
   const route=document.getElementById('m-nextbook-cb')?.checked?'次回予約':document.getElementById('m-rt').value;
   const symptom=document.getElementById('m-sym').value.trim();
   const nextMemo=document.getElementById('m-next-memo')?.value.trim()||'';
@@ -5610,7 +5620,7 @@ async function saveBk(){
   const kubunList=mKubunSel.slice();
   const previous=bookings[date][slot];
   const companionId=document.getElementById('m-family-patient').value;
-  const companion=patients.find(p=>String(p.id)===companionId);
+  const companion=patients.find(p=>String(p.id).trim()===companionId.trim());
   if(companionId&&(!companion||!p||!cardId||String(cardId)===companionId)){alert('患者一覧に登録された、診察券番号の異なる2名を選択してください。');return;}
   if(companion&&mSlotCount<2){alert('2名の予約は合計2枠以上を選択してください。');return;}
   const group=previous?.groupId?familyBookingBlock(date,slot):null;
@@ -7046,7 +7056,21 @@ function sortPatients(list,sort){
   return l;
 }
 
+function patientNumberRange(){
+  const numbers=patients.map(p=>String(p.id||'').trim()).filter(x=>/^\d+$/.test(x)).map(Number);
+  for(const day of Object.values(bookings))for(const b of Object.values(day)){const id=String(b.cardId||'').trim();if(/^\d+$/.test(id))numbers.push(Number(id));}
+  const max=Math.max(0,...numbers);return {max,next:max+1};
+}
+function renderPatientNumberGuide(){
+  const {max,next}=patientNumberRange();
+  const text='登録済み最大番号：'+max+' ／ 次の診察券番号：'+next;
+  const list=document.getElementById('patient-number-guide');if(list)list.textContent=text;
+  const booking=document.getElementById('booking-number-guide');if(booking)booking.textContent=text+'。新規のお問い合わせは診察券番号を空欄にして、患者名だけで予約を保存できます。来院後に番号・メニューを登録してください。';
+  const id=document.getElementById('c-id');if(id)id.placeholder='次の番号：'+next;
+}
+
 function renderPatients(){
+  renderPatientNumberGuide();
   const q=(document.getElementById('psearch')?.value||'').toLowerCase().replace(/[-\s]/g,'');
   const sort=document.getElementById('psort')?.value||'last_desc';
   let list=patients.filter(p=>{
