@@ -612,6 +612,7 @@ function saveBookingsSafe(rows){
     var header=rows[0].slice(),keys={},out=[header],prior={};
     existing.slice(1).forEach(function(r){prior[String(r[0]||'')+'|'+bookingResourceTime_(r)+'|'+String(r[4]||'')]=r;});
     rows.slice(1).forEach(function(row){
+      if(['2500','3000'].indexOf(String(row[4]||'').trim())>=0)return;
       var key=String(row[0]||'')+'|'+bookingResourceTime_(row);
       if(key==='|')return;
       if(keys[key])throw new Error('占有枠が重複しています: '+key);

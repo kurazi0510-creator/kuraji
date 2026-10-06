@@ -612,6 +612,7 @@ function saveBookingsSafe(rows){
     var header=rows[0].slice(),keys={},out=[header],prior={};
     existing.slice(1).forEach(function(r){prior[String(r[0]||'')+'|'+bookingResourceTime_(r)+'|'+String(r[4]||'')]=r;});
     rows.slice(1).forEach(function(row){
+      if(['2500','3000'].indexOf(String(row[4]||'').trim())>=0)return;
       var key=String(row[0]||'')+'|'+bookingResourceTime_(row);
       if(key==='|')return;
       if(keys[key])throw new Error('占有枠が重複しています: '+key);
@@ -3346,13 +3347,14 @@ function doGet(e){
 }
 function adminRequest(request){
   if(!request||!request.method)throw new Error('Invalid request');
-  var output;
+  var output,deletedCardCleanup;
   if(request.method==='GET'){
-    if(request.params&&request.params.action==='getAll'){var repair=repairTomitaCard2085();if(!repair.ok)throw new Error(repair.error);}
+    if(request.params&&request.params.action==='getAll'){var repair=repairTomitaCard2085();if(!repair.ok)throw new Error(repair.error);deletedCardCleanup=cleanupDeletedCards2500And3000_();}
     output=adminApiGet_({parameter:request.params||{}});
   }else if(request.method==='POST'){
     output=adminApiPost_({postData:{contents:JSON.stringify(request.body||{})},parameter:{}});
   }else throw new Error('Invalid method');
+  if(deletedCardCleanup){var data=JSON.parse(output.getContent());data.deletedCardCleanup=deletedCardCleanup;return JSON.stringify(data);}
   return output.getContent();
 }
 
@@ -3397,6 +3399,39 @@ function repairTomitaCard2085(){
     props.setProperty('TOMITA_2085_REPAIR_DONE','v1');
     return {ok:true,changed:matches.length+plans.length};
   }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
+}
+
+function cleanupDeletedCards2500And3000_() {
+  var props=PropertiesService.getScriptProperties();
+  var cached=props.getProperty('DELETED_CARDS_2500_3000_CLEANUP_V1');
+  if(cached)return JSON.parse(cached);
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try {
+    var ss=adminSpreadsheet_();
+    if(!ss)throw new Error('管理用スプレッドシートが取得できません');
+    var targetsById={'2500':true,'3000':true};
+    var report={targetIds:['2500','3000'],deleted:{},skipped:[]};
+    var norm=function(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();};
+    var headers=['診察券no','診察券番号','診察券','cardid','患者id','患者番号'];
+    var plans=[];
+    ss.getSheets().forEach(function(sheet){
+      var rows=sheet.getDataRange().getValues();if(rows.length<2)return;
+      var columns=[];rows[0].forEach(function(h,c){if(headers.indexOf(norm(h))>=0)columns.push(c);});
+      if(!columns.length){report.skipped.push(sheet.getName());return;}
+      var targets=[];
+      for(var i=1;i<rows.length;i++)if(columns.some(function(c){return targetsById[norm(rows[i][c])]===true;}))targets.push(i+1);
+      if(targets.length)plans.push({sheet:sheet,rows:targets});
+    });
+    // 古い患者データが別端末から再登録されるのを防止。
+    addPatientTombstone_('2500');
+    addPatientTombstone_('3000');
+    plans.forEach(function(p){p.rows.slice().reverse().forEach(function(row){p.sheet.deleteRow(row);});report.deleted[p.sheet.getName()]=p.rows.length;});
+    SpreadsheetApp.flush();
+    report.deletedTotal=Object.keys(report.deleted).reduce(function(n,key){return n+report.deleted[key];},0);
+    props.setProperty('DELETED_CARDS_2500_3000_CLEANUP_V1',JSON.stringify(report));
+    console.log('2500・3000番の削除結果: '+JSON.stringify(report));
+    return report;
+  } finally {lock.releaseLock();}
 }
 
 // Include ONLY in the owner-only project; never expose through the public router.

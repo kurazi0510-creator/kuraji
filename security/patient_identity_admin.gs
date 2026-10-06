@@ -40,3 +40,36 @@ function repairTomitaCard2085(){
     return {ok:true,changed:matches.length+plans.length};
   }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
 }
+
+function cleanupDeletedCards2500And3000_() {
+  var props=PropertiesService.getScriptProperties();
+  var cached=props.getProperty('DELETED_CARDS_2500_3000_CLEANUP_V1');
+  if(cached)return JSON.parse(cached);
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try {
+    var ss=adminSpreadsheet_();
+    if(!ss)throw new Error('管理用スプレッドシートが取得できません');
+    var targetsById={'2500':true,'3000':true};
+    var report={targetIds:['2500','3000'],deleted:{},skipped:[]};
+    var norm=function(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();};
+    var headers=['診察券no','診察券番号','診察券','cardid','患者id','患者番号'];
+    var plans=[];
+    ss.getSheets().forEach(function(sheet){
+      var rows=sheet.getDataRange().getValues();if(rows.length<2)return;
+      var columns=[];rows[0].forEach(function(h,c){if(headers.indexOf(norm(h))>=0)columns.push(c);});
+      if(!columns.length){report.skipped.push(sheet.getName());return;}
+      var targets=[];
+      for(var i=1;i<rows.length;i++)if(columns.some(function(c){return targetsById[norm(rows[i][c])]===true;}))targets.push(i+1);
+      if(targets.length)plans.push({sheet:sheet,rows:targets});
+    });
+    // 古い患者データが別端末から再登録されるのを防止。
+    addPatientTombstone_('2500');
+    addPatientTombstone_('3000');
+    plans.forEach(function(p){p.rows.slice().reverse().forEach(function(row){p.sheet.deleteRow(row);});report.deleted[p.sheet.getName()]=p.rows.length;});
+    SpreadsheetApp.flush();
+    report.deletedTotal=Object.keys(report.deleted).reduce(function(n,key){return n+report.deleted[key];},0);
+    props.setProperty('DELETED_CARDS_2500_3000_CLEANUP_V1',JSON.stringify(report));
+    console.log('2500・3000番の削除結果: '+JSON.stringify(report));
+    return report;
+  } finally {lock.releaseLock();}
+}

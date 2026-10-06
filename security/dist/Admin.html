@@ -2267,7 +2267,20 @@ let cancelDate=null, cancelSlot=null, cancelReasonVal='';
 let dataRenderVersion=0;
 const pageRenderVersion=Object.create(null);
 
+// 院長から削除指定された番号。端末の予約バックアップからの復活も防ぐ。
+function purgeDeletedCardCaches(){
+  const removed=new Set(['2500','3000']);
+  const match=v=>removed.has(String(v==null?'':v).normalize('NFKC').trim());
+  let count=0;
+  const before=patients.length;patients=patients.filter(p=>!match(p.id));count+=before-patients.length;
+  for(const day of Object.values(bookings))for(const [slot,b] of Object.entries(day))if(b&&match(b.cardId)){delete day[slot];count++;}
+  const filterRecords=rows=>rows.filter(r=>{if(r&&match(r.cardId)){count++;return false;}return true;});
+  patientTickets=filterRecords(patientTickets);bussanLog=filterRecords(bussanLog);
+  return count;
+}
+let deletedCardCleanupReport=null;
 function save(){
+  purgeDeletedCardCaches();
   try{
     localStorage.setItem('kj_extra_slots',JSON.stringify(extraSlotsByDate));
     localStorage.setItem('kj_p',JSON.stringify(patients));
@@ -2321,6 +2334,7 @@ function load(){
     stockData=st||DEFAULT_STOCK;
     ticketMaster=JSON.parse(localStorage.getItem('kj_tm')||'[]');
     patientTickets=JSON.parse(localStorage.getItem('kj_pt')||'[]');
+    if(purgeDeletedCardCaches())save();
   }catch(e){
     console.error('load error:',e);
     patients=[];bookings={};uriage={};bussanLog=[];
@@ -2479,6 +2493,8 @@ async function syncAll(){
       if(!res.ok)throw new Error('HTTP '+res.status);
       const data=JSON.parse(await res.text());
       if(!data.ok)throw new Error('GAS error');
+      if(data.deletedCardCleanup)deletedCardCleanupReport=data.deletedCardCleanup;
+      purgeDeletedCardCaches();
       if(typeof google!=='undefined'&&google.script?.run){
         patients=patients.filter(p=>String(p.name||'').replace(/[\s　]/g,'')!=='冨田茉香那'||String(p.id).trim()==='2085');
         for(const day of Object.values(bookings))for(const b of Object.values(day))if(String(b.name||'').replace(/[\s　]/g,'')==='冨田茉香那')b.cardId='2085';
@@ -7058,7 +7074,7 @@ function sortPatients(list,sort){
 
 function patientNumberRange(){
   // 郡さんの3000・10000番は専用番号として、通常の患者採番から除外する。
-  const reserved=new Set([3000,10000]);
+  const reserved=new Set([2500,3000,10000]);
   const numbers=patients.map(p=>String(p.id||'').trim()).filter(x=>/^\d+$/.test(x)&&!reserved.has(Number(x))).map(Number);
   for(const day of Object.values(bookings))for(const b of Object.values(day)){const id=String(b.cardId||'').trim();if(/^\d+$/.test(id)&&!reserved.has(Number(id)))numbers.push(Number(id));}
   const max=Math.max(0,...numbers);let next=max+1;while(reserved.has(next))next++;return {max,next};
@@ -7066,7 +7082,7 @@ function patientNumberRange(){
 function renderPatientNumberGuide(){
   const {max,next}=patientNumberRange();
   const text='登録済み最大番号：'+max+' ／ 次の診察券番号：'+next+'（郡さんの3000・10000番は対象外）';
-  const list=document.getElementById('patient-number-guide');if(list)list.textContent=text;
+  const list=document.getElementById('patient-number-guide');if(list){list.textContent=text;if(deletedCardCleanupReport){const report=document.createElement('small');report.style.display='block';report.textContent='削除指定2500・3000番：サーバー確認済み（削除 '+deletedCardCleanupReport.deletedTotal+'件）・端末内データ除去済み';list.appendChild(report);}}
   const booking=document.getElementById('booking-number-guide');if(booking)booking.textContent=text+'。新規のお問い合わせは診察券番号を空欄にして、患者名だけで予約を保存できます。来院後に番号・メニューを登録してください。';
   const id=document.getElementById('c-id');if(id)id.placeholder='次の番号：'+next;
 }
