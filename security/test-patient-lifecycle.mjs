@@ -14,3 +14,11 @@ const html=fs.readFileSync('kanri.html','utf8');function fn(name){let start=html
 const ui={patients:[{id:'2088',name:'木元'},{id:'10000',name:'郡'}],bookings:{d:{a:{cardId:'2090'}}},deletedPatientIds:new Set(['2089','2090']),Set,Array,String,Number,Math};vm.createContext(ui);vm.runInContext(fn('patientNumberRange'),ui);assert.equal(ui.patientNumberRange().max,2088);assert.equal(ui.patientNumberRange().next,2089,'deleted number can be newly registered, historical reservation must not inflate guide');ui.deletedPatientIds.delete('2089');ui.patients.push({id:'2089'});assert.equal(ui.patientNumberRange().next,2090);
 Object.assign(ui,{editPatientId:'2088',confirm:()=>true,fetch:async()=>({text:async()=>JSON.stringify({ok:false,error:'test failure'})}),alert:()=>{},save:()=>{throw Error('failed deletion must not save')},renderPatients(){},renderSched(){},closePEdit(){}});vm.runInContext(fn('deletePatientFromModal'),ui);await ui.deletePatientFromModal();assert.ok(ui.patients.some(p=>p.id==='2088'));assert.equal(ui.deletedPatientIds.has('2088'),false);
 console.log('PASS: getAll deletion state, tombstone-safe merge, intentional 2089 reuse, old-history removal, generation guards, normal edits, failed delete preservation, 2088 -> 2089 numbering, history excluded and future next ID advances');
+
+const syncPrefix=html.slice(html.indexOf("      if(Array.isArray(data.deletedPatientIds))"),html.indexOf("      if(prows.length>1){"));
+const partial={data:{customers:[['診察券No','患者名'],['2071','既存患者']],deletedPatientIds:['2500','3000','2089','2090']},patients:[{id:'2071'},{id:'2072',name:'未同期の患者'},{id:'2088',name:'木元'},{id:'2090',name:'削除済み'}],deletedPatientIds:new Set(),freshPatientRegistrations:new Map(),syncStartedAt:Date.now(),Set,String,Array};
+partial.purgeDeletedCardCaches=()=>{partial.patients=partial.patients.filter(p=>!partial.deletedPatientIds.has(p.id));};vm.createContext(partial);vm.runInContext(syncPrefix,partial);
+assert.ok(partial.patients.some(p=>p.id==='2072'),'missing from server is not proof of deletion');
+assert.ok(partial.patients.some(p=>p.id==='2088'),'keep locally saved patient during incomplete server response');
+assert.equal(partial.patients.some(p=>p.id==='2090'),false,'explicit tombstone still removes deleted patient');
+console.log('PASS: partial server response preserves 2072/2088; explicit deleted 2090 stays removed');
