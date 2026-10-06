@@ -56,7 +56,7 @@ renderLineUsers=function(){
   const status=lineRegistrationText('p',kind==='linked'?'予約確認を利用できます。':kind==='phone'?'電話番号は登録済みです。予約確認を利用するには、下のボタンで本人確認して連携してください。':'電話番号・患者情報を確認して登録してください。');row.append(status);
   function button(label,handler){const b=lineRegistrationText('button',label);b.style.cssText='padding:9px;margin:4px;cursor:pointer';b.onclick=async()=>{b.disabled=true;try{await handler();}catch(err){status.textContent='保存できませんでした：'+err.message;}finally{b.disabled=false;}};row.append(b);}
   button('本人確認して保存・予約確認を連携',async()=>{
-   const result=await lineRegistrationRpc({action:'verify',uid:user.userId,tel:lineRegistrationPhone(fields.phone.value),cardId:fields.cardId.value,confirmed:true});
+   const result=await lineRegistrationRpc({action:'verify',uid:user.userId,tel:lineRegistrationPhone(fields.phone.value),cardId:fields.cardId.value,confirmed:true,patient:patients.find(p=>String(p.id).trim()===String(fields.cardId.value).trim())||null});
    if(!result.ok)throw new Error(result.error||'保存に失敗しました');
    await loadLineUsers();
   });
