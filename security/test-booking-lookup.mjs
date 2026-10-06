@@ -23,7 +23,7 @@ const data={
 const sheet=name=>data[name]?{
   getDataRange:()=>({getValues:()=>data[name]}),getLastRow:()=>data[name].length,
   appendRow:row=>data[name].push(row),
-  getRange:row=>({setNumberFormat(){return this;},setValues(rows){data[name][row-1]=rows[0];return this;}}),
+  getRange:(row,col=1)=>({setNumberFormat(){return this;},setValue(value){data[name][row-1][col-1]=value;return this;},setValues(rows){if(!data[name][row-1])data[name][row-1]=[];rows[0].forEach((v,i)=>data[name][row-1][col-1+i]=v);return this;}}),
 }:null;
 const ss={getSheetByName:sheet,insertSheet(name){data[name]=[];return sheet(name);}};
 const cache=new Map(),props=new Map([['LINE_TOKEN','test-token']]);let sends=[];
@@ -77,3 +77,7 @@ for(const file of ['../confirm.html','./BookingLookup.html']){
   for(const script of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
 }
 console.log('Booking lookup: identity isolation, live bookings, pending requests, OTP and owner registration passed');
+
+// Older patient sheets put telephone in column 4, rather than column 5.
+data['患者']=data['患者'].map((r,i)=>i===0?['診察券No','患者名','性別','電話番号']: [r[0],r[1],'女性',r[4]]);
+const candidates=adminCtx.bookingLookupAdminRequest({action:'list'}).patients;assert.equal(candidates[0].tel,tel);assert.equal(adminCtx.bookingLookupAdminRequest({action:'verify',tel,uid,cardId:'123',confirmed:true}).ok,true);assert.equal(ctx.lookupBooking(tel).list.length,1);assert.throws(()=>adminCtx.bookingLookupAdminRequest({action:'verify',tel:otherTel,uid,cardId:'123',confirmed:true}),/一致/);console.log('PASS: header-based phone column works for staff linking and public lookup; mismatched phone remains rejected.');

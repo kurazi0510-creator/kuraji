@@ -1,3 +1,7 @@
+function patientPhoneColumn_(rows){
+  var headers=(rows[0]||[]).map(function(h){return String(h||'').trim();});
+  var index=headers.indexOf('電話番号');if(index<0)index=headers.indexOf('電話');if(index<0)index=headers.indexOf('phone');if(index<0)throw new Error('患者シートの電話番号列が見つかりません');return index;
+}
 // Shared reader. Links are written by the owner or the signed LINE registration webhook.
 function verifiedBookingLookupLink_(tel){
   var ss=SpreadsheetApp.getActiveSpreadsheet(),sheet=ss.getSheetByName('予約確認連携');
@@ -35,7 +39,7 @@ function lookupVerifiedBookings_(tel){
   if(!link.cardId)return {ok:true,list:[],requests:[],needsLink:true};
   var patientSheet=ss.getSheetByName('患者'),patients=patientSheet?patientSheet.getDataRange().getValues():[];
   var matches=patients.slice(1).filter(function(r){return String(r[0]).trim()===link.cardId;});
-  if(matches.length!==1||normalizeName_(matches[0][1])!==normalizeName_(link.name)||fixPhoneLeadingZero_(matches[0][4])!==tel)return {ok:false,error:'院へお問い合わせください'};
+  if(matches.length!==1||normalizeName_(matches[0][1])!==normalizeName_(link.name)||fixPhoneLeadingZero_(matches[0][patientPhoneColumn_(patients)])!==tel)return {ok:false,error:'院へお問い合わせください'};
   var bookings=ss.getSheetByName('予約表');
   if(bookings)bookings.getDataRange().getValues().slice(1).forEach(function(r){
     if(String(r[4]).trim()!==link.cardId||/キャンセル|継続/.test(String(r[2])))return;

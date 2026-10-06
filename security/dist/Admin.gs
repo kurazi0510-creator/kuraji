@@ -3131,6 +3131,10 @@ function deleteBookingsByName(namePrefix){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 
+function patientPhoneColumn_(rows){
+  var headers=(rows[0]||[]).map(function(h){return String(h||'').trim();});
+  var index=headers.indexOf('電話番号');if(index<0)index=headers.indexOf('電話');if(index<0)index=headers.indexOf('phone');if(index<0)throw new Error('患者シートの電話番号列が見つかりません');return index;
+}
 // Shared reader. Links are written by the owner or the signed LINE registration webhook.
 function verifiedBookingLookupLink_(tel){
   var ss=adminSpreadsheet_(),sheet=ss.getSheetByName('予約確認連携');
@@ -3168,7 +3172,7 @@ function lookupVerifiedBookings_(tel){
   if(!link.cardId)return {ok:true,list:[],requests:[],needsLink:true};
   var patientSheet=ss.getSheetByName('患者'),patients=patientSheet?patientSheet.getDataRange().getValues():[];
   var matches=patients.slice(1).filter(function(r){return String(r[0]).trim()===link.cardId;});
-  if(matches.length!==1||normalizeName_(matches[0][1])!==normalizeName_(link.name)||fixPhoneLeadingZero_(matches[0][4])!==tel)return {ok:false,error:'院へお問い合わせください'};
+  if(matches.length!==1||normalizeName_(matches[0][1])!==normalizeName_(link.name)||fixPhoneLeadingZero_(matches[0][patientPhoneColumn_(patients)])!==tel)return {ok:false,error:'院へお問い合わせください'};
   var bookings=ss.getSheetByName('予約表');
   if(bookings)bookings.getDataRange().getValues().slice(1).forEach(function(r){
     if(String(r[4]).trim()!==link.cardId||/キャンセル|継続/.test(String(r[2])))return;
@@ -3331,7 +3335,7 @@ function adminSpreadsheet_(){
   if(!id)throw new Error('SPREADSHEET_ID is not configured');
   return SpreadsheetApp.openById(id);
 }
-var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,Salary:true,BookingLookup:true,MondoPrint:true,MondoKotsuPrint:true};
+var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,BookingLookup:true,MondoPrint:true,MondoKotsuPrint:true};
 function doGet(e){
   var page=e&&e.parameter&&e.parameter.page||'Admin';
   if(typeof page!=='string'||!Object.prototype.hasOwnProperty.call(ADMIN_PAGES_,page))throw new Error('Unknown page');
@@ -3391,61 +3395,6 @@ function repairTomitaCard2085(){
   }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
 }
 
-// Included ONLY in the owner-only project. No public salary API.
-function salaryValidate_(data){
-  if(!data||typeof data!=='object'||Array.isArray(data))throw new Error('給与データの形式が違います');
-  Object.keys(data).forEach(function(k){
-    if(!/^(murao_settings|murao_rest_periods|murao_salary_\d{4}_(?:[0-9]|1[01]))$/.test(k)||typeof data[k]!=='string')throw new Error('給与データの項目が違います');
-    var value=JSON.parse(data[k]);
-    if(!value||typeof value!=='object')throw new Error('給与データの値が違います');
-  });
-  var json=JSON.stringify(data);
-  if(Utilities.newBlob(json).getBytes().length>180000)throw new Error('データ量が大きすぎます。保存前にバックアップしてください');
-  return json;
-}
-function salaryRead_(props){
-  var revision=props.getProperty('SALARY_REVISION')||'';
-  if(!revision)return {status:'ok',data:{},revision:''};
-  var count=Number(props.getProperty('SALARY_'+revision+'_COUNT'));
-  if(!count||count>100)throw new Error('給与データの保存情報を確認してください');
-  var raw='';
-  for(var i=0;i<count;i++){
-    var part=props.getProperty('SALARY_'+revision+'_'+i);
-    if(part===null)throw new Error('給与データの保存情報を確認してください');
-    raw+=part;
-  }
-  var data=JSON.parse(raw);salaryValidate_(data);
-  return {status:'ok',data:data,revision:revision};
-}
-function salaryRequest(request){
-  if(!request||['load','save'].indexOf(request.action)<0)throw new Error('給与操作が違います');
-  var lock=LockService.getScriptLock();lock.waitLock(10000);
-  try{
-    var props=PropertiesService.getScriptProperties();
-    if(request.action==='load')return salaryRead_(props);
-    var previous=props.getProperty('SALARY_REVISION')||'';
-    if(typeof request.revision!=='string'||request.revision!==previous)throw new Error('別の画面で更新されました。バックアップしてから最新データを取得してください');
-    var raw=salaryValidate_(request.data),revision=Utilities.getUuid(),values={};
-    // At most 1800 UTF-16 code units per property (under 9KB in UTF-8).
-    // Write all chunks before swapping the pointer, preserving the old snapshot on failure.
-    var count=0,start=0;
-    while(start<raw.length){
-      var end=Math.min(raw.length,start+1800),last=raw.charCodeAt(end-1);
-      if(end<raw.length&&last>=0xD800&&last<=0xDBFF)end--;
-      values['SALARY_'+revision+'_'+count++]=raw.slice(start,end);start=end;
-    }
-    values['SALARY_'+revision+'_COUNT']=String(count);
-    try{props.setProperties(values);}catch(err){Object.keys(values).forEach(function(k){props.deleteProperty(k);});throw err;}
-    try{props.setProperty('SALARY_REVISION',revision);}catch(err){Object.keys(values).forEach(function(k){props.deleteProperty(k);});throw err;}
-    if(previous){
-      var oldCount=Number(props.getProperty('SALARY_'+previous+'_COUNT'))||0;
-      for(var j=0;j<oldCount;j++)props.deleteProperty('SALARY_'+previous+'_'+j);
-      props.deleteProperty('SALARY_'+previous+'_COUNT');
-    }
-    return {status:'ok',revision:revision};
-  }finally{lock.releaseLock();}
-}
-
 // Include ONLY in the owner-only project; never expose through the public router.
 function bookingLookupAdminRequest(request){
   if(!request||['list','verify','revoke'].indexOf(request.action)<0)throw new Error('操作が違います');
@@ -3454,7 +3403,8 @@ function bookingLookupAdminRequest(request){
     var links={},rows=sheet?sheet.getDataRange().getValues():[];
     rows.slice(1).forEach(function(r){links[String(r[0])]={tel:String(r[0]),uid:String(r[1]),cardId:String(r[2]),name:String(r[3]),active:String(r[4])==='有効'};});
     var patientsSheet=ss.getSheetByName('患者');
-    var candidates=patientsSheet?patientsSheet.getDataRange().getValues().slice(1).map(function(r){return {cardId:String(r[0]).trim(),name:String(r[1]||''),tel:fixPhoneLeadingZero_(r[4])};}).filter(function(p){return p.cardId&&p.name&&p.tel;}):[];
+    var patientRows=patientsSheet?patientsSheet.getDataRange().getValues():[],phoneCol=patientRows.length?patientPhoneColumn_(patientRows):-1;
+    var candidates=patientsSheet?patientRows.slice(1).map(function(r){return {cardId:String(r[0]).trim(),name:String(r[1]||''),tel:fixPhoneLeadingZero_(r[phoneCol])};}).filter(function(p){return p.cardId&&p.name&&p.tel;}):[];
     return {version:'line-registration-20261001',patients:candidates,users:getLineUsers().users||[],links:Object.keys(links).map(function(k){return links[k];})};
   }
   var tel=String(request.tel||'').replace(/\D/g,'');
@@ -3466,11 +3416,11 @@ function bookingLookupAdminRequest(request){
     if(!/^U[0-9a-f]{32}$/i.test(uid)||!cardId)throw new Error('LINEと診察券番号を選んでください');
     var users=getLineUsers().users||[];
     if(!users.some(function(u){return u.userId===uid;}))throw new Error('LINEの登録が見つかりません');
-    var patients=ss.getSheetByName('患者'),matches=patients?patients.getDataRange().getValues().slice(1).filter(function(r){return String(r[0]).trim()===cardId;}):[];
+    var patients=ss.getSheetByName('患者'),allPatients=patients?patients.getDataRange().getValues():[],matches=patients?allPatients.slice(1).filter(function(r){return String(r[0]).trim()===cardId;}):[];
     if(matches.length!==1)throw new Error('患者一覧の診察券番号を確認してください');
     name=String(matches[0][1]||'').trim();
     if(!name)throw new Error('患者名がありません');
-    if(fixPhoneLeadingZero_(matches[0][4])!==tel)throw new Error('患者一覧の電話番号と一致しません。先に患者情報を確認してください');
+    if(fixPhoneLeadingZero_(matches[0][patientPhoneColumn_(allPatients)])!==tel)throw new Error('患者一覧の電話番号と一致しません。先に患者情報を確認してください');
   }
   var lock=LockService.getScriptLock();lock.waitLock(10000);
   try{

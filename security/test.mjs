@@ -82,6 +82,10 @@ adminCtx.HtmlService.createTemplateFromFile=()=>template={evaluate:()=>({setTitl
 adminCtx.doGet({parameter:{page:'Karte',name:'</script><script>alert(1)</script>'}});
 assert.equal(template.pageParamsJson.includes('<'),false);
 assert.equal(JSON.parse(template.pageParamsJson).name,'</script><script>alert(1)</script>');
+assert.equal(typeof adminCtx.salaryRequest,'undefined');
+assert.throws(()=>adminCtx.doGet({parameter:{page:'Salary'}}),/Unknown page/);
+// Retained standalone salary source still preserves existing backups.
+vm.runInContext(fs.readFileSync(new URL('./salary_admin.gs',import.meta.url),'utf8'),adminCtx);
 // Salary is available only through the owner's private RPC, with atomic snapshots
 // and stale-write rejection. Test real persistence behavior and failure recovery.
 const salaryProps=new Map();let salaryFail=false,salaryId=0;

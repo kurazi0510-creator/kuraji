@@ -70,7 +70,7 @@ function adminSpreadsheet_(){
   if(!id)throw new Error('SPREADSHEET_ID is not configured');
   return SpreadsheetApp.openById(id);
 }
-var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,Salary:true,BookingLookup:true,MondoPrint:true,MondoKotsuPrint:true};
+var ADMIN_PAGES_={Admin:true,Karte:true,TodaySplit:true,LineSetup:true,TriggerSetup:true,Uriage:true,BookingLookup:true,MondoPrint:true,MondoKotsuPrint:true};
 function doGet(e){
   var page=e&&e.parameter&&e.parameter.page||'Admin';
   if(typeof page!=='string'||!Object.prototype.hasOwnProperty.call(ADMIN_PAGES_,page))throw new Error('Unknown page');
@@ -91,7 +91,7 @@ function adminRequest(request){
 }
 `;
 admin+='\n'+fs.readFileSync(path.join(root,'security/patient_identity_admin.gs'),'utf8');
-admin+='\n'+fs.readFileSync(path.join(root,'security/salary_admin.gs'),'utf8');
+
 admin+='\n'+fs.readFileSync(path.join(root,'security/booking_lookup_admin.gs'),'utf8');
 writeGenerated('Admin.gs', admin);
 
@@ -105,7 +105,6 @@ const publicPages = ['book.html', 'confirm.html', 'consent.html', 'symptom.html'
 for (const [name, filename] of Object.entries(pages)) {
   let html = fs.readFileSync(path.join(root, filename), 'utf8');
   if(name==='Admin')html=html.replace('<div class="nav-t" onclick="location.href=\'uriage.html\'"', '<div class="nav-t" onclick="window.open(adminPageUrl(\'BookingLookup\'),\'_top\')">📋 予約確認の連携</div>\n  <div class="nav-t" onclick="location.href=\'uriage.html\'"');
-  if(name==='Admin')html=html.replace('<div class="nav-t" onclick="location.href=\'uriage.html\'" style="background:#22c55e;color:white">✍️ 売上入力</div>', '<div class="nav-t" onclick="location.href=\'uriage.html\'" style="background:#22c55e;color:white">✍️ 売上入力</div>\n  <div class="nav-t" onclick="window.open(adminPageUrl(\'Salary\'),\'_top\')">💴 給与管理</div>');
   if(name==='Salary'){
     const transfer=fs.readFileSync(path.join(root,'security/salary_transfer.js'),'utf8');
     const client=fs.readFileSync(path.join(root,'security/salary_private_client.js'),'utf8');
