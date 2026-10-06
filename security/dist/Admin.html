@@ -4496,6 +4496,22 @@ async function toggleExtraSlotUI(time){
   finally{extraSlotWrites.delete(key);}
 }
 function closeExtraSlotModal(){ document.getElementById('extraSlotModal').classList.remove('on'); }
+function renderFamilyBookingSummary(tr,date,slot,bk){
+  if(!bk.groupId)return;
+  const members=Object.entries(bookings[date]||{}).filter(([t,b])=>b.groupId===bk.groupId&&!b.cont&&!b.cancelled).sort(([a],[b])=>a.localeCompare(b));
+  if(members.length<2||members[0][0]!==slot)return;
+  const cell=tr.children[2];cell.replaceChildren();
+  const title=document.createElement('div');title.textContent='同時来院 '+members.length+'名';title.style.cssText='font-weight:700;margin-bottom:6px;color:var(--accent)';cell.appendChild(title);
+  for(const [memberSlot,member] of members){
+    const card=document.createElement('div');card.style.cssText='padding:8px;margin-bottom:6px;border:1px solid #cbd5e1;border-radius:6px;min-width:170px;background:#fff';
+    const name=document.createElement('strong');name.textContent=(member.name||'')+' 様（診察券 '+(member.cardId||'')+'）';card.appendChild(name);
+    const menu=document.createElement('div');menu.style.cssText='font-size:0.75rem;margin:5px 0;white-space:normal';
+    const details=[member.menu,member.option,...(member.shochi||[]).map(x=>x.name+(x.qty>1?' ×'+x.qty:''))].filter(Boolean);
+    menu.textContent=details.length?details.join(' ／ '):'メニュー・施術内容：未入力';card.appendChild(menu);
+    const edit=document.createElement('button');edit.type='button';edit.className='btn bc bsm';edit.style.cssText='min-height:36px';edit.textContent=(member.name||'この患者')+'様のメニュー・会計を編集';edit.onclick=()=>editBk(date,memberSlot);card.appendChild(edit);cell.appendChild(card);
+  }
+}
+
 function renderSched(){
   const date=document.getElementById('selDate').value;if(!date)return;
   statOverride={}; // 日付が変わったら手動入力をリセット
@@ -4605,6 +4621,7 @@ function renderSched(){
     }else{
       tr.innerHTML=`<td class="tc">${s}</td><td></td><td><span style="color:#ccc;font-size:0.7rem">空き</span></td><td colspan="6"></td><td><button class="btn ba bsm" onclick="openModal('${date}','${s}')">＋予約</button></td>`;
     }
+    if(bk&&!bk.cont&&!bk.cancelled)renderFamilyBookingSummary(tr,date,s,bk);
     tbody.appendChild(tr);
   });
   updateStats(date,sl.filter(s=>s!=='BREAK'));
