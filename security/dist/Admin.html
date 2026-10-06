@@ -1396,7 +1396,14 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
         </div>
         <div class="fg" style="grid-column:1/-1">
           <label>予約枠数（同時来院の場合は2名合計）</label>
-          <div id="family-booking-area" style="margin:8px 0"><label>同じ時刻に来院する2人目</label><select class="inp" id="m-family-patient"><option value="">なし（1名）</option></select><small>患者様ごとの会計は、保存後それぞれの「内容編集」から入力できます。日時変更は2名まとめて変更します。</small></div>
+          <div id="family-booking-area" style="margin:8px 0">
+            <label for="m-family-search">同じ時刻に来院する2人目</label>
+            <input type="hidden" id="m-family-patient" value="">
+            <input class="inp" id="m-family-search" placeholder="名前・ふりがな・診察券番号で検索" autocomplete="off" oninput="if(!event.isComposing)renderFamilyPatientResults()" oncompositionend="renderFamilyPatientResults()" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();selectFirstFamilyPatient()}" aria-controls="m-family-results">
+            <div id="m-family-results" style="max-height:230px;overflow-y:auto;margin-top:6px" aria-live="polite"></div>
+            <div id="m-family-selected" style="margin-top:6px" aria-live="polite"></div>
+            <small>2人目を選んだ後、下の枠数を2名分の合計にしてください。会計は保存後、各患者様の「内容編集」から入力できます。</small>
+          </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="pay-btn" id="slot-btn-1" onclick="setSlotCount(1)" style="min-width:50px">1枠</button>
             <button class="pay-btn" id="slot-btn-2" onclick="setSlotCount(2)" style="min-width:50px">2枠</button>
@@ -4641,11 +4648,62 @@ function updateStats(date,sl){
 // ===== 同時来院・会計詳細 =====
 function bookingDetail(raw){try{const v=JSON.parse(raw||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch(e){return {};}}
 function bookingDetailsForSave(b){const m={};for(const k of ['appointmentTime','groupId','groupSpan','holdGroup','kubunFee','payItems','couponData','freeGiven','menuPrice','optPrice','nextMemo','nextNote'])if(b[k]!==undefined)m[k]=b[k];return m;}
+function normalizeFamilyPatientQuery(value){
+  return String(value||'').normalize('NFKC').toLowerCase().replace(/[\s・･]/g,'').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+}
+function familyPatientMatches(query){
+  const q=normalizeFamilyPatientQuery(query),first=String(document.getElementById('m-id').value||'');
+  if(!q)return [];
+  const terms=q.split(/[　 ]+/).filter(Boolean);
+  return patients.filter(p=>p.id&&String(p.id)!==first&&terms.every(term=>[p.name,p.kana,p.id].some(v=>normalizeFamilyPatientQuery(v).includes(term))))
+    .sort((a,b)=>Number(normalizeFamilyPatientQuery(b.id)===q)-Number(normalizeFamilyPatientQuery(a.id)===q)||String(a.name||'').localeCompare(String(b.name||''),'ja'));
+}
+function renderFamilyPatientResults(){
+  const input=document.getElementById('m-family-search'),box=document.getElementById('m-family-results');
+  box.replaceChildren();
+  if(input.disabled)return;
+  const query=input.value.trim();
+  if(!query){box.textContent='名前の一部、ふりがな、診察券番号を入力してください。';return;}
+  const hits=familyPatientMatches(query);
+  if(!hits.length){box.textContent='該当する患者様がいません。1人目と同じ患者様は表示されません。';return;}
+  hits.slice(0,30).forEach(p=>{
+    const button=document.createElement('button');button.type='button';button.className='inp';
+    button.style.cssText='display:block;width:100%;text-align:left;min-height:52px;margin-bottom:6px;cursor:pointer;background:#f0fdf4;white-space:normal';
+    button.textContent=(p.name||'名前未登録')+'　／ 診察券 '+p.id+(p.kana?'　('+p.kana+')':'');
+    button.onclick=()=>selectFamilyPatient(String(p.id));box.appendChild(button);
+  });
+  if(hits.length>30){const note=document.createElement('div');note.textContent='候補が'+hits.length+'名います。名前や番号をもう少し入力して絞り込んでください。';box.appendChild(note);}
+}
+function renderFamilyPatientSelection(){
+  const field=document.getElementById('m-family-patient'),box=document.getElementById('m-family-selected');
+  const p=patients.find(x=>String(x.id)===String(field.value));box.replaceChildren();
+  if(!p){box.textContent=field.disabled?'登録済みの同時来院予約です。患者様の変更は再登録してください。':'現在：1名予約（2人目は未選択）';return;}
+  const label=document.createElement('strong');label.textContent='選択中：'+p.name+' ／ 診察券 '+p.id;box.appendChild(label);
+  if(!field.disabled){const button=document.createElement('button');button.type='button';button.className='btn bsm';button.textContent='選択を解除';button.style.marginLeft='8px';button.onclick=()=>selectFamilyPatient('');box.appendChild(button);}
+}
+function selectFamilyPatient(id){
+  const field=document.getElementById('m-family-patient');if(field.disabled)return;
+  if(id&&String(document.getElementById('m-id').value)===String(id)){alert('1人目とは別の患者様を選んでください。');return;}
+  if(id&&!patients.some(p=>String(p.id)===String(id)))return;
+  field.value=String(id||'');document.getElementById('m-family-search').value='';
+  document.getElementById('m-family-results').replaceChildren();
+  if(id&&mSlotCount<2)setSlotCount(2);
+  renderFamilyPatientSelection();
+}
+function selectFirstFamilyPatient(){
+  const input=document.getElementById('m-family-search');if(input.disabled)return;
+  const hits=familyPatientMatches(input.value);if(hits.length===1)selectFamilyPatient(String(hits[0].id));
+}
+function refreshFamilyPatientSearch(){
+  const field=document.getElementById('m-family-patient');
+  if(!field.disabled&&field.value&&String(field.value)===String(document.getElementById('m-id').value)){field.value='';renderFamilyPatientSelection();}
+  renderFamilyPatientResults();
+}
 function initFamilyBooking(b){
-  const sel=document.getElementById('m-family-patient');sel.replaceChildren(new Option('なし（1名）',''));
-  patients.filter(p=>p.id).forEach(p=>sel.add(new Option(p.name+'／診察券 '+p.id,String(p.id))));
-  sel.value='';sel.disabled=!!b?.groupId;
-  if(b?.groupId){const other=Object.values(bookings[editDate]||{}).find(x=>x.groupId===b.groupId&&!x.cont&&!x.cancelled&&x.cardId!==b.cardId);if(other)sel.value=String(other.cardId);}
+  const field=document.getElementById('m-family-patient'),search=document.getElementById('m-family-search');
+  field.value='';field.disabled=!!b?.groupId;search.value='';search.disabled=field.disabled;
+  if(b?.groupId){const other=Object.values(bookings[editDate]||{}).find(x=>x.groupId===b.groupId&&!x.cont&&!x.cancelled&&String(x.cardId)!==String(b.cardId));if(other)field.value=String(other.cardId);}
+  renderFamilyPatientResults();renderFamilyPatientSelection();
 }
 function familyBookingBlock(date,slot){
   const b=bookings[date]?.[slot];if(!b?.groupId)return null;
@@ -5349,6 +5407,7 @@ function editBk(date,slot){
 function closeModal(){document.getElementById('bmodal').classList.remove('on');}
 
 function autoFill(){
+  refreshFamilyPatientSearch();
   const id=document.getElementById('m-id').value;
   const p=patients.find(p=>p.id===String(id));
   if(p){
@@ -5387,6 +5446,7 @@ function renderModalPatients(){
 function selectModalPatient(id){
   const p=patients.find(x=>x.id===id);if(!p)return;
   document.getElementById('m-id').value=p.id;
+  refreshFamilyPatientSearch();
   document.getElementById('m-nm').value=p.name;
   document.getElementById('m-sym').value=p.symptom||'';
   document.getElementById('m-patient-list').style.display='none';
