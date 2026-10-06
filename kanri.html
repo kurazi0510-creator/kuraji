@@ -4431,16 +4431,19 @@ function openExtraSlotModal(){
 }
 function renderExtraSlotButtons(){
   const box=document.getElementById('extraSlotButtons');
-  box.innerHTML=LUNCH_CANDIDATE_SLOTS.map(t=>{
+  const groups=[['早朝',LUNCH_CANDIDATE_SLOTS.filter(t=>t<'12:00')],['12・13時台',LUNCH_CANDIDATE_SLOTS.filter(t=>t>='12:00'&&t<'14:00')],['臨時14時台',LUNCH_CANDIDATE_SLOTS.filter(t=>t>='14:00')]];
+  box.innerHTML=groups.map(([label,times])=>'<div style="flex-basis:100%;font-weight:bold;margin-top:6px">'+label+'</div>'+times.map(t=>{
     const on=extraSlotsForCurrentDate.includes(t);
     return `<button class="btn bsm" style="background:${on?'#0f766e':'#f1f5f9'};color:${on?'white':'#475569'};border-color:${on?'#0f766e':'#e2e8f0'}" onclick="toggleExtraSlotUI('${t}')">${t}${on?' ✓':''}</button>`;
-  }).join('');
+  }).join('')).join('');
 }
 async function toggleExtraSlotUI(time){
   const date=document.getElementById('selDate').value;
   const isOn=extraSlotsForCurrentDate.includes(time);
   try{
-    await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'toggleExtraSlot',date,time,add:!isOn})});
+    const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'toggleExtraSlot',date,time,add:!isOn})});
+    const result=await res.json();
+    if(!result.ok)throw new Error(result.error||'特別枠を保存できませんでした');
     if(isOn) extraSlotsForCurrentDate=extraSlotsForCurrentDate.filter(t=>t!==time);
     else extraSlotsForCurrentDate.push(time);
     renderExtraSlotButtons();
@@ -4492,7 +4495,11 @@ function renderSched(){
       tr.innerHTML=`<td class="tc">${s}</td><td><span class="kb k-ct">↑継続中</span></td><td><span style="color:var(--muted);font-size:0.75rem">↑${bk.name||''}</span></td><td colspan="6"></td><td>${bk.groupId?'同時来院の確保枠':`<button class="btn bd bsm" onclick="delBk('${date}','${s}')">削除</button>`}</td>`;
     }else if(bk&&bk.cancelled){
       tr.className='cancelled';
-      if(bk.holdGroup){tr.innerHTML='<td>'+s+'</td><td>同時来院枠・確保中</td><td colspan=8>1名キャンセル済み。残る患者様のため枠を確保しています。</td>';tbody.appendChild(tr);return;}
+      if(bk.holdGroup){
+        tr.innerHTML='<td>'+(bk.appointmentTime||s)+'</td><td>キャンセル</td><td class="family-cancelled-name"></td><td colspan=7>もう1名の予約・会計は維持しています。元の合計枠は確保中です。</td>';
+        tr.querySelector('.family-cancelled-name').textContent=(bk.name||'')+' 様（'+(bk.cancelReason||'理由未記入')+'）';
+        tbody.appendChild(tr);return;
+      }
       const reason=bk.cancelReason||'';
       const rebookedBy=bk.reBookedBy||'';
       tr.innerHTML=`<td class="tc">${s}</td>
@@ -4613,7 +4620,7 @@ async function removeFamilyBookingMember(date,slot,reason){
   if(!confirm(b.name+'様のみを'+reason+'にします。ほかの患者様の予約は残します。'))return false;
   const before=JSON.stringify(bookings);
   const activeOthers=group.entries.filter(([t,x])=>t!==slot&&!x.cont&&!x.cancelled);
-  if(!activeOthers.length){for(const [t,x] of group.entries){if(reason==='完全削除')delete bookings[date][t];else bookings[date][t]={cancelled:true,name:x.cont?'':x.name,cardId:x.cont?'':x.cardId,cancelReason:reason};}}
+  if(!activeOthers.length){for(const [t,x] of group.entries){if(reason==='完全削除')delete bookings[date][t];else bookings[date][t]={cancelled:true,name:x.cont?'':x.name,cardId:x.cont?'':x.cardId,cancelReason:x.cancelled?(x.cancelReason||reason):reason,appointmentTime:x.cont?undefined:x.appointmentTime};}}
   else if(reason==='完全削除'){
     const survivor=activeOthers[0][1];
     for(const [t,x] of group.entries)if(t===slot||x.cont)bookings[date][t]={cont:true,name:survivor.name,cardId:survivor.cardId,groupId:survivor.groupId,groupSpan:survivor.groupSpan,appointmentTime:survivor.appointmentTime};
@@ -4742,7 +4749,9 @@ async function execMoveBooking(){
 function openCancelModal(date,slot){
   const bk=bookings[date]?.[slot];if(!bk)return;
   cancelDate=date;cancelSlot=slot;cancelReasonVal='';
-  document.getElementById('cancel-info').innerHTML=`<strong>${date} ${slot}</strong><br>${bk.name||''} 様`;
+  const family=familyBookingBlock(date,slot);
+  const others=family?family.entries.filter(([t,x])=>t!==slot&&!x.cont&&!x.cancelled).map(([t,x])=>x.name):[];
+  document.getElementById('cancel-info').textContent=date+' '+(bk.appointmentTime||slot)+'　'+(bk.name||'')+' 様'+(others.length?'のみキャンセルします。'+others.join('・')+'様の予約・会計は残ります。':'');
   document.querySelectorAll('#cancel-reason-btns .pay-btn').forEach(b=>b.classList.remove('on'));
   document.getElementById('cancel-note').value='';
   const sel=document.getElementById('cancel-reason-sel');
