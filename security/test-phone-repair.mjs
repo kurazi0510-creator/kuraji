@@ -9,7 +9,7 @@ const backupRows=[['診察券No','患者名','修正前電話番号','修正後�
 const old={getName:()=> '電話番号修正前_20261001_105010',getDataRange:()=>({getValues:()=>[backupRows[0],['1','確認 太郎','0901234567','09012345679']]})};
 const current={getName:()=> '電話番号修正前_20261002_105010',getDataRange:()=>({getValues:()=>backupRows})};
 const ss={getSheetByName:n=>n==='患者'?sheet:null,getSheets:()=>[current,old]};
-const context={SpreadsheetApp:{getActiveSpreadsheet:()=>ss,flush(){}},LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},Logger:{log(){}}};
+const context={PropertiesService:{getScriptProperties:()=>({getProperty:()=>null,getProperties:()=>({})})},SpreadsheetApp:{getActiveSpreadsheet:()=>ss,flush(){}},LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},Logger:{log(){}}};
 vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../gas_full_v5.gs',import.meta.url),'utf8'),context);
 context.getPatientTombstones_=()=>({});context.saveSheet=(name,rows)=>{assert.equal(name,'患者');patients=rows;};
 context.saveCustomersSafe([header,['1','確認 太郎','0901234567']]);

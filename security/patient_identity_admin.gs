@@ -41,35 +41,49 @@ function repairTomitaCard2085(){
   }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
 }
 
-function cleanupDeletedCards2500And3000_() {
+// 院長が2088番まで登録済みと確認。過去の誤登録2089・2090を初回だけ整理。
+function reconcilePatientNumber2088_(){
   var props=PropertiesService.getScriptProperties();
-  var cached=props.getProperty('DELETED_CARDS_2500_3000_CLEANUP_V1');
-  if(cached)return JSON.parse(cached);
+  if(props.getProperty('PATIENT_NUMBER_RECONCILE_2088_V1')==='done')return;
   var lock=LockService.getScriptLock();lock.waitLock(10000);
-  try {
-    var ss=adminSpreadsheet_();
-    if(!ss)throw new Error('管理用スプレッドシートが取得できません');
-    var targetsById={'2500':true,'3000':true};
-    var report={targetIds:['2500','3000'],deleted:{},skipped:[]};
-    var norm=function(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();};
-    var headers=['診察券no','診察券番号','診察券','cardid','患者id','患者番号'];
-    var plans=[];
-    ss.getSheets().forEach(function(sheet){
-      var rows=sheet.getDataRange().getValues();if(rows.length<2)return;
-      var columns=[];rows[0].forEach(function(h,c){if(headers.indexOf(norm(h))>=0)columns.push(c);});
-      if(!columns.length){report.skipped.push(sheet.getName());return;}
-      var targets=[];
-      for(var i=1;i<rows.length;i++)if(columns.some(function(c){return targetsById[norm(rows[i][c])]===true;}))targets.push(i+1);
-      if(targets.length)plans.push({sheet:sheet,rows:targets});
-    });
-    // 古い患者データが別端末から再登録されるのを防止。
-    addPatientTombstone_('2500');
-    addPatientTombstone_('3000');
-    plans.forEach(function(p){p.rows.slice().reverse().forEach(function(row){p.sheet.deleteRow(row);});report.deleted[p.sheet.getName()]=p.rows.length;});
-    SpreadsheetApp.flush();
-    report.deletedTotal=Object.keys(report.deleted).reduce(function(n,key){return n+report.deleted[key];},0);
-    props.setProperty('DELETED_CARDS_2500_3000_CLEANUP_V1',JSON.stringify(report));
-    console.log('2500・3000番の削除結果: '+JSON.stringify(report));
+  try{
+    if(props.getProperty('PATIENT_NUMBER_RECONCILE_2088_V1')==='done')return;
+    addPatientTombstone_('2089');addPatientTombstone_('2090');
+    props.setProperty('PATIENT_NUMBER_RECONCILE_2088_V1','done');
+  }finally{lock.releaseLock();}
+}
+function cleanupDeletedCards2500And3000_(){
+  reconcilePatientNumber2088_();
+  var props=PropertiesService.getScriptProperties();
+  var targets=getPatientTombstones_();targets['2500']=true;targets['3000']=true;
+  var signature=Object.keys(targets).sort().join(',');
+  var cached=props.getProperty('DELETED_CARD_CLEANUP_V2');
+  if(cached){var previous=JSON.parse(cached);if(previous.signature===signature)return previous.report;}
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    addPatientTombstone_('2500');addPatientTombstone_('3000');
+    var report=purgeDeletedCardRows_(adminSpreadsheet_(),targets);
+    SpreadsheetApp.flush();props.setProperty('DELETED_CARD_CLEANUP_V2',JSON.stringify({signature:signature,report:report}));
     return report;
-  } finally {lock.releaseLock();}
+  }finally{lock.releaseLock();}
+}
+function registerNewPatient_(patient){
+  if(!patient||!/^\d+$/.test(String(patient.id||''))||!String(patient.name||'').trim())return {ok:false,error:'診察券番号と患者名が必要です'};
+  var id=String(patient.id).trim();if(['2500','3000','10000'].indexOf(id)>=0)return {ok:false,error:'この番号は新規採番に使用できません'};
+  reconcilePatientNumber2088_();
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    var ss=adminSpreadsheet_(),sheet=ss.getSheetByName('患者');if(!sheet)throw new Error('患者シートがありません');
+    var rows=sheet.getDataRange().getValues(),deleted=getPatientTombstones_();
+    if(rows.slice(1).some(function(r){return String(r[0]).trim()===id&&!deleted[id];}))throw new Error('この診察券番号はすでに登録されています。最新データを取得してください');
+    if(deleted[id]){var targets={};targets[id]=true;purgeDeletedCardRows_(ss,targets);rows=sheet.getDataRange().getValues();}
+    var header=rows[0].slice(),generation=Utilities.getUuid();
+    if(header.indexOf('患者世代ID')<0){header.push('患者世代ID');sheet.getRange(1,1,1,header.length).setValues([header]);}
+    var values={'診察券No':id,'診察券番号':id,'患者名':patient.name,'ふりがな':patient.kana||'','性別':patient.sex||'','電話番号':patient.tel||'','電話':patient.tel||'','LINE':patient.line||'','LINEユーザーID':patient.lineUid||'','住所':patient.city||'','職業':patient.job||'','流入元':patient.src||'','症状':patient.symptom||'','前回通院日':'','通院回数':0,'生年月日':patient.dob||'','備考':patient.note||'','アラート送信':'TRUE','誕生日クーポン送信':'TRUE','患者世代ID':generation};
+    var newRow=header.map(function(h){return Object.prototype.hasOwnProperty.call(values,String(h).trim())?values[String(h).trim()]:'';});newRow[0]=id;newRow[1]=patient.name;
+    sheet.getRange(sheet.getLastRow()+1,1,1,newRow.length).setNumberFormat('@').setValues([newRow]);
+    PropertiesService.getScriptProperties().setProperty('PATIENT_GENERATION_'+id,generation);
+    var deletedIds=Object.keys(deleted).filter(function(v){return v!==id;});PropertiesService.getScriptProperties().setProperty('DELETED_PATIENT_IDS',JSON.stringify(deletedIds));
+    return {ok:true,generation:generation,deletedPatientIds:deletedIds};
+  }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
 }

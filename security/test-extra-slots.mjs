@@ -20,7 +20,7 @@ assert.deepEqual(Array.from(g.getExtraSlotsForDate('2026-10-06').extra),['07:50'
 assert.ok(html.includes('await loadExtraSlotsThenRender(true);\n  // ふりがな'));
 console.log('PASS: exact early/lunch/late times, saved daily slot cache, offline reload, stale-response isolation, occupied-slot deletion guard, server dedup/date normalization, safe reset and 20-minute overlap.');
 // Exercise the actual getAll synchronization parser after a completely empty local reset.
-Object.assign(c,{AbortController,setTimeout:()=>0,clearTimeout:()=>{},patients:[],patientTickets:[],bussanLog:[],uriage:{},recalcAllVisitCounts:()=>{},syncLineIds:()=>{},checkElapsedAlert:()=>{},renderPatients:()=>{},pullStock:()=>{},save:()=>{},today:()=> '2026-10-06',tryParse:v=>JSON.parse(v)});
+Object.assign(c,{AbortController,setTimeout:()=>0,clearTimeout:()=>{},deletedPatientIds:new Set(),freshPatientRegistrations:new Map(),patients:[],patientTickets:[],bussanLog:[],uriage:{},recalcAllVisitCounts:()=>{},syncLineIds:()=>{},checkElapsedAlert:()=>{},renderPatients:()=>{},pullStock:()=>{},save:()=>{},today:()=> '2026-10-06',tryParse:v=>JSON.parse(v)});
 for(const n of ['fmtDate','bookingDetail','purgeDeletedCardCaches','syncAll'])vm.runInContext(fn(html,n),c);
 const headers=Array(21).fill('');headers[0]='日付';headers[20]='予約詳細(JSON)';
 const early=['2026-10-06','07:50','保険','親','1',...Array(10).fill('')];early[15]='3980';early[20]=JSON.stringify({resourceSlot:'07:50',payItems:[{label:'施術料',unitPrice:3980,amount:3980,qty:1}]});

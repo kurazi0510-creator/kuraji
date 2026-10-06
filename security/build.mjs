@@ -86,6 +86,7 @@ function adminRequest(request){
     if(request.params&&request.params.action==='getAll'){var repair=repairTomitaCard2085();if(!repair.ok)throw new Error(repair.error);deletedCardCleanup=cleanupDeletedCards2500And3000_();}
     output=adminApiGet_({parameter:request.params||{}});
   }else if(request.method==='POST'){
+    if(request.body&&request.body.action==='registerNewPatient')return JSON.stringify(registerNewPatient_(request.body.patient));
     output=adminApiPost_({postData:{contents:JSON.stringify(request.body||{})},parameter:{}});
   }else throw new Error('Invalid method');
   if(deletedCardCleanup){var data=JSON.parse(output.getContent());data.deletedCardCleanup=deletedCardCleanup;return JSON.stringify(data);}

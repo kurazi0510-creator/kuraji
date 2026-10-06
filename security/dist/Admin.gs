@@ -569,7 +569,8 @@ function saveLineUserPhoneManual(userId,phone,name,cardId){
 function getAllData(){
   var ss=adminSpreadsheet_();
   var b=ss.getSheetByName("予約表"),c=ss.getSheetByName("患者"),u=ss.getSheetByName("売上");
-  return{ok:true,extraSlotsByDate:getAllExtraSlots_(),bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
+  var deleted=getPatientTombstones_();
+  return{ok:true,deletedPatientIds:Object.keys(deleted),extraSlotsByDate:getAllExtraSlots_(),bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues().filter(function(r,i){return i===0||!deleted[String(r[0]||'').trim()];}):[[]],uriage:u?u.getDataRange().getValues():[[]]};
 }
 function saveSheet(name,rows){
   var ss=adminSpreadsheet_();
@@ -611,7 +612,12 @@ function saveBookingsSafe(rows){
     if(rows[0][20]!=='予約詳細(JSON)'&&existing.slice(1).some(function(r){return !!r[20];}))throw new Error('予約画面が古いバージョンです。再読み込みして最新データを取得してください');
     var header=rows[0].slice(),keys={},out=[header],prior={};
     existing.slice(1).forEach(function(r){prior[String(r[0]||'')+'|'+bookingResourceTime_(r)+'|'+String(r[4]||'')]=r;});
+    var deletedCards=getPatientTombstones_();
+    var patientGenerations=PropertiesService.getScriptProperties().getProperties();
     rows.slice(1).forEach(function(row){
+      var card=String(row[4]||'').trim();
+      if(deletedCards[card])return;
+      if(patientGenerations['PATIENT_GENERATION_'+card]&&bookingRowDetail_(row).patientGeneration!==patientGenerations['PATIENT_GENERATION_'+card])return;
       if(['2500','3000'].indexOf(String(row[4]||'').trim())>=0)return;
       var key=String(row[0]||'')+'|'+bookingResourceTime_(row);
       if(key==='|')return;
@@ -640,20 +646,15 @@ function saveBookingsSafe(rows){
 // 通常の削除（全件pushからの差分）では削除が反映されず「何回消しても復活する」原因になっていた。
 // この関数は該当の診察券Noの行を直接シートから削除するため、確実に消える。
 function deletePatientByCardId(cardId){
+  var id=String(cardId||'').trim();if(!/^\d+$/.test(id))return {ok:false,error:'診察券番号が不正です'};
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
     var ss=adminSpreadsheet_();
-    var s=ss.getSheetByName("患者");
-    if(!s) return {ok:false, error:"シートが見つかりません"};
-    var data=s.getDataRange().getValues();
-    var deleted=0;
-    for(var i=data.length-1;i>=1;i--){
-      if(String(data[i][0]||"").trim()===String(cardId).trim()){
-        s.deleteRow(i+1);
-        deleted++;
-      }
-    }
-    return {ok:true, deleted:deleted};
-  }catch(err){ return {ok:false, error:err.message}; }
+    addPatientTombstone_(id);
+    var target={};target[id]=true;
+    var report=purgeDeletedCardRows_(ss,target);
+    return {ok:true,deleted:report.deletedTotal,deletedPatientIds:Object.keys(getPatientTombstones_())};
+  }catch(err){return {ok:false,error:err.message};}finally{lock.releaseLock();}
 }
 // ============================================================
 // ★重複登録された患者様の「余分な診察券番号」を完全に削除する（安全装置つき・1回だけ実行する用）
@@ -756,6 +757,10 @@ function deleteDuplicatePatients_(dryRun){
   return out;
 }
 function saveCustomersSafe(rows){
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{return saveCustomersSafeUnlocked_(rows);}finally{lock.releaseLock();}
+}
+function saveCustomersSafeUnlocked_(rows){
   var ss=adminSpreadsheet_();
   var s=ss.getSheetByName("患者");
   var existing=s?s.getDataRange().getValues():[];
@@ -768,14 +773,19 @@ function saveCustomersSafe(rows){
   }
   var merged=[header];
   var seenIds={};
+  var generations=PropertiesService.getScriptProperties().getProperties();
+  var generationCol=(rows[0]||[]).indexOf('患者世代ID');
   var tomb=getPatientTombstones_(); // ★完全削除した診察券番号（古い画面からの保存で復活させない）
   for(var j=1;j<rows.length;j++){
     var incoming=rows[j];
     var id=String(incoming[0]||"").trim();
     if(!id) continue;
     if(tomb[id]) continue;
+    if(generations['PATIENT_GENERATION_'+id]&&String(incoming[generationCol]||'')!==generations['PATIENT_GENERATION_'+id])continue;
     seenIds[id]=true;
     var base=existingById[id];
+    var sourceRow=incoming,sourceHeader=rows[0]||[];
+    incoming=header.map(function(h,col){var sourceCol=sourceHeader.indexOf(h);return sourceCol>=0?sourceRow[sourceCol]:(base?base[col]:'');});
     var mergedRow=incoming.map(function(val,colIdx){
       var v=(val===null||val===undefined)?"":String(val).trim();
       // ★電話番号だけは特別扱い：正しい11桁の携帯番号(090/080/070)が、
@@ -798,7 +808,7 @@ function saveCustomersSafe(rows){
   }
   // 今回の同期に含まれなかった既存患者はそのまま保持する（削除しない）
   Object.keys(existingById).forEach(function(id){
-    if(!seenIds[id]) merged.push(existingById[id]);
+    if(!seenIds[id]&&!tomb[id]) merged.push(existingById[id]);
   });
   saveSheet("患者", merged);
 }
@@ -3132,6 +3142,22 @@ function deleteBookingsByName(namePrefix){
   }catch(err){ return {ok:false, error:err.message}; }
 }
 
+function purgeDeletedCardRows_(ss,targets){
+  var report={targetIds:Object.keys(targets),deleted:{},deletedTotal:0,skipped:[]};
+  var norm=function(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();};
+  var aliases=['診察券no','診察券番号','診察券','cardid','patientid','patient_id','患者id','患者番号'];
+  var plans=[];
+  ss.getSheets().forEach(function(sheet){
+    var rows=sheet.getDataRange().getValues();if(rows.length<2)return;
+    var cols=[];rows[0].forEach(function(h,c){if(aliases.indexOf(norm(h))>=0)cols.push(c);});
+    if(!cols.length){report.skipped.push(sheet.getName());return;}
+    var indexes=[];for(var i=1;i<rows.length;i++)if(cols.some(function(c){return targets[norm(rows[i][c])]===true;}))indexes.push(i+1);
+    if(indexes.length)plans.push({sheet:sheet,rows:indexes});
+  });
+  plans.forEach(function(plan){plan.rows.reverse().forEach(function(row){plan.sheet.deleteRow(row);});report.deleted[plan.sheet.getName()]=plan.rows.length;report.deletedTotal+=plan.rows.length;});
+  return report;
+}
+
 function patientPhoneColumn_(rows){
   var headers=(rows[0]||[]).map(function(h){return String(h||'').trim();});
   var index=headers.indexOf('電話番号');if(index<0)index=headers.indexOf('電話');if(index<0)index=headers.indexOf('phone');if(index<0)throw new Error('患者シートの電話番号列が見つかりません');return index;
@@ -3352,6 +3378,7 @@ function adminRequest(request){
     if(request.params&&request.params.action==='getAll'){var repair=repairTomitaCard2085();if(!repair.ok)throw new Error(repair.error);deletedCardCleanup=cleanupDeletedCards2500And3000_();}
     output=adminApiGet_({parameter:request.params||{}});
   }else if(request.method==='POST'){
+    if(request.body&&request.body.action==='registerNewPatient')return JSON.stringify(registerNewPatient_(request.body.patient));
     output=adminApiPost_({postData:{contents:JSON.stringify(request.body||{})},parameter:{}});
   }else throw new Error('Invalid method');
   if(deletedCardCleanup){var data=JSON.parse(output.getContent());data.deletedCardCleanup=deletedCardCleanup;return JSON.stringify(data);}
@@ -3401,37 +3428,51 @@ function repairTomitaCard2085(){
   }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
 }
 
-function cleanupDeletedCards2500And3000_() {
+// 院長が2088番まで登録済みと確認。過去の誤登録2089・2090を初回だけ整理。
+function reconcilePatientNumber2088_(){
   var props=PropertiesService.getScriptProperties();
-  var cached=props.getProperty('DELETED_CARDS_2500_3000_CLEANUP_V1');
-  if(cached)return JSON.parse(cached);
+  if(props.getProperty('PATIENT_NUMBER_RECONCILE_2088_V1')==='done')return;
   var lock=LockService.getScriptLock();lock.waitLock(10000);
-  try {
-    var ss=adminSpreadsheet_();
-    if(!ss)throw new Error('管理用スプレッドシートが取得できません');
-    var targetsById={'2500':true,'3000':true};
-    var report={targetIds:['2500','3000'],deleted:{},skipped:[]};
-    var norm=function(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();};
-    var headers=['診察券no','診察券番号','診察券','cardid','患者id','患者番号'];
-    var plans=[];
-    ss.getSheets().forEach(function(sheet){
-      var rows=sheet.getDataRange().getValues();if(rows.length<2)return;
-      var columns=[];rows[0].forEach(function(h,c){if(headers.indexOf(norm(h))>=0)columns.push(c);});
-      if(!columns.length){report.skipped.push(sheet.getName());return;}
-      var targets=[];
-      for(var i=1;i<rows.length;i++)if(columns.some(function(c){return targetsById[norm(rows[i][c])]===true;}))targets.push(i+1);
-      if(targets.length)plans.push({sheet:sheet,rows:targets});
-    });
-    // 古い患者データが別端末から再登録されるのを防止。
-    addPatientTombstone_('2500');
-    addPatientTombstone_('3000');
-    plans.forEach(function(p){p.rows.slice().reverse().forEach(function(row){p.sheet.deleteRow(row);});report.deleted[p.sheet.getName()]=p.rows.length;});
-    SpreadsheetApp.flush();
-    report.deletedTotal=Object.keys(report.deleted).reduce(function(n,key){return n+report.deleted[key];},0);
-    props.setProperty('DELETED_CARDS_2500_3000_CLEANUP_V1',JSON.stringify(report));
-    console.log('2500・3000番の削除結果: '+JSON.stringify(report));
+  try{
+    if(props.getProperty('PATIENT_NUMBER_RECONCILE_2088_V1')==='done')return;
+    addPatientTombstone_('2089');addPatientTombstone_('2090');
+    props.setProperty('PATIENT_NUMBER_RECONCILE_2088_V1','done');
+  }finally{lock.releaseLock();}
+}
+function cleanupDeletedCards2500And3000_(){
+  reconcilePatientNumber2088_();
+  var props=PropertiesService.getScriptProperties();
+  var targets=getPatientTombstones_();targets['2500']=true;targets['3000']=true;
+  var signature=Object.keys(targets).sort().join(',');
+  var cached=props.getProperty('DELETED_CARD_CLEANUP_V2');
+  if(cached){var previous=JSON.parse(cached);if(previous.signature===signature)return previous.report;}
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    addPatientTombstone_('2500');addPatientTombstone_('3000');
+    var report=purgeDeletedCardRows_(adminSpreadsheet_(),targets);
+    SpreadsheetApp.flush();props.setProperty('DELETED_CARD_CLEANUP_V2',JSON.stringify({signature:signature,report:report}));
     return report;
-  } finally {lock.releaseLock();}
+  }finally{lock.releaseLock();}
+}
+function registerNewPatient_(patient){
+  if(!patient||!/^\d+$/.test(String(patient.id||''))||!String(patient.name||'').trim())return {ok:false,error:'診察券番号と患者名が必要です'};
+  var id=String(patient.id).trim();if(['2500','3000','10000'].indexOf(id)>=0)return {ok:false,error:'この番号は新規採番に使用できません'};
+  reconcilePatientNumber2088_();
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    var ss=adminSpreadsheet_(),sheet=ss.getSheetByName('患者');if(!sheet)throw new Error('患者シートがありません');
+    var rows=sheet.getDataRange().getValues(),deleted=getPatientTombstones_();
+    if(rows.slice(1).some(function(r){return String(r[0]).trim()===id&&!deleted[id];}))throw new Error('この診察券番号はすでに登録されています。最新データを取得してください');
+    if(deleted[id]){var targets={};targets[id]=true;purgeDeletedCardRows_(ss,targets);rows=sheet.getDataRange().getValues();}
+    var header=rows[0].slice(),generation=Utilities.getUuid();
+    if(header.indexOf('患者世代ID')<0){header.push('患者世代ID');sheet.getRange(1,1,1,header.length).setValues([header]);}
+    var values={'診察券No':id,'診察券番号':id,'患者名':patient.name,'ふりがな':patient.kana||'','性別':patient.sex||'','電話番号':patient.tel||'','電話':patient.tel||'','LINE':patient.line||'','LINEユーザーID':patient.lineUid||'','住所':patient.city||'','職業':patient.job||'','流入元':patient.src||'','症状':patient.symptom||'','前回通院日':'','通院回数':0,'生年月日':patient.dob||'','備考':patient.note||'','アラート送信':'TRUE','誕生日クーポン送信':'TRUE','患者世代ID':generation};
+    var newRow=header.map(function(h){return Object.prototype.hasOwnProperty.call(values,String(h).trim())?values[String(h).trim()]:'';});newRow[0]=id;newRow[1]=patient.name;
+    sheet.getRange(sheet.getLastRow()+1,1,1,newRow.length).setNumberFormat('@').setValues([newRow]);
+    PropertiesService.getScriptProperties().setProperty('PATIENT_GENERATION_'+id,generation);
+    var deletedIds=Object.keys(deleted).filter(function(v){return v!==id;});PropertiesService.getScriptProperties().setProperty('DELETED_PATIENT_IDS',JSON.stringify(deletedIds));
+    return {ok:true,generation:generation,deletedPatientIds:deletedIds};
+  }catch(e){return {ok:false,error:e.message};}finally{lock.releaseLock();}
 }
 
 // Include ONLY in the owner-only project; never expose through the public router.

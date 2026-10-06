@@ -595,7 +595,8 @@ function saveLineUserPhoneManual(userId,phone,name,cardId){
 function getAllData(){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var b=ss.getSheetByName("予約表"),c=ss.getSheetByName("患者"),u=ss.getSheetByName("売上");
-  return{ok:true,extraSlotsByDate:getAllExtraSlots_(),bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues():[[]],uriage:u?u.getDataRange().getValues():[[]]};
+  var deleted=getPatientTombstones_();
+  return{ok:true,deletedPatientIds:Object.keys(deleted),extraSlotsByDate:getAllExtraSlots_(),bookings:b?b.getDataRange().getValues():[[]],customers:c?c.getDataRange().getValues().filter(function(r,i){return i===0||!deleted[String(r[0]||'').trim()];}):[[]],uriage:u?u.getDataRange().getValues():[[]]};
 }
 function saveSheet(name,rows){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -637,7 +638,12 @@ function saveBookingsSafe(rows){
     if(rows[0][20]!=='予約詳細(JSON)'&&existing.slice(1).some(function(r){return !!r[20];}))throw new Error('予約画面が古いバージョンです。再読み込みして最新データを取得してください');
     var header=rows[0].slice(),keys={},out=[header],prior={};
     existing.slice(1).forEach(function(r){prior[String(r[0]||'')+'|'+bookingResourceTime_(r)+'|'+String(r[4]||'')]=r;});
+    var deletedCards=getPatientTombstones_();
+    var patientGenerations=PropertiesService.getScriptProperties().getProperties();
     rows.slice(1).forEach(function(row){
+      var card=String(row[4]||'').trim();
+      if(deletedCards[card])return;
+      if(patientGenerations['PATIENT_GENERATION_'+card]&&bookingRowDetail_(row).patientGeneration!==patientGenerations['PATIENT_GENERATION_'+card])return;
       if(['2500','3000'].indexOf(String(row[4]||'').trim())>=0)return;
       var key=String(row[0]||'')+'|'+bookingResourceTime_(row);
       if(key==='|')return;
@@ -666,20 +672,15 @@ function saveBookingsSafe(rows){
 // 通常の削除（全件pushからの差分）では削除が反映されず「何回消しても復活する」原因になっていた。
 // この関数は該当の診察券Noの行を直接シートから削除するため、確実に消える。
 function deletePatientByCardId(cardId){
+  var id=String(cardId||'').trim();if(!/^\d+$/.test(id))return {ok:false,error:'診察券番号が不正です'};
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
   try{
     var ss=SpreadsheetApp.getActiveSpreadsheet();
-    var s=ss.getSheetByName("患者");
-    if(!s) return {ok:false, error:"シートが見つかりません"};
-    var data=s.getDataRange().getValues();
-    var deleted=0;
-    for(var i=data.length-1;i>=1;i--){
-      if(String(data[i][0]||"").trim()===String(cardId).trim()){
-        s.deleteRow(i+1);
-        deleted++;
-      }
-    }
-    return {ok:true, deleted:deleted};
-  }catch(err){ return {ok:false, error:err.message}; }
+    addPatientTombstone_(id);
+    var target={};target[id]=true;
+    var report=purgeDeletedCardRows_(ss,target);
+    return {ok:true,deleted:report.deletedTotal,deletedPatientIds:Object.keys(getPatientTombstones_())};
+  }catch(err){return {ok:false,error:err.message};}finally{lock.releaseLock();}
 }
 // ============================================================
 // ★重複登録された患者様の「余分な診察券番号」を完全に削除する（安全装置つき・1回だけ実行する用）
@@ -782,6 +783,10 @@ function deleteDuplicatePatients_(dryRun){
   return out;
 }
 function saveCustomersSafe(rows){
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{return saveCustomersSafeUnlocked_(rows);}finally{lock.releaseLock();}
+}
+function saveCustomersSafeUnlocked_(rows){
   var ss=SpreadsheetApp.getActiveSpreadsheet();
   var s=ss.getSheetByName("患者");
   var existing=s?s.getDataRange().getValues():[];
@@ -794,14 +799,19 @@ function saveCustomersSafe(rows){
   }
   var merged=[header];
   var seenIds={};
+  var generations=PropertiesService.getScriptProperties().getProperties();
+  var generationCol=(rows[0]||[]).indexOf('患者世代ID');
   var tomb=getPatientTombstones_(); // ★完全削除した診察券番号（古い画面からの保存で復活させない）
   for(var j=1;j<rows.length;j++){
     var incoming=rows[j];
     var id=String(incoming[0]||"").trim();
     if(!id) continue;
     if(tomb[id]) continue;
+    if(generations['PATIENT_GENERATION_'+id]&&String(incoming[generationCol]||'')!==generations['PATIENT_GENERATION_'+id])continue;
     seenIds[id]=true;
     var base=existingById[id];
+    var sourceRow=incoming,sourceHeader=rows[0]||[];
+    incoming=header.map(function(h,col){var sourceCol=sourceHeader.indexOf(h);return sourceCol>=0?sourceRow[sourceCol]:(base?base[col]:'');});
     var mergedRow=incoming.map(function(val,colIdx){
       var v=(val===null||val===undefined)?"":String(val).trim();
       // ★電話番号だけは特別扱い：正しい11桁の携帯番号(090/080/070)が、
@@ -824,7 +834,7 @@ function saveCustomersSafe(rows){
   }
   // 今回の同期に含まれなかった既存患者はそのまま保持する（削除しない）
   Object.keys(existingById).forEach(function(id){
-    if(!seenIds[id]) merged.push(existingById[id]);
+    if(!seenIds[id]&&!tomb[id]) merged.push(existingById[id]);
   });
   saveSheet("患者", merged);
 }
@@ -3156,6 +3166,22 @@ function deleteBookingsByName(namePrefix){
     }
     return {ok:true, deleted:deleted};
   }catch(err){ return {ok:false, error:err.message}; }
+}
+
+function purgeDeletedCardRows_(ss,targets){
+  var report={targetIds:Object.keys(targets),deleted:{},deletedTotal:0,skipped:[]};
+  var norm=function(v){return String(v==null?'':v).normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();};
+  var aliases=['診察券no','診察券番号','診察券','cardid','patientid','patient_id','患者id','患者番号'];
+  var plans=[];
+  ss.getSheets().forEach(function(sheet){
+    var rows=sheet.getDataRange().getValues();if(rows.length<2)return;
+    var cols=[];rows[0].forEach(function(h,c){if(aliases.indexOf(norm(h))>=0)cols.push(c);});
+    if(!cols.length){report.skipped.push(sheet.getName());return;}
+    var indexes=[];for(var i=1;i<rows.length;i++)if(cols.some(function(c){return targets[norm(rows[i][c])]===true;}))indexes.push(i+1);
+    if(indexes.length)plans.push({sheet:sheet,rows:indexes});
+  });
+  plans.forEach(function(plan){plan.rows.reverse().forEach(function(row){plan.sheet.deleteRow(row);});report.deleted[plan.sheet.getName()]=plan.rows.length;report.deletedTotal+=plan.rows.length;});
+  return report;
 }
 
 function patientPhoneColumn_(rows){
