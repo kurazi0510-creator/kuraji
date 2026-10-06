@@ -43,10 +43,12 @@ function bookingLookupAdminRequest(request){
 function ensureLinkPatient_(ss,card,tel,local){
   var sheet=ss.getSheetByName('患者');if(!sheet)throw new Error('患者シートが見つかりません');
   var rows=sheet.getDataRange().getValues(),header=rows[0]||[],phoneCol=patientPhoneColumn_(rows);
+  var deleted=getPatientTombstones_()[card];
+  var restore2088=deleted&&card==='2088'&&local&&String(local.id).trim()==='2088'&&normalizeName_(local.name)===normalizeName_('木元美穂')&&fixPhoneLeadingZero_(local.tel)===tel;
   var matches=[];for(var i=1;i<rows.length;i++)if(String(rows[i][0]).trim()===card)matches.push(i);
   if(!matches.length){
     if(!local||String(local.id).trim()!==card||!String(local.name||'').trim()||fixPhoneLeadingZero_(local.tel)!==tel)throw new Error('診察券'+card+'はサーバーの患者一覧に未保存です。患者情報の保存状態を確認してください');
-    if(getPatientTombstones_()[card])throw new Error('診察券'+card+'は削除済みとして記録されています。復活させず院長に確認してください');
+    if(deleted&&!restore2088)throw new Error('診察券'+card+'は削除済みとして記録されています。復活させず院長に確認してください');
     var values={'診察券No':card,'患者名':local.name,'ふりがな':local.kana||'','性別':local.sex||'','電話番号':tel,'電話':tel,'phone':tel,'LINE':local.line||'','LINEユーザーID':local.lineUid||'','住所':local.city||'','職業':local.job||'','流入元':local.src||'','症状':local.symptom||'','前回通院日':local.last||'','通院回数':local.count||0,'生年月日':local.dob||'','備考':local.note||'','アラート送信':local.alertSend===false?'FALSE':'TRUE','誕生日クーポン送信':local.birthdaySend===false?'FALSE':'TRUE'};
     var record=header.map(function(h){return values[String(h).trim()]===undefined?'':values[String(h).trim()];});record[0]=card;record[1]=local.name;record[phoneCol]=tel;
     sheet.appendRow(record);rows=sheet.getDataRange().getValues();matches=[rows.length-1];
@@ -70,6 +72,14 @@ function ensureLinkPatient_(ss,card,tel,local){
     matches.forEach(function(index){backup.appendRow([new Date(),card,index+1,JSON.stringify(rows[index])]);});
     sheet.getRange(matches[0]+1,1,1,merged.length).setValues([merged]);
     matches.slice(1).sort(function(a,b){return b-a;}).forEach(function(index){sheet.deleteRow(index+1);});
+  }
+  if(restore2088){
+    var props=PropertiesService.getScriptProperties();
+    var ids=JSON.parse(props.getProperty('DELETED_PATIENT_IDS')||'[]');
+    var audit=ss.getSheetByName('line_patient_restore_log')||ss.insertSheet('line_patient_restore_log');
+    if(!audit.getLastRow())audit.appendRow(['日時','診察券No','患者名','処理']);
+    audit.appendRow([new Date(),card,name,'院長指定：木元美穂様2088を削除済み扱いから復元']);
+    props.setProperty('DELETED_PATIENT_IDS',JSON.stringify(ids.filter(function(id){return String(id)!==card;})));
   }
   return name;
 }
