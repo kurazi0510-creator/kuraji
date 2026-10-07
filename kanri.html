@@ -5113,6 +5113,7 @@ function updateShochiNet(){
   const net=Math.max(0,total-disc);
   const netEl=document.getElementById('m-shochi-net');
   if(netEl)netEl.textContent=disc>0?'→ 実際 '+net.toLocaleString()+'円':'';
+  recalcTotalPay();
 }
 function updateBussanNet(){
   const totalEl=document.getElementById('m-bussan-total');
@@ -5121,6 +5122,7 @@ function updateBussanNet(){
   const net=Math.max(0,total-disc);
   const netEl=document.getElementById('m-bussan-net');
   if(netEl)netEl.textContent=disc>0?'→ 実際 '+net.toLocaleString()+'円':'';
+  recalcTotalPay();
 }
 function calcMShochiTotal(){
   let total=0;
@@ -5594,7 +5596,7 @@ async function saveBk(){
   const shochiDisc=parseInt(document.getElementById('m-shochi-discount')?.value)||0;
   const bussanDisc=parseInt(document.getElementById('m-bussan-discount')?.value)||0;
   // 支払い詳細データを収集
-  const finalPayItems = payItems.map(p=>({label:p.label||'',amount:parseInt(p.amount)||0,unitPrice:parseInt(p.unitPrice??p.amount)||0,qty:parseInt(p.qty)||1,menuVal:p.menuVal||'',method:p.method||'現金'})).filter(p=>p.label||p.amount);
+  const finalPayItems = payItems.map(p=>({label:p.label||'',amount:parseInt(p.amount)||0,unitPrice:parseInt(p.unitPrice??p.amount)||0,qty:parseInt(p.qty)||1,menuVal:p.menuVal||'',method:p.method||'現金',coversDetails:!!p.coversDetails})).filter(p=>p.label||p.amount);
   const finalCouponData = couponData.session ? {...couponData} : null;
   let payAmount=document.getElementById('m-pay-amount').value.trim();
   // 支払金額が空の場合は合計から割引を引いた値を自動セット
@@ -6130,6 +6132,7 @@ function onPayMenuChange(id, val){
   updatePayItem(id,'label',label);
   updatePayItem(id,'unitPrice',price);
   const item=payItems.find(p=>p.id===id);
+  if(item)delete item.coversDetails;
   updatePayItem(id,'amount',String((parseInt(price)||0)*(item?.qty||1)));
   renderPayItems();
   recalcTotalPay(true);
@@ -6156,12 +6159,38 @@ function recalcTotalPayWithQty(fromDetails=false){
   recalcTotalPay(fromDetails);
 }
 function recalcTotalPay(fromDetails=false){
-  const total = payItems.reduce((s,p)=>s+(parseInt(p.amount)||0), 0);
+  const total = calculatePaymentTotal();
   const amtEl = document.getElementById('m-pay-amount');
   if(!amtEl)return;
   if(fromDetails){delete amtEl.dataset.manual;amtEl.disabled=false;}
-  if(!amtEl.dataset.manual && (fromDetails||payItems.length))amtEl.value=String(total);
+  if(!amtEl.dataset.manual)amtEl.value=String(total);
   payItems.forEach(item=>{const sub=document.getElementById('pi-sub-'+item.id);if(sub)sub.textContent=(parseInt(item.amount)||0).toLocaleString();});
+}
+
+function calculatePaymentTotal(){
+  const number=v=>parseInt(v)||0;
+  const key=v=>String(v||'').normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();
+  let total=payItems.reduce((sum,p)=>sum+number(p.amount),0);
+  // 旧予約の支払合計から生成した行は、明細を含む保存済み合計。
+  if(payItems.some(p=>p.coversDetails||p.id==='pi-legacy'))return total;
+  const covered=new Map();
+  for(const p of payItems){const k=key(p.label);covered.set(k,(covered.get(k)||0)+Math.max(1,number(p.qty)));}
+  const groups=[{items:[],discount:number(document.getElementById('m-shochi-discount')?.value)},
+    {items:[],discount:number(document.getElementById('m-bussan-discount')?.value)}];
+  shochiMaster.forEach(s=>{const qty=number(mShochiSel[s.id]);if(qty>0)groups[0].items.push({name:s.name,qty,price:number(window.mShochiPrice?.[s.id]??s.price)});});
+  (window.mShochiFree||[]).forEach(r=>{if(r.name&&number(r.price)>0)groups[0].items.push({name:r.name,qty:1,price:number(r.price)});});
+  bussanMaster.forEach(b=>{const qty=number(mBussanQty[b.id]);if(qty>0)groups[1].items.push({name:b.name,qty,price:Math.max(0,number(mBussanPrice?.[b.id]??b.price)-number(mBussanDisc[b.id]))});});
+  (window.mBussanFree||[]).forEach(r=>{if(r.name&&number(r.price)>0)groups[1].items.push({name:r.name,qty:Math.max(1,number(r.qty)),price:number(r.price)});});
+  for(const group of groups){
+    let gross=0,alreadyCovered=0;
+    for(const item of group.items){
+      gross+=item.price*item.qty;
+      const k=key(item.name),used=Math.min(item.qty,covered.get(k)||0);
+      alreadyCovered+=item.price*used;covered.set(k,(covered.get(k)||0)-used);
+    }
+    total+=Math.max(0,gross-Math.max(0,group.discount)-alreadyCovered);
+  }
+  return total;
 }
 
 function syncPayAmount(){
@@ -6235,6 +6264,7 @@ function updateCouponInfo(){
 }
 
 function updatePayDetailSummary(){
+  recalcTotalPay();
   const sumDiv = document.getElementById('pay-detail-summary');
   const shochiDiv = document.getElementById('pay-shochi-summary');
   const bussanDiv = document.getElementById('pay-bussan-summary');
@@ -6278,7 +6308,7 @@ function initPayItems(bk){
     const payMethods = pay?[...pay.querySelectorAll('.pay-btn.on')].map(b=>b.getAttribute('data-v')):[];
     const amount = bk?.payAmount||'';
     if(amount && parseFloat(amount)>0){
-      payItems = [{id:'pi-legacy',label:'施術料',amount:amount,method:payMethods[0]||'現金'}];
+      payItems = [{id:'pi-legacy',label:'施術料',amount:amount,method:payMethods[0]||'現金',coversDetails:true}];
     }
   }
   // 回数券データ復元
