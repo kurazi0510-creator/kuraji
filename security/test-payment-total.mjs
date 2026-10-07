@@ -13,3 +13,9 @@ amount.dataset.manual='1';amount.value='3200';c.mShochiSel={h:1};c.recalcTotalPa
 c.payItems=[];c.recalcTotalPay(true);assert.equal(amount.value,'1000','detail-only payment also calculated');
 c.payItems=[{id:'pi-legacy',label:'施術料',amount:'4600',coversDetails:true}];c.recalcTotalPay(true);assert.equal(amount.value,'4600','legacy saved total is not double counted');
 console.log('PASS: 3500+1100=4600; quantity, removal, goods, discount, duplicate coverage, manual override and legacy total');
+for(const n of ['updatePayItem','onPayMenuChange','cancelSelectedTreatment'])vm.runInContext(fn(n),c);
+c.renderPayItems=()=>{};c.renderMShochiBtns=()=>{};c.calcMShochiTotal=()=>c.updatePayDetailSummary();elements['m-shochi-discount'].value='0';
+c.payItems=[{id:'pi-legacy',label:'施術料',amount:'3500',qty:1,coversDetails:true}];c.mShochiSel={h:1};c.onPayMenuChange('pi-legacy','施術料|3500');assert.equal(amount.value,'4600','changing legacy payment menu must include current details');
+c.cancelSelectedTreatment('h');assert.equal(amount.value,'3500');assert.equal(c.mShochiSel.h,undefined,'cancel only selected treatment');
+c.mShochiSel={h:1};c.payItems.push({id:'t',label:'水素+ツイスター',amount:'1100',qty:1});c.cancelSelectedTreatment('h');assert.equal(amount.value,'3500');assert.equal(c.payItems.length,1,'cancel removes matching explicit charge, preserves fee');
+console.log('PASS: real saved-record menu change 3500+1100=4600, treatment cancel returns 3500');
