@@ -248,7 +248,7 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
 </head>
 <body>
 <header>
-  <div class="logo">倉治<span>整骨院</span> 管理システム v5 <span style="font-size:0.6rem;color:rgba(255,255,255,0.4);font-weight:normal">更新版：2026-10-07-1040</span></div>
+  <div class="logo">倉治<span>整骨院</span> 管理システム v5 <span style="font-size:0.6rem;color:rgba(255,255,255,0.4);font-weight:normal">更新版：2026-10-07-1205</span></div>
   <div style="display:flex;align-items:center;gap:8px">
     <span style="font-size:0.68rem;color:rgba(255,255,255,0.55)" id="hdate"></span>
     <span class="sbadge s-ing" id="sbadge" onclick="syncAll()">🔄 接続中...</span>
@@ -2284,6 +2284,7 @@ let deletedCardCleanupReport=null;
 const storedSaveValues=new Map();
 function save(){
   purgeDeletedCardCaches();
+  cleanCachedPatientAddresses();
   try{
     let changed=false,bookingsChanged=false;
     const put=(key,value)=>{
@@ -2346,7 +2347,7 @@ function load(){
     stockData=st||DEFAULT_STOCK;
     ticketMaster=JSON.parse(localStorage.getItem('kj_tm')||'[]');
     patientTickets=JSON.parse(localStorage.getItem('kj_pt')||'[]');
-    if(purgeDeletedCardCaches())save();
+    if(purgeDeletedCardCaches()|cleanCachedPatientAddresses())save();
   }catch(e){
     console.error('load error:',e);
     patients=[];bookings={};uriage={};bussanLog=[];
@@ -2493,6 +2494,18 @@ function cleanSymptom(v){
 function setStat(cls,txt){const el=document.getElementById('sbadge');el.className='sbadge '+cls;el.textContent=txt;}
 
 // ===== SYNC =====
+function cleanPatientAddress(value){
+  const text=String(value??'').trim();
+  const compact=text.normalize('NFKC').replace(/[\s()（）\-ー−]/g,'');
+  // 電話番号だけの文字列は住所ではない。番地や正しい住所は保持する。
+  return /^(?:0[789]0\d{8}|[789]0\d{8}|0[1-9]\d{8})$/.test(compact)?'':text;
+}
+function cleanCachedPatientAddresses(){
+  let changed=false;
+  patients.forEach(p=>{const city=cleanPatientAddress(p.city);if(city!==String(p.city??'').trim()){p.city=city;changed=true;}});
+  return changed;
+}
+
 function normalizePatientTableRows(rows){
   if(!Array.isArray(rows))return [];
   const key=v=>String(v??'').normalize('NFKC').replace(/[\s　]/g,'').toLowerCase();
@@ -2586,10 +2599,9 @@ async function syncAll(){
           // 住所判定: 数字や「市」「町」「丁」を含む
           const isAddress = v => v && (v.includes('市')||v.includes('町')||v.includes('丁')||v.includes('番')||v.match(/\d+-\d+/));
           // 住所: ヘッダー位置を優先、なければr[5]、r[6]も候補
-          const rv_city = isAddress(rv_city_hdr) ? rv_city_hdr :
-                          isAddress(rv_city_r4)  ? rv_city_r4  :
-                          isAddress(rv_city_r6)  ? rv_city_r6  :
-                          rv_city_hdr||rv_city_r4;
+          // 住所列がある場合は空欄も正しい値として扱い、電話列を代用しない。
+          const rv_city = hi('住所')>-1 ? cleanPatientAddress(rv_city_hdr) :
+            cleanPatientAddress([rv_city_r4,rv_city_r6].find(v=>isAddress(v))||'');
 
           // 職業: ヘッダー「職業」の位置 と [5] の両方確認
           const rv_job_hdr = hi('職業')>-1 ? String(r[hi('職業')]||'').trim() : '';
@@ -2820,6 +2832,7 @@ async function pushB(){
 }
 
 async function pushP(){
+  cleanCachedPatientAddresses();
   const hdr=['診察券No','患者名','ふりがな','性別','電話番号','LINE','LINEユーザーID','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考','アラート送信','誕生日クーポン送信','患者世代ID'];
   const rows=[hdr,...patients.map(p=>[p.id,p.name,p.kana||'',p.sex||'',normTel(p.tel||''),p.line||'',p.lineUid||'',p.city||'',p.job||'',p.src||'',p.symptom||'',p.last||'',p.count||0,p.dob||'',p.note||'',p.alertSend===false?'FALSE':'TRUE',p.birthdaySend===false?'FALSE':'TRUE',p.generation||''])];
   try{const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'saveCustomers',rows:JSON.stringify(rows)}),redirect:'follow'});const d=JSON.parse(await res.text());setStat(d.ok?'s-ok':'s-err',d.ok?'✅ 同期済み':'⚠ 保存エラー');}catch(e){setStat('s-err','⚠ 保存エラー');}
@@ -6740,7 +6753,7 @@ async function addPatient(){
   const name=document.getElementById('c-nm').value.trim();
   if(!id||!name){alert('診察券Noと患者名は必須です');return;}
   if(patients.find(p=>p.id===id)){alert('この診察券Noは既に登録されています');return;}
-  const patient={id,name,kana:document.getElementById('c-kana').value.trim(),sex:document.getElementById('c-sex').value,tel:normTel(document.getElementById('c-tel').value.trim()),line:document.getElementById('c-line').value,zip:document.getElementById('c-postal').value.trim(),city:document.getElementById('c-city').value.trim(),job:document.getElementById('c-job').value.trim(),src:document.getElementById('c-src').value,dob:document.getElementById('c-dob').value,symptom:document.getElementById('c-sym').value.trim(),note:document.getElementById('c-note').value.trim(),last:'',count:0};
+  const patient={id,name,kana:document.getElementById('c-kana').value.trim(),sex:document.getElementById('c-sex').value,tel:normTel(document.getElementById('c-tel').value.trim()),line:document.getElementById('c-line').value,zip:document.getElementById('c-postal').value.trim(),city:cleanPatientAddress(document.getElementById('c-city').value),job:document.getElementById('c-job').value.trim(),src:document.getElementById('c-src').value,dob:document.getElementById('c-dob').value,symptom:document.getElementById('c-sym').value.trim(),note:document.getElementById('c-note').value.trim(),last:'',count:0};
   try{
     const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'registerNewPatient',patient})});
     const result=JSON.parse(await res.text());
@@ -6886,7 +6899,7 @@ function openPEdit(id){
   updatePeCouponStatus();
   renderPeTicketList(id);
   document.getElementById('pe-postal').value=p.zip||'';
-  document.getElementById('pe-city').value=p.city||'';
+  document.getElementById('pe-city').value=cleanPatientAddress(p.city);
   document.getElementById('pe-job').value=p.job||'';
   document.getElementById('pe-src').value=p.src||'-';
   document.getElementById('pe-last').value=p.last||'';
@@ -7098,7 +7111,7 @@ async function savePEdit(){
   const _uid2=document.getElementById('pe-line-uid2')?.value.trim()||'';
   p.lineUid=_uid2||_uid1||p.lineUid||'';
   p.zip=document.getElementById('pe-postal').value.trim();
-  p.city=document.getElementById('pe-city').value.trim();
+  p.city=cleanPatientAddress(document.getElementById('pe-city').value);
   p.job=document.getElementById('pe-job').value.trim();
   p.src=document.getElementById('pe-src').value;
   // 回数券情報

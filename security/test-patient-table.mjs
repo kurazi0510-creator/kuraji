@@ -2,7 +2,7 @@ import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:asser
 const html=fs.readFileSync('kanri.html','utf8');
 function fn(name){const start=html.indexOf('function '+name+'('),tail=html.slice(start),next=tail.slice(10).search(/\n(?:async )?function /);return tail.slice(0,next<0?undefined:next+10);}
 const ctx={String,Number,Array,Date,Set,Math,patients:[{id:'診察券No',name:'患者名'}]};vm.createContext(ctx);
-for(const name of ['normalizePatientTableRows','sortPatients','fmtDate','normTel','isGarbageData'])vm.runInContext(fn(name),ctx);
+for(const name of ['cleanPatientAddress','normalizePatientTableRows','sortPatients','fmtDate','normTel','isGarbageData'])vm.runInContext(fn(name),ctx);
 const oldHeader=['診察券No','患者名','ふりがな','性別','電話番号','LINE','住所','職業','流入元','症状','前回通院日','通院回数','生年月日'];
 const newHeader=['診察券No','患者名','ふりがな','性別','電話番号','LINE','LINEユーザーID','住所','職業','流入元','症状','前回通院日','通院回数','生年月日','備考'];
 const rows=[oldHeader,['2071','既存患者','キゾン','男性','08011111111','あり','交野市','会社員','LINE','腰痛','2026-10-01',2,'1980-01-01'],newHeader];
@@ -14,3 +14,9 @@ assert.equal(ctx.patients.find(p=>p.id==='2088').name,'木元 美穂');assert.eq
 const sorted=ctx.sortPatients([...ctx.patients,{id:'10000'},{id:'診察券No'},{id:undefined}],'id_desc');assert.equal(sorted[0].id,'10000');assert.equal(sorted[1].id,'2088');assert.equal(sorted[17].id,'2072');assert.equal(sorted[18].id,'2071');assert.equal(ctx.sortPatients(ctx.patients,'id_asc')[0].id,'2071');
 assert.equal(JSON.stringify(rows),originalRows,'source rows untouched');
 console.log('PASS: repeated header and shifted columns preserve every 2072–2088 patient, fields and numeric order; invalid IDs sort last; original rows unchanged');
+for(const phone of ['08038319377','080-3831-9377','８０３８３１９３７７','9051215975'])assert.equal(ctx.cleanPatientAddress(phone),'');
+for(const addr of ['交野市星田4-5-14','枚方市茄子作３－２０－５－２０３','4-5-14'])assert.equal(ctx.cleanPatientAddress(addr),addr);
+ctx.patients=[];ctx.data={customers:[newHeader,['2087','平井','ヒライ','男性','08038319377','あり','','','あり','LINE']]};
+vm.runInContext('{'+html.slice(html.indexOf('      const prows=normalizePatientTableRows'),html.indexOf('      // 予約データ：'))+'}',ctx);assert.equal(ctx.patients[0].city,'','blank address must never fall back to phone');
+vm.runInContext(fn('cleanCachedPatientAddresses'),ctx);ctx.patients[0].city='08038319377';assert.equal(ctx.cleanCachedPatientAddresses(),true);assert.equal(ctx.patients[0].city,'');assert.equal(ctx.patients[0].tel,'08038319377');
+console.log('PASS: phone-only addresses rejected, blank address column remains blank, stale cache cleaned, real addresses and phone fields preserved.');
