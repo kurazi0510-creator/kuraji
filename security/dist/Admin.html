@@ -5000,7 +5000,7 @@ function buildShochiDirectTable(){
   const hdr=document.createElement('tr');
   hdr.innerHTML='<th style="text-align:left;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0">処置名</th>'+
     '<th style="text-align:center;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:60px">個数</th>'+
-    '<th style="text-align:right;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:110px">金額（円）</th>';
+    '<th style="text-align:right;font-size:0.7rem;color:#64748b;padding:4px;border-bottom:1px solid #e2e8f0;width:110px">単価（円）</th><th></th>';
   tbl.appendChild(hdr);
 
   // マスタ全件表示
@@ -5017,9 +5017,10 @@ function buildShochiDirectTable(){
     nameTd.textContent=(isSelected?'✅ ':'')+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
     nameTd.onclick=function(){
       const tr=this.closest('tr');
-      const priceInp=tr.querySelector('input[data-shid="'+sh.id+'"]');
-      const qtyInp=tr.querySelectorAll('input[type=number]')[0];
+      const priceInp=tr.querySelector('input[data-field="price"]');
+      const qtyInp=tr.querySelector('input[data-field="qty"]');
       if((mShochiSel[sh.id]||0)>0){
+        cancelSelectedTreatment(sh.id);return;
         // 解除
         mShochiSel[sh.id]=0;
         delete window.mShochiPrice[sh.id];
@@ -5044,13 +5045,14 @@ function buildShochiDirectTable(){
     const qtyTd=document.createElement('td');
     qtyTd.style.cssText='padding:4px;text-align:center';
     const qtyInp=document.createElement('input');
-    qtyInp.type='number';qtyInp.min='1';
+    qtyInp.type='number';qtyInp.min='0';qtyInp.dataset.field='qty';
     qtyInp.value=Math.max(1,mShochiSel[sh.id]||1);
     qtyInp.dataset.shid=sh.id;
     qtyInp.style.cssText='width:50px;padding:5px 4px;border:1.5px solid #94a3b8;border-radius:8px;font-size:0.9rem;font-weight:700;text-align:center';
     qtyInp.oninput=function(){
       const id=this.dataset.shid;
-      const q=parseInt(this.value)||1;
+      const q=Math.max(0,parseInt(this.value)||0);
+      if(q===0){cancelSelectedTreatment(id);return;}
       // 金額が入っていれば選択済みとして個数更新
       if((window.mShochiPrice[id]!=null&&window.mShochiPrice[id]>0)){
         mShochiSel[id]=q;
@@ -5068,7 +5070,7 @@ function buildShochiDirectTable(){
     inp.min='0';
     inp.placeholder='0';
     inp.value=window.mShochiPrice[sh.id]!=null?window.mShochiPrice[sh.id]:sh.price;
-    inp.dataset.shid=sh.id;
+    inp.dataset.shid=sh.id;inp.dataset.field='price';
     inp.dataset.defprice=sh.price;
     inp.style.cssText='width:90px;padding:5px 8px;border:2px solid '+(isSelected?'#4ade80':'#e2e8f0')+';border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
     inp.oninput=function(){
@@ -5077,7 +5079,7 @@ function buildShochiDirectTable(){
       const defPrice=parseInt(this.dataset.defprice)||0;
       if(val>0){
         // 個数欄の値を取得して反映
-        const qtyEl=this.closest('tr').querySelector('input[type=number][data-shid]');
+        const qtyEl=this.closest('tr').querySelector('input[data-field="qty"]');
         const q=qtyEl&&qtyEl!==this?parseInt(qtyEl.value)||1:mShochiSel[id]||1;
         mShochiSel[id]=q;
         window.mShochiPrice[id]=val;
@@ -5095,6 +5097,10 @@ function buildShochiDirectTable(){
     tr.appendChild(nameTd);
     tr.appendChild(qtyTd);
     tr.appendChild(priceTd);
+    const cancelTd=document.createElement('td');
+    const cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.textContent='取消';cancelBtn.disabled=false;
+    cancelBtn.style.cssText='padding:5px 8px;border:1px solid #fca5a5;border-radius:6px;color:#b91c1c;background:#fff1f2;cursor:pointer';
+    cancelBtn.onclick=()=>cancelSelectedTreatment(sh.id);cancelTd.appendChild(cancelBtn);tr.appendChild(cancelTd);
     tbl.appendChild(tr);
   });
 
@@ -5118,9 +5124,9 @@ function buildShochiDirectTable(){
     priceInp.style.cssText='width:80px;padding:5px 8px;border:2px solid #fbbf24;border-radius:8px;font-size:0.95rem;font-weight:700;text-align:right';
     priceInp.oninput=function(){window.mShochiFree[i].price=parseInt(this.value)||0;calcMShochiTotal();};
     const delBtn=document.createElement('button');
-    delBtn.textContent='削除';
+    delBtn.textContent='取消';
     delBtn.style.cssText='margin-left:4px;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:4px 6px;font-size:0.72rem;cursor:pointer';
-    delBtn.onclick=function(){window.mShochiFree.splice(i,1);buildShochiDirectTable();calcMShochiTotal();};
+    delBtn.onclick=()=>cancelFreeCharge('treatment',i);
 
     nameTd.appendChild(nameInp);
     priceTd.appendChild(priceInp);priceTd.appendChild(delBtn);
@@ -5177,7 +5183,7 @@ function calcMShochiTotal(){
   document.getElementById('m-shochi-total').textContent=yen(total);
   const menuEl=document.getElementById('m-menu');
   const menuPriceEl=document.getElementById('m-menu-price');
-  if(menuEl&&selected.length>0){menuEl.value=selected.join('・');if(menuPriceEl)menuPriceEl.value=total;updateMenuTotal();}
+  if(menuEl){menuEl.value=selected.join('・');if(menuPriceEl)menuPriceEl.value=total;updateMenuTotal();}
   updateMTotal();
   updatePayDetailSummary();
 }
@@ -5221,9 +5227,12 @@ function renderMBussanItems(){
           oninput="if(!mBussanPrice)mBussanPrice={};mBussanPrice['${bs.id}']=parseInt(this.value)||0;calcMBussanTotal();">円/${bs.unit}
       </span>`;
     const inp=document.createElement('input');inp.type='number';inp.min='0';inp.value=qty||0;inp.className='bussan-qty';
-    inp.oninput=function(){mBussanQty[bs.id]=parseInt(this.value)||0;renderMBussanItems();calcMBussanTotal();};
+    inp.oninput=function(){const q=Math.max(0,parseInt(this.value)||0);if(!q){cancelSelectedGoods(bs.id);return;}mBussanQty[bs.id]=q;renderMBussanItems();calcMBussanTotal();};
     div.appendChild(inp);
     if(qty>0){
+      const cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.textContent='取消';
+      cancelBtn.style.cssText='margin-left:6px;padding:5px 9px;border:1px solid #fca5a5;border-radius:6px;color:#b91c1c;background:#fff1f2;cursor:pointer';
+      cancelBtn.onclick=()=>cancelSelectedGoods(bs.id);div.appendChild(cancelBtn);
       const discWrap=document.createElement('div');
       discWrap.style.cssText='display:flex;align-items:center;gap:4px;margin-top:4px;width:100%';
       discWrap.innerHTML=`<button onclick="toggleDiscInput('${bs.id}',this)" style="background:none;border:1px solid #e2e8f0;border-radius:5px;padding:2px 8px;font-size:0.7rem;color:#64748b;cursor:pointer">${disc>0?'割引: '+disc+'円':'割引を入力'}</button>
@@ -5260,7 +5269,7 @@ function renderMBussanItems(){
         oninput="window.mBussanFree[${i}].price=parseInt(this.value)||0;calcMBussanTotal()">円
       <input type="number" placeholder="個数" value="${row.qty||1}" min="1" style="width:50px;padding:4px 6px;border:1px solid #bae6fd;border-radius:6px;font-size:0.8rem;text-align:center"
         oninput="window.mBussanFree[${i}].qty=parseInt(this.value)||1;calcMBussanTotal()">
-      <button onclick="window.mBussanFree.splice(${i},1);renderMBussanItems();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 8px;font-size:0.75rem;cursor:pointer">削除</button>`;
+      <button onclick="cancelFreeCharge('goods',${i})" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 8px;font-size:0.75rem;cursor:pointer">取消</button>`;
     freeWrap.appendChild(rowDiv);
   });
   const addBtn=document.createElement('button');
@@ -5288,7 +5297,7 @@ function renderFreeGivenItems(){
       </select>
       <input type="number" placeholder="数量" value="${row.qty||1}" min="1" style="width:56px;padding:4px 6px;border:1px solid #fca5a5;border-radius:6px;font-size:0.8rem;text-align:center"
         oninput="window.mFreeGiven[${i}].qty=parseInt(this.value)||1">
-      <button onclick="window.mFreeGiven.splice(${i},1);renderFreeGivenItems();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 8px;font-size:0.75rem;cursor:pointer">削除</button>`;
+      <button onclick="window.mFreeGiven.splice(${i},1);renderFreeGivenItems();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:5px;padding:3px 8px;font-size:0.75rem;cursor:pointer">取消</button>`;
     area.appendChild(rowDiv);
   });
   const addBtn2=document.createElement('button');
@@ -6339,9 +6348,26 @@ function cancelSelectedTreatment(id){
   const treatment=shochiMaster.find(s=>s.id===id);if(!treatment)return;
   delete mShochiSel[id];if(window.mShochiPrice)delete window.mShochiPrice[id];
   payItems=payItems.filter(p=>String(p.label||'').replace(/[\s　]/g,'')!==String(treatment.name).replace(/[\s　]/g,''));
+  if(!Object.values(mShochiSel).some(q=>q>0)&&!(window.mShochiFree||[]).some(r=>r.name&&r.price>0)){
+    const menu=document.getElementById('m-menu'),price=document.getElementById('m-menu-price');if(menu)menu.value='';if(price)price.value='0';
+  }
   renderMShochiBtns();renderPayItems();
   const amount=document.getElementById('m-pay-amount');if(amount)delete amount.dataset.manual;
   calcMShochiTotal();recalcTotalPay(true);
+}
+
+function cancelSelectedGoods(id){
+  const item=bussanMaster.find(b=>b.id===id);if(!item)return;
+  delete mBussanQty[id];delete mBussanDisc[id];if(mBussanPrice)delete mBussanPrice[id];
+  payItems=payItems.filter(p=>String(p.label||'').replace(/[\s　]/g,'')!==String(item.name).replace(/[\s　]/g,''));
+  renderMBussanItems();renderPayItems();calcMBussanTotal();recalcTotalPay(true);
+}
+function cancelFreeCharge(kind,index){
+  const rows=kind==='goods'?window.mBussanFree:window.mShochiFree;
+  if(!rows?.[index])return;const name=rows[index].name;rows.splice(index,1);
+  payItems=payItems.filter(p=>String(p.label||'').replace(/[\s　]/g,'')!==String(name||'').replace(/[\s　]/g,''));
+  if(kind==='goods'){renderMBussanItems();calcMBussanTotal();}else{renderMShochiBtns();calcMShochiTotal();}
+  renderPayItems();recalcTotalPay(true);
 }
 
 function initPayItems(bk){
