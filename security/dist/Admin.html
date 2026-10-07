@@ -248,7 +248,7 @@ function adminPageUrl(page){return window.KURAJI_ADMIN_URL+'?page='+encodeURICom
 </head>
 <body>
 <header>
-  <div class="logo">倉治<span>整骨院</span> 管理システム v5 <span style="font-size:0.6rem;color:rgba(255,255,255,0.4);font-weight:normal">build:2026-09-01-2245</span></div>
+  <div class="logo">倉治<span>整骨院</span> 管理システム v5 <span style="font-size:0.6rem;color:rgba(255,255,255,0.4);font-weight:normal">更新版：2026-10-07-1040</span></div>
   <div style="display:flex;align-items:center;gap:8px">
     <span style="font-size:0.68rem;color:rgba(255,255,255,0.55)" id="hdate"></span>
     <span class="sbadge s-ing" id="sbadge" onclick="syncAll()">🔄 接続中...</span>
@@ -2281,27 +2281,35 @@ function purgeDeletedCardCaches(){
   return count;
 }
 let deletedCardCleanupReport=null;
+const storedSaveValues=new Map();
 function save(){
   purgeDeletedCardCaches();
   try{
-    localStorage.setItem('kj_deleted_patient_ids',JSON.stringify([...deletedPatientIds]));
-    localStorage.setItem('kj_extra_slots',JSON.stringify(extraSlotsByDate));
-    localStorage.setItem('kj_p',JSON.stringify(patients));
-    localStorage.setItem('kj_b',JSON.stringify(bookings));
-    localStorage.setItem('kj_u',JSON.stringify(uriage));
-    localStorage.setItem('kj_bl',JSON.stringify(bussanLog));
-    localStorage.setItem('kj_bm',JSON.stringify(bussanMaster));
-    localStorage.setItem('kj_sm',JSON.stringify(shochiMaster));
-    localStorage.setItem('kj_st',JSON.stringify(stockData));
-    localStorage.setItem('kj_tm',JSON.stringify(ticketMaster));
-    localStorage.setItem('kj_pt',JSON.stringify(patientTickets));
+    let changed=false,bookingsChanged=false;
+    const put=(key,value)=>{
+      const previous=storedSaveValues.has(key)?storedSaveValues.get(key):localStorage.getItem(key);
+      if(previous===value){storedSaveValues.set(key,value);return;}
+      localStorage.setItem(key,value);storedSaveValues.set(key,value);changed=true;if(key==='kj_b')bookingsChanged=true;
+    };
+    put('kj_deleted_patient_ids',JSON.stringify([...deletedPatientIds]));
+    put('kj_extra_slots',JSON.stringify(extraSlotsByDate));
+    put('kj_p',JSON.stringify(patients));
+    put('kj_b',JSON.stringify(bookings));
+    put('kj_u',JSON.stringify(uriage));
+    put('kj_bl',JSON.stringify(bussanLog));
+    put('kj_bm',JSON.stringify(bussanMaster));
+    put('kj_sm',JSON.stringify(shochiMaster));
+    put('kj_st',JSON.stringify(stockData));
+    put('kj_tm',JSON.stringify(ticketMaster));
+    put('kj_pt',JSON.stringify(patientTickets));
     // 予約データのバックアップ（GASで上書きされた時の復元用）
-    localStorage.setItem('kj_b_bak',JSON.stringify(bookings));
-    localStorage.setItem('kj_b_bak_ts',Date.now().toString());
-    dataRenderVersion++;
+    put('kj_b_bak',JSON.stringify(bookings));
+    if(bookingsChanged)put('kj_b_bak_ts',Date.now().toString());
+    if(changed)dataRenderVersion++;
   }catch(e){console.error('save error:',e);}
 }
 function load(){
+  storedSaveValues.clear();
   try{
     extraSlotsByDate=JSON.parse(localStorage.getItem('kj_extra_slots')||'{}');
     if(!extraSlotsByDate||Array.isArray(extraSlotsByDate)||typeof extraSlotsByDate!=='object')extraSlotsByDate={};
@@ -4972,7 +4980,10 @@ async function execCancel(){
 }
 
 // ===== モーダルタブ =====
+let modalDetailRenderPending={shochi:false,bussan:false};
 function switchMTab(tab){
+  if(tab==='shochi'&&modalDetailRenderPending.shochi){renderMShochiBtns();modalDetailRenderPending.shochi=false;}
+  if(tab==='bussan'&&modalDetailRenderPending.bussan){renderMBussanItems();modalDetailRenderPending.bussan=false;}
   const tabs=['basic','shochi','bussan','pay'];
   document.querySelectorAll('.mtab').forEach((t,i)=>t.classList.toggle('on',tabs[i]===tab));
   document.querySelectorAll('.mpane').forEach((p,i)=>p.classList.toggle('on',tabs[i]===tab));
@@ -5017,8 +5028,7 @@ function buildShochiDirectTable(){
     nameTd.textContent=(isSelected?'✅ ':'')+sh.name+'（定価'+sh.price.toLocaleString()+'円）';
     nameTd.onclick=function(){
       const tr=this.closest('tr');
-      const priceInp=tr.querySelector('input[data-field="price"]');
-      const qtyInp=tr.querySelector('input[data-field="qty"]');
+      const priceInp=inp; // 金額欄そのものを参照し、個数欄を検索しない。
       if((mShochiSel[sh.id]||0)>0){
         cancelSelectedTreatment(sh.id);return;
         // 解除
@@ -5079,7 +5089,7 @@ function buildShochiDirectTable(){
       const defPrice=parseInt(this.dataset.defprice)||0;
       if(val>0){
         // 個数欄の値を取得して反映
-        const qtyEl=this.closest('tr').querySelector('input[data-field="qty"]');
+        const qtyEl=qtyInp;
         const q=qtyEl&&qtyEl!==this?parseInt(qtyEl.value)||1:mShochiSel[id]||1;
         mShochiSel[id]=q;
         window.mShochiPrice[id]=val;
@@ -5399,7 +5409,7 @@ function openModal(date,slot){
   document.getElementById('m-patient-list').style.display='none';
   document.getElementById('m-selected-info').style.display='none';
   resetKubun();resetBui();
-  mShochiSel={};mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=[];window.mBussanPrice={};window.mShochiPrice={};window.mShochiDisc={};renderMShochiBtns();renderMBussanItems();resetMPay();initPayItems(null);
+  mShochiSel={};mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=[];window.mBussanPrice={};window.mShochiPrice={};window.mShochiDisc={};modalDetailRenderPending={shochi:true,bussan:true};resetMPay();initPayItems(null);
   document.getElementById('hist-btn').style.display='none';
   switchMTab('basic');
   document.getElementById('bmodal').classList.add('on');
@@ -5433,19 +5443,20 @@ function editBk(date,slot){
   setSlotCount(bk.groupSpan||bookingSpanCount(date,slot,bk));
   Object.entries(bk.kubunFee||{}).forEach(([k,v])=>{const el=document.getElementById('fee-'+k);if(el)el.value=v;});
   loadBui(bk.bui||[]);
-  mShochiSel={};(bk.shochi||[]).forEach(s=>{mShochiSel[s.id]=(s.qty||1);});renderMShochiBtns();
+  mShochiSel={};(bk.shochi||[]).forEach(s=>{mShochiSel[s.id]=(s.qty||1);});modalDetailRenderPending={shochi:true,bussan:true};
   if(bk.shochiMemo)document.getElementById('m-shochi-memo').value=bk.shochiMemo;
   else document.getElementById('m-shochi-memo').value='';
   mBussanQty={};window.mBussanFree=[];window.mShochiFree=[];window.mFreeGiven=(bk.freeGiven||[]).map(f=>({stockId:f.stockId,qty:f.qty}));window.mBussanPrice={};window.mShochiPrice={};
+  (bk.shochi||[]).forEach(s=>{if(String(s.id||'').startsWith('free_'))window.mShochiFree.push({name:s.name,price:s.price});else if(s.price!=null)window.mShochiPrice[s.id]=s.price;});
   (bk.bussan||[]).forEach(b=>{
     if(String(b.id||'').startsWith('free_')){
       // 自由入力（サポーターなど、商品マスターに無い物販）は、編集画面を開いた時にちゃんと復元する
       window.mBussanFree.push({name:b.name, price:b.price, qty:b.qty||1});
     }else{
-      mBussanQty[b.id]=(b.qty||0);
+      mBussanQty[b.id]=(b.qty||0);if(b.price!=null)mBussanPrice[b.id]=b.price;
     }
   });
-  renderMBussanItems();
+  updatePayDetailSummary();
   loadMPay(bk.pay||[],bk.payAmount||'');
   setTimeout(()=>{
     if(editDate!==date||editSlot!==slot)return;
