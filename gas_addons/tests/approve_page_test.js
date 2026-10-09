@@ -12,7 +12,8 @@ r=ctx.apSave("T",[{row:3,key:"k2",text:"x",ok:true}]);a(!r[0].ok&&rows[2][8]==="
 r=ctx.apSave("T",[{row:2,key:"k1",text:" ",ok:true}]);a(!r[0].ok,"空文面は送信OKにしない");
 try{ctx.apList("bad");a(false,"トークン")}catch(e){a(true,"トークン違いは拒否")}
 const fixed=new Date();
-ctx.CacheService={getScriptCache:()=>({_m:{},get(k){return this._m[k]||null},put(k,v){this._m[k]=v},remove(k){delete this._m[k]}})};
+const _cache={_m:{},get(k){return this._m[k]||null},put(k,v){this._m[k]=v},remove(k){delete this._m[k]}};
+ctx.CacheService={getScriptCache:()=>_cache};
 ctx.Utilities={formatDate:(d,tz,f)=>new Date(d.getTime()+9*3600000).toISOString().slice(0,10)};
 rows[1][0]=ctx.Utilities.formatDate(new Date());rows[2][0]=rows[1][0];
 ctx.PropertiesService={getScriptProperties:()=>({getProperty:k=>({AP_TOKEN:"T",AP_SHEET_ID:"x",AP_VIEW_PIN:"pinpin12"})[k]})};
