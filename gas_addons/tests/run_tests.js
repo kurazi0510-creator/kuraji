@@ -25,7 +25,7 @@ function makeCtx(opts) {
     Session: { getEffectiveUser: () => ({ getEmail: () => "owner@example.com" }) },
     UrlFetchApp: { fetch: (u, o) => { sent.push(JSON.parse(o.payload)); return { getResponseCode: () => 200 }; } },
     ScriptApp: { getProjectTriggers: () => triggers, deleteTrigger: t => { triggers.splice(triggers.indexOf(t), 1); },
-      newTrigger: h => { const t = { getHandlerFunction: () => h }; const b = { timeBased: () => b, everyDays: () => b, atHour: () => b, nearMinute: () => b, onWeekDay: () => b, onMonthDay: () => b, create: () => { triggers.push(t); return t; } }; return b; },
+      newTrigger: h => { const t = { getHandlerFunction: () => h }; const b = { timeBased: () => b, everyDays: () => b, everyHours: () => b, atHour: () => b, nearMinute: () => b, onWeekDay: () => b, onMonthDay: () => b, create: () => { triggers.push(t); return t; } }; return b; },
       WeekDay: { SUNDAY: 1 } },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({
       getSpreadsheetTimeZone: () => "Asia/Tokyo", getId: () => "sheetid",
@@ -36,7 +36,7 @@ function makeCtx(opts) {
   function mkSheet(n) { return {
     getDataRange: () => ({ getValues: () => sheets[n].map(r => r.slice()), getDisplayValues: () => sheets[n].map(r => r.map(String)) }),
     getLastRow: () => sheets[n].length, setFrozenRows() {}, deleteRows() {},
-    getRange: (r, c, nr, nc) => ({ setNumberFormat() {}, setValues: v => { for (let i = 0; i < v.length; i++) sheets[n][r - 1 + i] = v[i]; } }) }; }
+    getRange: (r, c, nr, nc) => ({ setNumberFormat() {}, setValues: v => { for (let i = 0; i < v.length; i++) { const row = sheets[n][r - 1 + i] || (sheets[n][r - 1 + i] = []); for (let j = 0; j < v[i].length; j++) row[c - 1 + j] = v[i][j]; } } }) }; }
   vm.createContext(ctx);
   ["kr_common.gs", "kr_followup.gs", "kr_backup.gs", "kr_kpi.gs", "kr_setup.gs"].forEach(f => vm.runInContext(fs.readFileSync(path.join(dir, f), "utf8"), ctx, { filename: f }));
   ctx.__t = { props, sheets, sent, mails, trashed, triggers };
@@ -101,37 +101,110 @@ test("名前のスペース違いは同一人物", () => {
   assert.strictEqual(p.targets.length, 0);
 });
 
-console.log("■ 再来院フォロー 実行（モック）");
-function followCtx(mode, extra) {
+console.log("■ 再来院フォロー 半自動（モック）");
+function followCtx(extra, today) {
   const hdr = ["日付", "区分", "患者名", "診察券No", "予約ルート", "支払金額", "物販(JSON)", "区分リスト"];
-  const sheets = { "予約表": [hdr, ["2026-10-01", "保険", "山田 太郎", "5", "", 0, "", "保険"], ["2026-10-01", "保険", "未登録 花子", "6", "", 0, "", "保険"], ["2026-06-01", "保険", "山田 太郎", "5", "", 0, "", "保険"], ["2026-06-01", "保険", "未登録 花子", "6", "", 0, "", "保険"]],
-    "患者": [["診察券No", "患者名", "流入元", "LINE"], ["5", "山田 太郎", "", ""], ["6", "未登録 花子", "", ""]] };
-  const c = makeCtx({ props: Object.assign({ KR_FOLLOWUP_MODE: mode, LINE_TOKEN: "tok", LINE_USER_ID: "owner" }, extra || {}), sheets });
-  c.findLineUidForPatient_ = p => (p.name === "山田 太郎" ? "Uyamada" : "");
+  const row = (d, nm, id, k) => [d, k || "保険", nm, id, "", 0, "", k || "保険"];
+  const sheets = { "予約表": [hdr,
+      row("2026-10-01", "山田 太郎", "5"), row("2026-06-01", "山田 太郎", "5"),          // 再診・14日前 → 14日ステージ
+      row("2026-10-01", "未登録 花子", "6"), row("2026-06-01", "未登録 花子", "6"),        // LINE未登録
+      row("2026-10-14", "初診 一郎", "7", "新規"),                                         // 初診の翌日
+    ],
+    "患者": [["診察券No", "患者名", "流入元", "LINE"], ["5", "山田 太郎", "", ""], ["6", "未登録 花子", "", ""], ["7", "初診 一郎", "", ""]] };
+  const c = makeCtx({ props: Object.assign({ KR_FOLLOWUP_MODE: "queue", LINE_TOKEN: "tok", LINE_USER_ID: "owner" }, extra || {}), sheets });
+  c.findLineUidForPatient_ = p => ({ "山田 太郎": "Uyamada", "初診 一郎": "Uichiro" })[p.name] || "";
   return c;
 }
-test("dryrun: LINEは患者へ送られず、予定ログとオーナー通知のみ", () => {
-  const c = followCtx("dryrun");
-  const r = c.krFollowupRun_({ manual: true, today: "2026-10-15" });
-  assert.strictEqual(r.planned, 1); assert.strictEqual(r.unreg, 1);
-  assert.ok(!c.__t.sent.some(s => s.to === "Uyamada"));
+const TODAY = "2026-10-15";
+const qrows = c => c.__t.sheets["kr_followup_queue"].slice(1);
+test("候補作成: 患者さんには一切送らず、キューに積みメールで知らせる", () => {
+  const c = followCtx();
+  const r = c.krFollowupBuildQueue_({ today: TODAY });
+  assert.strictEqual(r.queued, 2); assert.strictEqual(r.unreg, 1);
+  assert.strictEqual(c.__t.sent.filter(s => s.to !== "owner").length, 0);
+  const q = qrows(c);
+  assert.deepStrictEqual(q.map(x => x[6]).sort(), [1, 14]);
+  assert.ok(q.every(x => x[9] === false && x[10] === "" && x[8].includes("郡")));
   assert.ok(c.__t.mails.length === 1);
 });
-test("live: 患者へ1通送信→2回目は重複しない", () => {
-  const c = followCtx("live");
-  const r1 = c.krFollowupRun_({ manual: true, today: "2026-10-15" });
-  assert.strictEqual(r1.sent, 1);
-  assert.strictEqual(c.__t.sent.filter(s => s.to === "Uyamada").length, 1);
-  const r2 = c.krFollowupRun_({ manual: true, today: "2026-10-15" });
-  assert.strictEqual(r2.sent, 0);
-  assert.strictEqual(c.__t.sent.filter(s => s.to === "Uyamada").length, 1);
+test("同じ候補は2回目の作成で二重に出ない", () => {
+  const c = followCtx();
+  c.krFollowupBuildQueue_({ today: TODAY }); c.krFollowupBuildQueue_({ today: TODAY });
+  assert.strictEqual(qrows(c).length, 2);
 });
-test("offなら何もしない / 月間上限0なら送らない", () => {
-  assert.strictEqual(followCtx("off").krFollowupRun_({ manual: true, today: "2026-10-15" }).mode, "off");
-  const c = followCtx("live", { KR_FOLLOWUP_MONTHLY_CAP: "1" });
-  c.__t.sheets["kr_followup_log"] = [c.KR_FOLLOWUP_LOG_HEADERS, ["2026-10-14", "X", "9", "2026-09-30", 14, 14, "送信済み", ""]];
-  const r = c.krFollowupRun_({ manual: true, today: "2026-10-15" });
-  assert.strictEqual(r.sent, 0); assert.strictEqual(r.over, 1);
+test("チェックなしの行は絶対に送らない", () => {
+  const c = followCtx();
+  c.krFollowupBuildQueue_({ today: TODAY });
+  const r = c.krFollowupSendRun_({ today: TODAY, manual: true });
+  assert.strictEqual(r.sent, 0);
+  assert.strictEqual(c.__t.sent.filter(s => s.to !== "owner").length, 0);
+});
+test("チェックした行だけ送信され、結果に記録、二重送信しない", () => {
+  const c = followCtx();
+  c.krFollowupBuildQueue_({ today: TODAY });
+  c.__t.sheets["kr_followup_queue"].forEach(r => { if (r[2] === "山田 太郎") r[9] = true; });
+  const r1 = c.krFollowupSendRun_({ today: TODAY, manual: true });
+  assert.strictEqual(r1.sent, 1);
+  const to = c.__t.sent.filter(s => s.to !== "owner");
+  assert.strictEqual(to.length, 1); assert.strictEqual(to[0].to, "Uyamada");
+  assert.strictEqual(qrows(c).find(x => x[2] === "山田 太郎")[10], "送信済み");
+  assert.strictEqual(qrows(c).find(x => x[2] === "初診 一郎")[10], "");   // チェックなしは未送信のまま
+  const r2 = c.krFollowupSendRun_({ today: TODAY, manual: true });
+  assert.strictEqual(r2.sent, 0); assert.strictEqual(c.__t.sent.filter(s => s.to !== "owner").length, 1);
+});
+test("送信直前の再確認: チェック後に次回予約が入ると、送らず理由を記録", () => {
+  const c = followCtx();
+  c.krFollowupBuildQueue_({ today: TODAY });
+  c.__t.sheets["kr_followup_queue"].forEach(r => { if (r[2] === "山田 太郎") r[9] = true; });
+  c.__t.sheets["予約表"].push(["2026-10-20", "保険", "山田 太郎", "5", "", 0, "", "保険"]);
+  const r = c.krFollowupSendRun_({ today: TODAY, manual: true });
+  assert.strictEqual(r.sent, 0); assert.strictEqual(r.aborted, 1);
+  assert.strictEqual(qrows(c).find(x => x[2] === "山田 太郎")[10], "送信中止：次回予約あり");
+  assert.strictEqual(c.__t.sent.filter(s => s.to !== "owner").length, 0);
+});
+test("送信直前の再確認: 除外・送信拒否・交通事故も送らない", () => {
+  const c = followCtx();
+  c.krFollowupBuildQueue_({ today: TODAY });
+  c.__t.sheets["kr_followup_queue"].forEach(r => { if (r[2]) r[9] = true; });
+  c.__t.sheets["患者"][1][4] = "FALSE"; // ダミー列
+  c.__t.sheets["患者"][0].push("再来院フォロー送信"); c.__t.sheets["患者"][1][4] = "FALSE"; // 山田さんは送信拒否に
+  c.__t.sheets["予約表"].push(["2026-10-14", "交通事故", "初診 一郎", "7", "", 0, "", "交通事故"]);
+  c.krFollowupSendRun_({ today: TODAY, manual: true });
+  assert.strictEqual(qrows(c).find(x => x[2] === "山田 太郎")[10], "送信中止：送信拒否・除外対象");
+  assert.strictEqual(qrows(c).find(x => x[2] === "初診 一郎")[10], "送信中止：交通事故の患者さん");
+  assert.strictEqual(c.__t.sent.filter(s => s.to !== "owner").length, 0);
+});
+test("送る期限を過ぎた行は送らない・候補作成時に閉じる", () => {
+  const c = followCtx();
+  c.krFollowupBuildQueue_({ today: TODAY });
+  c.__t.sheets["kr_followup_queue"].forEach(r => { if (r[2] === "山田 太郎") r[9] = true; });
+  c.krFollowupSendRun_({ today: "2026-10-25", manual: true });
+  assert.ok(qrows(c).find(x => x[2] === "山田 太郎")[10].startsWith("送信中止"));
+  const c2 = followCtx(); c2.krFollowupBuildQueue_({ today: TODAY });
+  c2.krFollowupBuildQueue_({ today: "2026-10-25" });
+  assert.ok(qrows(c2).every(x => x[10] !== ""));
+});
+test("患者シートが空なら、候補作成も送信も停止", () => {
+  const c = followCtx();
+  c.krFollowupBuildQueue_({ today: TODAY });
+  c.__t.sheets["kr_followup_queue"].forEach(r => { if (r[2]) r[9] = true; });
+  c.__t.sheets["患者"] = [["診察券No", "患者名"]];
+  assert.strictEqual(c.krFollowupSendRun_({ today: TODAY, manual: true }).error, "no patients");
+  assert.strictEqual(c.__t.sent.filter(s => s.to !== "owner").length, 0);
+  const c2 = followCtx(); c2.__t.sheets["患者"] = [["診察券No", "患者名"]];
+  assert.strictEqual(c2.krFollowupBuildQueue_({ today: TODAY }).error, "no patients");
+});
+test("offなら何もしない／live・dryrunには切り替えられない／上限を超えたら持ち越し", () => {
+  const c = followCtx({ KR_FOLLOWUP_MODE: "off" });
+  assert.strictEqual(c.krFollowupBuildQueue_({ today: TODAY }).mode, "off");
+  assert.throws(() => c.krFollowupSetMode("live"));
+  const c3 = followCtx({ KR_FOLLOWUP_MODE: "live" });           // 過去の設定値でも半自動として動く
+  assert.strictEqual(c3.krFollowupMode_(), "queue");
+  const c4 = followCtx({ KR_FOLLOWUP_MAX_PER_RUN: "1" });
+  c4.krFollowupBuildQueue_({ today: TODAY });
+  c4.__t.sheets["kr_followup_queue"].forEach(r => { if (r[2]) r[9] = true; });
+  const r = c4.krFollowupSendRun_({ today: TODAY, manual: true });
+  assert.strictEqual(r.sent, 1); assert.strictEqual(r.held, 1);
 });
 test("文面に患者名が入り、{name}が残らない", () => {
   [1, 7, 14, 45].forEach(s => { const m = c0.krFollowupMessage_(s, "山田太郎"); assert.ok(m.includes("山田太郎") && m.includes("郡") && !m.includes("{name}") && !m.includes("返信不要")); });
@@ -253,8 +326,8 @@ console.log("■ セットアップ");
 test("krSetupAll は何度実行しても二重トリガーにならない", () => {
   const c = makeCtx({ props: { LINE_USER_ID: "o" }, sheets: {} });
   c.krSetupAll(); c.krSetupAll();
-  ["krFollowupDaily", "krBackupWeekly", "krBackupMonthly", "krKpiMonthly"].forEach(h => assert.strictEqual(c.__t.triggers.filter(t => t.getHandlerFunction() === h).length, 1, h));
-  assert.strictEqual(c.__t.props.KR_FOLLOWUP_MODE, "dryrun");
+  ["krFollowupDaily", "krFollowupSendApproved", "krBackupWeekly", "krBackupMonthly", "krKpiMonthly"].forEach(h => assert.strictEqual(c.__t.triggers.filter(t => t.getHandlerFunction() === h).length, 1, h));
+  assert.strictEqual(c.__t.props.KR_FOLLOWUP_MODE, "queue");
 });
 test("krStopAll は kr のトリガーだけ消し、他は残す", () => {
   const c = makeCtx({ sheets: {} });

@@ -1,21 +1,21 @@
 /**
- * 倉治整骨院 追加機能①：再来院フォロー（kr_followup.gs）
+ * 倉治整骨院 追加機能①：再来院フォロー【半自動】（kr_followup.gs）
  *
- * 最終来院日から 14日 / 30日 / 60日 経った患者さんへ、LINEで気づかいのメッセージを自動送信します。
+ * ■ 仕組み（患者さんへ勝手には送りません）
+ *   1) 毎朝10:20、「今日送る候補」をシート kr_followup_queue に並べ、院長へメールでお知らせ
+ *   2) 院長が内容を見て、送ってよい行の「送信OK」にチェック（文面はその場で編集もできます）
+ *   3) 1時間ごとに、チェックされた行だけを送信。【送信の直前に必ず再確認】し、
+ *      次回予約あり・交通事故・送信拒否/除外・期限切れ・再来院済みなどに当たれば送らず、理由を「結果」列に記録
+ *   ・チェックの入っていない行は、何があっても送りません。
  *
- * ■ 既存機能との関係（重複・競合しないように設計）
- *   ・sendDormantPatientOutreach（90日以上の休眠促進）…そのまま。こちらは90日未満だけを担当します。
- *   ・dailyLineAlert（18/21日の初診料アラート）…現在停止中。この機能は触りません。
- *   ・既存の除外設定（患者シート「休眠促進送信」がFALSE）も尊重して送りません。
- *
+ * ■ 送るタイミング … 初診の翌日／初診7〜10日後／14日後(再診)／45日後（詳細は KR_FOLLOWUP_STAGES）
  * ■ 安全設計
- *   ・初期状態は「試験運転(dryrun)」…送信せず、"誰に送る予定か" だけをメールでお知らせします。
- *   ・live にした日から実際に送信。いつでも krStopAll() で緊急停止できます。
- *   ・すでに先の予約が入っている患者さんには送りません。
- *   ・同じ来院日・同じステージには1回しか送りません（ログシートで重複防止）。
- *   ・交通事故の患者さんには自動送信しません（院長への連絡リストに載せます）。
- *   ・1回の実行・1か月あたりの送信数に上限があります（LINEの通数を使い切らないため）。
- *   ・医療広告ガイドラインに配慮し、効果・改善をうたう表現や割引の訴求は入れていません。
+ *   ・同じ患者・同じ来院日・同じタイミングは、表示も送信も1回だけ（重複チェック用キー）
+ *   ・患者シートが空のときは、送信拒否の確認ができないため送信を停止
+ *   ・1回30通・月100通までの上限、送信は9〜20時のみ
+ *   ・完全自動モードは用意していません。krStopAll() でいつでも緊急停止
+ *   ・既存の 休眠促進(90日以上)・初診料アラート とは競合しません。既存の除外設定(休眠促進送信=FALSE)も尊重
+ *   ・医療広告ガイドラインに配慮し、効果をうたう表現・割引の訴求は入れていません
  */
 
 // 送るタイミング（最終来院日からの経過日数）
@@ -63,19 +63,21 @@ function krFollowupPlan_(todayStr, bookings, excluded, sentSet, unregSet, stages
   sentSet = sentSet || {};
   unregSet = unregSet || {};
   var today = krDayNum_(todayStr);
-  var cnt = {};       // key -> 今日までの来院回数
+  var cnt = {};       // key -> 今日までの来院回数（日数）
+  var seenDay = {};
   var last = {};      // key -> {day, date, name, id, jiko}
   var future = {};    // key -> true（今日より先の有効な予約あり）
   bookings.forEach(function (b) {
     if (!b.key || b.cancelled || b.cont) return;
     if (b.day > today) { future[b.key] = true; return; }
-    cnt[b.key] = (cnt[b.key] || 0) + 1;
+    if (!seenDay[b.key + "|" + b.date]) { seenDay[b.key + "|" + b.date] = true; cnt[b.key] = (cnt[b.key] || 0) + 1; } // 来院回数は「日」で数える
     var isJiko = b.kubunList.indexOf("交通事故") > -1 || b.kubun === "交通事故";
     var cur = last[b.key];
     if (!cur || b.day > cur.day) {
       last[b.key] = { day: b.day, date: b.date, name: b.name, id: b.id || (cur ? cur.id : ""), jiko: isJiko };
-    } else if (cur && !cur.id && b.id) {
-      cur.id = b.id;
+    } else if (cur) {
+      if (!cur.id && b.id) cur.id = b.id;
+      if (b.day === cur.day && isJiko) cur.jiko = true; // 同じ日に交通事故の行があれば交通事故扱い
     }
   });
   var out = { targets: [], jiko: [], skippedFuture: 0, skippedExcluded: 0, skippedSent: 0 };
@@ -143,112 +145,264 @@ function krFollowupHistory_() {
   return { sent: sent, unreg: unreg, sentThisMonth: sentThisMonth, sheet: sh };
 }
 
-// ───────── ③本体：トリガーから毎日呼ばれる ─────────
-// mode: "off" | "dryrun"(初期値) | "live"
-function krFollowupDaily() {
-  return krWithLock_(function () { return krFollowupRun_({ manual: false }); });
+// ───────── ③ 送信候補キュー（シート kr_followup_queue） ─────────
+var KR_FQ_SHEET = "kr_followup_queue";
+var KR_FQ_HEADERS = ["候補日", "診察券No", "患者名", "前回来院日", "経過日数", "タイミング", "ステージ", "次回予約", "送信する文面（編集できます）", "送信OK", "結果", "結果日時", "メモ", "重複チェック用キー"];
+var KR_FQ = { date: 0, id: 1, name: 2, last: 3, diff: 4, label: 5, stage: 6, next: 7, msg: 8, ok: 9, result: 10, at: 11, memo: 12, key: 13 };
+
+// モード：off（何もしない）／queue（半自動・初期値）。過去の設定値 dryrun/live も安全側の queue として扱う
+function krFollowupMode_() { return krProp_("KR_FOLLOWUP_MODE", "queue") === "off" ? "off" : "queue"; }
+
+function krFutureBookingDate_(bookings, key, todayN) {
+  var best = "";
+  bookings.forEach(function (b) {
+    if (b.key === key && !b.cancelled && !b.cont && b.day > todayN && (!best || b.date < best)) best = b.date;
+  });
+  return best;
 }
 
-// opts: { manual:true/false, forceMode:"dryrun", today:"yyyy-MM-dd", noLog:true }
-function krFollowupRun_(opts) {
-  opts = opts || {};
-  var mode = opts.forceMode || krProp_("KR_FOLLOWUP_MODE", "dryrun");
-  if (mode === "off") { Logger.log("再来院フォロー: OFFのため何もしません"); return { mode: mode }; }
-  if (mode === "live" && !opts.manual) {
-    var hour = krJstHour_();
-    if (hour < 9 || hour >= 20) { krLog_("krFollowupRun_", "INFO", "送信時間外(" + hour + "時)のためスキップ"); return { mode: mode, skipped: "time" }; }
+function krFqNow_() { return Utilities.formatDate(new Date(), KR_TZ, "yyyy-MM-dd HH:mm"); }
+
+function krFqFormatText_(sh, start, n) {
+  [1, 2, 4, 12, 14].forEach(function (c) { sh.getRange(start, c, n, 1).setNumberFormat("@"); });
+}
+
+// 送信OKが入ったまま送る期限を過ぎた行を閉じる（遅れて送らないため）
+function krFollowupExpire_(sh, data, today) {
+  var todayN = krDayNum_(today), n = 0;
+  for (var i = 1; i < data.length; i++) {
+    var r = data[i];
+    if (String(r[KR_FQ.result] || "").trim() !== "") continue;
+    var st = parseInt(r[KR_FQ.stage], 10);
+    var lastN = krDayNum_(krCellDateStr_(r[KR_FQ.last]));
+    if (isNaN(st) || isNaN(lastN)) continue;
+    var w = KR_FOLLOWUP_WINDOWS[st] === undefined ? 2 : KR_FOLLOWUP_WINDOWS[st];
+    if (todayN - lastN > st + w) {
+      sh.getRange(i + 1, KR_FQ.result + 1, 1, 2).setValues([["期限切れ（送らず終了）", krFqNow_()]]);
+      data[i][KR_FQ.result] = "期限切れ（送らず終了）";
+      n++;
+    }
   }
+  return n;
+}
+
+// 毎朝（トリガー）：候補をキューに積む。患者さんには何も送らない
+function krFollowupDaily() {
+  return krWithLock_(function () { return krFollowupBuildQueue_({}); });
+}
+
+function krFollowupBuildQueue_(opts) {
+  opts = opts || {};
+  if (krFollowupMode_() === "off") { krLog_("krFollowupBuildQueue_", "INFO", "OFFのため何もしません"); return { mode: "off" }; }
   var today = opts.today || krTodayStr_();
+  var todayN = krDayNum_(today);
   var bookings = krLoadBookings_();
-  if (!bookings.length) { krLog_("krFollowupRun_", "WARN", "予約表が読めませんでした"); return { mode: mode, error: "no bookings" }; }
+  if (!bookings.length) { krLog_("krFollowupBuildQueue_", "WARN", "予約表が読めませんでした"); return { error: "no bookings" }; }
+  var patients = krLoadPatients_();
+  if (!patients.rows.length) {
+    krLog_("krFollowupBuildQueue_", "ALERT", "患者シートが空のため候補作成を停止");
+    krNotifyOwner_("【倉治整骨院】⚠ 患者シートが空です（再来院フォローを停止しました）",
+      "患者シートにデータがありません。送信拒否などの確認ができないため、今日のフォロー候補の作成を止めました。\nファイル→版の履歴から患者シートを確認してください。",
+      null, { line: "⚠ 患者シートが空です。再来院フォローを停止しました。メールをご確認ください。" });
+    return { error: "no patients" };
+  }
 
   var hist = krFollowupHistory_();
-  var plan = krFollowupPlan_(today, bookings, krFollowupExcluded_(), hist.sent, hist.unreg);
-
-  var monthlyCap = parseInt(krProp_("KR_FOLLOWUP_MONTHLY_CAP", "100"), 10) || 100;
-  var perRunCap = parseInt(krProp_("KR_FOLLOWUP_MAX_PER_RUN", "30"), 10) || 30;
-  var remain = Math.max(0, monthlyCap - hist.sentThisMonth);
-  var allow = Math.min(perRunCap, remain);
-
-  var rows = [], sentList = [], planList = [], unregList = [], failList = [], overList = [];
-  var live = (mode === "live");
-  var token = PropertiesService.getScriptProperties().getProperty("LINE_TOKEN");
-  if (live && !token) {
-    krNotifyOwner_("【倉治整骨院】再来院フォロー：LINE_TOKENが未設定のため送信できません", "スクリプトプロパティ LINE_TOKEN を確認してください。", null, {});
-    return { mode: mode, error: "no token" };
+  var sh = krEnsureSheet_(KR_FQ_SHEET, KR_FQ_HEADERS);
+  var data = sh.getDataRange().getValues();
+  var expired = krFollowupExpire_(sh, data, today);
+  var shownSet = {};
+  Object.keys(hist.sent).forEach(function (k) { shownSet[k] = true; });
+  for (var i = 1; i < data.length; i++) {
+    var k = String(data[i][KR_FQ.key] || "");
+    if (k) shownSet[k] = true;                     // 一度でも候補に出た組み合わせは二度と出さない
   }
 
-  var sendCount = 0;
+  var plan = krFollowupPlan_(today, bookings, krFollowupExcluded_(), shownSet, hist.unreg);
+  var newRows = [], unregList = [], logRows = [], shown = [];
   plan.targets.forEach(function (t) {
     var uid = krFindLineUid_(t.name, t.id);
     if (!uid) {
       if (!t.alreadyReportedUnreg) {
-        rows.push([today, t.name, t.id, t.lastVisit, t.diff, t.stage, "LINE未登録", "電話・来院時のお声がけ対象"]);
+        logRows.push([today, t.name, t.id, t.lastVisit, t.diff, t.stage, "LINE未登録", "電話・来院時のお声がけ対象"]);
         unregList.push(t);
       }
       return;
     }
-    if (sendCount >= allow) { overList.push(t); return; }
-    if (!live) {
-      rows.push([today, t.name, t.id, t.lastVisit, t.diff, t.stage, "試験(送信予定)", "送信はしていません"]);
-      planList.push(t);
-      sendCount++;
-      return;
-    }
-    var r = krSendLine_(uid, krFollowupMessage_(t.stage, t.name));
-    if (r && r.ok) {
-      rows.push([today, t.name, t.id, t.lastVisit, t.diff, t.stage, "送信済み", ""]);
-      sentList.push(t);
-    } else {
-      rows.push([today, t.name, t.id, t.lastVisit, t.diff, t.stage, "送信失敗", String((r && r.error) || "").slice(0, 120)]);
-      failList.push(t);
-    }
-    sendCount++;
+    var fut = krFutureBookingDate_(bookings, t.key, todayN);
+    newRows.push([today, t.id, t.name, t.lastVisit, t.diff, krStageLabel_(t.stage), t.stage,
+      fut ? "あり（" + fut + "）" : "なし", krFollowupMessage_(t.stage, t.name), false, "", "", "", t.dedupKey]);
+    shown.push(t);
   });
 
-  if (!opts.noLog) krAppendRows_(hist.sheet, rows);
-
-  // 院長へのご報告（対象が何もなければ通知しない）
-  var anything = sentList.length || planList.length || unregList.length || failList.length || overList.length || plan.jiko.length;
-  if (anything && !opts.noNotify) krFollowupNotify_(mode, today, sentList, planList, unregList, failList, overList, plan, remain, monthlyCap);
-  return { mode: mode, sent: sentList.length, planned: planList.length, unreg: unregList.length, failed: failList.length, over: overList.length, jiko: plan.jiko.length, plan: plan };
+  if (!opts.noWrite) {
+    if (newRows.length) {
+      var start = sh.getLastRow() + 1, n = newRows.length;
+      krFqFormatText_(sh, start, n);
+      sh.getRange(start, 1, n, KR_FQ_HEADERS.length).setValues(newRows);
+      try { sh.getRange(start, KR_FQ.ok + 1, n, 1).insertCheckboxes(); } catch (e) { krLog_("krFollowupBuildQueue_", "WARN", "チェックボックス設定に失敗: " + e.message); }
+    }
+    krAppendRows_(hist.sheet, logRows);
+  }
+  var anything = shown.length || unregList.length || plan.jiko.length;
+  if (anything && !opts.noNotify) krFollowupNotifyQueue_(today, shown, unregList, plan, expired);
+  return { mode: "queue", queued: shown.length, unreg: unregList.length, jiko: plan.jiko.length, expired: expired, plan: plan, rows: newRows };
 }
 
-function krFollowupNotify_(mode, today, sentList, planList, unregList, failList, overList, plan, remain, monthlyCap) {
-  var live = (mode === "live");
+function krFollowupNotifyQueue_(today, shown, unregList, plan, expired) {
   var label = function (t) { return "・" + t.name + (t.id ? "（" + t.id + "号）" : "") + " 前回" + t.lastVisit.slice(5).replace("-", "/") + "（" + t.diff + "日前／" + krStageLabel_(t.stage) + "）"; };
-  var L = [];
-  L.push(live ? "【再来院フォロー 送信報告】" + today : "【再来院フォロー 試験運転】" + today + "（まだ送信していません）");
-  var main = live ? sentList : planList;
-  L.push("");
-  L.push((live ? "■ 送信した方：" : "■ 送信予定の方：") + main.length + "名");
-  main.forEach(function (t) { L.push(label(t)); });
-  if (failList.length) { L.push(""); L.push("■ 送信に失敗した方（明日、再試行します）：" + failList.length + "名"); failList.forEach(function (t) { L.push(label(t)); }); }
-  if (unregList.length) { L.push(""); L.push("■ LINE未登録の方（電話や次回来院時のお声がけ候補）：" + unregList.length + "名"); unregList.forEach(function (t) { L.push(label(t)); }); }
-  if (plan.jiko.length) { L.push(""); L.push("■ 交通事故の患者さん（自動送信していません。必要なら個別にご連絡ください）：" + plan.jiko.length + "名"); plan.jiko.forEach(function (t) { L.push(label(t)); }); }
-  if (overList.length) { L.push(""); L.push("■ 送信数の上限により見送り（今月の残り" + remain + "通／上限" + monthlyCap + "通）：" + overList.length + "名"); overList.forEach(function (t) { L.push(label(t)); }); }
-  if (!live) { L.push(""); L.push("※ 内容に問題なければ、Apps Scriptで krFollowupSetMode('live') を実行すると明日から実際に送信します。"); }
-  var text = L.join("\n");
-  var short = (live ? "[再来院フォロー] 送信" + sentList.length + "名" : "[再来院フォロー試験] 送信予定" + planList.length + "名") + (unregList.length ? " / LINE未登録" + unregList.length + "名" : "") + (plan.jiko.length ? " / 事故" + plan.jiko.length + "名" : "");
-  krNotifyOwner_((live ? "【倉治整骨院】再来院フォロー送信報告 " : "【倉治整骨院】再来院フォロー試験運転 ") + today, text, null, { line: short });
+  var L = ["【再来院フォロー 送信候補】" + today, "まだ誰にも送っていません。送ってよい人を、シート「" + KR_FQ_SHEET + "」の「送信OK」にチェックしてください。", ""];
+  L.push("■ 送信候補：" + shown.length + "名");
+  shown.forEach(function (t) { L.push(label(t)); });
+  if (unregList.length) { L.push(""); L.push("■ LINE未登録の方（送れません。お声がけ候補）：" + unregList.length + "名"); unregList.forEach(function (t) { L.push(label(t)); }); }
+  if (plan.jiko.length) { L.push(""); L.push("■ 交通事故の患者さん（自動では扱いません。必要なら個別にご連絡ください）：" + plan.jiko.length + "名"); plan.jiko.forEach(function (t) { L.push(label(t)); }); }
+  if (expired) { L.push(""); L.push("■ 送る期限を過ぎて閉じた行：" + expired + "件"); }
+  L.push(""); L.push("※ チェック後、1時間以内に送信されます。送信の直前に、次回予約・除外などをもう一度確認します。");
+  krNotifyOwner_("【倉治整骨院】再来院フォロー 送信候補 " + today, L.join("\n"), null,
+    { line: "[再来院フォロー] 送信候補" + shown.length + "名。シートで「送信OK」にチェックしてください。" });
 }
 
-// ───────── ④手動で使う関数（Apps Scriptの実行ボタンから） ─────────
+// ───────── ④ 送信直前の再確認（純粋関数：テスト対象） ─────────
+// item: { key(スペースなしの患者名), id, lastVisit, stage }
+// 戻り値: { ok:true } または { ok:false, reason:"送信中止：…" }
+function krFollowupRecheck_(todayStr, bookings, excluded, sentSet, item) {
+  excluded = excluded || { ids: {}, keys: {} };
+  sentSet = sentSet || {};
+  var dedupKey = item.key + "|" + item.lastVisit + "|" + item.stage;
+  if (sentSet[dedupKey]) return { ok: false, reason: "送信中止：すでに送信済み（二重送信防止）" };
+  var plan = krFollowupPlan_(todayStr, bookings, excluded, sentSet, {});
+  if (plan.targets.some(function (t) { return t.dedupKey === dedupKey; })) return { ok: true };
+  if (plan.jiko.some(function (t) { return t.dedupKey === dedupKey; })) return { ok: false, reason: "送信中止：交通事故の患者さん" };
+  if ((item.id && excluded.ids[item.id]) || excluded.keys[item.key]) return { ok: false, reason: "送信中止：送信拒否・除外対象" };
+  var today = krDayNum_(todayStr), rule = krStageRule_(item.stage);
+  var future = false, lastDay = -Infinity, lastDate = "", days = {}, jiko = false;
+  bookings.forEach(function (b) {
+    if (b.key !== item.key || b.cancelled || b.cont) return;
+    if (b.day > today) { future = true; return; }
+    days[b.date] = true;
+    if (b.day > lastDay) { lastDay = b.day; lastDate = b.date; }
+  });
+  var cnt = Object.keys(days).length;
+  bookings.forEach(function (b) {
+    if (b.key === item.key && !b.cancelled && !b.cont && b.date === lastDate && (b.kubunList.indexOf("交通事故") > -1 || b.kubun === "交通事故")) jiko = true;
+  });
+  if (future && !rule.ignoreFuture) return { ok: false, reason: "送信中止：次回予約あり" };
+  if (jiko) return { ok: false, reason: "送信中止：交通事故の患者さん" };
+  if (lastDate !== item.lastVisit) return { ok: false, reason: "送信中止：前回来院日が変わりました（再来院済み）" };
+  if (rule.first && cnt !== 1) return { ok: false, reason: "送信中止：初診の方ではなくなりました" };
+  if (rule.repeat && cnt < 2) return { ok: false, reason: "送信中止：再診の方ではありません" };
+  var w = KR_FOLLOWUP_WINDOWS[item.stage] === undefined ? 2 : KR_FOLLOWUP_WINDOWS[item.stage];
+  if (today - lastDay > item.stage + w) return { ok: false, reason: "送信中止：送る期限を過ぎました" };
+  return { ok: false, reason: "送信中止：対象条件に合わなくなりました" };
+}
 
-// 今日（または指定日）に誰が対象になるかを確認する。送信もログ保存もしません。
-//   krFollowupPreview()            … 今日
-//   krFollowupPreview("2026-10-20") … 指定日として確認
+// ───────── ⑤ チェック済みの行だけを送信（1時間ごとのトリガー） ─────────
+function krFollowupSendApproved() {
+  return krWithLock_(function () { return krFollowupSendRun_({}); });
+}
+
+function krFollowupSendRun_(opts) {
+  opts = opts || {};
+  if (krFollowupMode_() === "off") return { mode: "off" };
+  var today = opts.today || krTodayStr_();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(KR_FQ_SHEET);
+  if (!sh) return { sent: 0 };
+  var data = sh.getDataRange().getValues();
+  var pending = [];
+  for (var i = 1; i < data.length; i++) {
+    var r = data[i];
+    var ok = r[KR_FQ.ok] === true || String(r[KR_FQ.ok]).toUpperCase() === "TRUE";
+    if (ok && String(r[KR_FQ.result] || "").trim() === "") pending.push(i);
+  }
+  if (!pending.length) return { sent: 0 };
+  if (!opts.manual) {
+    var hour = krJstHour_();
+    if (hour < 9 || hour >= 20) return { skipped: "time" };
+  }
+  if (!PropertiesService.getScriptProperties().getProperty("LINE_TOKEN")) {
+    krNotifyOwner_("【倉治整骨院】再来院フォロー：LINE_TOKENが未設定のため送信できません", "スクリプトプロパティ LINE_TOKEN を確認してください。", null, {});
+    return { error: "no token" };
+  }
+  var patients = krLoadPatients_();
+  if (!patients.rows.length) {
+    krLog_("krFollowupSendRun_", "ALERT", "患者シートが空のため送信を停止");
+    krNotifyOwner_("【倉治整骨院】⚠ 患者シートが空のため、フォロー送信を停止しました",
+      "送信拒否の確認ができないため、チェック済みの行も送っていません。患者シートを確認してください。", null,
+      { line: "⚠ 患者シートが空のため、再来院フォローの送信を停止しました。" });
+    return { error: "no patients" };
+  }
+  var bookings = krLoadBookings_();
+  if (!bookings.length) { krLog_("krFollowupSendRun_", "WARN", "予約表が読めないため送信を停止"); return { error: "no bookings" }; }
+  var excluded = krFollowupExcluded_();
+  var hist = krFollowupHistory_();
+  var sentSet = {};
+  Object.keys(hist.sent).forEach(function (k) { sentSet[k] = true; });
+  var monthlyCap = parseInt(krProp_("KR_FOLLOWUP_MONTHLY_CAP", "100"), 10) || 100;
+  var perRun = parseInt(krProp_("KR_FOLLOWUP_MAX_PER_RUN", "30"), 10) || 30;
+  var allow = Math.min(perRun, Math.max(0, monthlyCap - hist.sentThisMonth));
+
+  var sent = [], aborted = [], failed = [], held = [], logRows = [], sendCount = 0;
+  pending.forEach(function (i) {
+    var r = data[i];
+    var name = String(r[KR_FQ.name] || "").trim();
+    var id = String(r[KR_FQ.id] || "").trim();
+    var stage = parseInt(r[KR_FQ.stage], 10);
+    var lastVisit = krCellDateStr_(r[KR_FQ.last]);
+    var msg = String(r[KR_FQ.msg] || "").trim();
+    var setResult = function (text) { sh.getRange(i + 1, KR_FQ.result + 1, 1, 2).setValues([[text, krFqNow_()]]); };
+    var item = { key: name.replace(/[\s　]+/g, ""), id: id, lastVisit: lastVisit, stage: stage };
+    var chk = krFollowupRecheck_(today, bookings, excluded, sentSet, item);
+    if (!chk.ok) { setResult(chk.reason); aborted.push({ name: name, reason: chk.reason }); return; }
+    if (!msg) { setResult("送信中止：文面が空です"); aborted.push({ name: name, reason: "文面が空です" }); return; }
+    if (sendCount >= allow) { held.push(name); return; }   // 上限：結果を入れず、次回に持ち越し
+    var uid = krFindLineUid_(name, id);
+    if (!uid) { setResult("送信中止：LINE未登録"); aborted.push({ name: name, reason: "LINE未登録" }); return; }
+    var res = krSendLine_(uid, msg);
+    sendCount++;
+    if (res && res.ok) {
+      setResult("送信済み");
+      sentSet[item.key + "|" + lastVisit + "|" + stage] = true;
+      logRows.push([today, name, id, lastVisit, r[KR_FQ.diff], stage, "送信済み", "半自動"]);
+      sent.push(name);
+    } else {
+      setResult("送信失敗：" + String((res && res.error) || "").slice(0, 80) + "（再試行は結果欄を空にしてください）");
+      failed.push(name);
+    }
+  });
+  krAppendRows_(hist.sheet, logRows);
+
+  if (sent.length || aborted.length || failed.length || held.length) {
+    var L = ["【再来院フォロー 送信報告】" + today, ""];
+    L.push("■ 送信しました：" + sent.length + "名"); sent.forEach(function (n) { L.push("・" + n); });
+    if (aborted.length) { L.push(""); L.push("■ 送信直前の確認で見送り：" + aborted.length + "名"); aborted.forEach(function (a) { L.push("・" + a.name + " … " + a.reason); }); }
+    if (failed.length) { L.push(""); L.push("■ 送信に失敗：" + failed.length + "名"); failed.forEach(function (n) { L.push("・" + n); }); }
+    if (held.length) { L.push(""); L.push("■ 送信数の上限のため次回に持ち越し：" + held.length + "名"); held.forEach(function (n) { L.push("・" + n); }); }
+    krNotifyOwner_("【倉治整骨院】再来院フォロー 送信報告 " + today, L.join("\n"), null,
+      { line: "[再来院フォロー] 送信" + sent.length + "名" + (aborted.length ? " / 見送り" + aborted.length + "名" : "") + (failed.length ? " / 失敗" + failed.length + "名" : "") });
+  }
+  krLog_("krFollowupSendRun_", "INFO", "送信" + sent.length + " 見送り" + aborted.length + " 失敗" + failed.length + " 持越" + held.length);
+  return { sent: sent.length, aborted: aborted.length, failed: failed.length, held: held.length };
+}
+
+// ───────── ⑥ 手動で使う関数（Apps Scriptの実行ボタンから） ─────────
+
+// 今日（または指定日）の候補を確認する。シートにも書かず、通知もしません。
 function krFollowupPreview(dateStr) {
-  var r = krFollowupRun_({ manual: true, forceMode: "dryrun", today: dateStr || krTodayStr_(), noLog: true, noNotify: true });
+  var r = krFollowupBuildQueue_({ today: dateStr || krTodayStr_(), noWrite: true, noNotify: true });
   var plan = r.plan || { targets: [], jiko: [] };
-  var lines = ["対象日: " + (dateStr || krTodayStr_()), "送信予定: " + plan.targets.length + "名 / 交通事故(自動送信なし): " + plan.jiko.length + "名"];
+  var lines = ["対象日: " + (dateStr || krTodayStr_()), "候補: " + plan.targets.length + "名 / 交通事故(対象外): " + plan.jiko.length + "名"];
   plan.targets.forEach(function (t) { lines.push("  " + t.name + "（" + t.id + "号）" + t.diff + "日 → " + krStageLabel_(t.stage)); });
   Logger.log(lines.join("\n"));
   return lines.join("\n");
 }
 
+// 今すぐ候補を作る（朝のトリガーを待たずに試すとき）。患者さんには送りません。
+function krFollowupBuildNow() { return krWithLock_(function () { return JSON.stringify(krFollowupBuildQueue_({}).queued); }); }
+
 function krFollowupSetMode(mode) {
-  if (["off", "dryrun", "live"].indexOf(mode) < 0) throw new Error("mode は 'off' / 'dryrun' / 'live' のどれかです");
+  if (mode === "live" || mode === "dryrun") throw new Error("完全自動は用意していません。半自動は 'queue'、停止は 'off' を指定してください。");
+  if (["off", "queue"].indexOf(mode) < 0) throw new Error("mode は 'queue'(半自動) / 'off'(停止) のどちらかです");
   krSetProp_("KR_FOLLOWUP_MODE", mode);
   krLog_("krFollowupSetMode", "INFO", "モードを " + mode + " に変更");
   return "再来院フォロー: " + mode;
@@ -256,13 +410,15 @@ function krFollowupSetMode(mode) {
 
 function krFollowupInstallTrigger() {
   krDeleteTriggers_("krFollowupDaily");
+  krDeleteTriggers_("krFollowupSendApproved");
   ScriptApp.newTrigger("krFollowupDaily").timeBased().everyDays(1).atHour(10).nearMinute(20).create();
-  if (!PropertiesService.getScriptProperties().getProperty("KR_FOLLOWUP_MODE")) krSetProp_("KR_FOLLOWUP_MODE", "dryrun");
-  return "再来院フォローのトリガーを設定しました（毎日10:20頃・現在のモード: " + krProp_("KR_FOLLOWUP_MODE", "dryrun") + "）";
+  ScriptApp.newTrigger("krFollowupSendApproved").timeBased().everyHours(1).create();
+  krSetProp_("KR_FOLLOWUP_MODE", krFollowupMode_());
+  return "再来院フォロー(半自動)のトリガーを設定しました（毎朝10:20に候補作成／1時間ごとにチェック済みを送信・現在のモード: " + krFollowupMode_() + "）";
 }
-function krFollowupRemoveTrigger() { return krDeleteTriggers_("krFollowupDaily") + "件のトリガーを削除しました"; }
+function krFollowupRemoveTrigger() { return (krDeleteTriggers_("krFollowupDaily") + krDeleteTriggers_("krFollowupSendApproved")) + "件のトリガーを削除しました"; }
 
-// 文面の確認用：院長本人のLINEにだけ、3種類の文面を送る（患者さんには送りません）
+// 文面の確認用：院長本人のLINEにだけ、全パターンの文面を送る（患者さんには送りません）
 function krFollowupTestToOwner() {
   var owner = PropertiesService.getScriptProperties().getProperty("LINE_USER_ID");
   if (!owner) return "LINE_USER_IDが未設定です";
