@@ -8101,7 +8101,7 @@ document.getElementById('histModal').addEventListener('click',function(e){if(e.t
 </script>
 <script>
 // 再来院フォロー候補の「見るだけ」ページを開く（追加機能側。編集・送信はできません）
-var KR_FOLLOWUP_VIEW_URL = ""; // 承認ページのウェブアプリURL + ?v=1 を設定
+var KR_FOLLOWUP_VIEW_URL = "https://script.google.com/macros/s/AKfycbzX8dBOiy9L3V1jV6l9SgddnQAkFTUlkJ-Va2wM5cPO6SLFoUuhQUyja2S9PH6cOwEJtQ/exec?v=1"; // スタッフ用（見るだけ・パスワード必須）
 function openFollowupView(){
   if(!KR_FOLLOWUP_VIEW_URL){ alert('フォロー候補ページのURLが未設定です。院長に確認してください。'); return; }
   window.open(KR_FOLLOWUP_VIEW_URL, '_blank');
