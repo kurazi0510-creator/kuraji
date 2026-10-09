@@ -18,7 +18,9 @@
  *   ・医療広告ガイドラインに配慮し、効果・改善をうたう表現や割引の訴求は入れていません。
  */
 
-var KR_FOLLOWUP_STAGES = [14, 30, 60];
+var KR_FOLLOWUP_STAGES = [3, 14, 45];       // 3=初診の方だけ(来院1回のみ)／14・45=全員
+var KR_FOLLOWUP_FIRST_STAGE = 3;
+function krStageLabel_(st) { return st === KR_FOLLOWUP_FIRST_STAGE ? "初診" + st + "日後" : st + "日フォロー"; }
 var KR_FOLLOWUP_WINDOW = 2;                 // N日〜N+2日の間に1回だけ送る（トリガー失敗時の取りこぼし吸収）
 var KR_FOLLOWUP_LOG = "kr_followup_log";
 var KR_FOLLOWUP_EXCLUDE = "kr_followup_exclude";
@@ -30,12 +32,12 @@ function krFollowupMessage_(stage, name) {
   var base;
   if (custom) {
     base = custom.replace(/\\n/g, "\n");
+  } else if (stage === 3) {
+    base = "{name}様、倉治整骨院の郡です。\n\n先日はご来院いただき、ありがとうございました。\nその後、お身体の具合はいかがですか？施術のあとで気になることや、不安なことはありませんか？\n\nどんな小さなことでも、このLINEに一言ご返信ください。私が確認してお返事します。\nご予約もこのLINEからいつでもどうぞ。";
   } else if (stage === 14) {
-    base = "いつも倉治整骨院をご利用いただき、ありがとうございます😊\n\n{name}様\n\n前回のご来院から2週間ほどが経ちました。\nその後、お身体の調子はいかがでしょうか？\n\nご不明な点やご相談があれば、いつでもお気軽にご連絡ください。\nご予約はこのLINEからどうぞ。\n(自動送信のため返信不要です)";
-  } else if (stage === 30) {
-    base = "いつも倉治整骨院をご利用いただき、ありがとうございます😊\n\n{name}様\n\n前回のご来院から1か月ほどが経ちました。\nお身体の調子はいかがでしょうか？\n\nご都合のよいときに、またお顔を見せていただけたら嬉しいです。\nご予約はこのLINEからどうぞ。\n(自動送信のため返信不要です)";
+    base = "{name}様、倉治整骨院の郡です。\n\n前回の施術から2週間ほどたちましたが、その後お身体の具合はいかがですか？\n\n痛みが戻っていたり、気になることがあれば、このLINEに一言ご返信ください。私が確認してお返事します。\n無理にご来院いただく必要はありません。どうぞお大事にお過ごしください。";
   } else {
-    base = "いつも倉治整骨院をご利用いただき、ありがとうございます😊\n\n{name}様\n\nご無沙汰しております。その後お変わりありませんか？\n\n気になることがありましたら、無理のない範囲でいつでもご相談ください。\nご予約はこのLINEからどうぞ。\n(自動送信のため返信不要です)";
+    base = "{name}様、倉治整骨院の郡です。\n\nご無沙汰しております。前回のご来院から1か月半ほどたちましたが、その後のお身体の具合はいかがでしょうか。\n\n気になる症状が出ていたり、前回の状態が続いているようでしたら、遠慮なくこのLINEにご連絡ください。\nご自身のペースで大丈夫です。";
   }
   return base.split("{name}").join(name);
 }
@@ -50,11 +52,13 @@ function krFollowupPlan_(todayStr, bookings, excluded, sentSet, unregSet, stages
   sentSet = sentSet || {};
   unregSet = unregSet || {};
   var today = krDayNum_(todayStr);
+  var cnt = {};       // key -> 今日までの来院回数
   var last = {};      // key -> {day, date, name, id, jiko}
   var future = {};    // key -> true（今日より先の有効な予約あり）
   bookings.forEach(function (b) {
     if (!b.key || b.cancelled || b.cont) return;
     if (b.day > today) { future[b.key] = true; return; }
+    cnt[b.key] = (cnt[b.key] || 0) + 1;
     var isJiko = b.kubunList.indexOf("交通事故") > -1 || b.kubun === "交通事故";
     var cur = last[b.key];
     if (!cur || b.day > cur.day) {
@@ -69,6 +73,7 @@ function krFollowupPlan_(todayStr, bookings, excluded, sentSet, unregSet, stages
     var diff = today - v.day;
     var stage = null;
     for (var i = 0; i < stages.length; i++) {
+      if (stages[i] === KR_FOLLOWUP_FIRST_STAGE && cnt[key] !== 1) continue; // 初診ステージは来院1回の方だけ
       if (diff >= stages[i] && diff <= stages[i] + windowDays) { stage = stages[i]; break; }
     }
     if (stage === null) return;
@@ -197,7 +202,7 @@ function krFollowupRun_(opts) {
 
 function krFollowupNotify_(mode, today, sentList, planList, unregList, failList, overList, plan, remain, monthlyCap) {
   var live = (mode === "live");
-  var label = function (t) { return "・" + t.name + (t.id ? "（" + t.id + "号）" : "") + " 前回" + t.lastVisit.slice(5).replace("-", "/") + "（" + t.diff + "日前／" + t.stage + "日フォロー）"; };
+  var label = function (t) { return "・" + t.name + (t.id ? "（" + t.id + "号）" : "") + " 前回" + t.lastVisit.slice(5).replace("-", "/") + "（" + t.diff + "日前／" + krStageLabel_(t.stage) + "）"; };
   var L = [];
   L.push(live ? "【再来院フォロー 送信報告】" + today : "【再来院フォロー 試験運転】" + today + "（まだ送信していません）");
   var main = live ? sentList : planList;
@@ -223,7 +228,7 @@ function krFollowupPreview(dateStr) {
   var r = krFollowupRun_({ manual: true, forceMode: "dryrun", today: dateStr || krTodayStr_(), noLog: true, noNotify: true });
   var plan = r.plan || { targets: [], jiko: [] };
   var lines = ["対象日: " + (dateStr || krTodayStr_()), "送信予定: " + plan.targets.length + "名 / 交通事故(自動送信なし): " + plan.jiko.length + "名"];
-  plan.targets.forEach(function (t) { lines.push("  " + t.name + "（" + t.id + "号）" + t.diff + "日 → " + t.stage + "日フォロー"); });
+  plan.targets.forEach(function (t) { lines.push("  " + t.name + "（" + t.id + "号）" + t.diff + "日 → " + krStageLabel_(t.stage)); });
   Logger.log(lines.join("\n"));
   return lines.join("\n");
 }
@@ -249,7 +254,7 @@ function krFollowupTestToOwner() {
   if (!owner) return "LINE_USER_IDが未設定です";
   var ok = 0;
   KR_FOLLOWUP_STAGES.forEach(function (s) {
-    var r = krSendLine_(owner, "【文面確認・" + s + "日フォロー】\n\n" + krFollowupMessage_(s, "テスト太郎"));
+    var r = krSendLine_(owner, "【文面確認・" + krStageLabel_(s) + "】\n\n" + krFollowupMessage_(s, "テスト太郎"));
     if (r && r.ok) ok++;
   });
   return ok + "/" + KR_FOLLOWUP_STAGES.length + "通を院長のLINEへ送信しました";
