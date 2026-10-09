@@ -159,6 +159,29 @@ function krFindLineUid_(name, id) {
   } catch (e) {
     krLog_("krFindLineUid_", "WARN", name + ": " + e.message);
   }
+  return krFindLineUidSimple_(name, id);
+}
+// 既存の検索関数が同じプロジェクトに無い場合の代替：LINE_IDsシートを
+// 「診察券No(cardId列)が1件だけ一致」→「名前が完全一致で1件だけ」の順で探す（複数該当は送らない）
+function krFindLineUidSimple_(name, id) {
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LINE_IDs");
+    if (!sh) return "";
+    var d = sh.getDataRange().getValues();
+    if (d.length < 2) return "";
+    var h = d[0].map(function (x) { return String(x || "").trim(); });
+    var ci = h.indexOf("cardId"); if (ci < 0) ci = 6;
+    var norm = function (v) { return String(v || "").replace(/[\s\u3000]+/g, ""); };
+    var byCard = [], byName = [];
+    for (var r = 1; r < d.length; r++) {
+      var uid = String(d[r][0] || "").trim();
+      if (!uid) continue;
+      if (id && String(d[r][ci] || "").trim() === String(id)) byCard.push(uid);
+      if (norm(name) && norm(d[r][1]) === norm(name)) byName.push(uid);
+    }
+    if (byCard.length === 1) return byCard[0];
+    if (byCard.length === 0 && byName.length === 1) return byName[0];
+  } catch (e) { krLog_("krFindLineUidSimple_", "WARN", e.message); }
   return "";
 }
 function krSendLine_(uid, msg) {
