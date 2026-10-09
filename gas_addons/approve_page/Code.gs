@@ -40,6 +40,10 @@ function apSheet_() {
 }
 
 function doGet(e) {
+  // スタッフ用の「見るだけ」ページ（?v=1）。パスワードはページ内で入力。送信や編集はできません
+  if (e && e.parameter && e.parameter.v) {
+    return HtmlService.createTemplateFromFile("view").evaluate().setTitle("再来院フォロー 候補一覧").addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
   var t = (e && e.parameter && e.parameter.t) || "";
   try { apCheck_(t); } catch (err) {
     return HtmlService.createHtmlOutput("<p style='font:16px sans-serif;padding:24px'>アクセスできません。LINEに届いたURLから開いてください。</p>");
@@ -89,4 +93,38 @@ function apSave(t, items) {
     SpreadsheetApp.flush();
     return res;
   } finally { lock.releaseLock(); }
+}
+
+// ───────── スタッフ用：見るだけ（編集・送信はできません） ─────────
+// スクリプトプロパティ AP_VIEW_PIN … スタッフ用の閲覧パスワード（8文字以上推奨）
+function apViewCheck_(pin) {
+  var cache = CacheService.getScriptCache();
+  var fails = Number(cache.get("ap_fail") || 0);
+  if (fails >= 5) throw new Error("パスワードを間違えすぎました。10分後にもう一度お試しください");
+  var want = apProp_("AP_VIEW_PIN");
+  if (!want || String(pin || "") !== want) {
+    cache.put("ap_fail", String(fails + 1), 600);
+    throw new Error("パスワードが違います");
+  }
+  cache.remove("ap_fail");
+}
+
+// 直近7日分の候補と、その状態を返す（文面・患者名・状態のみ。書き込みはしない）
+function apView(pin) {
+  apViewCheck_(pin);
+  var sh = apSheet_(), last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, AP_HEADERS.length).getValues();
+  var today = Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy-MM-dd");
+  var from = Utilities.formatDate(new Date(Date.now() - 7 * 86400000), "Asia/Tokyo", "yyyy-MM-dd");
+  var out = [];
+  vals.forEach(function (r) {
+    var d = apFmt_(r[0]);
+    if (!String(r[2] || "").trim() || d < from) return;
+    var res = String(r[10] || "");
+    var status = res ? res : (r[9] === true ? "送信OK済み（送信待ち）" : "院長の確認待ち");
+    out.push({ date: d, name: String(r[2]), timing: String(r[5]), prev: apFmt_(r[3]), next: String(r[7] || ""), text: String(r[8] || ""), status: status, today: d === today });
+  });
+  out.sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+  return out;
 }

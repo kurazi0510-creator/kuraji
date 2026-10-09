@@ -58,3 +58,10 @@
 - エラーはシート `kr_system_log` に残ります。
 - LINE_TOKENなどはスクリプトプロパティに保管（コードやGitHubに書かない）。
 - テスト：`node gas_addons/tests/run_tests.js`（29項目）
+
+## スマホ承認ページ・スタッフ用の一覧（approve_page フォルダ）
+- `Code.gs` と `index.html`（郡さん用：文面を直して送信OK）、`view.html`（スタッフ用：見るだけ）を、**別の新しいプロジェクト**に貼る。
+- スクリプトプロパティ：`AP_SHEET_ID`（スプレッドシートID）、`AP_TOKEN`（`apMakeToken`で作成）、`AP_VIEW_PIN`（スタッフ用閲覧パスワード）。
+- ウェブアプリのデプロイを2つ：①自分のみ（郡さん用）、②全員（スタッフ用。`?v=1` 付きURL。パスワード必須・5回失敗で10分ロック）。
+- 無題のプロジェクトに `KR_APPROVE_URL`（①のURL＋`?t=合言葉`）を入れると、毎朝のLINEにリンクが付く。
+- `kanri.html` の「📨 フォロー候補」ボタンは、`KR_FOLLOWUP_VIEW_URL`（②のURL＋`?v=1`）を設定すると開く。

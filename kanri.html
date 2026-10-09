@@ -238,6 +238,7 @@ function printThisPage(pageId){
   <div class="nav-t" onclick="goPage('lottery')">🎉 抽選</div>
   <div class="nav-t" onclick="location.href='symptom.html'">🩺 症状図</div>
   <div class="nav-t" onclick="location.href='line_template.html'">💬 LINE雛形</div>
+  <div class="nav-t" onclick="openFollowupView()">📨 フォロー候補</div>
   <div class="nav-t" onclick="location.href='gas_update.html'" style="background:#f97316;color:white">⚙️ GAS更新</div>
 </div>
 
@@ -8097,6 +8098,14 @@ document.getElementById('histModal').addEventListener('click',function(e){if(e.t
   new MutationObserver(syncModalOpen).observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true});
   syncModalOpen();
 })();
+</script>
+<script>
+// 再来院フォロー候補の「見るだけ」ページを開く（追加機能側。編集・送信はできません）
+var KR_FOLLOWUP_VIEW_URL = ""; // 承認ページのウェブアプリURL + ?v=1 を設定
+function openFollowupView(){
+  if(!KR_FOLLOWUP_VIEW_URL){ alert('フォロー候補ページのURLが未設定です。院長に確認してください。'); return; }
+  window.open(KR_FOLLOWUP_VIEW_URL, '_blank');
+}
 </script>
 </body>
 </html>
