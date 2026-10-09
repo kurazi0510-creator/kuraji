@@ -54,45 +54,46 @@ test("krToCsv_ カンマ・引用符・改行", () => assert.strictEqual(c0.krTo
 
 console.log("■ 再来院フォロー判定");
 const T = "2026-10-15";
-test("14日経過で対象になる", () => {
-  const p = c0.krFollowupPlan_(T, withDay([B("2026-10-01", "山田 太郎", { id: "5" })], c0), null, {}, {});
-  assert.strictEqual(p.targets.length, 1); assert.strictEqual(p.targets[0].stage, 14);
+const OLD = B("2026-01-01", "A");
+const P = (d, arr, ex, sent) => c0.krFollowupPlan_(d, withDay(arr, c0), ex || null, sent || {}, {});
+const R = (d, arr) => (P(d, arr).targets[0] || {}).stage;
+test("再診(来院2回以上)は14日後に対象。窓は14〜16日", () => {
+  const f = d => R(T, [B(d, "A"), OLD]);
+  assert.strictEqual(f("2026-10-01"), 14); assert.strictEqual(f("2026-09-29"), 14);
+  assert.strictEqual(f("2026-10-02"), undefined); assert.strictEqual(f("2026-09-28"), undefined);
 });
-test("13日・17日は対象外 / 16日は救済窓内", () => {
-  const f = d => c0.krFollowupPlan_(T, withDay([B(d, "A")], c0), null, {}, {}).targets.length;
-  assert.strictEqual(f("2026-10-02"), 0); assert.strictEqual(f("2026-09-29"), 1); assert.strictEqual(f("2026-09-28"), 0);
-});
-test("45日ステージ・30日/60日は対象外", () => {
-  const f = d => (c0.krFollowupPlan_(T, withDay([B(d, "A"), B("2026-01-01", "A")], c0), null, {}, {}).targets[0] || {}).stage;
+test("45日後は全員対象。30日/60日は対象外", () => {
+  const f = d => R(T, [B(d, "A"), OLD]);
   assert.strictEqual(f("2026-08-31"), 45); assert.strictEqual(f("2026-09-15"), undefined); assert.strictEqual(f("2026-08-16"), undefined);
 });
-test("初診翌日は来院1回の方だけ（2回以上の方には送らない）", () => {
-  const t = "2026-10-15";
-  const first = c0.krFollowupPlan_(t, withDay([B("2026-10-14", "A")], c0), null, {}, {});
-  assert.strictEqual(first.targets[0].stage, 1);
-  const repeat = c0.krFollowupPlan_(t, withDay([B("2026-09-01", "A"), B("2026-10-14", "A")], c0), null, {}, {});
-  assert.strictEqual(repeat.targets.length, 0);
+test("初診(来院1回): 翌日=1, 7〜10日後=7, 14日後は対象外", () => {
+  assert.strictEqual(R(T, [B("2026-10-14", "A")]), 1);
+  assert.strictEqual(R(T, [B("2026-10-08", "A")]), 7);
+  assert.strictEqual(R(T, [B("2026-10-05", "A")]), 7);
+  assert.strictEqual(R(T, [B("2026-10-04", "A")]), undefined);
+  assert.strictEqual(R(T, [B("2026-10-01", "A")]), undefined);
 });
-test("未来の予約がある人には送らない", () => {
-  const p = c0.krFollowupPlan_(T, withDay([B("2026-10-01", "A"), B("2026-10-20", "A")], c0), null, {}, {});
-  assert.strictEqual(p.targets.length, 0); assert.strictEqual(p.skippedFuture, 1);
+test("再診の人には初診ステージ(翌日・7日)を送らない", () => {
+  assert.strictEqual(R(T, [B("2026-10-14", "A"), B("2026-09-01", "A")]), undefined);
+  assert.strictEqual(R(T, [B("2026-10-08", "A"), B("2026-09-01", "A")]), undefined);
+});
+test("翌日フォローは次回予約があっても送る／7日・14日・45日は次回予約があれば送らない", () => {
+  assert.strictEqual(R(T, [B("2026-10-14", "A"), B("2026-10-20", "A")]), 1);
+  assert.strictEqual(R(T, [B("2026-10-08", "A"), B("2026-10-20", "A")]), undefined);
+  assert.strictEqual(R(T, [B("2026-10-01", "A"), OLD, B("2026-10-20", "A")]), undefined);
 });
 test("キャンセル・継続行は来院扱いしない", () => {
-  const p = c0.krFollowupPlan_(T, withDay([B("2026-09-01", "A"), B("2026-10-01", "A", { cancelled: true }), B("2026-10-01", "A", { cont: true })], c0), null, {}, {});
-  assert.strictEqual(p.targets.length, 0); // 最終来院は09-01(44日) → 窓外
-});
-test("最終来院で判定（過去に何度来ていても最新日基準）", () => {
-  const p = c0.krFollowupPlan_(T, withDay([B("2026-08-01", "A"), B("2026-10-01", "A")], c0), null, {}, {});
-  assert.strictEqual(p.targets[0].stage, 14);
+  assert.strictEqual(P(T, [B("2026-09-01", "A"), B("2026-10-01", "A", { cancelled: true }), B("2026-10-01", "A", { cont: true })]).targets.length, 0);
 });
 test("除外(ID/名前)・送信済み重複は送らない", () => {
-  const bk = withDay([B("2026-10-01", "山田 太郎", { id: "5" })], c0);
-  assert.strictEqual(c0.krFollowupPlan_(T, bk, { ids: { "5": true }, keys: {} }, {}, {}).targets.length, 0);
-  assert.strictEqual(c0.krFollowupPlan_(T, bk, { ids: {}, keys: { "山田太郎": true } }, {}, {}).targets.length, 0);
-  assert.strictEqual(c0.krFollowupPlan_(T, bk, null, { "山田太郎|2026-10-01|14": true }, {}).skippedSent, 1);
+  const bk = [B("2026-10-01", "山田 太郎", { id: "5" }), B("2026-01-01", "山田 太郎", { id: "5" })];
+  assert.strictEqual(P(T, bk).targets.length, 1);
+  assert.strictEqual(P(T, bk, { ids: { "5": true }, keys: {} }).targets.length, 0);
+  assert.strictEqual(P(T, bk, { ids: {}, keys: { "山田太郎": true } }).targets.length, 0);
+  assert.strictEqual(P(T, bk, null, { "山田太郎|2026-10-01|14": true }).skippedSent, 1);
 });
 test("交通事故は自動送信せず別枠", () => {
-  const p = c0.krFollowupPlan_(T, withDay([B("2026-10-01", "A", { kubun: "交通事故", kubunList: ["交通事故"] })], c0), null, {}, {});
+  const p = P(T, [B("2026-10-01", "A", { kubun: "交通事故", kubunList: ["交通事故"] }), OLD]);
   assert.strictEqual(p.targets.length, 0); assert.strictEqual(p.jiko.length, 1);
 });
 test("名前のスペース違いは同一人物", () => {
@@ -103,7 +104,7 @@ test("名前のスペース違いは同一人物", () => {
 console.log("■ 再来院フォロー 実行（モック）");
 function followCtx(mode, extra) {
   const hdr = ["日付", "区分", "患者名", "診察券No", "予約ルート", "支払金額", "物販(JSON)", "区分リスト"];
-  const sheets = { "予約表": [hdr, ["2026-10-01", "保険", "山田 太郎", "5", "", 0, "", "保険"], ["2026-10-01", "保険", "未登録 花子", "6", "", 0, "", "保険"]],
+  const sheets = { "予約表": [hdr, ["2026-10-01", "保険", "山田 太郎", "5", "", 0, "", "保険"], ["2026-10-01", "保険", "未登録 花子", "6", "", 0, "", "保険"], ["2026-06-01", "保険", "山田 太郎", "5", "", 0, "", "保険"], ["2026-06-01", "保険", "未登録 花子", "6", "", 0, "", "保険"]],
     "患者": [["診察券No", "患者名", "流入元", "LINE"], ["5", "山田 太郎", "", ""], ["6", "未登録 花子", "", ""]] };
   const c = makeCtx({ props: Object.assign({ KR_FOLLOWUP_MODE: mode, LINE_TOKEN: "tok", LINE_USER_ID: "owner" }, extra || {}), sheets });
   c.findLineUidForPatient_ = p => (p.name === "山田 太郎" ? "Uyamada" : "");
@@ -133,7 +134,7 @@ test("offなら何もしない / 月間上限0なら送らない", () => {
   assert.strictEqual(r.sent, 0); assert.strictEqual(r.over, 1);
 });
 test("文面に患者名が入り、{name}が残らない", () => {
-  [1, 14, 45].forEach(s => { const m = c0.krFollowupMessage_(s, "山田太郎"); assert.ok(m.includes("山田太郎") && m.includes("郡") && !m.includes("{name}") && !m.includes("返信不要")); });
+  [1, 7, 14, 45].forEach(s => { const m = c0.krFollowupMessage_(s, "山田太郎"); assert.ok(m.includes("山田太郎") && m.includes("郡") && !m.includes("{name}") && !m.includes("返信不要")); });
 });
 
 console.log("■ バックアップ");

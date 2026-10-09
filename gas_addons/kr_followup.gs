@@ -18,26 +18,38 @@
  *   ・医療広告ガイドラインに配慮し、効果・改善をうたう表現や割引の訴求は入れていません。
  */
 
-var KR_FOLLOWUP_STAGES = [1, 14, 45];       // 1=初診の翌日(来院1回のみの方だけ)(来院1回のみ)／14・45=全員
-var KR_FOLLOWUP_FIRST_STAGE = 1;
-function krStageLabel_(st) { return st === KR_FOLLOWUP_FIRST_STAGE ? "初診" + st + "日後" : st + "日フォロー"; }
-var KR_FOLLOWUP_WINDOW = 2;                 // N日〜N+2日の間に1回だけ送る（トリガー失敗時の取りこぼし吸収）
+// 送るタイミング（最終来院日からの経過日数）
+//  1  = 初診の翌日        … 来院1回だけの方。次回予約の有無に関係なく送る（アフターフォロー）
+//  7  = 初診から7〜10日後 … 来院1回だけで、次回予約がまだ無い方
+//  14 = 14日後           … 再診（来院2回以上）で、次回予約が無い方
+//  45 = 45日後           … 全員で、次回予約が無い方
+var KR_FOLLOWUP_STAGES = [1, 7, 14, 45];
+var KR_FOLLOWUP_WINDOWS = { 1: 1, 7: 3, 14: 2, 45: 2 };  // N日〜N+窓日の間に1回だけ（トリガー失敗の取りこぼし吸収）
+function krStageRule_(st) {
+  if (st === 1) return { first: true, ignoreFuture: true };
+  if (st === 7) return { first: true };
+  if (st === 14) return { repeat: true };
+  return {};
+}
+function krStageLabel_(st) { return st === 1 ? "初診の翌日" : (st === 7 ? "初診7日後" : st + "日フォロー"); }
 var KR_FOLLOWUP_LOG = "kr_followup_log";
 var KR_FOLLOWUP_EXCLUDE = "kr_followup_exclude";
 var KR_FOLLOWUP_LOG_HEADERS = ["実行日", "患者名", "診察券No", "前回来院日", "経過日数", "ステージ", "結果", "メモ"];
 
-// ───────── メッセージ文面（院長が KR_MSG_14 / KR_MSG_30 / KR_MSG_60 で自由に変更可能。{name} が患者名） ─────────
+// ───────── メッセージ文面（院長が KR_MSG_1 / KR_MSG_7 / KR_MSG_14 / KR_MSG_45 で自由に変更可能。{name} が患者名） ─────────
 function krFollowupMessage_(stage, name) {
   var custom = krProp_("KR_MSG_" + stage, "");
   var base;
   if (custom) {
     base = custom.replace(/\\n/g, "\n");
   } else if (stage === 1) {
-    base = "{name}様、倉治整骨院の郡です。\n\n昨日はご来院いただき、ありがとうございました。\nその後、お身体の具合はいかがですか？施術のあとで気になることや、不安なことはありませんか？\n\nどんな小さなことでも、このLINEに一言ご返信ください。私が確認してお返事します。\nご予約もこのLINEからいつでもどうぞ。";
+    base = "{name}様、昨日は倉治整骨院へお越しいただき、ありがとうございました。\n\nその後、お身体の状態はいかがでしょうか？\n施術後に気になることや、普段の動作で「ここが気になる」という点がありましたら、このLINEへお気軽にご連絡ください😊\n\n無理のない範囲でお過ごしください。\n倉治整骨院 郡";
+  } else if (stage === 7) {
+    base = "{name}様、倉治整骨院の郡です。\n\n初回のご来院から少し日にちがたちましたので、ご連絡しました。\nその後、お身体の状態はいかがでしょうか？\n\nまだ気になる症状や、日常生活で困る動きがございましたら、一度状態を確認させていただけます。\nご希望でしたら、このLINEに「予約希望」と送ってください😊";
   } else if (stage === 14) {
-    base = "{name}様、倉治整骨院の郡です。\n\n前回の施術から2週間ほどたちましたが、その後お身体の具合はいかがですか？\n\n痛みが戻っていたり、気になることがあれば、このLINEに一言ご返信ください。私が確認してお返事します。\n無理にご来院いただく必要はありません。どうぞお大事にお過ごしください。";
+    base = "{name}様、こんにちは。倉治整骨院の郡です。\n\nその後、お身体の状態はいかがでしょうか？\n前回気になっていた症状が続いていたり、日常生活で気になる動きがございましたら、お気軽にご相談ください😊\n\n無理にご来院いただく必要はありません。どうぞお大事にお過ごしください。";
   } else {
-    base = "{name}様、倉治整骨院の郡です。\n\nご無沙汰しております。前回のご来院から1か月半ほどたちましたが、その後のお身体の具合はいかがでしょうか。\n\n気になる症状が出ていたり、前回の状態が続いているようでしたら、遠慮なくこのLINEにご連絡ください。\nご自身のペースで大丈夫です。";
+    base = "{name}様、こんにちは。倉治整骨院の郡です。\n\nしばらくお身体の状態を確認できていませんが、その後いかがでしょうか？\n肩・腰などで気になることがございましたら、我慢せずお気軽にご相談ください。\n\nご予約をご希望の場合は、このLINEに希望日時を送っていただければ確認いたします😊";
   }
   return base.split("{name}").join(name);
 }
@@ -47,7 +59,6 @@ function krFollowupMessage_(stage, name) {
 // 出力: { targets:[], jiko:[], skippedFuture:n, skippedExcluded:n, skippedSent:n }
 function krFollowupPlan_(todayStr, bookings, excluded, sentSet, unregSet, stages, windowDays) {
   stages = stages || KR_FOLLOWUP_STAGES;
-  windowDays = (windowDays === undefined) ? KR_FOLLOWUP_WINDOW : windowDays;
   excluded = excluded || { ids: {}, keys: {} };
   sentSet = sentSet || {};
   unregSet = unregSet || {};
@@ -71,13 +82,16 @@ function krFollowupPlan_(todayStr, bookings, excluded, sentSet, unregSet, stages
   Object.keys(last).forEach(function (key) {
     var v = last[key];
     var diff = today - v.day;
-    var stage = null;
+    var stage = null, ignoreFuture = false;
     for (var i = 0; i < stages.length; i++) {
-      if (stages[i] === KR_FOLLOWUP_FIRST_STAGE && cnt[key] !== 1) continue; // 初診ステージは来院1回の方だけ
-      if (diff >= stages[i] && diff <= stages[i] + windowDays) { stage = stages[i]; break; }
+      var st = stages[i], rule = krStageRule_(st);
+      var w = (typeof windowDays === "number") ? windowDays : (KR_FOLLOWUP_WINDOWS[st] === undefined ? 2 : KR_FOLLOWUP_WINDOWS[st]);
+      if (rule.first && cnt[key] !== 1) continue;       // 初診向け：来院1回の方だけ
+      if (rule.repeat && !(cnt[key] >= 2)) continue;    // 再診向け：来院2回以上の方だけ
+      if (diff >= st && diff <= st + w) { stage = st; ignoreFuture = !!rule.ignoreFuture; break; }
     }
     if (stage === null) return;
-    if (future[key]) { out.skippedFuture++; return; }
+    if (future[key] && !ignoreFuture) { out.skippedFuture++; return; }
     if ((v.id && excluded.ids[v.id]) || excluded.keys[key]) { out.skippedExcluded++; return; }
     var dedupKey = key + "|" + v.date + "|" + stage;
     if (sentSet[dedupKey]) { out.skippedSent++; return; }
