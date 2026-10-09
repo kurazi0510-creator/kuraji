@@ -18,8 +18,8 @@
  *   ・医療広告ガイドラインに配慮し、効果・改善をうたう表現や割引の訴求は入れていません。
  */
 
-var KR_FOLLOWUP_STAGES = [3, 14, 45];       // 3=初診の方だけ(来院1回のみ)／14・45=全員
-var KR_FOLLOWUP_FIRST_STAGE = 3;
+var KR_FOLLOWUP_STAGES = [1, 14, 45];       // 1=初診の翌日(来院1回のみの方だけ)(来院1回のみ)／14・45=全員
+var KR_FOLLOWUP_FIRST_STAGE = 1;
 function krStageLabel_(st) { return st === KR_FOLLOWUP_FIRST_STAGE ? "初診" + st + "日後" : st + "日フォロー"; }
 var KR_FOLLOWUP_WINDOW = 2;                 // N日〜N+2日の間に1回だけ送る（トリガー失敗時の取りこぼし吸収）
 var KR_FOLLOWUP_LOG = "kr_followup_log";
@@ -32,8 +32,8 @@ function krFollowupMessage_(stage, name) {
   var base;
   if (custom) {
     base = custom.replace(/\\n/g, "\n");
-  } else if (stage === 3) {
-    base = "{name}様、倉治整骨院の郡です。\n\n先日はご来院いただき、ありがとうございました。\nその後、お身体の具合はいかがですか？施術のあとで気になることや、不安なことはありませんか？\n\nどんな小さなことでも、このLINEに一言ご返信ください。私が確認してお返事します。\nご予約もこのLINEからいつでもどうぞ。";
+  } else if (stage === 1) {
+    base = "{name}様、倉治整骨院の郡です。\n\n昨日はご来院いただき、ありがとうございました。\nその後、お身体の具合はいかがですか？施術のあとで気になることや、不安なことはありませんか？\n\nどんな小さなことでも、このLINEに一言ご返信ください。私が確認してお返事します。\nご予約もこのLINEからいつでもどうぞ。";
   } else if (stage === 14) {
     base = "{name}様、倉治整骨院の郡です。\n\n前回の施術から2週間ほどたちましたが、その後お身体の具合はいかがですか？\n\n痛みが戻っていたり、気になることがあれば、このLINEに一言ご返信ください。私が確認してお返事します。\n無理にご来院いただく必要はありません。どうぞお大事にお過ごしください。";
   } else {

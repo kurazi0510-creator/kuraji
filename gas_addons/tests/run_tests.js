@@ -66,11 +66,11 @@ test("45日ステージ・30日/60日は対象外", () => {
   const f = d => (c0.krFollowupPlan_(T, withDay([B(d, "A"), B("2026-01-01", "A")], c0), null, {}, {}).targets[0] || {}).stage;
   assert.strictEqual(f("2026-08-31"), 45); assert.strictEqual(f("2026-09-15"), undefined); assert.strictEqual(f("2026-08-16"), undefined);
 });
-test("初診3日後は来院1回の方だけ（2回以上の方には送らない）", () => {
+test("初診翌日は来院1回の方だけ（2回以上の方には送らない）", () => {
   const t = "2026-10-15";
-  const first = c0.krFollowupPlan_(t, withDay([B("2026-10-12", "A")], c0), null, {}, {});
-  assert.strictEqual(first.targets[0].stage, 3);
-  const repeat = c0.krFollowupPlan_(t, withDay([B("2026-09-01", "A"), B("2026-10-12", "A")], c0), null, {}, {});
+  const first = c0.krFollowupPlan_(t, withDay([B("2026-10-14", "A")], c0), null, {}, {});
+  assert.strictEqual(first.targets[0].stage, 1);
+  const repeat = c0.krFollowupPlan_(t, withDay([B("2026-09-01", "A"), B("2026-10-14", "A")], c0), null, {}, {});
   assert.strictEqual(repeat.targets.length, 0);
 });
 test("未来の予約がある人には送らない", () => {
@@ -133,7 +133,7 @@ test("offなら何もしない / 月間上限0なら送らない", () => {
   assert.strictEqual(r.sent, 0); assert.strictEqual(r.over, 1);
 });
 test("文面に患者名が入り、{name}が残らない", () => {
-  [3, 14, 45].forEach(s => { const m = c0.krFollowupMessage_(s, "山田太郎"); assert.ok(m.includes("山田太郎") && m.includes("郡") && !m.includes("{name}") && !m.includes("返信不要")); });
+  [1, 14, 45].forEach(s => { const m = c0.krFollowupMessage_(s, "山田太郎"); assert.ok(m.includes("山田太郎") && m.includes("郡") && !m.includes("{name}") && !m.includes("返信不要")); });
 });
 
 console.log("■ バックアップ");
