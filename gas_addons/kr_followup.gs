@@ -259,7 +259,7 @@ function krFollowupNotifyQueue_(today, shown, unregList, plan, expired) {
   if (expired) { L.push(""); L.push("■ 送る期限を過ぎて閉じた行：" + expired + "件"); }
   L.push(""); L.push("※ チェック後、1時間以内に送信されます。送信の直前に、次回予約・除外などをもう一度確認します。");
   krNotifyOwner_("【倉治整骨院】再来院フォロー 送信候補 " + today, L.join("\n"), null,
-    { line: "[再来院フォロー] 送信候補" + shown.length + "名。シートで「送信OK」にチェックしてください。" });
+    { line: "[再来院フォロー] 送信候補" + shown.length + "名。" + (krProp_("KR_APPROVE_URL", "") ? "スマホで文面を確認・編集して送れます：\n" + krProp_("KR_APPROVE_URL", "") : "シートで「送信OK」にチェックしてください。") });
 }
 
 // ───────── ④ 送信直前の再確認（純粋関数：テスト対象） ─────────

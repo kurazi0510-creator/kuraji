@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja"><head><base target="_top"><meta charset="utf-8">
+<style>
+body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;background:#f3f5f4;color:#222}
+h1{font-size:18px;margin:0;padding:14px 16px;background:#2e7d32;color:#fff}
+.note{padding:10px 16px;font-size:13px;color:#555}
+.card{background:#fff;margin:12px;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.nm{font-size:17px;font-weight:bold}.meta{font-size:13px;color:#555;margin:4px 0 8px;line-height:1.6}
+.warn{color:#b00020;font-weight:bold}
+textarea{width:100%;box-sizing:border-box;min-height:220px;font-size:16px;line-height:1.5;padding:8px;border:1px solid #bbb;border-radius:6px}
+.btns{display:flex;gap:8px;margin-top:10px}
+button{flex:1;padding:12px 6px;font-size:15px;border:0;border-radius:8px;color:#fff}
+.send{background:#2e7d32}.save{background:#546e7a}.skip{background:#9e9e9e}
+.msg{margin-top:8px;font-size:14px;color:#2e7d32}.err{color:#b00020}
+.ok{font-size:12px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;margin-left:6px}
+</style></head><body>
+<h1>再来院フォロー 承認</h1>
+<div class="note">文面を直して「この文面で送る」を押すと送信OKになり、次の自動送信（1時間以内）で、送信直前の再確認のうえ送られます。押さない人には送られません。</div>
+<div id="list">読み込み中…</div>
+<div class="note"><button class="save" style="flex:none;width:100%" onclick="load()">読み込み直す</button></div>
+<script>
+var TOKEN = <?!= JSON.stringify(token) ?>;
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function load(){
+  document.getElementById('list').textContent='読み込み中…';
+  google.script.run.withSuccessHandler(render).withFailureHandler(function(e){document.getElementById('list').innerHTML='<div class="card err">'+esc(e.message||e)+'</div>'}).apList(TOKEN);
+}
+function render(items){
+  var el=document.getElementById('list');
+  if(!items.length){el.innerHTML='<div class="card">いま確認する候補はありません。</div>';return}
+  el.innerHTML=items.map(function(it,i){
+    return '<div class="card" id="c'+i+'" data-row="'+it.row+'" data-key="'+esc(it.key)+'">'
+     +'<div class="nm">'+esc(it.name)+'様'+(it.ok?'<span class="ok">送信OK済み</span>':'')+'</div>'
+     +'<div class="meta">'+esc(it.timing)+'／前回来院 '+esc(it.prev)+'（'+esc(it.days)+'日前）／診察券 '+esc(it.id)
+     +'<br>次回予約：'+(it.next&&it.next!=='なし'?'<span class="warn">'+esc(it.next)+'</span>':'なし')+'</div>'
+     +'<textarea id="t'+i+'">'+esc(it.text)+'</textarea>'
+     +'<div class="btns"><button class="send" onclick="go('+i+',true)">この文面で送る</button>'
+     +'<button class="save" onclick="go('+i+',false)">保存だけ</button></div>'
+     +'<div class="msg" id="m'+i+'"></div></div>';
+  }).join('');
+}
+function go(i,ok){
+  var c=document.getElementById('c'+i), m=document.getElementById('m'+i);
+  if(ok && !confirm(c.querySelector('.nm').textContent.replace('送信OK済み','')+' に送る内容でよいですか？')) return;
+  m.className='msg'; m.textContent='保存中…';
+  google.script.run.withSuccessHandler(function(r){
+    var x=r[0]||{}; m.className='msg'+(x.ok?'':' err'); m.textContent=x.msg||'';
+  }).withFailureHandler(function(e){m.className='msg err';m.textContent=e.message||e})
+  .apSave(TOKEN,[{row:Number(c.dataset.row),key:c.dataset.key,text:document.getElementById('t'+i).value,ok:ok}]);
+}
+load();
+</script></body></html>
