@@ -451,15 +451,34 @@ function getSVG(key,w,h){
 function getP(e){
   const r=dr.getBoundingClientRect();
   const sx2=dr.width/r.width,sy2=dr.height/r.height;
-  const s2=e.touches?e.touches[0]:e;
+  const s2=e.touches?.[0]||e.changedTouches?.[0]||e;
   return{x:(s2.clientX-r.left)*sx2,y:(s2.clientY-r.top)*sy2};
 }
-dr.addEventListener('mousedown',onS);dr.addEventListener('touchstart',onS,{passive:false});
-dr.addEventListener('mousemove',onM);dr.addEventListener('touchmove',onM,{passive:false});
-dr.addEventListener('mouseup',onE);dr.addEventListener('touchend',onE,{passive:false});
+
+// ★ iPadではPointer Eventsを使い、Apple Pencilにも正式対応。
+//   iPhone/PC等は従来のマウス・タッチ操作をそのまま維持する。
+const IS_IPAD=/iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+if(IS_IPAD&&window.PointerEvent){
+  dr.addEventListener('pointerdown',onS,{passive:false});
+  dr.addEventListener('pointermove',onM,{passive:false});
+  dr.addEventListener('pointerup',onE,{passive:false});
+  dr.addEventListener('pointercancel',onE,{passive:false});
+  dr.addEventListener('pointerleave',e=>{if(drawing&&e.pointerType!=='pen')onE(e);},{passive:false});
+}else{
+  dr.addEventListener('mousedown',onS);
+  dr.addEventListener('touchstart',onS,{passive:false});
+  dr.addEventListener('mousemove',onM);
+  dr.addEventListener('touchmove',onM,{passive:false});
+  dr.addEventListener('mouseup',onE);
+  dr.addEventListener('touchend',onE,{passive:false});
+}
 
 function onS(e){
-  e.preventDefault();drawing=true;
+  e.preventDefault();
+  if(IS_IPAD&&e.pointerId!=null){
+    try{dr.setPointerCapture(e.pointerId);}catch(_){}
+  }
+  drawing=true;
   const p=getP(e);sx=lx=p.x;sy=ly=p.y;
   if(!stacks[cur])stacks[cur]=[];
   stacks[cur].push(dx.getImageData(0,0,dr.width,dr.height));
@@ -468,34 +487,53 @@ function onS(e){
 }
 function onM(e){
   e.preventDefault();if(!drawing)return;
+
+  // Apple Pencilは細かい移動点も拾って、手書きを滑らかにする
+  const evs=(IS_IPAD&&e.pointerType==='pen'&&typeof e.getCoalescedEvents==='function')
+    ? (e.getCoalescedEvents().length?e.getCoalescedEvents():[e])
+    : [e];
+
+  if(tool==='pen'||tool==='erase'){
+    evs.forEach(ev=>{
+      const p=getP(ev);
+      if(tool==='pen'){
+        dx.globalCompositeOperation='source-over';
+        dx.strokeStyle=color;
+        // Pencilの筆圧を少しだけ反映。指・マウスは従来の太さのまま。
+        const pressure=(IS_IPAD&&ev.pointerType==='pen'&&ev.pressure>0)?ev.pressure:null;
+        dx.lineWidth=pressure==null?sz:Math.max(1,sz*(0.75+pressure*0.75));
+        dx.lineCap='round';dx.lineJoin='round';
+      }else{
+        dx.globalCompositeOperation='destination-out';
+        dx.lineWidth=sz*6;dx.lineCap='round';dx.lineJoin='round';
+      }
+      dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();
+      lx=p.x;ly=p.y;
+    });
+    return;
+  }
+
   const p=getP(e);
-  if(tool==='pen'){
-    dx.globalCompositeOperation='source-over';
-    dx.strokeStyle=color;dx.lineWidth=sz;dx.lineCap='round';dx.lineJoin='round';
-    dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();
-    lx=p.x;ly=p.y;
-  }else if(tool==='erase'){
-    dx.globalCompositeOperation='destination-out';
-    dx.lineWidth=sz*6;dx.lineCap='round';
-    dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();
-    lx=p.x;ly=p.y;
+  const st=stacks[cur];
+  dx.globalCompositeOperation='source-over';
+  dx.clearRect(0,0,dr.width,dr.height);
+  if(st&&st.length>0)dx.putImageData(st[st.length-1],0,0);
+  dx.strokeStyle=color;dx.lineWidth=sz;dx.lineCap='round';
+  if(tool==='circle'){
+    const r=Math.hypot(p.x-sx,p.y-sy);
+    dx.beginPath();dx.arc(sx,sy,r,0,Math.PI*2);dx.stroke();
   }else{
-    const st=stacks[cur];
-    dx.globalCompositeOperation='source-over';
-    dx.clearRect(0,0,dr.width,dr.height);
-    if(st&&st.length>0)dx.putImageData(st[st.length-1],0,0);
-    dx.strokeStyle=color;dx.lineWidth=sz;dx.lineCap='round';
-    if(tool==='circle'){
-      const r=Math.hypot(p.x-sx,p.y-sy);
-      dx.beginPath();dx.arc(sx,sy,r,0,Math.PI*2);dx.stroke();
-    }else{
-      const ang=Math.atan2(p.y-sy,p.x-sx),len=Math.min(22,Math.hypot(p.x-sx,p.y-sy)*0.35);
-      dx.beginPath();dx.moveTo(sx,sy);dx.lineTo(p.x,p.y);dx.stroke();
-      dx.beginPath();dx.moveTo(p.x,p.y);dx.lineTo(p.x-len*Math.cos(ang-0.45),p.y-len*Math.sin(ang-0.45));dx.lineTo(p.x-len*Math.cos(ang+0.45),p.y-len*Math.sin(ang+0.45));dx.closePath();dx.fillStyle=color;dx.fill();
-    }
+    const ang=Math.atan2(p.y-sy,p.x-sx),len=Math.min(22,Math.hypot(p.x-sx,p.y-sy)*0.35);
+    dx.beginPath();dx.moveTo(sx,sy);dx.lineTo(p.x,p.y);dx.stroke();
+    dx.beginPath();dx.moveTo(p.x,p.y);dx.lineTo(p.x-len*Math.cos(ang-0.45),p.y-len*Math.sin(ang-0.45));dx.lineTo(p.x-len*Math.cos(ang+0.45),p.y-len*Math.sin(ang+0.45));dx.closePath();dx.fillStyle=color;dx.fill();
   }
 }
-function onE(e){e.preventDefault();drawing=false;dx.globalCompositeOperation='source-over';}
+function onE(e){
+  e.preventDefault();drawing=false;dx.globalCompositeOperation='source-over';
+  if(IS_IPAD&&e.pointerId!=null){
+    try{dr.releasePointerCapture(e.pointerId);}catch(_){}
+  }
+}
 
 function setT(t){tool=t;document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));document.getElementById('t-'+t).classList.add('active');}
 function setC(c){color=c;document.querySelectorAll('.color-dot').forEach(b=>b.classList.remove('on'));const m={'#e74c3c':'d-red','#2980b9':'d-blue','#2c3e50':'d-black','#27ae60':'d-green'};if(m[c])document.getElementById(m[c]).classList.add('on');}
