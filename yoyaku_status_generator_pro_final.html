@@ -587,7 +587,7 @@ async function autoFetchAvailability(){
     // 例：作成時刻が14時なら、午前の枠は表示せず、これから始まる午後の枠だけを対象にする
     const now=new Date();
     const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-    let available=d.available||[];
+    let available=(d.available||[]).filter(hhmm=>hhmm!=='12:50');
     let filteredCount=0;
     if(dateVal===todayStr){
       const nowHHMM=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
