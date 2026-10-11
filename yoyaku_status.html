@@ -86,7 +86,7 @@
  }
  function showFull(){
    status.innerHTML='<div class="full"><div class="badge">本日満枠</div><strong>本日のご予約は満枠となりました</strong><div class="sub">たくさんのご予約ありがとうございます。</div><div class="wait">キャンセル待ちはLINEで承ります</div></div>';
-   updated.textContent='9/16 16:40更新';
+   updated.textContent='';
    lineBtn.textContent='LINEでキャンセル待ち・相談';
    statusNote.textContent='キャンセルが出た場合は、LINEで順番にご案内いたします。明日以降はWEB予約をご利用ください。';
  }
@@ -94,6 +94,35 @@
  // ★空いている時間をタップ → LINE（メッセージ入力済み）または電話でそのまま予約
  //   ジェネレーターで公開した「手修正後の最終的な空き時間」をそのまま使う
  const WD=['日','月','火','水','木','金','土'];
+// 日本の祝日判定（曜日表示に「・祝」を付ける）
+function isJapaneseHoliday(date){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const base=(x)=>{
+    const y=x.getFullYear(),m=x.getMonth()+1,day=x.getDate(),wd=x.getDay();
+    const nthMonday=(month,n)=>m===month&&wd===1&&day>=1+(n-1)*7&&day<=7*n;
+    const vernal=(y>=1980&&y<=2099)?Math.floor(20.8431+0.242194*(y-1980)-Math.floor((y-1980)/4)):null;
+    const autumn=(y>=1980&&y<=2099)?Math.floor(23.2488+0.242194*(y-1980)-Math.floor((y-1980)/4)):null;
+    return (m===1&&day===1)||nthMonday(1,2)||(m===2&&day===11)||(m===2&&day===23)||
+      (m===3&&day===vernal)||(m===4&&day===29)||(m===5&&[3,4,5].includes(day))||
+      (m===8&&day===11)||nthMonday(7,3)||nthMonday(9,3)||(m===9&&day===autumn)||
+      nthMonday(10,2)||(m===11&&day===3)||(m===11&&day===23);
+  };
+  if(base(d))return true;
+  const prev=new Date(d);prev.setDate(prev.getDate()-1);
+  const next=new Date(d);next.setDate(next.getDate()+1);
+  if(base(prev)&&base(next)&&d.getDay()!==0)return true;
+  let p=new Date(d);p.setDate(p.getDate()-1);
+  let sawSundayHoliday=false;
+  while(base(p)){
+    if(p.getDay()===0)sawSundayHoliday=true;
+    p.setDate(p.getDate()-1);
+  }
+  return sawSundayHoliday;
+}
+function wdLabel(date){
+  return WD[date.getDay()]+(isJapaneseHoliday(date)?'・祝':'');
+}
+
  const LINE_OA='https://line.me/R/oaMessage/%40qin9307o/?';
  function renderSlots(d,now,closed){
    const old=document.getElementById('slotBox');if(old)old.remove();
@@ -111,7 +140,7 @@
    const dt=new Date(d.slotDate+'T00:00:00');
    const diffDays=Math.round((dt-new Date(today+'T00:00:00'))/86400000);
    const relLabel=diffDays===0?'本日 ':diffDays===1?'明日 ':'次回 ';
-   const dayLabel=relLabel+(dt.getMonth()+1)+'/'+dt.getDate()+'('+WD[dt.getDay()]+')';
+   const dayLabel=relLabel+(dt.getMonth()+1)+'/'+dt.getDate()+'('+wdLabel(dt)+')';
    const am=list.filter(x=>toMin(x)<13*60),pm=list.filter(x=>toMin(x)>=13*60);
    const btns=arr=>arr.map(x=>'<button class="slotbtn" onclick="openSheet(\''+d.slotDate+'\',\''+x+'\')">'+x+'</button>').join('');
    const box=document.createElement('section');
@@ -123,7 +152,7 @@
  let bookLabel='', bookIsNew=true;
  window.openSheet=function(date,time){
    const dt=new Date(date+'T00:00:00');
-   bookLabel=(dt.getMonth()+1)+'月'+dt.getDate()+'日('+WD[dt.getDay()]+') '+time+'〜';
+   bookLabel=(dt.getMonth()+1)+'月'+dt.getDate()+'日('+wdLabel(dt)+') '+time+'〜';
    document.getElementById('sheetWhen').textContent=bookLabel;
    document.getElementById('fldName').value='';
    document.getElementById('fldFurigana').value='';
@@ -222,7 +251,7 @@
    }
    const img=document.createElement('img');img.alt='倉治整骨院 本日の予約空き状況';img.src=d.image;status.innerHTML='';status.appendChild(img);
    renderSlots(d,now,closed);
-   if(d.updatedAt){const x=new Date(d.updatedAt);updated.textContent='最終更新：'+x.toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});}else{updated.textContent='最新の予約空き状況';}
+   updated.textContent='';
  }
  // 診療時間内の満枠日は、外部画像を待たずにすぐ満枠表示へ切り替えます。
  if(FULL_DATES.has(ymd(jstNow()))&&!isClosedNow()) showFull();
