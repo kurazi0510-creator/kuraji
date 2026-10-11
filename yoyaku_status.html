@@ -67,6 +67,20 @@
  const pageTitle=document.getElementById('pageTitle');
  const lineBtn=document.getElementById('lineBtn');
  const statusNote=document.getElementById('statusNote');
+ const STATUS_CACHE_KEY='kuraji_latest_status_cache_v1';
+ function saveStatusCache(d){
+   try{
+     if(d&&d.ok&&d.image&&d.slotDate){
+       localStorage.setItem(STATUS_CACHE_KEY,JSON.stringify({savedAt:Date.now(),data:d}));
+     }
+   }catch(e){}
+ }
+ function loadStatusCache(){
+   try{
+     const x=JSON.parse(localStorage.getItem(STATUS_CACHE_KEY)||'null');
+     return x&&x.data&&x.data.ok&&x.data.image&&x.data.slotDate?x.data:null;
+   }catch(e){return null;}
+ }
  // 満枠になった日を登録。日付が変われば通常表示へ自動復帰します。
  const FULL_DATES=new Set(['2026-09-16']);
  const jstNow=()=>new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
@@ -225,10 +239,17 @@ function wdLabel(date){
  };
  window.closeSheet=function(){const b=document.getElementById('sheetBg');b.style.display='none';b.style.height='';b.style.top='';};
  function render(){
-   const d=window.KURAJI_LATEST_STATUS;
+   let d=window.KURAJI_LATEST_STATUS;
    const now=jstNow();
    const today=ymd(now);
    const closed=isClosedNow();
+
+   // ★LINE内ブラウザ等でApps Scriptの読み込みが一時的に失敗しても、
+   //   直前に正常表示できた未来分の予約状況を消さない。
+   if(!d||!d.ok||!d.image){
+     const cached=loadStatusCache();
+     if(cached&&cached.slotDate&&cached.slotDate>today) d=cached;
+   }
    if(FULL_DATES.has(today)&&!closed){showFull();return;}
    if(!d||!d.ok||!d.image){
      if(closed){showClosed('明日の空き状況を準備中です。');return;}
@@ -249,15 +270,64 @@ function wdLabel(date){
      if(!slotDate || slotDate<=today){showClosed('明日の空き状況を準備中です。');return;}
      pageTitle.textContent='明日の予約空き状況';lineBtn.textContent='LINEで予約・相談';statusNote.textContent='明日の空き状況は変動します。表示中の時間でも、ご連絡のタイミングにより埋まっている場合があります。';
    }
+   saveStatusCache(d);
    const img=document.createElement('img');img.alt='倉治整骨院 本日の予約空き状況';img.src=d.image;status.innerHTML='';status.appendChild(img);
    renderSlots(d,now,closed);
    updated.textContent='';
  }
  // 診療時間内の満枠日は、外部画像を待たずにすぐ満枠表示へ切り替えます。
  if(FULL_DATES.has(ymd(jstNow()))&&!isClosedNow()) showFull();
- window.addEventListener('kuraji-status-loaded',render,{once:true});
- const s=document.createElement('script');s.src=GAS+'?action=js&t='+Date.now();s.onerror=function(){if(isClosedNow()){showClosed('本日の診療時間は終了しております。');return;}status.innerHTML='<div class="error">最新の予約状況を取得できませんでした。<br>再読み込みしてください。</div>';updated.textContent='';};document.body.appendChild(s);
- setTimeout(function(){if(!window.KURAJI_LATEST_STATUS){if(isClosedNow()){showClosed('本日の診療時間は終了しております。');return;}status.innerHTML='<div class="error">読み込みに時間がかかっています。<br>画面を再読み込みしてください。</div>';updated.textContent='';}},10000);
+ window.addEventListener('kuraji-status-loaded',function(){
+   if(window.KURAJI_LATEST_STATUS) saveStatusCache(window.KURAJI_LATEST_STATUS);
+   render();
+ });
+
+ // ★先に前回の正常データを表示してから最新データを取りに行く。
+ //   これでLINE内ブラウザの通信揺れで10/12の表示が出たり消えたりしない。
+ const cachedAtStart=loadStatusCache();
+ if(cachedAtStart){
+   window.KURAJI_LATEST_STATUS=cachedAtStart;
+   render();
+ }
+
+ function loadLatestStatus(attempt){
+   const s=document.createElement('script');
+   s.src=GAS+'?action=js&t='+Date.now()+'&try='+attempt;
+   s.async=true;
+   s.onload=function(){
+     if(window.KURAJI_LATEST_STATUS){
+       saveStatusCache(window.KURAJI_LATEST_STATUS);
+       render();
+     }else if(attempt<3){
+       setTimeout(function(){loadLatestStatus(attempt+1);},600*attempt);
+     }
+   };
+   s.onerror=function(){
+     if(attempt<3){
+       setTimeout(function(){loadLatestStatus(attempt+1);},600*attempt);
+       return;
+     }
+     // 3回失敗しても、未来分のキャッシュがあるならその表示を維持する
+     const cached=loadStatusCache(),today=ymd(jstNow());
+     if(cached&&cached.slotDate>today){
+       window.KURAJI_LATEST_STATUS=cached;render();return;
+     }
+     if(isClosedNow()){showClosed('明日の空き状況を準備中です。');return;}
+     status.innerHTML='<div class="error">最新の予約状況を取得できませんでした。<br>再読み込みしてください。</div>';updated.textContent='';
+   };
+   document.body.appendChild(s);
+ }
+ loadLatestStatus(1);
+
+ setTimeout(function(){
+   if(window.KURAJI_LATEST_STATUS)return;
+   const cached=loadStatusCache(),today=ymd(jstNow());
+   if(cached&&cached.slotDate>today){
+     window.KURAJI_LATEST_STATUS=cached;render();return;
+   }
+   if(isClosedNow()){showClosed('明日の空き状況を準備中です。');return;}
+   status.innerHTML='<div class="error">読み込みに時間がかかっています。<br>画面を再読み込みしてください。</div>';updated.textContent='';
+ },10000);
  // ★キーボードが開いた時、シートがキーボードの下に隠れないようにする
  //   （LINE等アプリ内ブラウザは、キーボード表示時に画面サイズの通知が遅れたり無かったりするため
  //   visualViewportで実際に見えている高さを検知し、オーバーレイの高さをそれに合わせる）
