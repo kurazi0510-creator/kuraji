@@ -448,6 +448,43 @@ const PHOTO_B64='/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQ
 // ===== 色設定 =====
 const DAY_COLORS={1:'#E8732A',2:'#4BA84E',3:'#29A8D4',4:'#F2C200',5:'#8B5FC7',6:'#E87BA8'};
 const DAY_NAMES=['日','月','火','水','木','金','土'];
+// 日本の祝日判定（表示用：曜日の横に「・祝」を付ける）
+function isJapaneseHoliday(date){
+  const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  const y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate(),wd=d.getDay();
+  const nthMonday=(month,n)=>m===month&&wd===1&&day>=1+(n-1)*7&&day<=7*n;
+  const vernal=(y>=1980&&y<=2099)?Math.floor(20.8431+0.242194*(y-1980)-Math.floor((y-1980)/4)):null;
+  const autumn=(y>=1980&&y<=2099)?Math.floor(23.2488+0.242194*(y-1980)-Math.floor((y-1980)/4)):null;
+  const base=(x)=>{
+    const yy=x.getFullYear(),mm=x.getMonth()+1,dd=x.getDate(),ww=x.getDay();
+    const nth=(month,n)=>mm===month&&ww===1&&dd>=1+(n-1)*7&&dd<=7*n;
+    const ve=(yy>=1980&&yy<=2099)?Math.floor(20.8431+0.242194*(yy-1980)-Math.floor((yy-1980)/4)):null;
+    const ae=(yy>=1980&&yy<=2099)?Math.floor(23.2488+0.242194*(yy-1980)-Math.floor((yy-1980)/4)):null;
+    return (mm===1&&dd===1)||nth(1,2)||(mm===2&&dd===11)||(mm===2&&dd===23)||
+      (mm===3&&dd===ve)||(mm===4&&dd===29)||(mm===5&&[3,4,5].includes(dd))||
+      (mm===8&&dd===11)||nth(7,3)||nth(9,3)||(mm===9&&dd===ae)||
+      nth(10,2)||(mm===11&&dd===3)||(mm===11&&dd===23);
+  };
+  if(base(d))return true;
+
+  // 国民の休日：前後が祝日の平日
+  const prev=new Date(d);prev.setDate(prev.getDate()-1);
+  const next=new Date(d);next.setDate(next.getDate()+1);
+  if(base(prev)&&base(next)&&wd!==0)return true;
+
+  // 振替休日：直前の連続する祝日の中に日曜の祝日があれば、その次の平日を祝日扱い
+  let p=new Date(d);p.setDate(p.getDate()-1);
+  let sawSundayHoliday=false;
+  while(base(p)){
+    if(p.getDay()===0)sawSundayHoliday=true;
+    p.setDate(p.getDate()-1);
+  }
+  return sawSundayHoliday;
+}
+function jpDowLabel(date){
+  return DAY_NAMES[date.getDay()]+(isJapaneseHoliday(date)?'・祝':'');
+}
+
 // 休診背景色（落ち着いた紺）
 const KYUSHIN_BG='#1a3a5c';
 
@@ -909,7 +946,7 @@ function generateYoyaku(){
     if(!confirm('空き時間が選択されていません。\n「本日は満枠です」として画像を作成しますか？')) return;
   }
   const d=new Date(dateVal+'T00:00:00');
-  const month=d.getMonth()+1,day=d.getDate(),dow=DAY_NAMES[d.getDay()];
+  const month=d.getMonth()+1,day=d.getDate(),dow=jpDowLabel(d);
   const SIZE=800,canvas=document.getElementById('yCanvas');
   canvas.width=SIZE;canvas.height=SIZE;
   const ctx=canvas.getContext('2d');
