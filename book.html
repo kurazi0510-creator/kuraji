@@ -116,8 +116,8 @@ textarea{resize:none;height:64px;}
     <h2><span class="step-num">3</span>お客様情報</h2>
     <label>お名前<span class="req">必須</span></label>
     <input type="text" id="f-name" placeholder="山田 太郎">
-    <label id="f-kana-label" style="display:none">ふりがな<span class="req">必須</span><span class="note" style="display:inline;margin:0 0 0 4px">（初めての方は診察券を事前に準備いたします）</span></label>
-    <input type="text" id="f-kana" placeholder="やまだ たろう" style="display:none">
+    <label id="f-kana-label">ふりがな<span class="req">必須</span><span class="note" style="display:inline;margin:0 0 0 4px">（ひらがなで入力してください）</span></label>
+    <input type="text" id="f-kana" placeholder="やまだ たろう" autocomplete="off" required>
     <label id="f-cardid-label" style="display:none">診察券番号<span class="note" style="display:inline;margin:0 0 0 4px">（お分かりの方のみで結構です）</span></label>
     <input type="text" id="f-cardid" placeholder="例：1234" inputmode="numeric" style="display:none">
     <label>お電話番号<span class="req">必須</span></label>
@@ -210,11 +210,11 @@ function pickMenu(i){
   document.getElementById('infoCard').style.display='block';
   const isFirst=selMenu.label.includes('初診');
   const isRepeat=selMenu.label.includes('再診');
-  document.getElementById('f-kana-label').style.display=isFirst?'block':'none';
-  document.getElementById('f-kana').style.display=isFirst?'block':'none';
+  document.getElementById('f-kana-label').style.display='block';
+  document.getElementById('f-kana').style.display='block';
   document.getElementById('f-cardid-label').style.display=isRepeat?'block':'none';
   document.getElementById('f-cardid').style.display=isRepeat?'block':'none';
-  if(!isFirst) document.getElementById('f-kana').value='';
+  // 通院中の方もふりがな入力を維持
   if(!isRepeat) document.getElementById('f-cardid').value='';
   // メニュー(必要枠数)が変わるので、既に選んだ候補は一旦クリアして枠の空き判定を作り直す
   cand=[];
@@ -346,7 +346,7 @@ function checkReady(){
   const tel=document.getElementById('f-tel')?.value.replace(/[^0-9]/g,'');
   const isFirst=selMenu&&selMenu.label.includes('初診');
   const kana=document.getElementById('f-kana')?.value.trim();
-  const ok=selMenu && cand.length>=1 && name && tel && tel.length>=10 && (!isFirst || kana);
+  const ok=selMenu && cand.length>=1 && name && kana && tel && tel.length>=10;
   const btn=document.getElementById('submitBtn');
   if(btn) btn.disabled=!ok;
 }
