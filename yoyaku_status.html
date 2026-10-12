@@ -71,6 +71,10 @@
  function saveStatusCache(d){
    try{
      if(d&&d.ok&&d.image&&d.slotDate){
+       const old=JSON.parse(localStorage.getItem(STATUS_CACHE_KEY)||'null');
+       const today=ymd(jstNow());
+       // 新しく公開された未来分を、古い当日分の読み込みで上書きしない
+       if(old&&old.data&&old.data.slotDate>today&&d.slotDate<old.data.slotDate)return;
        localStorage.setItem(STATUS_CACHE_KEY,JSON.stringify({savedAt:Date.now(),data:d}));
      }
    }catch(e){}
@@ -252,10 +256,10 @@ function wdLabel(date){
 
    // ★LINE内ブラウザ等でApps Scriptの読み込みが一時的に失敗しても、
    //   直前に正常表示できた未来分の予約状況を消さない。
-   if(!d||!d.ok||!d.image){
-     const cached=loadStatusCache();
-     if(cached&&cached.slotDate&&cached.slotDate>today) d=cached;
-   }
+   const cached=loadStatusCache();
+   // GASが古い当日分を返しても、保存済みの翌日分があればそちらを保持
+   if(cached&&cached.slotDate>today&&
+      (!d||!d.ok||!d.image||!d.slotDate||d.slotDate<cached.slotDate))d=cached;
    if(FULL_DATES.has(today)&&!closed){showFull();return;}
    if(!d||!d.ok||!d.image){
      if(closed){showClosed('明日の空き状況を準備中です。');return;}
