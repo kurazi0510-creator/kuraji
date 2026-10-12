@@ -90,9 +90,15 @@
    if(day===4||day===6) return 12*60+30;
    return 20*60;
  }
+ // 臨時診療・祝日診療の受付終了時刻（公開ページ用）。
+ // 2026/10/12(月・祝)は午前のみ：12:30終了。翌日分を午後から表示する。
+ const SPECIAL_CLOSE={'2026-10-12':12*60+30};
  function isClosedNow(){
    const n=jstNow(),mins=n.getHours()*60+n.getMinutes();
-   return mins>=closeMinutes(n.getDay());
+   const key=ymd(n);
+   const end=Object.prototype.hasOwnProperty.call(SPECIAL_CLOSE,key)
+     ? SPECIAL_CLOSE[key] : closeMinutes(n.getDay());
+   return mins>=end;
  }
  function showClosed(message){
    status.innerHTML='<div class="closed"><strong>本日の受付は終了しました</strong><div class="sub">'+message+'</div></div>';
@@ -144,8 +150,8 @@ function wdLabel(date){
    const today=ymd(now);
    // 診療中は「今日」の分だけ、受付終了後は「今日より先（明日以降）」の分を表示する。
    // 明日が休診（日曜等）で先生が明後日の分を公開した場合も、日付を問わずそのまま表示する。
-   if(!closed && d.slotDate!==today) return;
-   if(closed && d.slotDate<=today) return;
+   if(d.slotDate<today) return;
+   if(d.slotDate===today && closed) return;
    const nowMin=now.getHours()*60+now.getMinutes();
    const toMin=x=>{const a=x.split(':').map(Number);return a[0]*60+a[1];};
    // 本日分は、すでに過ぎた時間を出さない
@@ -255,20 +261,24 @@ function wdLabel(date){
      if(closed){showClosed('明日の空き状況を準備中です。');return;}
      status.innerHTML='<div class="error">最新の予約状況を取得できませんでした。<br>少し時間をおいて再読み込みしてください。</div>';updated.textContent='';return;
    }
-   // ★「いつ公開されたか」ではなく「その画像が何日分の予定か(slotDate)」だけで判断する。
-   //   休診日を挟んで先読み公開していても、日付が変わった瞬間に消えないようにするため。
-   const slotDate=d.slotDate||'';
-   if(!closed){
-     // 診療中：公開されている画像が「今日の分」でなければ、まだ本日分が準備できていない
-     if(slotDate && slotDate!==today){
-       status.innerHTML='<div class="closed"><strong>本日の空き状況は準備中です</strong><div class="sub">お急ぎの場合はLINEまたはお電話でお問い合わせください。</div></div>';
-       updated.textContent='';
-       return;
-     }
+   // 公開済みの「対象日」を最優先。未来日を先行公開している時は
+   // 通常の閉院時刻（平日20時）にかかわらずその画像を消さない。
+   const slotDate=String(d.slotDate||'');
+   if(slotDate && slotDate>today){
+     const dt=new Date(slotDate+'T00:00:00');
+     const diff=Math.round((dt-new Date(today+'T00:00:00'))/86400000);
+     pageTitle.textContent=diff===1?'明日の予約空き状況':'次回の予約空き状況';
+     lineBtn.textContent='LINEで予約・相談';
+     statusNote.textContent='空き状況は変動します。表示中の時間でも、ご連絡のタイミングにより埋まっている場合があります。';
+   }else if(slotDate===today && !closed){
+     pageTitle.textContent='本日の予約空き状況';
+   }else if(closed){
+     showClosed('次回の空き状況を準備中です。');
+     return;
    }else{
-     // 受付終了後：公開されている画像が「今日以前」の分のままなら、次回分がまだ準備できていない
-     if(!slotDate || slotDate<=today){showClosed('明日の空き状況を準備中です。');return;}
-     pageTitle.textContent='明日の予約空き状況';lineBtn.textContent='LINEで予約・相談';statusNote.textContent='明日の空き状況は変動します。表示中の時間でも、ご連絡のタイミングにより埋まっている場合があります。';
+     status.innerHTML='<div class="closed"><strong>本日の空き状況は準備中です</strong><div class="sub">お急ぎの場合はLINEまたはお電話でお問い合わせください。</div></div>';
+     updated.textContent='';
+     return;
    }
    saveStatusCache(d);
    const img=document.createElement('img');img.alt='倉治整骨院 本日の予約空き状況';img.src=d.image;status.innerHTML='';status.appendChild(img);
