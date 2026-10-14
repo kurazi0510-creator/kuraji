@@ -4777,6 +4777,7 @@ async function removeFamilyBookingMember(date,slot,reason){
 async function moveFamilyBooking(date,slot,newDate,newTime){
   const g=familyBookingBlock(date,slot);if(!g)return;
   const source=new Set(g.entries.map(([t])=>date+'|'+t));
+  if(slotsBeforeLunch(newDate,newTime,g.span)<g.span){alert('昼休みにかかるため、'+newTime+'からは同時来院予約を移せません。別の時間を選ぶか、特別枠を追加してください。');return;}
   for(let i=0;i<g.span;i++){const t=moveTimeBy20(newTime,i),b=bookings[newDate]?.[t];if(b&&(!b.cancelled||b.holdGroup)&&!source.has(newDate+'|'+t)){alert(t+'は別の予約で使用されています。');return;}}
   if(!confirm(g.names.join('・')+'様の同時来院予約を全員まとめて'+newDate+' '+newTime+'へ変更しますか？'))return;
   const before=JSON.stringify(bookings),btn=document.getElementById('move-booking-submit');btn.disabled=true;
@@ -4789,6 +4790,20 @@ function moveTimeBy20(slot,steps){
   m+=20*steps;
   h+=Math.floor(m/60);m=((m%60)+60)%60;
   return pad(h)+':'+pad(m);
+}
+// 昼休み（午前の終了〜午後の開始。午前のみの日は15:00まで）の時刻か。
+// 院長がその日に特別枠として追加した時刻は、昼休みでも予約に使える。
+function lunchBlockedSlot(date,time){
+  const cfg=getBizDayConfig(date),hm=t=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(t||''));return m?pad(+m[1])+':'+m[2]:'';};
+  const amEnd=cfg&&!cfg.closed&&cfg.am?hm(cfg.am[1]):'';
+  if(!amEnd||time<amEnd)return false;
+  if(time>=(cfg.pm&&hm(cfg.pm[0])||'15:00'))return false;
+  return !getSlots(dayType(date),date).includes(time);
+}
+// 開始枠から続けて確保できる枠数（昼休みに入る手前で止める。12:10開始なら1枠）
+function slotsBeforeLunch(date,slot,count){
+  for(let i=1;i<count;i++)if(lunchBlockedSlot(date,moveTimeBy20(slot,i)))return i;
+  return count;
 }
 function bookingSpanCount(date,slot,bk){
   let count=1;
@@ -4858,15 +4873,16 @@ async function execMoveBooking(){
   const oldBk=bookings[oldDate]?.[oldSlot];
   if(!oldBk||oldBk.cont||oldBk.cancelled){alert('元の予約が見つかりません。最新データを取得して確認してください。');return;}
   const span=bookingSpanCount(oldDate,oldSlot,oldBk);
+  const newSpan=slotsBeforeLunch(newDate,newSlot,span);// 変更先でも昼休みをまたがない
   const sourceKeys=new Set();
   for(let i=0;i<span;i++)sourceKeys.add(oldDate+'|'+moveTimeBy20(oldSlot,i));
-  for(let i=0;i<span;i++){
+  for(let i=0;i<newSpan;i++){
     const t=moveTimeBy20(newSlot,i), existing=bookings[newDate]?.[t];
     if(existing&&(!existing.cancelled||existing.holdGroup)&&!sourceKeys.has(newDate+'|'+t)){
       alert('変更先の '+t+' は、すでに別の予約で使用されています。別の時間を選択してください。');return;
     }
   }
-  if(!confirm((oldBk.name||'患者')+'様の予約日時を変更します。\n\n'+oldDate+' '+oldSlot+'\n　↓\n'+newDate+' '+newSlot+'\n\nよろしいですか？'))return;
+  if(!confirm((oldBk.name||'患者')+'様の予約日時を変更します。\n\n'+oldDate+' '+oldSlot+'\n　↓\n'+newDate+' '+newSlot+(newSpan<span?'\n（昼休みにかかるため'+newSpan+'枠で確保します）':'')+'\n\nよろしいですか？'))return;
   const before=JSON.stringify(bookings);
   const btn=document.getElementById('move-booking-submit');
   btn.disabled=true;btn.textContent='変更中...';
@@ -4877,7 +4893,7 @@ async function execMoveBooking(){
     const arrivalMinute=minutes(newSlot)+minutes(oldBk.appointmentTime||oldSlot)-minutes(oldSlot);
     if(arrivalMinute<0||arrivalMinute>=1440)throw Error('来院時刻が日付をまたぎます。変更先を確認してください');
     bookings[newDate][newSlot]={...oldBk,appointmentTime:pad(Math.floor(arrivalMinute/60))+':'+pad(arrivalMinute%60)};
-    for(let i=1;i<span;i++)bookings[newDate][moveTimeBy20(newSlot,i)]={cont:true,name:oldBk.name||'',cardId:oldBk.cardId||''};
+    for(let i=1;i<newSpan;i++)bookings[newDate][moveTimeBy20(newSlot,i)]={cont:true,name:oldBk.name||'',cardId:oldBk.cardId||''};
     save();
     const ok=await pushB();
     if(!ok)throw new Error('予約表を保存できませんでした');
@@ -5673,6 +5689,11 @@ async function saveBk(){
   const anchor=group?group.anchor:slot;
   if(group&&mSlotCount!==group.span){alert('登録済みの同時来院予約の枠数は、日時変更では維持されます。枠数を変更する場合は一度キャンセルして再登録してください。');return;}
   if(!group){
+    const fit=slotsBeforeLunch(date,slot,mSlotCount);
+    if(fit<mSlotCount){
+      if(companion){alert('昼休みにかかるため、この時間から'+mSlotCount+'枠の同時来院予約は入れられません。開始時間を変更するか、特別枠を追加してください。');return;}
+      setSlotCount(fit);// 昼休みの手前で止める（12:10開始なら12:10の1枠）
+    }
     const excluded=new Set([slot]);
     if(previous&&!previous.cancelled)for(let i=1;i<bookingSpanCount(date,slot,previous);i++)excluded.add(moveTimeBy20(slot,i));
     for(let i=0;i<mSlotCount;i++){
@@ -5703,15 +5724,15 @@ async function saveBk(){
   const optPrice=parseInt(document.getElementById('m-opt-price')?.value)||0;
   bookings[date][slot]={...bookingDetailsForSave(prevBk||{}),appointmentTime:arrival,kubun,kubunList,kubunFee,name,cardId,route,symptom,nextMemo:nextMemo||nextNote,nextNote:nextMemo||nextNote,option,menu,menuPrice,optPrice,bui:mBuiSel.slice(),shochi:shochiArr,shochiMemo,bussan:bussanArr,pay:mPaySel.slice(),payAmount,payItems:finalPayItems,couponData:finalCouponData,elapsed:el,visitCount:vc};
   // 継続枠（安全版：空枠か自分のcont枠のみ設定。他の患者の予約は絶対に上書きしない）
-  // ★時間を20分ずつ足して計算する方式（12:10など昼休み直前の枠から始めても、
-  //   休憩マーカーに関係なく12:30・12:50への継続枠を作れるようにする）
+  // ★継続枠は昼休みをまたがない。昼休みの時刻（特別枠を除く）に来たら止め、
+  //   そこにある既存の継続行も作成・削除しない（院長が手で整理する）
   let contTime=slot;
   for(let i=1;i<=Math.max(4,bookingSpanCount(date,slot,prevBk||{} )-1);i++){
     let [ch,cm]=contTime.split(':').map(Number);
     cm+=20; if(cm>=60){cm-=60;ch++;}
     contTime=pad(ch)+':'+pad(cm);
     const existing=bookings[date][contTime];
-    if(group)break;
+    if(group||lunchBlockedSlot(date,contTime))break;
     if(i<=extra){// 継続枠が必要な範囲：空枠か自分のcont枠なら設定
       if(!existing||existing.cancelled&&!existing.holdGroup||(existing.cont&&existing.cardId===cardId&&existing.name===name)){bookings[date][contTime]={cont:true,name,cardId};}
       // 他の患者が入っている場合は触らない（上書きしない）
@@ -6484,11 +6505,12 @@ function bookNextAppt(){
     slots:nbSlot
   };
   // 複数枠の場合は続き枠も確保
+  // その日の枠（特別枠を含む）で、昼休みや診療時間外に入る手前で止める
   if(nbSlot>1){
-    const allSlots=['08:30','08:50','09:10','09:30','09:50','10:10','10:30','10:50','11:10','11:30','11:50','12:10','12:30','15:00','15:20','15:40','16:00','16:20','16:40','17:00','17:20','17:40','18:00','18:20','18:40','19:00','19:20','19:40'];
-    const idx=allSlots.indexOf(t);
-    for(let i=1;i<nbSlot&&idx+i<allSlots.length;i++){
-      const ns=allSlots[idx+i];
+    const daySlots=getSlots(dayType(d),d);
+    for(let i=1;i<nbSlot;i++){
+      const ns=moveTimeBy20(t,i);
+      if(!daySlots.includes(ns))break;
       if(!bookings[d][ns]||bookings[d][ns].cancelled){
         bookings[d][ns]={...bookings[d][t],cont:true};
       }
