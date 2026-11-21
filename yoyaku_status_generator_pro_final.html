@@ -175,6 +175,29 @@
   .badge-ig{background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;}
   .badge-line{background:#06c755;color:#fff;}
 </style>
+<style id="kjn-css">
+  .tab-btn.notice{background:#fff8e1;color:#8d6e00;border-color:#ffe082;}
+  .tab-btn.active.notice{background:#f9a825;color:#fff;border-color:#f9a825;}
+  #tab-notice{width:100%;max-width:460px;}
+  .kjn-box{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;border:2px solid #eee;box-sizing:border-box;width:100%}
+  .kjn-box h3{margin:0 0 8px;font-size:15px;color:#444}
+  .kjn-box label{display:block;font-size:13px;font-weight:700;color:#555;margin:8px 0 4px}
+  .kjn-box input[type=text],.kjn-box input[type=password],.kjn-box input[type=datetime-local],.kjn-box input[type=url]{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-family:inherit;box-sizing:border-box}
+  .kjn-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:4px 0}
+  .kjn-row label{display:inline-flex;gap:6px;align-items:center;margin:0;font-weight:600}
+  .kjn-btn{width:100%;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:800;font-family:inherit;cursor:pointer;margin-top:8px}
+  .kjn-btn.main{background:#f9a825;color:#fff}.kjn-btn.sub{background:#fff;color:#8d6e00;border:2px solid #ffd54f}.kjn-btn.end{background:#fff;color:#c62828;border:2px solid #ef9a9a}
+  .kjn-btn:disabled{opacity:.55;cursor:default}
+  .kjn-msg{font-size:13px;min-height:18px;margin-top:6px;color:#555;white-space:pre-wrap}.kjn-msg.err{color:#c62828;font-weight:700}.kjn-msg.ok{color:#2e7d32;font-weight:700}
+  .kjn-prev{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-top:8px}
+  .kjn-prev img{max-width:100%;border-radius:8px;border:1px solid #ddd}
+  .kjn-card{display:flex;align-items:center;gap:10px;background:#fff7ed;border:2px solid #f36c0a;border-radius:14px;padding:6px 10px 6px 6px;min-height:72px;width:100%;box-sizing:border-box}
+  .kjn-card img{width:60px;height:60px;object-fit:cover;border-radius:9px;border:1px solid #f1d6c1}
+  .kjn-card b{display:block;font-size:15px}.kjn-card small{color:#765744;font-weight:700}
+  .kjn-state{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:800;color:#fff}
+  .kjn-state.active{background:#2e7d32}.kjn-state.scheduled{background:#1976d2}.kjn-state.expired,.kjn-state.ended,.kjn-state.none{background:#757575}
+  .kjn-note{font-size:12px;color:#777;line-height:1.6}
+</style>
 </head>
 <body>
 
@@ -187,6 +210,7 @@
   <button class="tab-btn kyushin" onclick="switchTab('kyushin')">🏥 休診のお知らせ</button>
   <button class="tab-btn enq" onclick="switchTab('enq')">📊 アンケート投稿</button>
   <button class="tab-btn tokubetsu" onclick="switchTab('tokubetsu')">🕐 臨時診療のお知らせ</button>
+  <button class="tab-btn notice" onclick="switchTab('notice')">📢 患者ページお知らせ</button>
 </div>
 
 <div style="width:100%;max-width:460px;margin-bottom:14px;background:#fff;border-radius:12px;padding:12px 14px;border:2px solid #eee;box-sizing:border-box">
@@ -392,6 +416,72 @@
 </div>
 
 <!-- ===== 臨時診療のお知らせタブ ===== -->
+<!-- ===== 患者ページお知らせタブ（新規） ===== -->
+<div class="tab-content" id="tab-notice">
+  <div class="kjn-box">
+    <h3>① いま掲載中のお知らせ</h3>
+    <div id="kjnCurrent" class="kjn-note">（パスワードを入れて「状況を更新」を押してください）</div>
+    <button type="button" class="kjn-btn sub" id="kjnRefresh">🔄 状況を更新</button>
+    <button type="button" class="kjn-btn end" id="kjnEnd" disabled>⏹ 公開中のお知らせを今すぐ終了</button>
+    <div class="kjn-msg" id="kjnMsgCurrent"></div>
+  </div>
+
+  <div class="kjn-box">
+    <h3>② お知らせ用パスワード</h3>
+    <label for="kjnToken">お知らせ用パスワード（予約状況の公開用とは別です）</label>
+    <input type="password" id="kjnToken" autocomplete="off" placeholder="40文字のパスワード">
+    <div class="kjn-row"><label><input type="checkbox" id="kjnRemember"> この端末に保存する</label></div>
+    <div class="kjn-note">ふだんは保存しない設定です（このページを閉じると忘れます）。自分専用の端末だけ、保存してください。共有のパソコンでは保存しないでください。</div>
+    <button type="button" class="kjn-btn sub" id="kjnForget">🗑 この端末に保存したパスワードを削除</button>
+    <details style="margin-top:8px"><summary style="font-size:12px;color:#777;cursor:pointer">🔑 初回だけ：パスワードを作る</summary>
+      <div class="kjn-note" style="margin:6px 0">この端末の中で、40文字のパスワードを作ります（どこにも送信・保存しません）。作ったら「コピー」して、お知らせ用Apps Scriptの「プロジェクトの設定 → スクリプトプロパティ」に <b>NOTICE_TOKEN</b> として登録してください。チャットやGitHubには貼らないでください。</div>
+      <button type="button" class="kjn-btn sub" id="kjnGen">🎲 パスワードを作る</button>
+      <input type="text" id="kjnGenOut" readonly placeholder="（ここに表示されます）" style="margin-top:6px">
+      <button type="button" class="kjn-btn sub" id="kjnGenCopy" disabled>📋 コピー</button>
+      <div class="kjn-msg" id="kjnMsgGen"></div>
+    </details>
+    <details style="margin-top:8px"><summary style="font-size:12px;color:#777;cursor:pointer">接続先の設定（通常は変更不要）</summary>
+      <label for="kjnGas">お知らせ用Apps ScriptのURL</label>
+      <input type="url" id="kjnGas" placeholder="https://script.google.com/macros/s/…/exec">
+      <div class="kjn-note">空欄のときは、組み込み済みのURLを使います。</div>
+    </details>
+  </div>
+
+  <div class="kjn-box">
+    <h3>③ お知らせ画像を選ぶ</h3>
+    <input type="file" id="kjnFile" accept="image/jpeg,image/png">
+    <div class="kjn-note">おすすめは正方形（800×800px）です。大きな画像は自動で縮小・圧縮します。</div>
+    <div class="kjn-msg" id="kjnMsgFile"></div>
+    <label for="kjnTitle">題名（40文字まで。例：11/23（祝）祝日診療）</label>
+    <input type="text" id="kjnTitle" maxlength="40" placeholder="例：11/23（祝）祝日診療いたします">
+  </div>
+
+  <div class="kjn-box">
+    <h3>④ 掲載期間（日本時間）</h3>
+    <label>掲載の開始</label>
+    <div class="kjn-row">
+      <label><input type="radio" name="kjnStart" value="now" checked> 今すぐ</label>
+      <label><input type="radio" name="kjnStart" value="at"> 日時を指定</label>
+    </div>
+    <input type="datetime-local" id="kjnStartAt" disabled>
+    <label>掲載の終了</label>
+    <div class="kjn-row">
+      <label><input type="radio" name="kjnEnd" value="day" checked> 開始した日のみ（その日の23:59まで）</label>
+      <label><input type="radio" name="kjnEnd" value="at"> 日時を指定</label>
+    </div>
+    <input type="datetime-local" id="kjnEndAt" disabled>
+    <div class="kjn-note">掲載できるのは最長90日です。終了時刻をすぎると、自動で通常の予約状況だけの表示に戻ります。</div>
+  </div>
+
+  <div class="kjn-box">
+    <h3>⑤ プレビュー（患者ページでの見え方）</h3>
+    <div id="kjnPreview" class="kjn-note">（画像を選ぶと表示されます）</div>
+    <button type="button" class="kjn-btn main" id="kjnPublish" disabled>📢 このお知らせを公開する</button>
+    <div class="kjn-msg" id="kjnMsgPublish"></div>
+    <div class="kjn-note">公開すると、いま掲載中のお知らせは新しいものに置き換わります（掲載できるお知らせは1つです）。</div>
+  </div>
+</div>
+
 <div class="tab-content" id="tab-tokubetsu">
 
   <div class="panel">
@@ -1517,6 +1607,209 @@ function wrapTextColor(ctx,text,x,y,maxW,lineH,color,size){
   wrapText(ctx,text,x,y,maxW,lineH);
 }
 
+</script>
+<script id="kjn-js">
+/* 患者ページお知らせ（新規・独立）。既存の予約状況の公開処理とは別。名前はすべて kjn で始める。 */
+(function(){
+  var KJN_GAS_DEFAULT='https://script.google.com/macros/s/AKfycbzZzP2G-Vez7zfCYEnPJIADZemesVR2ngvSPqQIarq4ndHgNM_YOPa5y4TMiLHYYvHUnA/exec';
+  var LS_TOKEN='kjn_token_v1',LS_GAS='kjn_gas_url_v1';
+  var $=function(id){return document.getElementById(id)};
+  var state={image:'',thumb:'',imageBytes:0,aspectWarn:false,current:null,busy:false};
+
+  function lsGet(k){try{return localStorage.getItem(k)||''}catch(e){return ''}}
+  function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+  function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
+  function msg(id,t,cls){var el=$(id);if(!el)return;el.textContent=t||'';el.className='kjn-msg'+(cls?' '+cls:'')}
+  function gasUrl(){
+    var u=($('kjnGas').value||'').trim()||lsGet(LS_GAS)||KJN_GAS_DEFAULT;
+    if(!u||u.indexOf('__NOTICE')===0)return '';
+    return u;
+  }
+  var ERR={unauthorized:'パスワードが違います。',server_not_configured:'お知らせ用Apps Scriptの初期設定(setupNotice)が未完了です。',
+    invalid_image:'画像の形式が正しくありません（JPEG/PNGのみ）。',image_too_large:'画像が大きすぎます。小さい画像でもう一度お試しください。',
+    invalid_period:'掲載期間が正しくありません。',end_in_past:'終了日時が過去になっています。',end_before_start:'終了は開始より後にしてください。',
+    period_too_long:'掲載期間が長すぎます（最長90日）。',invalid_json:'送信内容が正しくありません。',unknown_action:'不明な操作です。'};
+  function errText(e){return ERR[e]||('エラー：'+e)}
+
+  async function post(action,extra){
+    var url=gasUrl();if(!url)throw new Error('接続先(お知らせ用Apps ScriptのURL)が未設定です');
+    var token=($('kjnToken').value||'').trim();if(!token)throw new Error('お知らせ用パスワードを入力してください');
+    var body=Object.assign({action:action,token:token},extra||{});
+    var ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+    var timer=setTimeout(function(){if(ctl)ctl.abort()},45000);
+    try{
+      var resp=await fetch(url,{method:'POST',body:JSON.stringify(body),signal:ctl?ctl.signal:undefined});
+      var data=await resp.json();
+      if(data&&data.ok){ if($('kjnRemember').checked)lsSet(LS_TOKEN,token); }
+      return data;
+    }finally{clearTimeout(timer)}
+  }
+
+  /* ---------- 日時 ---------- */
+  function jstParts(d){
+    var f=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+    var o={};f.formatToParts(d).forEach(function(x){o[x.type]=x.value});return o;
+  }
+  function jstLocalStr(d){var o=jstParts(d);return o.year+'-'+o.month+'-'+o.day+'T'+o.hour+':'+o.minute}
+  function toIso(local){var d=new Date(local+':00+09:00');return isNaN(d.getTime())?null:d.toISOString()}
+  function label(iso){
+    var d=new Date(iso),o=jstParts(d),wd=['日','月','火','水','木','金','土'][new Date(Date.UTC(+o.year,+o.month-1,+o.day)).getUTCDay()];
+    return (+o.month)+'/'+(+o.day)+'('+wd+') '+o.hour+':'+o.minute;
+  }
+  function period(){
+    var now=new Date(),startMode=document.querySelector('input[name=kjnStart]:checked').value,endMode=document.querySelector('input[name=kjnEnd]:checked').value;
+    var startIso='',startLocal;
+    if(startMode==='at'){startLocal=$('kjnStartAt').value;if(!startLocal)throw new Error('開始日時を入力してください');startIso=toIso(startLocal)}
+    else startLocal=jstLocalStr(now);
+    var endLocal=endMode==='day'?startLocal.slice(0,10)+'T23:59:59':$('kjnEndAt').value;
+    // datetime-local は秒がないため、終了を「日時指定」にした場合は分までで判定する
+    if(!endLocal)throw new Error('終了日時を入力してください');
+    var endIso=new Date(endLocal.length===16?endLocal+':00+09:00':endLocal+'+09:00').toISOString();
+    var s=startIso?new Date(startIso):now,e=new Date(endIso);
+    if(isNaN(e.getTime()))throw new Error('終了日時が正しくありません');
+    if(e<=now)throw new Error('終了日時が過去になっています');
+    if(e<=s)throw new Error('終了は開始より後にしてください');
+    if(e-s>90*86400000)throw new Error('掲載期間は最長90日です');
+    return {startIso:startIso,endIso:endIso,startLabel:startIso?label(startIso):'今すぐ',endLabel:label(endIso)};
+  }
+
+  /* ---------- 画像 ---------- */
+  function loadImage(file){
+    return new Promise(function(res,rej){
+      var url=URL.createObjectURL(file),im=new Image();
+      im.onload=function(){URL.revokeObjectURL(url);res(im)};
+      im.onerror=function(){URL.revokeObjectURL(url);rej(new Error('画像を読み込めませんでした'))};
+      im.src=url;
+    });
+  }
+  function drawJpeg(im,w,h,sx,sy,sw,sh,q){
+    var c=document.createElement('canvas');c.width=w;c.height=h;
+    var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,sx,sy,sw,sh,0,0,w,h);
+    return c.toDataURL('image/jpeg',q);
+  }
+  var rawBytes=function(u){return Math.floor((u.length-u.indexOf(',')-1)*3/4)};
+  async function processFile(file){
+    if(!/^image\/(jpeg|png)$/.test(file.type))throw new Error('JPEGまたはPNGの画像を選んでください');
+    var im=await loadImage(file),W=im.naturalWidth,H=im.naturalHeight;
+    if(!W||!H)throw new Error('画像を読み込めませんでした');
+    var scale=Math.min(1,1200/Math.max(W,H)),w=Math.max(1,Math.round(W*scale)),h=Math.max(1,Math.round(H*scale));
+    var full='',q=[0.85,0.78,0.7,0.6,0.5],i;
+    for(i=0;i<q.length;i++){full=drawJpeg(im,w,h,0,0,W,H,q[i]);if(rawBytes(full)<=1300000)break}
+    if(rawBytes(full)>1450000)throw new Error('画像を十分に小さくできませんでした。別の画像でお試しください');
+    var side=Math.min(W,H),sx=Math.floor((W-side)/2),sy=Math.floor((H-side)/2),th='',tq=[0.8,0.7,0.6,0.5];
+    for(i=0;i<tq.length;i++){th=drawJpeg(im,160,160,sx,sy,side,side,tq[i]);if(rawBytes(th)<=50000)break}
+    state.image=full;state.thumb=th;state.imageBytes=rawBytes(full);
+    state.aspectWarn=Math.abs(W/H-1)>0.12;
+    state.size=W+'×'+H+' → '+w+'×'+h;
+  }
+
+  function renderPreview(){
+    var box=$('kjnPreview');box.textContent='';
+    if(!state.image){box.textContent='（画像を選ぶと表示されます）';return}
+    var p;try{p=period()}catch(e){p=null}
+    var card=document.createElement('div');card.className='kjn-card';
+    var im=document.createElement('img');im.src=state.thumb;im.alt='';
+    var tx=document.createElement('div');var b=document.createElement('b'),sm=document.createElement('small');
+    b.textContent=($('kjnTitle').value||'').trim()||'倉治整骨院からのお知らせ';sm.textContent=p?p.endLabel+'まで':'（掲載期間を確認してください）';
+    tx.appendChild(b);tx.appendChild(sm);card.appendChild(im);card.appendChild(tx);box.appendChild(card);
+    var big=document.createElement('img');big.src=state.image;big.alt='拡大表示';big.style.marginTop='10px';big.style.maxWidth='100%';big.style.borderRadius='8px';big.style.border='1px solid #ddd';
+    var note=document.createElement('div');note.className='kjn-note';note.style.marginTop='6px';
+    note.textContent='患者ページでは、上のカードが表示され、タップすると下の画像が拡大されます。（'+state.size+'、約'+Math.round(state.imageBytes/1024)+'KB）'+(state.aspectWarn?'\n⚠ 正方形でない画像です。拡大したとき、縦長だと見切れずに小さく表示されます。':'');
+    note.style.whiteSpace='pre-wrap';
+    box.appendChild(note);box.appendChild(big);
+    $('kjnPublish').disabled=state.busy||!state.image;
+  }
+
+  /* ---------- 状況 ---------- */
+  var STATE_JP={active:'掲載中',scheduled:'掲載予定',expired:'期限切れ',ended:'終了済み',none:'なし'};
+  function renderCurrent(d){
+    var box=$('kjnCurrent');box.textContent='';
+    var n=d&&d.notice;state.current=n||null;
+    if(!n||n.state==='none'){box.textContent='いま掲載中のお知らせはありません。';$('kjnEnd').disabled=true;
+      if(d&&d.failCount>0){var f0=document.createElement('div');f0.style.marginTop='6px';f0.textContent='※ パスワードの入力失敗の記録（直近6時間）：'+d.failCount+'回（心当たりがなければお知らせください）';box.appendChild(f0)}
+      return}
+    var st=document.createElement('span');st.className='kjn-state '+n.state;st.textContent=STATE_JP[n.state]||n.state;
+    var t=document.createElement('div');t.style.margin='6px 0';t.style.fontWeight='700';t.textContent=n.title||'（題名なし）';
+    var pr=document.createElement('div');pr.textContent='期間：'+n.startLabel+' 〜 '+n.endLabel+'（日本時間）';
+    box.appendChild(st);box.appendChild(t);box.appendChild(pr);
+    if(d&&d.failCount>0){var f=document.createElement('div');f.style.marginTop='6px';f.textContent='※ パスワードの入力失敗の記録（直近6時間）：'+d.failCount+'回（心当たりがなければお知らせください）';box.appendChild(f)}
+    $('kjnEnd').disabled=!(n.state==='active'||n.state==='scheduled');
+  }
+  async function refresh(quiet){
+    if(state.busy)return;state.busy=true;if(!quiet)msg('kjnMsgCurrent','確認中…');
+    try{
+      var d=await post('status');
+      if(d&&d.ok){renderCurrent(d);msg('kjnMsgCurrent',quiet?'':'最新の状況です（'+label(d.serverNow)+'）','ok')}
+      else msg('kjnMsgCurrent',errText(d&&d.error),'err');
+    }catch(e){msg('kjnMsgCurrent','通信できませんでした：'+e.message,'err')}
+    finally{state.busy=false;$('kjnPublish').disabled=!state.image}
+  }
+
+  async function publish(){
+    if(state.busy)return;
+    var p;try{p=period()}catch(e){msg('kjnMsgPublish',e.message,'err');return}
+    if(!state.image){msg('kjnMsgPublish','先に画像を選んでください','err');return}
+    var title=($('kjnTitle').value||'').trim();
+    if(!confirm('次の内容で公開します。\n\n題名：'+(title||'（なし）')+'\n期間：'+p.startLabel+' 〜 '+p.endLabel+'（日本時間）\n\n公開中のお知らせは、これに置き換わります。よろしいですか？'))return;
+    state.busy=true;$('kjnPublish').disabled=true;msg('kjnMsgPublish','公開中…');
+    try{
+      var d=await post('publish',{image:state.image,thumb:state.thumb,title:title,startAt:p.startIso,endAt:p.endIso});
+      if(d&&d.ok){msg('kjnMsgPublish','✅ 公開しました（'+(STATE_JP[d.notice.state]||'')+'）','ok');state.busy=false;await refresh(true)}
+      else msg('kjnMsgPublish','❌ 公開できませんでした：'+errText(d&&d.error),'err');
+    }catch(e){
+      msg('kjnMsgPublish','通信エラーのため結果を確認中…\n'+e.message,'err');
+      state.busy=false;
+      try{var d2=await post('status');if(d2&&d2.ok){renderCurrent(d2);var n=d2.notice;if(n&&n.title===title&&n.state!=='none'&&Date.now()-Date.parse(n.startAt)<120000&&n.endAt===p.endIso)msg('kjnMsgPublish','✅ 公開されていました（通信の返事だけ届かなかったようです）','ok');else msg('kjnMsgPublish','❌ 公開できていません。電波の良い場所でもう一度お試しください。','err')}}catch(e2){msg('kjnMsgPublish','❌ 通信エラー：'+e.message,'err')}
+    }finally{state.busy=false;$('kjnPublish').disabled=!state.image}
+  }
+  async function endNow(){
+    if(state.busy)return;
+    if(!confirm('公開中のお知らせを、今すぐ終了します。よろしいですか？'))return;
+    state.busy=true;msg('kjnMsgCurrent','終了しています…');
+    try{
+      var d=await post('end');
+      if(d&&d.ok){state.busy=false;await refresh(true);msg('kjnMsgCurrent','✅ お知らせを終了しました。患者ページは通常の表示に戻ります。','ok')}
+      else msg('kjnMsgCurrent','❌ 終了できませんでした：'+errText(d&&d.error),'err');
+    }catch(e){msg('kjnMsgCurrent','❌ 通信エラー：'+e.message,'err')}
+    finally{state.busy=false}
+  }
+
+  /* ---------- 画面の部品 ---------- */
+  function init(){
+    if(!$('tab-notice'))return;
+    var saved=lsGet(LS_TOKEN);if(saved){$('kjnToken').value=saved;$('kjnRemember').checked=true}
+    $('kjnGas').value=lsGet(LS_GAS);
+    $('kjnGas').addEventListener('change',function(){var v=($('kjnGas').value||'').trim();if(v)lsSet(LS_GAS,v);else lsDel(LS_GAS)});
+    $('kjnRemember').addEventListener('change',function(){if(!$('kjnRemember').checked)lsDel(LS_TOKEN)});
+    $('kjnForget').addEventListener('click',function(){lsDel(LS_TOKEN);$('kjnToken').value='';$('kjnRemember').checked=false;msg('kjnMsgCurrent','この端末に保存したパスワードを削除しました。','ok')});
+    var now=new Date();$('kjnStartAt').value=jstLocalStr(now);$('kjnEndAt').value=jstLocalStr(new Date(now.getTime()+86400000)).slice(0,10)+'T23:59';
+    Array.prototype.forEach.call(document.querySelectorAll('input[name=kjnStart]'),function(r){r.addEventListener('change',function(){$('kjnStartAt').disabled=document.querySelector('input[name=kjnStart]:checked').value!=='at';renderPreview()})});
+    Array.prototype.forEach.call(document.querySelectorAll('input[name=kjnEnd]'),function(r){r.addEventListener('change',function(){$('kjnEndAt').disabled=document.querySelector('input[name=kjnEnd]:checked').value!=='at';renderPreview()})});
+    ['kjnStartAt','kjnEndAt','kjnTitle'].forEach(function(id){$(id).addEventListener('input',renderPreview)});
+    $('kjnFile').addEventListener('change',async function(){
+      var f=$('kjnFile').files&&$('kjnFile').files[0];state.image='';state.thumb='';
+      if(!f){msg('kjnMsgFile','');renderPreview();return}
+      msg('kjnMsgFile','画像を処理中…');
+      try{await processFile(f);msg('kjnMsgFile','✅ 画像を読み込みました（'+state.size+'）','ok')}catch(e){msg('kjnMsgFile','❌ '+e.message,'err')}
+      renderPreview();
+    });
+    $('kjnGen').addEventListener('click',function(){
+      var A='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789',out='',buf=new Uint8Array(1);
+      var limit=256-(256%A.length);
+      while(out.length<40){crypto.getRandomValues(buf);if(buf[0]<limit)out+=A.charAt(buf[0]%A.length)}   // 偏りのない乱数
+      $('kjnGenOut').value=out;$('kjnToken').value=out;$('kjnGenCopy').disabled=false;
+      msg('kjnMsgGen','作りました。「コピー」して、Apps Scriptに登録してください。（この画面のパスワード欄にも入れました）','ok');
+    });
+    $('kjnGenCopy').addEventListener('click',async function(){
+      try{await navigator.clipboard.writeText($('kjnGenOut').value);msg('kjnMsgGen','コピーしました。','ok')}
+      catch(e){$('kjnGenOut').select();msg('kjnMsgGen','コピーできませんでした。表示された文字を長押しして、コピーしてください。','err')}
+    });
+    $('kjnRefresh').addEventListener('click',function(){refresh(false)});
+    $('kjnEnd').addEventListener('click',endNow);
+    $('kjnPublish').addEventListener('click',publish);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
 </script>
 </body>
 </html>
