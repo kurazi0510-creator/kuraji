@@ -124,7 +124,7 @@ document.querySelectorAll('[data-ga]').forEach(function(a){
    使う名前：window.KURAJI_NOTICE_STATUS / KURAJI_NOTICE_IMAGE、イベント kuraji-notice-loaded / kuraji-notice-image-loaded、kj-notice-* */
 (function(){
   try{
-    var KJ_NOTICE_GAS='__NOTICE_GAS_URL__';
+    var KJ_NOTICE_GAS='https://script.google.com/macros/s/AKfycby2SSP_zfeBj69FuRXfxW6LohTSEIbHNCmemVjO34352mEoDn4WFsXESUe-DreWm1q_/exec';
     if(!KJ_NOTICE_GAS||KJ_NOTICE_GAS.indexOf('__NOTICE')===0)return;      // 未設定のときは何もしない
     var root=document.getElementById('kj-notice-root');if(!root)return;
     var WAIT_MS=8000,IMG_WAIT_MS=15000,RECHECK_MS=60000;
