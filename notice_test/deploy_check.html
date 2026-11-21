@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>予約状況公開GAS 照合チェック（読むだけ）</title>
+<style>body{font-family:-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;max-width:640px;margin:0 auto;padding:16px;color:#222}h1{font-size:19px}input{width:100%;padding:10px;font-size:15px;box-sizing:border-box}button{width:100%;padding:13px;font-size:16px;font-weight:700;margin-top:10px;border:0;border-radius:10px;background:#f36c0a;color:#fff}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}td,th{border:1px solid #ddd;padding:7px;vertical-align:top;text-align:left}.ok{color:#2e7d32;font-weight:800}.ng{color:#c62828;font-weight:800}.note{font-size:12px;color:#666;line-height:1.6}code{background:#f4f4f4;padding:1px 4px;border-radius:4px;word-break:break-all}</style></head><body>
+<h1>予約状況公開GAS　照合チェック</h1>
+<p class="note">既存の「倉治整骨院_予約状況公開専用」の公開URLに、<b>読むだけ</b>の確認と、<b>必ず拒否される</b>送信（パスワードなし・不正な内容）だけを行い、保存済みコードと同じ動きをするかを調べます。画像の保存・更新・削除は一切起きません。パスワードは使いません。</p>
+<label for="u" style="font-size:13px;font-weight:700">既存の予約状況公開GASのURL（…/exec）</label>
+<input id="u" placeholder="https://script.google.com/macros/s/…/exec">
+<button id="go">照合チェックを実行</button>
+<div id="id" class="note" style="margin-top:10px"></div>
+<table id="t" hidden><tr><th style="width:34px">#</th><th>確認内容（保存コードから予想される結果）</th><th style="width:60px">結果</th></tr></table>
+<p id="sum" style="font-weight:800"></p>
+<p class="note">⚠ 全部「一致」でも、動作が同じだと分かるだけで、コードが完全に同一であることの証明にはなりません。デプロイ管理画面のバージョン・日付と、あわせて判断してください。</p>
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  var rows=[],okN=0,ngN=0;
+  function add(n,text,pass,detail){var tr=document.createElement('tr');
+    [n,text+(detail?'\n→ '+detail:''),pass?'一致':'相違'].forEach(function(v,i){var td=document.createElement('td');td.textContent=v;td.style.whiteSpace='pre-wrap';if(i===2)td.className=pass?'ok':'ng';tr.appendChild(td)});
+    $('t').appendChild(tr);pass?okN++:ngN++}
+  function withTimeout(p,ms){return Promise.race([p,new Promise(function(_,rej){setTimeout(function(){rej(new Error('タイムアウト'))},ms)})])}
+  function jsonp(url){return new Promise(function(res,rej){var s=document.createElement('script');var t=setTimeout(function(){rej(new Error('タイムアウト'))},30000);
+    window.addEventListener('kuraji-status-loaded',function h(){window.removeEventListener('kuraji-status-loaded',h);clearTimeout(t);res(window.KURAJI_LATEST_STATUS)});
+    s.onerror=function(){clearTimeout(t);rej(new Error('読み込み失敗'))};s.src=url;document.head.appendChild(s)})}
+  async function post(url,body){var r=await withTimeout(fetch(url,{method:'POST',body:body}),30000);return r.text()}
+  $('go').onclick=async function(){
+    var u=($('u').value||'').trim();
+    if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(u)){alert('URLの形が違います（https://script.google.com/macros/s/…/exec）');return}
+    $('id').textContent='デプロイID（URLの途中の文字列）：'+u.split('/s/')[1].split('/')[0]+'\n→ 「デプロイを管理」画面のデプロイIDと同じか見比べてください。';$('id').style.whiteSpace='pre-wrap';
+    $('t').hidden=false;while($('t').rows.length>1)$('t').deleteRow(1);okN=ngN=0;$('go').disabled=true;$('sum').textContent='確認中…';
+    var meta=null;
+    try{var r=await withTimeout(fetch(u+'?action=meta&t='+Date.now(),{cache:'no-store'}),30000);meta=await r.json();
+      add(1,'?action=meta は {ok:true, updatedAt:"…"} だけを返す',meta&&meta.ok===true&&typeof meta.updatedAt==='string'&&Object.keys(meta).sort().join()==='ok,updatedAt',JSON.stringify(meta))}
+    catch(e){add(1,'?action=meta は {ok:true, updatedAt:"…"} だけを返す',false,String(e.message))}
+    try{var d=await jsonp(u+'?action=js&t='+Date.now());
+      var keys=d?Object.keys(d).sort().join():'';
+      add(2,'?action=js は window.KURAJI_LATEST_STATUS = {ok, updatedAt, image(data:image…), slotDate, slots[]} を設定し、イベント kuraji-status-loaded を出す',
+        !!d&&d.ok===true&&typeof d.updatedAt==='string'&&/^data:image\//.test(d.image||'')&&typeof d.slotDate==='string'&&Array.isArray(d.slots)&&keys==='image,ok,slotDate,slots,updatedAt','項目：'+keys);
+      add(3,'?action=meta の更新日時と、?action=js の更新日時が一致する',!!meta&&!!d&&meta.updatedAt===d.updatedAt,(meta&&meta.updatedAt)+' / '+(d&&d.updatedAt))}
+    catch(e){add(2,'?action=js が読み込める',false,String(e.message))}
+    try{var h=await (await withTimeout(fetch(u,{cache:'no-store'}),30000)).text();
+      add(4,'パラメーターなしで開くと、HTMLの「本日の予約空き状況｜倉治整骨院」ページを返す',/本日の予約空き状況/.test(h)&&/倉治整骨院/.test(h),'先頭：'+h.slice(0,60).replace(/\s+/g,' '))}
+    catch(e){add(4,'パラメーターなしで開くとHTMLを返す',false,String(e.message))}
+    var probes=[[5,'パスワードが違う送信 {"token":"…"} → {"ok":false,"error":"unauthorized"}','{"token":"deploy-check-not-a-real-token","image":"x"}','{"ok":false,"error":"unauthorized"}'],
+                [6,'パスワードなしの送信 {} → unauthorized','{}','{"ok":false,"error":"unauthorized"}'],
+                [7,'JSONでない送信 → {"ok":false,"error":"invalid_json"}（パスワード確認より先にJSONを確認する順序）','this is not json','{"ok":false,"error":"invalid_json"}']];
+    for(var i=0;i<probes.length;i++){var p=probes[i];
+      try{var tx=(await post(u,p[2])).trim();add(p[0],p[1],tx===p[3],tx.slice(0,120))}catch(e){add(p[0],p[1],false,String(e.message))}}
+    $('sum').textContent='結果：一致 '+okN+' 件／相違 '+ngN+' 件'+(ngN?'　← 保存コードと違う動きがあります。保存コードを変更せず、その内容を報告してください。':'　← 保存コードと同じ動きです。');
+    $('sum').className=ngN?'ng':'ok';$('go').disabled=false;
+  };
+})();
+</script></body></html>
